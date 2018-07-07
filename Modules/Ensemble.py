@@ -19,6 +19,8 @@ class Ensemble:
         
         This method initializes and prepares the ensemble.
         
+        NOTE: To now this works only in the gamma point (dyn0 must be a 1x1x1 supercell)
+        
         Parameters
         ----------
             dyn0 : cellconstructor.Phonons.Phonons()
@@ -33,6 +35,9 @@ class Ensemble:
         self.energies = []
         self.forces = []
         self.stresses = []
+        
+        self.sscha_energies = []
+        self.sscha_forces = []
         
         # The original dynamical matrix used to generate the ensemble
         self.dyn_0 = dyn0
@@ -83,6 +88,8 @@ class Ensemble:
                 The dimension of the ensemble. This should match the n_random
                 variable from the fortran sscha.x input file.
         """
+        A_TO_BOHR = 1.889725989
+        
         # Check if the given data_dir is a real directory
         if not os.path.isdir(data_dir):
             raise IOError("Error, the given data_dir %s is not a valid directory." % data_dir)
@@ -97,24 +104,32 @@ class Ensemble:
         self.forces = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3))
         self.stresses = np.zeros( (self.N, 3,3))
         
+        self.sscha_energies = np.zeros(self.N)
+        self.sscha_energies = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3))
+        
         for i in range(self.N):
             # Load the structure
             structure = CC.Structure.Structure()
-            structure.load_scf("%s/scf_population%d_%d.dat" % (data_dir, population, i+1), alat = self.dyn_0.alat)
+            structure.read_scf("%s/scf_population%d_%d.dat" % (data_dir, population, i+1), alat = self.dyn_0.alat)
             structure.has_unit_cell = True
             structure.unit_cell = self.dyn_0.structure.unit_cell
             
-            # Load forces
-            self.forces[i,:,:] = np.loadtxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1)) 
+            # Load forces (Forces are in Ry/bohr, convert them in Ry /A)
+            self.forces[i,:,:] = np.loadtxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1)) * A_TO_BOHR
             
             # Load stress
             self.stresses[i,:,:] =  np.loadtxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)) 
+            
+            # Setup the sscha energies and forces
+            self.sscha_energies[i], self.sscha_forces[i,:,:] = self.dyn_0.get_energy_forces(structure)
             
         # Load the energy
         self.energies = np.loadtxt("%s/energies_supercell_population%d.dat" % (data_dir, population))
         
         # Setup the initial weight
         self.rho = np.ones(self.N)
+        
+        # Setup the sscha 
         
     def update_weights(self, new_dynamical_matrix, newT):
         """
@@ -137,6 +152,7 @@ class Ensemble:
         
         for i in range(self.N):
             self.rho[i] = new_dynamical_matrix.GetRatioProbability(self.structures[i], newT, self.T0, self.dyn_0)
+            self.sscha_energies[i], self.sscha_forces[i, :,:] = new_dynamical_matrix.get_energy_forces(self.structures[i])
             
         self.current_dyn = new_dynamical_matrix
         
@@ -147,7 +163,7 @@ class Ensemble:
         
         return self.N * np.sum(self.rho) / float(np.sum(self.rho**2)) 
     
-    def get_average_energy(self):
+    def get_average_energy(self, subtract_sscha = False):
         """
         GET ENERGY
         ==========
@@ -161,9 +177,18 @@ class Ensemble:
             
         where :math:`\\rho_i` is the ratio between the probability of extracting the configuration $i$
         with the current dynamical matrix and with the dynamical matrix used to extract the ensemble.
+        
+        Parameters
+        ----------
+            subtract_sscha : bool, optional, default False
+                If true, the average difference of energy respect to the sscha one is returned. This
+                is good, because you can compute analytically the sscha energy and sum it on an infinite
+                ensembe. Do in this way to suppress the stochastic noise.
         """
         
-        return np.sum( self.rho * self.energies) / self.N
+        if subtract_sscha:
+            return np.sum( self.rho * (self.energies - self.sscha_energies)) / self.N
+        return np.sum( self.rho * (self.energies)) / self.N
      
     def get_average_forces(self):
         """
@@ -180,6 +205,8 @@ class Ensemble:
         where :math:`\\rho_i` is the ratio between the probability of extracting the configuration $i$
         with the current dynamical matrix and with the dynamical matrix used to extract the ensemble.
         """
-        return np.sum( np.tile(self.rho, (self.dyn_0.structure.N_atoms, 3, 1)) * self.forces) / self.N
+        
+        new_rho = np.tile(self.rho, (self.dyn_0.structure.N_atoms, 3, 1))
+        return np.sum( new_rho  * (self.forces - self.sscha_forces)) / self.N
     
     
