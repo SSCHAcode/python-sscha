@@ -4,8 +4,8 @@ setup( name = "python-sscha",
        description = "Python implementation of the sscha code",
        author = "Lorenzo Monacelli",
        url = "https://github.com/mesonepigreco/python-sscha",
-       packages = ["python-sscha"],
-       package_dir = {"python-sscha": "Modules"},
+       packages = ["sscha"],
+       package_dir = {"sscha": "Modules"},
        install_requires = ["numpy", "ase", "scipy", "cellconstructor"],
        license = "GPLv3"
        )

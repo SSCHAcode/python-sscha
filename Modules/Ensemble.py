@@ -125,7 +125,9 @@ class Ensemble:
             self.stresses[i,:,:] =  np.loadtxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)) 
             
             # Setup the sscha energies and forces
-            self.sscha_energies[i], self.sscha_forces[i,:,:] = self.dyn_0.get_energy_forces(structure)
+            energy, force = self.dyn_0.get_energy_forces(structure)
+            self.sscha_energies[i] = energy 
+            self.sscha_forces[i,:,:] = force
             
         # Load the energy
         self.energies = np.loadtxt("%s/energies_supercell_population%d.dat" % (data_dir, population))
@@ -134,6 +136,53 @@ class Ensemble:
         self.rho = np.ones(self.N)
         
         # Setup the sscha 
+        
+    def generate(self, N, evenodd = True):
+        """
+        GENERATE THE ENSEMBLE
+        =====================
+        
+        This subroutine generates the ensemble from dyn0 and T0 setted when this
+        class is created.
+        You still need to generate the forces for the configurations.
+        
+        Parameters
+        ----------
+            N : int
+                The number of random configurations to be extracted
+            evenodd : bool, optional
+                If true for each configuration also the opposite is extracted
+        """
+        
+        if evenodd and (N % 2 != 0):
+            raise ValueError("Error, evenodd allowed only with an even number of random structures")
+            
+        self.N = N
+        self.structures = []
+        if evenodd:
+            structs = self.dyn_0.ExtractRandomStructures(N / 2, self.T0)
+            for i, s in enumerate(structs):
+                self.structures.append(s)
+                new_s = s.copy()
+                # Get the opposite displacement structure
+                new_s.coords = self.dyn_0.structure.coords - new_s.get_displacements(self.dyn_0.structure.coords)
+                self.structures.append(new_s)
+        else:
+            self.structures = self.dyn_0.ExtractRandomStructures(N, self.T0)
+        
+        # Compute the sscha energy and forces
+        self.sscha_energies = np.zeros( ( self.N))
+        self.sscha_forces = np.zeros((self.N, self.dyn_0.structure.N_atoms, 3))
+        for i, s in enumerate(self.structures):
+            energy, force  = self.dyn_0.get_energy_forces(s)
+            
+            self.sscha_energies[i] = energy
+            self.sscha_forces[i,:,:] = force
+        
+        self.rho = np.ones(self.N)
+        
+        
+        
         
     def update_weights(self, new_dynamical_matrix, newT):
         """
@@ -209,7 +258,7 @@ class Ensemble:
             \\left< \\vec F\\right> = \\frac{1}{N} \\sum_{i = 1}^{N}\\vec F_i \\rho_i
             
             
-        where :math:`\\rho_i` is the ratio between the probability of extracting the configuration $i$
+        where :math:`\\rho_i` is the ratio between the probability of extracting the configuration :math:`i`
         with the current dynamical matrix and with the dynamical matrix used to extract the ensemble.
         """
         
