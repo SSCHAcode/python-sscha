@@ -209,4 +209,27 @@ class Ensemble:
         new_rho = np.tile(self.rho, (self.dyn_0.structure.N_atoms, 3, 1))
         return np.sum( new_rho  * (self.forces - self.sscha_forces)) / self.N
     
+    def get_free_energy_gradient_respect_to_dyn(self):
+        """
+        FREE ENERGY GRADIENT
+        ====================
+        
+        Get the free energy gradient respect to the dynamical matrix.
+        
+        .. math::
+            
+            \\nabla_\\Phi \\mathacl F = -\\sum_{a\\mu}\\frac{e_\\mu^a \\nabla_\\Phi \\ln a_\\mu + \\nabla_\\Phi e_\mu^a}{\\sqrt M_a} \\left<(f_a - f^{\\Phi}_a)q_\\mu\\right>
+            
+            q_\\mu = \\sum_b \\sqrt M_b e_\\mu^b (R_b - \\mathcal R_b)
+            
+            \\nabla_\\Phi \\ln a_\\mu = \\frac{1}{2\\omega_\\mu a_\\mu} \\frac{\\partial a_\\mu}{\\partial\\omega_\\mu} \\frac{e_\\mu^a e_\\mu^b}{\\sqrt {M_aM_b}}
+            
+            \\nabla_\\Phi e_\mu^c  =\\sum_{\\nu \\neq \\mu} \\frac{e_\\nu^a e_\\mu^b}{\\sqrt {M_aM_b} (\\omega_\\mu^2 - \\omega_\\nu^2)} e_\\nu^c
     
+        Return
+        ------
+            A 3Nx3N matrix. The gradient of the free energy (To be symmetrized)
+            
+        """
+        # TODO: TO BE DONE
+        pass
