@@ -50,7 +50,6 @@ class Ensemble:
         
         self.current_T = T0
         
-        self.q = []
         
     def load(self, data_dir, population, N):
         """
@@ -165,7 +164,7 @@ class Ensemble:
                 self.structures.append(s)
                 new_s = s.copy()
                 # Get the opposite displacement structure
-                new_s.coords = self.dyn_0.structure.coords - new_s.get_displacements(self.dyn_0.structure.coords)
+                new_s.coords = self.dyn_0.structure.coords - new_s.get_displacement(self.dyn_0.structure)
                 self.structures.append(new_s)
         else:
             self.structures = self.dyn_0.ExtractRandomStructures(N, self.T0)
@@ -173,6 +172,8 @@ class Ensemble:
         # Compute the sscha energy and forces
         self.sscha_energies = np.zeros( ( self.N))
         self.sscha_forces = np.zeros((self.N, self.dyn_0.structure.N_atoms, 3))
+        self.energies = np.zeros(self.N)
+        self.forces = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3))
         for i, s in enumerate(self.structures):
             energy, force  = self.dyn_0.get_energy_forces(s)
             
@@ -204,11 +205,11 @@ class Ensemble:
         
         self.current_T = newT
         for i in range(self.N):
-            self.rho[i] = new_dynamical_matrix.GetRatioProbability(self.structures[i], newT, self.T0, self.dyn_0)
+            #print "Weight %d" % i
+            self.rho[i] = new_dynamical_matrix.GetRatioProbability(self.structures[i], newT, self.dyn_0, self.T0)
+            #print "Is :", self.rho[i]
             self.sscha_energies[i], self.sscha_forces[i, :,:] = new_dynamical_matrix.get_energy_forces(self.structures[i])
             
-            # Update also the q
-            self.q[i]
             
         self.current_dyn = new_dynamical_matrix
         
@@ -262,8 +263,7 @@ class Ensemble:
         with the current dynamical matrix and with the dynamical matrix used to extract the ensemble.
         """
         
-        new_rho = np.tile(self.rho, (self.dyn_0.structure.N_atoms, 3, 1))
-        return np.sum( new_rho  * (self.forces - self.sscha_forces)) / self.N
+        return np.einsum("i, iab ->ab", self.rho, self.forces - self.sscha_forces) / np.sum(self.rho)
     
     def get_free_energy_gradient_respect_to_dyn(self):
         """
@@ -302,7 +302,7 @@ class Ensemble:
         # Get the mass vector
         _m_ = np.zeros(self.dyn_0.structure.N_atoms * 3)
         for i in range(self.current_dyn.structure.N_atoms):
-            _m_[ 3*i : 3*i + 3] = self.current_dyn.structure.masses[ self.current_dyn.structure.atom[i]]
+            _m_[ 3*i : 3*i + 3] = self.current_dyn.structure.masses[ self.current_dyn.structure.atoms[i]]
         
         _m_sqrtinv = 1 / np.sqrt(_m_)
         
@@ -312,7 +312,7 @@ class Ensemble:
         
         # TODO: improve the remove translations
         w = w[3:]
-        pols = pols[:, 3:]
+        pols = np.real(pols[:, 3:])
         
         n_modes = len(w)
         
@@ -332,8 +332,12 @@ class Ensemble:
         _w_ = np.tile(w, (n_modes, 1))
         # 1 / (w_mu^2 - w_nu^2)
         one_over_omegamunu = 1 / (_w_**2 - _w_.transpose()**2)
-        one_over_omegamunu *= 1 - np.eye(n_modes) # Remove the therms for mu equal to nu
+        #one_over_omegamunu *= 1 - np.eye(n_modes) # Remove the therms for mu equal to nu
+        one_over_omegamunu[ _w_ == _w_.transpose()] = 0
         
+        #print "freqs:", w
+        #print "w", _w_
+        #print "one_over_omega:", one_over_omegamunu
                                         
         # Get the derivative of the lna_mu respect to the dynamical matrix
         # Inner product
@@ -342,13 +346,16 @@ class Ensemble:
         # Get the derivative respect to the polarization vector
         d_pol_d_dyn = np.einsum("ai,bj,ci,ji,a,b,c->abjc", pols, pols, pols, one_over_omegamunu, _m_sqrtinv, _m_sqrtinv, _m_sqrtinv)
         
+        print "d_lna:", d_lna_d_dyn
+        print "d_pol:", d_pol_d_dyn
+        
         pre_sum = d_lna_d_dyn + d_pol_d_dyn
         
         # Get the q vector
         d_F_d_dyn = np.zeros(np.shape(self.current_dyn.dynmats[0]))
         for i in range(self.N):
             # Get the displacements of the structure
-            u_disp = self.structures[i].get_displacements(self.current_dyn).reshape(3 * self.current_dyn.structure.N_atoms)
+            u_disp = self.structures[i].get_displacement(self.current_dyn.structure).reshape(3 * self.current_dyn.structure.N_atoms)
             
             # Get the forces on the configuration
             delta_f = (self.forces[i,:,:] - self.sscha_forces[i,:,:]).reshape(3 * self.current_dyn.structure.N_atoms)
@@ -359,11 +366,22 @@ class Ensemble:
             # Get gamma matrix
             gamma = np.einsum("abcd, d", pre_sum, delta_f)
             
+            #print "%d) delta_f = " % (i+1), delta_f
+            #print "%d) q = " % (i+1), q
+            #print "%d) gamma = " % (i+1), gamma
+            
             # Contract the gamma matrix and multiply it for the weight
-            d_F_d_dyn += - np.einsum("abc, c", gamma, q) * self.rho[i]
+            partial_gradient = - np.einsum("abc, c", gamma, q)
+            d_F_d_dyn += partial_gradient * self.rho[i]
+            
+            #print "conf %d | weight %.4e | partial gradient:" % (i, self.rho[i]), partial_gradient
+            
             
         # Normalization
         d_F_d_dyn /= np.sum(self.rho)
+        print "Grad:"
+        for i in range(np.shape(d_F_d_dyn)[0]):
+            print " ".join(["%7.2e" % x for x in list(d_F_d_dyn[i,:])])
         
         #TODO: apply symmetries
             

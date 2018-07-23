@@ -10,7 +10,7 @@ import numpy as np
 
 class SSCHA_Minimizer:
     
-    def __init__(self, ensemble, root_representation):
+    def __init__(self, ensemble, root_representation = "normal"):
         """
         This class create a minimizer to perform the sscha minimization.
         It performs the sscha minimization.
@@ -28,6 +28,7 @@ class SSCHA_Minimizer:
         self.ensemble = ensemble
         self.root_representation = root_representation
         
+        
         # The symmetries
         self.symmetries = None
         
@@ -40,6 +41,9 @@ class SSCHA_Minimizer:
         # Projection. This is chosen to fix some constraint on the minimization
         self.projector_dyn = None
         self.projector_struct = None
+        
+        # The gradient before the last step was performed (Used for the CG)
+        self.prev_grad = None
         
         
     def minimization_step(self, algorithm = "sdes"):
@@ -68,13 +72,14 @@ class SSCHA_Minimizer:
         struct_grad = - self.ensemble.get_average_forces()
         
         # Apply the translational symmetry on the structure
-        struct_grad -= np.tile(np.einsum("ij->j", struct_grad), (self.ensemble.current_dyn.N_atoms,1))
+        struct_grad -= np.tile(np.einsum("ij->j", struct_grad), (self.ensemble.current_dyn.structure.N_atoms,1))
         
         
         current_dyn = self.ensemble.current_dyn
         current_struct = self.ensemble.current_dyn.structure
         
         # Perform the step for the dynamical matrix
+        new_dyn = current_dyn
         new_dyn.dynmats[0] = current_dyn.dynmats[0] - self.min_step_dyn * dyn_grad
         
         # Perform the step for the structure
@@ -90,6 +95,10 @@ class SSCHA_Minimizer:
         self.ensemble.update_weights(new_dyn, self.ensemble.current_T)
         self.dyn = new_dyn
         
+        # Update the previous gradient
+        self.prev_grad = dyn_grad
+        
+        
     def get_free_energy(self):
         """
         SSCHA FREE ENERGY
@@ -98,6 +107,8 @@ class SSCHA_Minimizer:
         Obtain the SSCHA free energy for the system.
         This is done by integrating the free energy along the hamiltonians, starting
         from current_dyn to the real system.
+        
+        The result is in Rydberg
         
         .. math::
             
@@ -130,6 +141,11 @@ class SSCHA_Minimizer:
         for iq in range(nq):
             w, pols = self.dyn.DyagDinQ(iq)
             
+            # Remove translations
+            # TODO: improve
+            if iq == 0:
+                w = w[3:]
+            
             free_energy += np.sum( w / 2)
             if T > 0:
                 beta = 1 / (K_to_Ry * T)
@@ -137,7 +153,10 @@ class SSCHA_Minimizer:
         
         # We got the F_0 
         # Now we can compute the free energy difference
-        free_energy += self.ensemble.get_energy(subtract_sscha_energy = True)
+        anharmonic_free_energy = self.ensemble.get_average_energy(subtract_sscha = True)
+        #print "Free energy harmonic:", free_energy
+        #print "Free energy anharmonic:", anharmonic_free_energy
+        free_energy += anharmonic_free_energy
         
         return free_energy
 
