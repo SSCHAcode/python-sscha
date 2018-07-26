@@ -36,7 +36,7 @@ class SSCHA_Minimizer:
         self.min_step_dyn = 1
         self.min_step_struc = 1
         
-        self.dyn = self.ensemble.current_dyn
+        self.dyn = self.ensemble.current_dyn.Copy()
         
         # Projection. This is chosen to fix some constraint on the minimization
         self.projector_dyn = None
@@ -98,8 +98,24 @@ class SSCHA_Minimizer:
         # Update the previous gradient
         self.prev_grad = dyn_grad
         
+    def update(self):
+        """
+        UPDATE IMPORTANCE SAMPLING
+        ==========================
         
-    def get_free_energy(self):
+        
+        This methods makes the self.dyn coincide with self.ensemble.current_dyn, and overwrites the stochastic
+        weights of the current_dyn.
+        
+        Call this method each time you modify the dynamical matrix of the minimization to avoid errors.
+        
+        NOTE: it is equivalent to call self.ensemble.update_weights(self.dyn, self.ensemble.current_T)
+        """
+        
+        self.ensemble.update_weights(self.dyn, self.ensemble.current_T)
+        
+        
+    def get_free_energy(self, return_error = False):
         """
         SSCHA FREE ENERGY
         =================
@@ -108,7 +124,9 @@ class SSCHA_Minimizer:
         This is done by integrating the free energy along the hamiltonians, starting
         from current_dyn to the real system.
         
-        The result is in Rydberg
+        The result is in Rydberg.
+        
+        NOTE: this method just recall the self.ensemble.get_free_energy function.
         
         .. math::
             
@@ -127,38 +145,15 @@ class SSCHA_Minimizer:
         -------
             float
                 The free energy in the current dynamical matrix and at the ensemble temperature
+        
         """
-        K_to_Ry=6.336857346553283e-06
         
-        T = self.ensemble.current_T
-
+        #TODO: CHECK THE CONSISTENCY BETWEEN THE DYNAMICAL MATRICES
+        # Check if the dynamical matrix has correctly been updated
+        #if np.sum( self.dyn != self.ensemble.current_dyn):
+        #    raise ValueError("Error, the ensemble dynamical matrix has not been updated. You forgot to call self.update() before")
         
-        # Dyagonalize the current dynamical matrix
-        nq = len(self.dyn.dynmats)
-        
-        # For each q point
-        free_energy = 0
-        for iq in range(nq):
-            w, pols = self.dyn.DyagDinQ(iq)
-            
-            # Remove translations
-            # TODO: improve
-            if iq == 0:
-                w = w[3:]
-            
-            free_energy += np.sum( w / 2)
-            if T > 0:
-                beta = 1 / (K_to_Ry * T)
-                free_energy += np.sum( 1 / beta * np.log(1 - np.exp(-beta * w)))
-        
-        # We got the F_0 
-        # Now we can compute the free energy difference
-        anharmonic_free_energy = self.ensemble.get_average_energy(subtract_sscha = True)
-        #print "Free energy harmonic:", free_energy
-        #print "Free energy anharmonic:", anharmonic_free_energy
-        free_energy += anharmonic_free_energy
-        
-        return free_energy
+        return self.ensemble.get_free_energy(return_error = return_error)
 
 def get_root_dyn(dyn_fc, root_representation):
     """

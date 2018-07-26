@@ -5,11 +5,16 @@ import numpy as np
 import cellconstructor as CC
 import cellconstructor.Structure
 import cellconstructor.Phonons
+import cellconstructor.Methods
 
 """
 This source contains the Ensemble class
 It is used to Load and Save info about the ensemble.
 """
+
+# The small value considered zero
+__EPSILON__ =  1e-6
+
 
 class Ensemble:
     def __init__(self, dyn0, T0):
@@ -40,13 +45,13 @@ class Ensemble:
         self.sscha_forces = []
         
         # The original dynamical matrix used to generate the ensemble
-        self.dyn_0 = dyn0
+        self.dyn_0 = dyn0.Copy()
         self.T0 = T0
         
         # This is the weight of each configuration in the sampling.
         # It is updated with the update_weigths function
         self.rho = []
-        self.current_dyn = dyn0
+        self.current_dyn = dyn0.Copy()
         
         self.current_T = T0
         
@@ -121,7 +126,8 @@ class Ensemble:
             self.forces[i,:,:] = np.loadtxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1)) * A_TO_BOHR
             
             # Load stress
-            self.stresses[i,:,:] =  np.loadtxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)) 
+            if os.path.exists("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)):
+                self.stresses[i,:,:] =  np.loadtxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)) 
             
             # Setup the sscha energies and forces
             energy, force = self.dyn_0.get_energy_forces(structure)
@@ -134,7 +140,61 @@ class Ensemble:
         # Setup the initial weight
         self.rho = np.ones(self.N)
         
-        # Setup the sscha 
+        
+    def save(self, data_dir, population):
+        """
+        SAVE THE ENSEMBLE
+        =================
+        
+        
+        This function saves the ensemble in a way the original fortran SSCHA code can read it.
+        Look at the load function documentation to see clearely how it is saved.
+        
+        NOTE: This method do not save the dynamical matrix used to generate the ensemble (i.e. self.dyn0)
+        remember to save it separately to really save all the info about the ensemble.
+        
+        Parameters
+        ----------
+            data_dir : string
+                Path to the directory in which the data will be saved. If it does not exists, it will be created
+            population : int
+                The id of the population, usefull if you want to save more ensemble in the same data_dir without overwriting
+                the data.
+        """
+        A_TO_BOHR = 1.889725989
+        
+        # Check if the ensemble has really been initialized
+        if self.N == 0:
+            raise ValueError("Error, the ensemble seems to be not initialized.")
+        
+        # Check if the given data_dir is a real directory
+        if os.path.exists(data_dir) and not os.path.isdir(data_dir):
+            raise IOError("Error, the given data_dir %s is not a valid directory." % data_dir)
+        if not os.path.exists(data_dir):
+            os.mkdir(data_dir)
+        
+        # Remove the tailoring slash if any
+        if data_dir[-1] == "/":
+            data_dir = data_dir[:-1]
+            
+        
+        # Save the energies
+        np.savetxt("%s/energies_supercell_population%d.dat" % (data_dir, population), self.energies)
+        
+        # Check if the stresses must be saved
+        save_stress = False
+        if self.stresses != []:
+            print self.stresses
+            save_stress = True
+            
+        # Save the forces
+        for i in range(self.N):
+            np.savetxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1), self.forces[i,:,:] * A_TO_BOHR)
+            
+            if save_stress:
+                np.savetxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1), self.stresses[i,:,:])
+            
+
         
     def generate(self, N, evenodd = True):
         """
@@ -181,6 +241,8 @@ class Ensemble:
             self.sscha_forces[i,:,:] = force
         
         self.rho = np.ones(self.N)
+        self.current_dyn = self.dyn_0.Copy()
+        self.current_T = self.T0
         
         
         
@@ -213,6 +275,8 @@ class Ensemble:
             
         self.current_dyn = new_dynamical_matrix
         
+        
+        
     def get_effective_sample_size(self):
         """
         Get the Kong-Liu effective sample size with the given importance sampling.
@@ -220,7 +284,7 @@ class Ensemble:
         
         return self.N * np.sum(self.rho) / float(np.sum(self.rho**2)) 
     
-    def get_average_energy(self, subtract_sscha = False):
+    def get_average_energy(self, subtract_sscha = False, return_error = False):
         """
         GET ENERGY
         ==========
@@ -241,11 +305,42 @@ class Ensemble:
                 If true, the average difference of energy respect to the sscha one is returned. This
                 is good, because you can compute analytically the sscha energy and sum it on an infinite
                 ensembe. Do in this way to suppress the stochastic noise.
+            return_error : bool, optional, default False
+                If true also the error is returned as a second value
+                
+        Examples
+        --------
+        
+        
+        Example where ensemble is a correctly initialized self variable
+        
+        >>> energy = ensemble.get_average_energy()
+        
+        
+        The following example return also the stochastic error
+        >>> energy, error_on_energy = ensemble.get_average_energy(return_error = True)
+        
         """
         
+        value = 0
+        value2 = 0
+        
+        norm = np.sum(self.rho)
+        
         if subtract_sscha:
-            return np.sum( self.rho * (self.energies - self.sscha_energies)) / self.N
-        return np.sum( self.rho * (self.energies)) / self.N
+            value = np.sum( self.rho * (self.energies - self.sscha_energies)) / norm
+            if return_error:
+                value2 = np.sum( self.rho * (self.energies - self.sscha_energies)**2) / norm
+        else:
+            value = np.sum( self.rho * (self.energies)) / norm
+            if return_error:
+                value2 = np.sum( self.rho * (self.energies)**2) / norm
+        
+        # Get the error using the equation sqrt(<x^2> - <x>^2)/sqrt(N-1)
+        if return_error:
+            error = np.sqrt((value2 - value**2)/ (norm))
+            return value, error
+        return value
      
     def get_average_forces(self):
         """
@@ -264,6 +359,85 @@ class Ensemble:
         """
         
         return np.einsum("i, iab ->ab", self.rho, self.forces - self.sscha_forces) / np.sum(self.rho)
+    
+    
+    
+    def get_free_energy(self, return_error):
+        """
+        SSCHA FREE ENERGY
+        =================
+        
+        Obtain the SSCHA free energy for the system.
+        This is done by integrating the free energy along the hamiltonians, starting
+        from current_dyn to the real system.
+        
+        The result is in Rydberg
+        
+        .. math::
+            
+            \\mathcal F = \\mathcal F_0 + \\int_0^1 \\frac{d\\mathcal F_\\lambda}{d\\lambda} d\\lambda
+        
+        Where :math:`\\lambda` is the parameter for the adiabatic integration of the hamiltonian.
+        
+        .. math::
+            
+            H(\\lambda) = H_0 + (H - H_0) \\lambda
+        
+        here :math:`H_0` is the sscha harmonic hamiltonian, while :math:`H_1` is the real hamiltonian 
+        of the system.
+        
+        
+        Parameters
+        ----------
+            return_error : bool, optional, default False
+                If true also the error is returned as a second value.
+        
+        Returns
+        -------
+            float
+                The free energy in the current dynamical matrix and at the ensemble temperature
+        """
+        K_to_Ry=6.336857346553283e-06
+        
+        T = self.current_T
+
+        
+        # Dyagonalize the current dynamical matrix
+        nq = len(self.current_dyn.dynmats)
+        
+        # For each q point
+        free_energy = 0
+        for iq in range(nq):
+            w, pols = self.current_dyn.DyagDinQ(iq)
+            
+            # Remove translations
+            if iq == 0:
+                tmask = CC.Methods.get_translations(pols)
+                w = w[ ~tmask ]
+            
+            free_energy += np.sum( w / 2)
+            if T > 0:
+                beta = 1 / (K_to_Ry * T)
+                free_energy += np.sum( 1 / beta * np.log(1 - np.exp(-beta * w)))
+        
+        # We got the F_0 
+        # Now we can compute the free energy difference
+        anharmonic_free_energy = 0
+        error = 0
+        if return_error:
+            anharmonic_free_energy, error = self.get_average_energy(subtract_sscha = True, return_error = True)
+        else:
+            anharmonic_free_energy = self.get_average_energy(subtract_sscha = True, return_error = False)
+
+        #print "Free energy harmonic:", free_energy
+        #print "Free energy anharmonic:", anharmonic_free_energy
+        free_energy += anharmonic_free_energy
+        
+        if return_error:
+            return free_energy, error
+        return free_energy
+
+    
     
     def get_free_energy_gradient_respect_to_dyn(self):
         """
@@ -333,7 +507,7 @@ class Ensemble:
         # 1 / (w_mu^2 - w_nu^2)
         one_over_omegamunu = 1 / (_w_**2 - _w_.transpose()**2)
         #one_over_omegamunu *= 1 - np.eye(n_modes) # Remove the therms for mu equal to nu
-        one_over_omegamunu[ _w_ == _w_.transpose()] = 0
+        one_over_omegamunu[ (_w_ - _w_.transpose()) < __EPSILON__] = 0
         
         #print "freqs:", w
         #print "w", _w_
@@ -346,8 +520,8 @@ class Ensemble:
         # Get the derivative respect to the polarization vector
         d_pol_d_dyn = np.einsum("ai,bj,ci,ji,a,b,c->abjc", pols, pols, pols, one_over_omegamunu, _m_sqrtinv, _m_sqrtinv, _m_sqrtinv)
         
-        print "d_lna:", d_lna_d_dyn
-        print "d_pol:", d_pol_d_dyn
+        #print "d_lna:", d_lna_d_dyn
+        #print "d_pol:", d_pol_d_dyn
         
         pre_sum = d_lna_d_dyn + d_pol_d_dyn
         
@@ -379,9 +553,9 @@ class Ensemble:
             
         # Normalization
         d_F_d_dyn /= np.sum(self.rho)
-        print "Grad:"
-        for i in range(np.shape(d_F_d_dyn)[0]):
-            print " ".join(["%7.2e" % x for x in list(d_F_d_dyn[i,:])])
+        #print "Grad:"
+        #for i in range(np.shape(d_F_d_dyn)[0]):
+        #    print " ".join(["%7.2e" % x for x in list(d_F_d_dyn[i,:])])
         
         #TODO: apply symmetries
             
