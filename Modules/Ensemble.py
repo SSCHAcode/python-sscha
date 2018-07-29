@@ -115,12 +115,15 @@ class Ensemble:
         self.sscha_energies = np.zeros(self.N)
         self.sscha_energies = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3))
         
+        self.structures = []
+        
         for i in range(self.N):
             # Load the structure
             structure = CC.Structure.Structure()
             structure.read_scf("%s/scf_population%d_%d.dat" % (data_dir, population, i+1), alat = self.dyn_0.alat)
             structure.has_unit_cell = True
             structure.unit_cell = self.dyn_0.structure.unit_cell
+            self.structures.append(structure)
             
             # Load forces (Forces are in Ry/bohr, convert them in Ry /A)
             self.forces[i,:,:] = np.loadtxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1)) * A_TO_BOHR
@@ -150,7 +153,7 @@ class Ensemble:
         This function saves the ensemble in a way the original fortran SSCHA code can read it.
         Look at the load function documentation to see clearely how it is saved.
         
-        NOTE: This method do not save the dynamical matrix used to generate the ensemble (i.e. self.dyn0)
+        NOTE: This method do not save the dynamical matrix used to generate the ensemble (i.e. self.dyn_0)
         remember to save it separately to really save all the info about the ensemble.
         
         Parameters
@@ -187,10 +190,17 @@ class Ensemble:
             print self.stresses
             save_stress = True
             
-        # Save the forces
         for i in range(self.N):
-            np.savetxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1), self.forces[i,:,:] * A_TO_BOHR)
+            # Save the forces
+            np.savetxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1), self.forces[i,:,:] / A_TO_BOHR)
             
+            # Save the configurations
+            struct = self.structures[i]
+            struct.save_scf("%s/scf_population%d_%d.dat" % (data_dir, population, i+1), self.dyn_0.alat, True)
+            u_disp = struct.get_displacement(self.dyn_0.structure)
+            np.savetxt("%s/u_population%d_%d.dat" % (data_dir, population, i+1), u_disp * A_TO_BOHR)
+            
+            # Save the stress tensors if any
             if save_stress:
                 np.savetxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1), self.stresses[i,:,:])
             

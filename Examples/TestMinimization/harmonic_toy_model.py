@@ -22,11 +22,12 @@ import sscha.SchaMinimizer
 
 import numpy as np
 import matplotlib.pyplot as plt
-plt.rcParams['figure.dpi'] = 200
+plt.rcParams['figure.dpi'] = 120
 #plt.ion()
 
 # Rydberg to cm-1 conversion factor
 RyToCm  = 109691.40235
+RyTomev = 13605.698066
 
 # Load the harmonic dynamical matrix
 harm_dyn = CC.Phonons.Phonons("dyn_harmonic", full_name = True)
@@ -123,8 +124,8 @@ for i in range(M):
     
     
     # Save the ensemble
-    test_ensemble.save("data_dir", population = i)
-    test_ensemble.dyn_0.save_qe("dyn_pop%d_" % i)
+    test_ensemble.save("data_dir", population = i+1)
+    test_ensemble.dyn_0.save_qe("dyn_pop%d_" % (i+1))
     
     
     print "HARM:"
@@ -148,8 +149,8 @@ for i in range(M):
     
 # Plot the Free energy
 plt.figure()
-plt.errorbar(steps, free_IS, yerr = free_IS_err, label="IS")
-plt.errorbar(steps, free_STOC, yerr = free_STOC_err, label = "STOC")
+plt.errorbar(steps, free_IS * RyTomev, yerr = free_IS_err * RyTomev, label="IS")
+plt.errorbar(steps, free_STOC * RyTomev, yerr = free_STOC_err * RyTomev, label = "STOC")
 plt.xlabel("Step")
 plt.ylabel("Free energy")
 plt.title("Free energy test")
@@ -157,8 +158,8 @@ plt.legend()
 plt.tight_layout()
 
 plt.figure()
-plt.errorbar(steps, av_energy_IS[:,0], yerr = av_energy_IS[:,1], label = "IS")
-plt.errorbar(steps, av_energy_STOC[:,0], yerr = av_energy_STOC[:,1], label = "STOC")
+plt.errorbar(steps, av_energy_IS[:,0] * RyTomev, yerr = av_energy_IS[:,1] * RyTomev, label = "IS")
+plt.errorbar(steps, av_energy_STOC[:,0] * RyTomev, yerr = av_energy_STOC[:,1] * RyTomev, label = "STOC")
 plt.plot(steps, sscha_energy[:], label="SSCHA energy")
 plt.legend()
 plt.xlabel("Step")
