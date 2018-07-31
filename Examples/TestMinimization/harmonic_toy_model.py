@@ -15,10 +15,13 @@ In the end we check if the final matrix coincides with the harmonic one.
 import cellconstructor as CC
 import cellconstructor.Structure
 import cellconstructor.Phonons
+import cellconstructor.Methods
 
 import sscha
 import sscha.Ensemble
 import sscha.SchaMinimizer
+
+import spglib
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -145,6 +148,15 @@ for i in range(M):
     
     # Apply the sum rule 
     minim.dyn.ApplySumRule()
+    
+    # Get the symmetries from the matrix
+    print "Symmetry CLASS:", spglib.get_spacegroup(minim.dyn.structure.get_ase_atoms())
+    sym_spglib = spglib.get_symmetry(minim.dyn.structure.get_ase_atoms())
+    symmetries = CC.Methods.GetSymmetriesFromSPGLIB(sym_spglib)
+    print "Symmetry counts:", len(symmetries)
+    
+    # Symmetrize the matrix
+    minim.dyn.ForceSymmetries(symmetries)
     
 # Plot the Free energy
 plt.figure()
