@@ -22,6 +22,7 @@ import sscha.Ensemble
 import sscha.SchaMinimizer
 
 import spglib
+from ase.visualize import view
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -131,18 +132,18 @@ for i in range(M):
     test_ensemble.dyn_0.save_qe("dyn_pop%d_" % (i+1))
     
     
-    print "HARM:"
+    #print "HARM:"
     w, p = harm_dyn.DyagDinQ(0)
-    print w
-    print "Current:"
+    #print w
+    #print "Current:"
     w,p = test_ensemble.current_dyn.DyagDinQ(0)
-    print w
+    #print w
     frequencies[i, :] = w.copy()
     
     # Get the sscha contribution to the energy
     sscha_energy[i] = np.sum(w[~ CC.Methods.get_translations(p)] / 2)
          
-    print "%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e" % (steps[i], free_IS[i], free_IS_err[i], free_STOC[i], free_STOC_err[i], grad_IS[i], grad_STOC[i], kong_liu[i])
+    #print "%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e" % (steps[i], free_IS[i], free_IS_err[i], free_STOC[i], free_STOC_err[i], grad_IS[i], grad_STOC[i], kong_liu[i])
     
     minim.dyn.dynmats[0][5,0] += MOVE_STEP / np.sqrt(2)
     minim.dyn.dynmats[0][0,5] += MOVE_STEP / np.sqrt(2)
@@ -157,8 +158,15 @@ for i in range(M):
     print "Symmetry counts:", len(symmetries)
     
     # Symmetrize the matrix
-    minim.dyn.ForceSymmetries(symmetries)
-    
+    minim.dyn.ForceSymmetries(symmetries)    
+    for k, sym in enumerate(symmetries):
+        new_fc = minim.dyn.ApplySymmetry(sym)
+        d = np.sqrt(np.sum( (new_fc - minim.dyn.dynmats[0])**2))
+        print "Sym %d) d = %.4e" % (k+1, d)
+
+
+view(minim.dyn.structure.ge.get_ase_atoms())
+
 # Plot the Free energy
 plt.figure()
 plt.errorbar(steps, free_IS * RyTomev, yerr = free_IS_err * RyTomev, label="IS")
