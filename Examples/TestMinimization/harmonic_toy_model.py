@@ -97,7 +97,7 @@ for i in range(M):
     free_IS[i], free_IS_err[i] = minim.ensemble.get_free_energy(return_error = True)
     g = minim.ensemble.get_free_energy_gradient_respect_to_dyn()
     grad_IS[i] = .5 * (g[5,0] + g[0,5])
-    av_energy_IS[i,0], av_energy_IS[i, 1]  = minim.ensemble.get_average_energy(return_error = True, subtract_sscha = False)
+    av_energy_IS[i,0], av_energy_IS[i, 1]  = minim.ensemble.get_average_energy(return_error = True, subtract_sscha = True)
     
     # Generate a new ensemble
     test_ensemble = sscha.Ensemble.Ensemble(minim.dyn, T)
@@ -114,7 +114,7 @@ for i in range(M):
     print test_ensemble.energies - test_ensemble.sscha_energies
                        
     free_STOC[i], free_STOC_err[i] = test_ensemble.get_free_energy(return_error = True)
-    av_energy_STOC[i,0], av_energy_STOC[i, 1]  = test_ensemble.get_average_energy(return_error = True, subtract_sscha= False)
+    av_energy_STOC[i,0], av_energy_STOC[i, 1]  = test_ensemble.get_average_energy(return_error = True, subtract_sscha= True)
 
     g = test_ensemble.get_free_energy_gradient_respect_to_dyn()
     grad_STOC[i] = .5* (g[5,0] + g[0,5])
