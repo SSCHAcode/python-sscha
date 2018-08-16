@@ -61,7 +61,7 @@ def GetExactFreeEnergy(ensemble, N_int):
     
     on_exponent = np.outer(Lambda, ensemble.energies - ensemble.sscha_energies)
 
-    beta = 
+    # TODO: TO BE CONTINUE
 
     
     

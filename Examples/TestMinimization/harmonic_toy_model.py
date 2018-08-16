@@ -16,6 +16,7 @@ import cellconstructor as CC
 import cellconstructor.Structure
 import cellconstructor.Phonons
 import cellconstructor.Methods
+import cellconstructor.symmetries
 
 import sscha
 import sscha.Ensemble
@@ -27,7 +28,6 @@ from ase.visualize import view
 import numpy as np
 import matplotlib.pyplot as plt
 plt.rcParams['figure.dpi'] = 120
-#plt.ion()
 
 # Rydberg to cm-1 conversion factor
 RyToCm  = 109691.40235
@@ -56,7 +56,7 @@ T = 0 #K
 N = 1600
 
 # The number of minimization steps
-M = 5
+M = 8
 
 # Generate the ensemble
 ensemble = sscha.Ensemble.Ensemble(start_dyn, T)
@@ -76,7 +76,7 @@ minim.min_step_dyn = 1e-5
 minim.min_step_struc = 1e-5
 
 # Test gradient
-MOVE_STEP = 3e-3
+MOVE_STEP = 1e-3
 
 print "----- MOVING DYN ------- "
 print "# Step, free energy IS, error, free energy STOC, error, gradient IS, gradient STOC, Effective sample size"
@@ -94,6 +94,15 @@ sscha_energy = np.zeros(M)
 
 frequencies = np.zeros( (M, 6))
 
+qe_sym = CC.symmetries.QE_Symmetry(start_dyn.structure)
+qe_sym.SetupQPoint(np.array( [0,0,0]), verbose = True)
+
+# Extract the random move direction compatible with symmetries
+nat = harm_dyn.structure.N_atoms
+rand_vect = np.random.normal(scale = MOVE_STEP, size = (3 * nat, 3 * nat))
+qe_sym.SymmetrizeDynQ(rand_vect, np.array([0,0,0]))
+
+
 for i in range(M):
     minim.update()
     
@@ -106,7 +115,6 @@ for i in range(M):
     # Generate a new ensemble
     test_ensemble = sscha.Ensemble.Ensemble(minim.dyn, T)
     test_ensemble.generate(N)
-    print np.sum(minim.ensemble.rho), np.sum(test_ensemble.rho)
     
         
     for k in range(N):
@@ -115,7 +123,6 @@ for i in range(M):
         test_ensemble.forces[k, :,:] = force
                             
     test_ensemble.update_weights(minim.dyn, T)
-    print test_ensemble.energies - test_ensemble.sscha_energies
                        
     free_STOC[i], free_STOC_err[i] = test_ensemble.get_free_energy(return_error = True)
     av_energy_STOC[i,0], av_energy_STOC[i, 1]  = test_ensemble.get_average_energy(return_error = True, subtract_sscha= True)
@@ -141,31 +148,47 @@ for i in range(M):
     frequencies[i, :] = w.copy()
     
     # Get the sscha contribution to the energy
-    sscha_energy[i] = np.sum(w[~ CC.Methods.get_translations(p)] / 2)
+    sscha_energy[i] = np.sum(w[~ CC.Methods.get_translations(p, harm_dyn.structure.get_masses_array())] / 2)
          
     #print "%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e\t%.4e" % (steps[i], free_IS[i], free_IS_err[i], free_STOC[i], free_STOC_err[i], grad_IS[i], grad_STOC[i], kong_liu[i])
     
-    minim.dyn.dynmats[0][5,0] += MOVE_STEP / np.sqrt(2)
-    minim.dyn.dynmats[0][0,5] += MOVE_STEP / np.sqrt(2)
+    minim.dyn.dynmats[0] += rand_vect
     
     # Apply the sum rule 
     minim.dyn.ApplySumRule()
     
     # Get the symmetries from the matrix
     print "Symmetry CLASS:", spglib.get_spacegroup(minim.dyn.structure.get_ase_atoms())
-    sym_spglib = spglib.get_symmetry(minim.dyn.structure.get_ase_atoms())
-    symmetries = CC.Methods.GetSymmetriesFromSPGLIB(sym_spglib)
+    symmetries = qe_sym.GetSymmetries()
     print "Symmetry counts:", len(symmetries)
     
     # Symmetrize the matrix
-    minim.dyn.ForceSymmetries(symmetries)    
-    for k, sym in enumerate(symmetries):
-        new_fc = minim.dyn.ApplySymmetry(sym)
-        d = np.sqrt(np.sum( (new_fc - minim.dyn.dynmats[0])**2))
-        print "Sym %d) d = %.4e" % (k+1, d)
+    
+    #minim.dyn.ForceSymmetries(symmetries)    
+    
+    # Force the symmetrization also with QE
+    #qe_sym.SymmetrizeDynQ(minim.dyn.dynmats[0], np.array([0,0,0]))
+    
+    minim.dyn.save_qe("dyn_moved_%d" % i, full_name = True)
+#    for k, sym in enumerate(symmetries):
+#        new_fc = minim.dyn.ApplySymmetry(sym)
+#        d = np.sqrt(np.sum( (new_fc - minim.dyn.dynmats[0])**2))
+#        print "Sym %d) d = %.4e" % (k+1, d)
 
 
-view(minim.dyn.structure.ge.get_ase_atoms())
+ase_atm = minim.dyn.structure.get_ase_atoms()
+#view(ase_atm)
+
+# Prepare the final structure
+save_mat = np.transpose([steps,
+                         free_IS*RyTomev, free_IS_err*RyTomev, 
+                         free_STOC*RyTomev, free_STOC_err*RyTomev,
+                         av_energy_IS[:,0]*RyTomev, av_energy_IS[:,1]*RyTomev,
+                         av_energy_STOC[:,0]*RyTomev, av_energy_STOC[:,1]*RyTomev,
+                         sscha_energy*RyTomev, grad_IS, grad_STOC, kong_liu])
+np.savetxt("python_sscha_minim.dat", save_mat, 
+           header = "Steps|freeIS|err|freeSTOC|err|av_enIS|err|av_enSTOC|err|Escha|gradIS|gradSTOC|KL" )
+                         
 
 # Plot the Free energy
 plt.figure()

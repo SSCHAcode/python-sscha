@@ -133,6 +133,7 @@ class Ensemble:
                 self.stresses[i,:,:] =  np.loadtxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)) 
             
             # Setup the sscha energies and forces
+            print "Readin i = ", i
             energy, force = self.dyn_0.get_energy_forces(structure)
             self.sscha_energies[i] = energy 
             self.sscha_forces[i,:,:] = force
@@ -372,7 +373,7 @@ class Ensemble:
     
     
     
-    def get_free_energy(self, return_error):
+    def get_free_energy(self, return_error = False):
         """
         SSCHA FREE ENERGY
         =================
@@ -422,7 +423,7 @@ class Ensemble:
             
             # Remove translations
             if iq == 0:
-                tmask = CC.Methods.get_translations(pols)
+                tmask = CC.Methods.get_translations(pols, self.current_dyn.structure.get_masses_array())
                 w = w[ ~tmask ]
             
             free_energy += np.sum( w / 2)
