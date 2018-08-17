@@ -6,6 +6,9 @@ import cellconstructor as CC
 import cellconstructor.Structure
 import cellconstructor.Phonons
 import cellconstructor.Methods
+import cellconstructor.Manipulate
+
+import SCHAModules
 
 """
 This source contains the Ensemble class
@@ -14,6 +17,7 @@ It is used to Load and Save info about the ensemble.
 
 # The small value considered zero
 __EPSILON__ =  1e-6
+__A_TO_BOHR__ = 1.889725989
 
 
 class Ensemble:
@@ -54,6 +58,10 @@ class Ensemble:
         self.current_dyn = dyn0.Copy()
         
         self.current_T = T0
+        
+        
+        # To avoid to recompute each time the same variables store something usefull here
+        self.q_start = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
         
         
     def load(self, data_dir, population, N):
@@ -113,7 +121,7 @@ class Ensemble:
         self.stresses = np.zeros( (self.N, 3,3))
         
         self.sscha_energies = np.zeros(self.N)
-        self.sscha_energies = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3))
+        self.sscha_forces = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3))
         
         self.structures = []
         
@@ -133,7 +141,6 @@ class Ensemble:
                 self.stresses[i,:,:] =  np.loadtxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)) 
             
             # Setup the sscha energies and forces
-            print "Readin i = ", i
             energy, force = self.dyn_0.get_energy_forces(structure)
             self.sscha_energies[i] = energy 
             self.sscha_forces[i,:,:] = force
@@ -144,6 +151,8 @@ class Ensemble:
         # Setup the initial weight
         self.rho = np.ones(self.N)
         
+        # Initialize the q_start
+        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, self.dyn_0)
         
     def save(self, data_dir, population):
         """
@@ -205,6 +214,7 @@ class Ensemble:
             if save_stress:
                 np.savetxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1), self.stresses[i,:,:])
             
+        
 
         
     def generate(self, N, evenodd = True):
@@ -256,6 +266,9 @@ class Ensemble:
         self.current_T = self.T0
         
         
+        # Generate the q_start
+        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, self.dyn_0)
+        
         
         
     def update_weights(self, new_dynamical_matrix, newT):
@@ -277,10 +290,44 @@ class Ensemble:
         """
         
         self.current_T = newT
+        
+        # Get the frequencies of the original dynamical matrix
+        w, pols = self.dyn_0.DyagDinQ(0)
+        
+        # Exclude translations
+        w = w[~CC.Methods.get_translations(pols, self.dyn_0.structure.get_masses_array())]
+
+        # Convert from Ry to Ha and in fortran double precision
+        w = np.array(w/2, dtype = np.float64)
+        
+        # Get the a_0
+        old_a = SCHAModules.thermodynamic.w_to_a(w, self.T0)
+        
+        # Now do the same for the new dynamical matrix
+        w, pols = new_dynamical_matrix.DyagDinQ(0)
+        w = w[~CC.Methods.get_translations(pols, new_dynamical_matrix.structure.get_masses_array())]
+        w = np.array(w/2, dtype = np.float64)
+        new_a = SCHAModules.thermodynamic.w_to_a(w, newT)
+        
+        # Get the new q_vectors for the given matrix
+        new_q = CC.Manipulate.GetQ_vectors(self.structures, new_dynamical_matrix) * np.sqrt(2) * __A_TO_BOHR__
+        
+        # Convert the q vectors in the Hartree units
+        old_q = self.q_start * np.sqrt(2) * __A_TO_BOHR__
+        
+#        # Call the Fortran module to compute rho
+#        print "SHAPES:"
+#        print "NEW Q:", np.shape(new_q)
+#        print "OLD Q:", np.shape(old_q)
+#        print "NEW A:", np.shape(new_a)
+#        print "OLD A:", np.shape(old_a)
+        
+        self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
+        
         for i in range(self.N):
             #print "Weight %d" % i
-            self.rho[i] = new_dynamical_matrix.GetRatioProbability(self.structures[i], newT, self.dyn_0, self.T0)
-            #print "Is :", self.rho[i]
+            #tmp = new_dynamical_matrix.GetRatioProbability(self.structures[i], newT, self.dyn_0, self.T0)
+            #print "FORTRAN :", self.rho[i], "PYTHON:", tmp
             self.sscha_energies[i], self.sscha_forces[i, :,:] = new_dynamical_matrix.get_energy_forces(self.structures[i])
             
             
