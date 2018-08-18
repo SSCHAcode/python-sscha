@@ -62,7 +62,8 @@ class Ensemble:
         
         # To avoid to recompute each time the same variables store something usefull here
         self.q_start = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
-        
+        self.current_q = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
+
         
     def load(self, data_dir, population, N):
         """
@@ -142,6 +143,21 @@ class Ensemble:
             
             # Setup the sscha energies and forces
             energy, force = self.dyn_0.get_energy_forces(structure)
+#            
+#            print "Loading: config %d:" % i
+#            for j in range(structure.N_atoms):
+#                print "Atom %d" % j
+#                print "u_disp = ", structure.get_displacement(self.dyn_0.structure)[j,:]  *A_TO_BOHR
+#                print "force = ", self.forces[i, j, :] / A_TO_BOHR
+#                print "SCHA force = ", force[j, :] / A_TO_BOHR
+#            
+#            # Debugging stuff
+#            u_disp = structure.get_displacement(self.dyn_0.structure).reshape(3 * structure.N_atoms) * A_TO_BOHR
+#            print "TEST DOBULE:"
+#            print "NORMAL = ", self.dyn_0.dynmats[0].dot(u_disp)
+#            print "INVERSE = ", self.dyn_0.dynmats[0].dot(-u_disp)
+                
+            
             self.sscha_energies[i] = energy 
             self.sscha_forces[i,:,:] = force
             
@@ -153,6 +169,7 @@ class Ensemble:
         
         # Initialize the q_start
         self.q_start = CC.Manipulate.GetQ_vectors(self.structures, self.dyn_0)
+        self.current_q = self.q_start.copy()
         
     def save(self, data_dir, population):
         """
@@ -193,6 +210,10 @@ class Ensemble:
         
         # Save the energies
         np.savetxt("%s/energies_supercell_population%d.dat" % (data_dir, population), self.energies)
+        
+        self.dyn_0.save_qe("dyn_start_population%d_" % population)
+        self.current_dyn.save_qe("dyn_end_population%d_" % population)
+
         
         # Check if the stresses must be saved
         save_stress = False
@@ -268,7 +289,7 @@ class Ensemble:
         
         # Generate the q_start
         self.q_start = CC.Manipulate.GetQ_vectors(self.structures, self.dyn_0)
-        
+        self.current_q = self.q_start.copy()
         
         
     def update_weights(self, new_dynamical_matrix, newT):
@@ -310,10 +331,12 @@ class Ensemble:
         new_a = SCHAModules.thermodynamic.w_to_a(w, newT)
         
         # Get the new q_vectors for the given matrix
-        new_q = CC.Manipulate.GetQ_vectors(self.structures, new_dynamical_matrix) * np.sqrt(2) * __A_TO_BOHR__
+        self.current_q = CC.Manipulate.GetQ_vectors(self.structures, new_dynamical_matrix) 
         
         # Convert the q vectors in the Hartree units
         old_q = self.q_start * np.sqrt(2) * __A_TO_BOHR__
+        new_q = self.current_q * np.sqrt(2) * __A_TO_BOHR__
+        
         
 #        # Call the Fortran module to compute rho
 #        print "SHAPES:"
@@ -340,7 +363,8 @@ class Ensemble:
         Get the Kong-Liu effective sample size with the given importance sampling.
         """
         
-        return self.N * np.sum(self.rho) / float(np.sum(self.rho**2)) 
+        #return self.N * np.sum(self.rho) / float(np.sum(self.rho**2)) 
+        return np.sum(self.rho) * np.sum(self.rho) /  np.float64(np.sum(self.rho**2))
     
     def get_average_energy(self, subtract_sscha = False, return_error = False):
         """
@@ -542,24 +566,61 @@ class Ensemble:
         w, pols = self.current_dyn.DyagDinQ(0)
         
         
-        # TODO: improve the remove translations
-        w = w[3:]
-        pols = np.real(pols[:, 3:])
+        # Discard translations and convert in Ha units
+        not_trans = ~CC.Methods.get_translations(pols, self.current_dyn.structure.get_masses_array())
+        w = np.array(w[not_trans] / 2, dtype = np.float64)
+        pols = np.real(pols[:, not_trans])
         
         n_modes = len(w)
         
-        # Get the a_mu
-        a_mu = np.zeros(n_modes)
-        da_dw = np.zeros(n_modes)
-        if T == 0:
-            a_mu = 1 / np.sqrt(2* w) 
-            da_dw = -1 /  np.sqrt(8 * w**3)
-        else:            
-            beta = 1 / (K_to_Ry*T)
-            a_mu = 1 / np.sqrt( np.tanh(beta*w / 2) *2* w) 
-            da_dw = - (w*beta + np.sinh(w*beta)) / (2 * np.sqrt(2) * w**2 * (np.cosh(beta*w) - 1) * np.sqrt(np.cosh(beta*w / 2) / (np.sinh(beta*w/2) * w)))
-            
-    
+        # Convert the q vector into Ha units
+        q_new = np.array(self.current_q, dtype = np.float64) * np.sqrt(2) * __A_TO_BOHR__
+        
+        # Get the ityp variable 
+        ityp = self.current_dyn.structure.get_atomic_types()
+        
+        # Get the mass and convert in Ha units
+        mass = np.array(self.current_dyn.structure.get_masses_array() * 2,
+                        dtype = np.float64)
+        
+        # Get the a_mu and its derivatives
+        a_mu = np.zeros(n_modes, dtype = np.float64)
+        da_dw = np.zeros(n_modes, dtype = np.float64)
+        
+        # Use the fortran subroutines
+        a_mu = SCHAModules.thermodynamic.w_to_a(w, self.current_T)
+        da_dw = SCHAModules.thermodynamic.w_to_da(w, self.current_T)
+#        if T == 0:
+#            a_mu = 1 / np.sqrt(2* w) 
+#            da_dw = -1 /  np.sqrt(8 * w**3)
+#        else:            
+#            beta = 1 / (K_to_Ry*T)
+#            a_mu = 1 / np.sqrt( np.tanh(beta*w / 2) *2* w) 
+#            da_dw = - (w*beta + np.sinh(w*beta)) / (2 * np.sqrt(2) * w**2 * (np.cosh(beta*w) - 1) * np.sqrt(np.cosh(beta*w / 2) / (np.sinh(beta*w/2) * w)))
+#            
+#    
+
+        # Print the sscha forces converted
+        print "SCHA forces:"
+        for i in range(self.N):
+            for j in range(self.current_dyn.structure.N_atoms):
+                print "Conf\t%d\tAtom\t%d\t" % (i, j), self.sscha_forces[i, j, :]/ (__A_TO_BOHR__)
+                
+                
+        # Convert the forces in Ha / bohr units and in the same type as fortran
+        e_forces = np.array( self.forces - self.sscha_forces, dtype = np.float64) / (2 * __A_TO_BOHR__)
+        
+        # Get df_da
+        df_da = SCHAModules.anharmonic.get_df_da_nonav(w, w, self.current_T, pols,
+                                                       e_forces,
+                                                       q_new, ityp, mass, "stat_schappp")
+        
+        # Print dF _ dA
+        print "DF_DA PRINT:"
+        for i in range(self.N):
+            print "%d) " % i, df_da[i, :]
+        
+        
         # Prepare the w as a matrix
         _w_ = np.tile(w, (n_modes, 1))
         # 1 / (w_mu^2 - w_nu^2)

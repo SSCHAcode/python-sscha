@@ -53,7 +53,7 @@ print "\n".join(["\t".join( (str(w_sscha[i]), str(w_harm[i]))) for i in range(le
 T = 0 #K
 
 # The number of configurations
-N = 1600
+N = 10
 
 # The number of minimization steps
 M = 8
@@ -100,6 +100,7 @@ qe_sym.SetupQPoint(np.array( [0,0,0]), verbose = True)
 # Extract the random move direction compatible with symmetries
 nat = harm_dyn.structure.N_atoms
 rand_vect = np.random.normal(scale = MOVE_STEP, size = (3 * nat, 3 * nat))
+rand_vers = rand_vect / np.sqrt( np.sum(rand_vect**2) )
 qe_sym.SymmetrizeDynQ(rand_vect, np.array([0,0,0]))
 
 
@@ -109,7 +110,7 @@ for i in range(M):
     
     free_IS[i], free_IS_err[i] = minim.ensemble.get_free_energy(return_error = True)
     g = minim.ensemble.get_free_energy_gradient_respect_to_dyn()
-    grad_IS[i] = .5 * (g[5,0] + g[0,5])
+    grad_IS[i] = np.sum(g * rand_vers)
     av_energy_IS[i,0], av_energy_IS[i, 1]  = minim.ensemble.get_average_energy(return_error = True, subtract_sscha = True)
     
     # Generate a new ensemble
@@ -122,21 +123,24 @@ for i in range(M):
         test_ensemble.energies[k] = energy
         test_ensemble.forces[k, :,:] = force
                             
-    test_ensemble.update_weights(minim.dyn, T)
+    
+    # Save the ensemble
+    test_ensemble.save("data_dir", population = i+1)
+    test_ensemble.dyn_0.save_qe("dyn_pop%d_" % (i+1))
+    
+    #test_ensemble.update_weights(minim.dyn, T)
                        
     free_STOC[i], free_STOC_err[i] = test_ensemble.get_free_energy(return_error = True)
     av_energy_STOC[i,0], av_energy_STOC[i, 1]  = test_ensemble.get_average_energy(return_error = True, subtract_sscha= True)
 
     g = test_ensemble.get_free_energy_gradient_respect_to_dyn()
-    grad_STOC[i] = .5* (g[5,0] + g[0,5])
+    
+    
+    grad_STOC[i] = np.sum(g * rand_vers)
     
     steps[i] = i * MOVE_STEP
     kong_liu[i] = minim.ensemble.get_effective_sample_size() / float(N)
     
-    
-    # Save the ensemble
-    test_ensemble.save("data_dir", population = i+1)
-    test_ensemble.dyn_0.save_qe("dyn_pop%d_" % (i+1))
     
     
     #print "HARM:"
