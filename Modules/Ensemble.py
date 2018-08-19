@@ -585,6 +585,11 @@ class Ensemble:
         
         nat = len(mass)
         
+        # Prepare the symmetrization
+        qe_sym = CC.symmetries.QE_Symmetry(self.current_dyn.structure)
+        qe_sym.SetupQPoint(self.current_dyn.q_tot[0])
+        
+        
 #        # Get the a_mu and its derivatives
 #        a_mu = np.zeros(n_modes, dtype = np.float64)
 #        da_dw = np.zeros(n_modes, dtype = np.float64)
@@ -614,27 +619,24 @@ class Ensemble:
         df_da = SCHAModules.anharmonic.get_df_da_nonav(w, w, self.current_T, pols,
                                                        e_forces,
                                                        q_new, mass, "stat_schappp")
-        print np.shape(e_forces)
+        #print np.shape(e_forces)
         # Now get the rest of the derivative
         
         df_dfc = np.zeros( np.shape(self.current_dyn.dynmats[0]), dtype = np.float64)
         err_df_dfc = np.zeros( np.shape(self.current_dyn.dynmats[0]), dtype = np.float64)
+        
+        # Just to do something good
+        da_dcr_mat = np.zeros( (nat * 3, nat * 3, len(w)), dtype = np.float64)
+        
         for x_i in range(self.current_dyn.structure.N_atoms * 3):
             for y_i in range(x_i, self.current_dyn.structure.N_atoms * 3):
                 da_dcr, de_dcr = SCHAModules.anharmonic.get_da_dcr_and_de_dcr(w, pols, self.current_T,
                                                                               mass, x_i+1, y_i+1)
                 
-                print "SHAPES:"
-                print "df_da:", np.shape(df_da)
-                print "da_dcr:", np.shape(da_dcr)
-                print "e_forces:", np.shape(e_forces)
-                print "q_new:", np.shape(q_new)
-                print "mass:", np.shape(mass)
-                print "de_dcr:", np.shape(de_dcr)
-                print "rho:", np.shape(self.rho)
+                print "(%d, %d): DA_DCR = " % (x_i+1, y_i+1), da_dcr
+                da_dcr_mat[x_i, y_i, :] = da_dcr
+                da_dcr_mat[y_i, x_i, :] = da_dcr
 
-                
-                
                 df_dc, delta_df_dc = SCHAModules.anharmonic.get_df_dcoeff_av_new(df_da, da_dcr, e_forces,
                                                                                  q_new, mass, de_dcr, 
                                                                                  self.rho, 1, "err_yesrho")
@@ -644,9 +646,28 @@ class Ensemble:
                 
                 err_df_dfc[x_i, y_i] = delta_df_dc
                 err_df_dfc[y_i, x_i] = delta_df_dc
-                
+        
+        # Get the generator
+        ghr = np.zeros( (3*nat, 3*nat), dtype = np.float64, order = "F")
+        ghr[0,0] = 1
+        # Apply the sum rule
+        qe_sym.ImposeSumRule(ghr)
+        # Apply symmetries
+        qe_sym.SymmetrizeDynQ(ghr, self.current_dyn.q_tot[0])
+        ghr /= np.sqrt(np.trace(ghr.dot(ghr)))
+        print "Generator:"
+        print ghr
+
+        print "dA/dGhr = ", np.einsum("ijk, ij", da_dcr_mat, ghr)        
+        
+        # Force the symmetrization
+        qe_sym.ImposeSumRule(df_dfc)
+        qe_sym.ImposeSumRule(err_df_dfc)
+        qe_sym.SymmetrizeDynQ(df_dfc, self.current_dyn.q_tot[0])
+        qe_sym.SymmetrizeDynQ(err_df_dfc, self.current_dyn.q_tot[0])
         
         
+
 #        # Prepare the w as a matrix
 #        _w_ = np.tile(w, (n_modes, 1))
 #        # 1 / (w_mu^2 - w_nu^2)
