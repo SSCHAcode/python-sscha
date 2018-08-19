@@ -32,10 +32,6 @@ import matplotlib.pyplot as plt
 
 plt.rcParams['figure.dpi'] = 120
 
-# Rydberg to cm-1 and meV conversion factor
-RyToCm  = 109691.40235
-RyTomev = 13605.698066
-
 
 # Load the harmonic dynamical matrix
 harm_dyn = CC.Phonons.Phonons("dyn_harmonic", full_name = True)
@@ -84,41 +80,40 @@ for i in range(N):
 
 
 # Start the minimization
-minim = sscha.SCHAMinimizer.SSCHA_Minimizer(ensemble)
-minim.run()
+minim = sscha.SchaMinimizer.SSCHA_Minimizer(ensemble)
 
+# Cycle over the ensebles
+running = True
+while running:
+    print "Running the minimization..."
+    minim.run()
+    
+    # If the minimization is converged, exit.
+    if minim.is_converged():
+        running = False
+        print "The minimization is converged"
+    else:
+        # Extract the new ensemble
+        print "We are out of the statistical sampling."
+        print "Generating a new ensemble..."
+        new_ensemble = sscha.Ensemble.Ensemble(minim.dyn, T)
+        new_ensemble.generate(N)
+        
+        # Compute energies and forces with the harmonic Toy Model
+        for i in range(N):
+            energy, force = harm_dyn.get_energy_forces(ensemble.structures[i])
+            new_ensemble.energies[i] = energy
+            new_ensemble.forces[i, :,:] = force
+        
+        # Update the minimization ensemble and start again
+        minim.ensemble = new_ensemble
+                
 
+# The minimization is done.
+# Now plot the result
+print "Minimization done."
+print "Plotting the results"
+minim.plot_results()
 
-
-print ""
-print "Plotting results"
-# Plot the Free energy
-plt.figure()
-plt.errorbar(steps, free_IS * RyTomev, yerr = free_IS_err * RyTomev, label="IS")
-plt.errorbar(steps, free_STOC * RyTomev, yerr = free_STOC_err * RyTomev, label = "STOC")
-plt.xlabel("Step")
-plt.ylabel("Free energy")
-plt.title("Free energy test")
-plt.legend()
-plt.tight_layout()
-
-# Plot the gradient (compare with the numerical difference of Free energy)
-plt.figure()
-plt.errorbar(steps, grad_IS, yerr=grad_IS_err, label="IS")
-plt.errorbar(steps, grad_STOC, yerr=grad_STOC_err, label="STOC")
-plt.plot(steps[:-1] + MOVE_STEP * .5, np.diff(free_IS) / MOVE_STEP, label="IS finite difference")
-plt.plot(steps[:-1] + MOVE_STEP * .5, np.diff(free_STOC) / MOVE_STEP, label="STOC finite difference")
-plt.xlabel("Step")
-plt.ylabel("gradient along the direction")
-plt.title("Gradient test")
-plt.legend()
-plt.tight_layout()
-
-# Plot the Kong-Liu effective sample size
-plt.figure()
-plt.plot(steps, kong_liu)
-plt.title("Kong-Liu effective sample size")
-plt.xlabel("Step")
-plt.ylabel("$N_{eff} / N$")
-plt.tight_layout()
-plt.show()
+# Save the final dynamical matrix
+minim.dyn.save_qe("dyn_converged")

@@ -666,6 +666,9 @@ class Ensemble:
         qe_sym.SymmetrizeDynQ(df_dfc, self.current_dyn.q_tot[0])
         qe_sym.SymmetrizeDynQ(err_df_dfc, self.current_dyn.q_tot[0])
         
+        # Convert from [Ha/bohr] in [Ry/A]
+        df_dfc *= __A_TO_BOHR__ * 2
+        err_df_dfc *= __A_TO_BOHR__ * 2
         
 
 #        # Prepare the w as a matrix

@@ -7,6 +7,13 @@ It is possible to use it to perform the anharmonic minimization
 
 #import Ensemble
 import numpy as np
+import matplotlib.pyplot as plt
+
+
+# Rydberg to cm-1 and meV conversion factor
+__RyToCm__  = 109691.40235
+__RyTomev__ = 13605.698066
+
 
 class SSCHA_Minimizer:
     
@@ -50,7 +57,7 @@ class SSCHA_Minimizer:
         self.symmetries = None
         
         # The minimization step
-        self.min_step_dyn = 1
+        self.min_step_dyn = 1e-4
         self.min_step_struc = 1
         
         self.dyn = self.ensemble.current_dyn.Copy()
@@ -211,7 +218,7 @@ class SSCHA_Minimizer:
         
         return self.ensemble.get_free_energy(return_error = return_error)
     
-    def run(self):
+    def run(self, verbose = 1):
         """
         RUN THE SSCHA MINIMIZATION
         ==========================
@@ -219,7 +226,19 @@ class SSCHA_Minimizer:
         This function uses all the setted up parameters to run the minimization
         
         The minimization is stopped only when one of the stopping criteria are met.
+        
+        The verbose level can be chosen.
+        
+        Parameters
+        ----------
+            verbose : int
+                The verbosity level.
+                    - 0 : Noting is printed
+                    - 1 : For each step only the free energy, the modulus of the gradient and 
+                        the Kong-Liu effective sample size is printed.
+                    - 2 : The dynamical matrix at each step is saved on output with a progressive integer
         """
+        
         # Eliminate the convergence flag
         self.__converged__ = False
         
@@ -232,13 +251,28 @@ class SSCHA_Minimizer:
             self.__fe__.append(fe)
             self.__fe_err__.append(err)
             
+            
             # Compute the KL ratio
-            self.__KL__ = self.ensemble.get_effective_sample_size()
+            self.__KL__.append(self.ensemble.get_effective_sample_size())
             
             # Perform the minimization step
             self.minimization_step(self.minimization_algorithm)
             
             
+            # Print the step
+            if verbose >= 1:
+                print "Step ka = ", len(self.__fe__)
+                print "Free energy = %16.8f +- %16.8f meV" % (self.__fe__[-1] * __RyTomev__, 
+                                                              self.__fe_err__[-1] * __RyTomev__)
+                print "FC gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gc__[-1] * __RyTomev__, 
+                                                                       self.__gc_err__[-1] * __RyTomev__)
+                print "Kong-Liu effective sample size = ", self.__KL__[-1]
+            
+            if verbose >= 2:
+                # Print the dynamical matrix at each step
+                ka = len(self.__fe__)
+                self.dyn.save_qe("minim_dyn_step%d_" % ka)
+                
             # Get the stopping criteria
             running = not self.check_stop()
             
@@ -275,7 +309,47 @@ class SSCHA_Minimizer:
         
         return False
             
+    def plot_results(self):
+        """
+        PLOT RESULTS
+        ============
         
+        This usefull methods uses matplotlib to generate a plot of the
+        minimization.
+        
+        """
+        
+        # Convert the data in numpy arrays
+        fe = np.array(self.__fe__) * __RyTomev__
+        fe_err = np.array(self.__fe_err__) * __RyTomev__
+        
+        gc = np.array(self.__gc__) * __RyTomev__
+        gc_err = np.array(self.__gc_err__) * __RyTomev__
+        
+        kl = np.array(self.__KL__)
+        
+        steps = np.arange(len(fe))
+        
+        # Plot
+        plt.figure()
+        plt.title("Free energy")
+        plt.errorbar(steps, fe, yerr = fe_err, label = "Free energy")
+        plt.ylabel(r"$F$ [meV]")
+        plt.xlabel("steps")
+        
+        plt.figure()
+        plt.title("Gradient")
+        plt.errorbar(steps, gc, yerr = gc_err, label = "gradient")
+        plt.ylabel(r"$|\vec g|$ [meV / A]")
+        plt.xlabel("steps")
+        
+        plt.figure()
+        plt.title("Kong-Liu effective sample size")
+        plt.plot(steps, kl)
+        plt.ylabel(r"$\frac{N_{eff}}{N_0}$")
+        plt.xlabel("steps")
+        
+        plt.show()
             
     
 
