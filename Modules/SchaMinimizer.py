@@ -10,7 +10,9 @@ import numpy as np
 
 class SSCHA_Minimizer:
     
-    def __init__(self, ensemble, root_representation = "normal"):
+    def __init__(self, ensemble, root_representation = "normal",
+                 kong_liu_ratio = 0.5, meaningful_factor = 0.1,
+                 minimization_algorithm = "sdes"):
         """
         This class create a minimizer to perform the sscha minimization.
         It performs the sscha minimization.
@@ -23,6 +25,21 @@ class SSCHA_Minimizer:
             root_representation : string
                 Chose between "normal", "sqrt" and "root4". These are the nonlinear change
                 of variable to speedup the code.
+            kong_liu_ratio : float
+                The ration of the Kong-Liu effective sample size below which
+                the minimization is stopped and a new ensemble needs to be
+                generated to proceed.
+            meaningful_factor : float
+                The ration between the gradient and its error below which
+                the minimization is considered to be converged.
+            minimization_algorithm : string
+                The minimization algoirthm used. One between 'sdes', 'cgrf' or
+                'auto'. They behave as follow:
+                    - 'sdes' => Steepest Descent
+                    - 'cgrf' => Congjugate gradient
+                    - 'auto' => Uses cgrf if the error lower than the gradient, 'sdes' otherwise.
+                
+                NOTE: Only sdes is currently implemented.
         """
         
         self.ensemble = ensemble
@@ -45,6 +62,27 @@ class SSCHA_Minimizer:
         # The gradient before the last step was performed (Used for the CG)
         self.prev_grad = None
         
+        # Setup the statistical threshold
+        self.kong_liu_ratio = kong_liu_ratio
+        
+        # Setup the meaningful_factor
+        self.meaningful_factor = meaningful_factor
+        
+        # Setup the minimization algorithm
+        self.minimization_algorithm = minimization_algorithm
+        
+        # Initialize the variable for convergence
+        self.__converged__ = False
+        
+        # Initialize all the variables to store the minimization
+        self.__fe__ = []
+        self.__fe_err__ = []
+        self.__gc__ = []
+        self.__gc_err__ = []
+        self.__gw__ = []
+        self.__gw_err__ = []
+        self.__KL__ = []
+        
         
     def minimization_step(self, algorithm = "sdes"):
         """
@@ -64,7 +102,11 @@ class SSCHA_Minimizer:
             raise ValueError("Error, %s algorithm is not supported." % algorithm)
         
         # Get the gradient of the free-energy respect to the dynamical matrix
-        dyn_grad = self.ensemble.get_free_energy_gradient_respect_to_dyn()
+        dyn_grad, err = self.ensemble.get_free_energy_gradient_respect_to_dyn()
+        
+        # Store the gradient in the minimization
+        self.__gc__.append(np.trace(dyn_grad.dot(dyn_grad)))
+        self.__gc_err__.append(np.trace(err.dot(err)))
         
         # TODO: use the nonlinear change of variable to minimize correctly the dynamical matrix
         
@@ -72,6 +114,7 @@ class SSCHA_Minimizer:
         struct_grad = - self.ensemble.get_average_forces()
         
         # Apply the translational symmetry on the structure
+        # TODO: implement symmetries directly on the gradient of wyckoff
         struct_grad -= np.tile(np.einsum("ij->j", struct_grad), (self.ensemble.current_dyn.structure.N_atoms,1))
         
         
@@ -90,13 +133,26 @@ class SSCHA_Minimizer:
             current_struct.impose_symmetries(self.symmetries, verbose = False)
         
         new_dyn.structure = current_struct
+        self.dyn = new_dyn
         
         # Update the ensemble
-        self.ensemble.update_weights(new_dyn, self.ensemble.current_T)
-        self.dyn = new_dyn
+        self.update()
         
         # Update the previous gradient
         self.prev_grad = dyn_grad
+        
+        
+    def is_converged(self):
+        """
+        Simple method to check if the simulation is converged or
+        requires a new population to be runned.
+        
+        Result
+        ------
+            bool : 
+                True if the simulation ended for converging.
+        """
+        return self.__converged__
         
     def update(self):
         """
@@ -154,6 +210,74 @@ class SSCHA_Minimizer:
         #    raise ValueError("Error, the ensemble dynamical matrix has not been updated. You forgot to call self.update() before")
         
         return self.ensemble.get_free_energy(return_error = return_error)
+    
+    def run(self):
+        """
+        RUN THE SSCHA MINIMIZATION
+        ==========================
+        
+        This function uses all the setted up parameters to run the minimization
+        
+        The minimization is stopped only when one of the stopping criteria are met.
+        """
+        # Eliminate the convergence flag
+        self.__converged__ = False
+        
+        # TODO: Activate a new pipe to avoid to stop the execution of the python 
+        #       code when running the minimization. This allows for interactive plots
+        running = True
+        while running:
+            # Compute the free energy and its error
+            fe, err = self.get_free_energy(True)
+            self.__fe__.append(fe)
+            self.__fe_err__.append(err)
+            
+            # Compute the KL ratio
+            self.__KL__ = self.ensemble.get_effective_sample_size()
+            
+            # Perform the minimization step
+            self.minimization_step(self.minimization_algorithm)
+            
+            
+            # Get the stopping criteria
+            running = not self.check_stop()
+            
+        
+    def check_stop(self):
+        """
+        CHECK THE STOPPING CONDITION
+        ============================
+        
+        Check the stopping criteria and returns True if the stopping
+        condition is satisfied
+        
+        Result
+        ------
+            bool : 
+                True if the minimization must be stopped, False otherwise
+        
+        """
+        
+        # Check the gradient
+        last_gc = self.__gc__[-1]
+        last_gc_err = self.__gc_err__[-1]
+        
+        if last_gc < last_gc_err * self.meaningful_factor:
+            self.__converged__ = True
+            return True
+        
+        # Check the KL
+        kl = self.ensemble.get_effective_sample_size()
+        
+        if kl / float(self.ensemble.N) < self.kong_liu_ratio:
+            self.__converged__ = False
+            return True
+        
+        return False
+            
+        
+            
+    
 
 def get_root_dyn(dyn_fc, root_representation):
     """
