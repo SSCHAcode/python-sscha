@@ -527,6 +527,8 @@ class Ensemble:
         ====================
         
         Get the free energy gradient respect to the dynamical matrix.
+        The result is in [Ry/bohr^3] as the dynamical matrix are stored
+        in [Ry/bohr^2].
         
         .. math::
             
@@ -666,9 +668,9 @@ class Ensemble:
         qe_sym.SymmetrizeDynQ(df_dfc, self.current_dyn.q_tot[0])
         qe_sym.SymmetrizeDynQ(err_df_dfc, self.current_dyn.q_tot[0])
         
-        # Convert from [Ha/bohr] in [Ry/A]
-        df_dfc *= __A_TO_BOHR__ * 2
-        err_df_dfc *= __A_TO_BOHR__ * 2
+        # Convert from [Ha/bohr] in [Ry/bohr]
+        df_dfc *= 2
+        err_df_dfc *=  2
         
 
 #        # Prepare the w as a matrix

@@ -19,7 +19,7 @@ class SSCHA_Minimizer:
     
     def __init__(self, ensemble, root_representation = "normal",
                  kong_liu_ratio = 0.5, meaningful_factor = 0.1,
-                 minimization_algorithm = "sdes"):
+                 minimization_algorithm = "sdes", lambda_a = 1):
         """
         This class create a minimizer to perform the sscha minimization.
         It performs the sscha minimization.
@@ -47,6 +47,8 @@ class SSCHA_Minimizer:
                     - 'auto' => Uses cgrf if the error lower than the gradient, 'sdes' otherwise.
                 
                 NOTE: Only sdes is currently implemented.
+            lambda_a : float
+                The force constant minimization step.
         """
         
         self.ensemble = ensemble
@@ -57,7 +59,7 @@ class SSCHA_Minimizer:
         self.symmetries = None
         
         # The minimization step
-        self.min_step_dyn = 1e-4
+        self.min_step_dyn = lambda_a
         self.min_step_struc = 1
         
         self.dyn = self.ensemble.current_dyn.Copy()
@@ -77,6 +79,7 @@ class SSCHA_Minimizer:
         
         # Setup the minimization algorithm
         self.minimization_algorithm = minimization_algorithm
+        
         
         # Initialize the variable for convergence
         self.__converged__ = False
@@ -218,7 +221,7 @@ class SSCHA_Minimizer:
         
         return self.ensemble.get_free_energy(return_error = return_error)
     
-    def run(self, verbose = 1):
+    def run(self, verbose = 1, custom_function = None):
         """
         RUN THE SSCHA MINIMIZATION
         ==========================
@@ -237,6 +240,12 @@ class SSCHA_Minimizer:
                     - 1 : For each step only the free energy, the modulus of the gradient and 
                         the Kong-Liu effective sample size is printed.
                     - 2 : The dynamical matrix at each step is saved on output with a progressive integer
+            custom_function : pointer to function (self)
+                It is a custom function that takes as an input the current
+                structure. At each step this function is invoked. This allows
+                to print particular analysis during the minimization that
+                the user want to define to better control what is it happening
+                to the system. 
         """
         
         # Eliminate the convergence flag
@@ -258,6 +267,9 @@ class SSCHA_Minimizer:
             # Perform the minimization step
             self.minimization_step(self.minimization_algorithm)
             
+            # Invoke the custom function (if any)
+            if custom_function is not None:
+                custom_function(self)
             
             # Print the step
             if verbose >= 1:
@@ -275,6 +287,7 @@ class SSCHA_Minimizer:
                 
             # Get the stopping criteria
             running = not self.check_stop()
+            print "Running:", running
             
         
     def check_stop(self):
@@ -305,17 +318,25 @@ class SSCHA_Minimizer:
         
         if kl / float(self.ensemble.N) < self.kong_liu_ratio:
             self.__converged__ = False
+            print "KL:", kl, "KL/N:", kl / float(self.ensemble.N), "KL RAT:", self.kong_liu_ratio
             return True
         
+        print "I say false"
         return False
             
-    def plot_results(self):
+    def plot_results(self, save_filename = None):
         """
         PLOT RESULTS
         ============
         
         This usefull methods uses matplotlib to generate a plot of the
         minimization.
+        
+        Parameters
+        ----------
+            save_filename : optional, string
+                If present the plotted data will be saved in
+                a text file specified by input.
         
         """
         
@@ -329,6 +350,13 @@ class SSCHA_Minimizer:
         kl = np.array(self.__KL__)
         
         steps = np.arange(len(fe))
+        
+        # Check if the results need to be saved on a file
+        if save_filename is not None:
+            save_data = [steps, fe, fe_err, gc, gc_err, kl]
+            np.savetxt(save_filename, np.transpose(save_data),
+                       header = "Steps; Free energy +- error [meV]; FC gradient +- error [meV / A]; Kong-Liu N_eff")
+        
         
         # Plot
         plt.figure()
