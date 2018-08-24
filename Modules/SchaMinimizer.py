@@ -1,6 +1,24 @@
 # -*- coding: utf-8 -*-
 
 """
+This is part of the program python-sscha
+Copyright (C) 2018  Lorenzo Monacelli
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. 
+"""
+
+"""
 This file contains the SSCHA minimizer tool
 It is possible to use it to perform the anharmonic minimization 
 """
@@ -221,7 +239,46 @@ class SSCHA_Minimizer:
         
         return self.ensemble.get_free_energy(return_error = return_error)
     
-    def run(self, verbose = 1, custom_function = None):
+    def init(self):
+        """
+        INITIALIZE THE MINIMIZATION
+        ===========================
+        
+        This subroutine initialize the variables needed by the minimization.
+        Call this before the first time you invoke the run function.
+        """
+        
+        # Clean all the minimization variables
+        self.__fe__ = []
+        self.__fe_err__ = []
+        self.__converged__ = False
+        self.__gc__ = []
+        self.__gc_err__ = []
+        self.__KL__ = []
+        self.__gw__ = []
+        self.__gw_err__ = []
+    
+        # Get the free energy
+        fe, err = self.get_free_energy(True)
+        self.__fe__.append(fe)
+        self.__fe_err__.append(err)
+        
+        # Get the initial gradient
+        grad, grad_err = self.ensemble.get_free_energy_gradient_respect_to_dyn()
+        self.prev_grad = grad
+        
+        # Get the gradient modulus
+        gc = np.trace(grad.dot(grad))
+        gc_err = np.trace(grad_err.dot(grad_err))
+        
+        self.__gc__.append(gc)
+        self.__gc_err__.append(gc_err)
+        
+        # Compute the KL ratio
+        self.__KL__.append(self.ensemble.get_effective_sample_size())
+
+    
+    def run(self, verbose = 1, custom_function_pre = None, custom_function_post = None):
         """
         RUN THE SSCHA MINIMIZATION
         ==========================
@@ -240,12 +297,18 @@ class SSCHA_Minimizer:
                     - 1 : For each step only the free energy, the modulus of the gradient and 
                         the Kong-Liu effective sample size is printed.
                     - 2 : The dynamical matrix at each step is saved on output with a progressive integer
-            custom_function : pointer to function (self)
+            custom_function_pre : pointer to function (self)
                 It is a custom function that takes as an input the current
                 structure. At each step this function is invoked. This allows
                 to print particular analysis during the minimization that
                 the user want to define to better control what is it happening
                 to the system. 
+                This function is called before the minimization step has been performed.
+                The info on the system saved in the self minimization reguards the previous step.
+            custom_function_post : pointer to function(self)
+                The same as the previous argument, but this function is invoked after 
+                the minimization step has been perfomed. The data about free energy,
+                gradient and effective sample size have been updated.
         """
         
         # Eliminate the convergence flag
@@ -255,6 +318,13 @@ class SSCHA_Minimizer:
         #       code when running the minimization. This allows for interactive plots
         running = True
         while running:
+            # Invoke the custom fuction if any
+            if custom_function_pre is not None:
+                custom_function_pre(self)
+            
+            # Perform the minimization step
+            self.minimization_step(self.minimization_algorithm)
+            
             # Compute the free energy and its error
             fe, err = self.get_free_energy(True)
             self.__fe__.append(fe)
@@ -264,12 +334,12 @@ class SSCHA_Minimizer:
             # Compute the KL ratio
             self.__KL__.append(self.ensemble.get_effective_sample_size())
             
-            # Perform the minimization step
-            self.minimization_step(self.minimization_algorithm)
+            # Get the stopping criteria
+            running = not self.check_stop()
             
             # Invoke the custom function (if any)
-            if custom_function is not None:
-                custom_function(self)
+            if custom_function_post is not None:
+                custom_function_post(self)
             
             # Print the step
             if verbose >= 1:
@@ -285,8 +355,6 @@ class SSCHA_Minimizer:
                 ka = len(self.__fe__)
                 self.dyn.save_qe("minim_dyn_step%d_" % ka)
                 
-            # Get the stopping criteria
-            running = not self.check_stop()
             print "Running:", running
             
         

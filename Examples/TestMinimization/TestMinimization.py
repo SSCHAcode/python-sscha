@@ -122,6 +122,8 @@ def print_dyn_grad_projection(sscha_minim):
     print "Dyn_coeff [Ha/bohr^2]: ", dyn_coeff / 2
     print "GC_coeff [Ha/bohr^3]: ", gc_coeff / 2
 
+# Initialize the minimization
+minim.init()
 
 # Cycle over the ensebles
 running = True
