@@ -24,7 +24,6 @@ This module contains usefull subroutines to work with
 """
 
 import cellconstructor as CC
-import cellconstructor.Phonons
 import scipy, scipy.linalg
 import numpy as np
 
