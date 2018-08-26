@@ -26,6 +26,7 @@ This module contains usefull subroutines to work with
 import cellconstructor as CC
 import scipy, scipy.linalg
 import numpy as np
+import os
 
 # ------------------ GENERATORS ---------------------------
 # Here we work with the old sscha generators, to enable them
@@ -48,8 +49,65 @@ class Generators:
         self.wyck_gen = None
         self.wyck_ncoeff = 0
         
-        self.dyn_ncoeff = 0
+        self.dyn_ncoeff = []
         self.dyn_gen = []
+        
+    def LoadFromFileWyck(self, filename, natoms):
+        """
+        LOAD THE WYCKOFF GENERATORS FROM FILE
+        =====================================
+        
+        This subroutine initializes and loads the wyckoff
+        generator from the given filename
+        
+        Parameters
+        ----------
+            filename : string
+                Path to the file that contains the generators
+            natoms : int
+                The number of atoms in the structure
+        
+        """
+        # Check if the file exists
+        if not os.path.exists(filename):
+            raise IOError("Error while loading %s, file not found." % filename)
+        
+        
+        # Load the file
+        f = open(filename, "r")
+        flines = [l.strip() for l in f.readlines()]
+        f.close()
+        
+        
+        ngen = 0
+        current_i = 0
+        current_at = 0
+        for i, line in enumerate(flines):
+            # Get the number of generators
+            if i == 0:
+                ngen = int(flines[0])
+                self.wyck_gen = np.zeros((ngen, natoms, 3), dtype = np.float64)
+                continue
+            
+            # Get the value of the generators
+            l_number = np.array([np.float64(x) for x in line.split()])
+            
+            # Setup the generators
+            self.wyck_gen[current_i, current_at, :] = l_number
+            
+            current_at += 1
+            
+            # Check if the atoms are endend
+            if current_at == natoms:
+                current_at = 0
+                current_i += 1
+        
+        # Check if the number of line read matched the correct one
+        if current_i != ngen or current_at != 0:
+            raise IOError("Error, the specified file %s do not match with the given number of atoms" % filename)
+                
+        self.wyck_ncoeff = ngen
+        
     
     def LoadFromFileFC(self, filename, natoms, nqirr):
         """
@@ -67,69 +125,143 @@ class Generators:
                 The number of irreducible q points
         """
         
+        # Check if the file exists
+        if not os.path.exists(filename):
+            raise IOError("Error while loading %s, file not found." % filename)
+            
+            
         f = open(filename, "r")
         flines = [l.strip() for l in f.readlines()]
         
-        self.dyn_gen = []
+        self.dyn_ncoeff = []
         self.nat = natoms
-        
+        self.dyn_gen = np.zeros( (nqirr, 3*natoms*3*natoms, 3*natoms, 3*natoms), 
+                                dtype = np.complex128)
         # Read how many generator are for this particular q point
         n_gen = int(flines[0])
         current_i = 0
         
-        ghrs = []
+        ghrs = np.zeros( (3*natoms*3*natoms, 3*natoms, 3*natoms), dtype = np.complex128)
         fc = np.zeros( (3*natoms, 3*natoms), dtype = np.complex128) 
-        new_gen = True
+        new_gen = False
         
         na = 0
         nb = 0
         index  = 0
+        iq = 0
+        
+        #print "NGEN:", n_gen
         for i, line in enumerate(flines):
+            # Skip the first line
+            if i == 0:
+                continue
             
+            #print current_i, line
             if new_gen:
                 # Append the generator
-                if i != 0:
-                    ghrs.append(fc)
+                ghrs[current_i, :, :] = fc.copy()
                 
                 if current_i == n_gen:
                     n_gen = int(line)
                     current_i = 0
-                    self.dyn_gen.append( np.array(ghrs))
+                    self.dyn_gen[iq, :,:,:] =ghrs.copy()
                     self.dyn_ncoeff.append(len(ghrs))
+                    iq += 1
                     continue
             
                 
                 fc = np.zeros( (3*natoms, 3*natoms), dtype = np.complex128)
                 new_gen = False
                 current_i += 1
-                continue
             
             # Polish the line
-            line = line.replace(",", "")
-            line = line.replace("(", "")
-            line = line.replace(")", "")
+            line = line.replace(",", " ")
+            line = line.replace("(", " ")
+            line = line.replace(")", " ")
             
             line_list = [np.float64(x) for x in line.split()]
             
             # Select the atomic indexs
             if len(line_list) == 2:
-                na = line_list[0] -1
-                nb = line_list[1] -1
+                na = int(line_list[0] -1)
+                nb = int(line_list[1] -1)
                 index = 0
                 continue
+#            
+#            if na == 0 and nb ==0 and current_i == 0:
+#                print na, nb, index, line, line_list
             
             fc[3 * na + index, 3 * nb] = line_list[0] + 1j*line_list[1]
             fc[3 * na + index, 3 * nb + 1] = line_list[2] + 1j*line_list[3]
             fc[3 * na + index, 3 * nb + 2] = line_list[4] + 1j*line_list[5]
             
-            if (na+1  == natoms ) and (nb+1 == natoms):
+            index += 1
+            
+            if (na+1  == natoms ) and (nb+1 == natoms) and index == 3:
+                #print na, nb, index, natoms, "NEW GEN", current_i
                 new_gen = True
             
                 
         # Append also the last generators
-        self.dyn_gen.append( np.array(ghrs))
-        self.dyn_ncoeff.append(len(ghrs))
+        self.dyn_gen[iq, :, :, :] =  ghrs.copy()
+        self.dyn_ncoeff.append(n_gen)
         
+        
+    def ProjectWyck(self, coords):
+        """
+        PROJECT THE COORDINATES IN THE WYCKOFF GENERATORS
+        =================================================
+        
+        The following method project the given atomic displacement into
+        the generators of the wyckoff positions.
+        
+        Parameters
+        ----------
+            coords : n_at x 3
+                The coordinates of the atomic displacement to be projected
+        
+        Results
+        -------
+            coeffs : ndarray
+                The coefficients of the wyckoff positions
+        """
+        # Check the coords shape
+        s = np.shape(coords)
+        if len(s) != 2:
+            raise ValueError("The given array must be 2 dimensional")
+        
+        nat = np.shape(self.wyck_gen)[1]
+        if s[0] != nat:
+            raise ValueError("The number of atoms in the coords does not match the one in the wyckoff positions")
+
+        if s[1] != 3:
+            raise ValueError("Error, the vectors must be 3d-cartesian for each atom")
+            
+        return np.einsum("ijk, jk", self.wyck_gen, coords)
+    
+    def GenWyck(self, coeffs):
+        """
+        GENERATE A WYCKOFF DISPLACEMENT
+        ===============================
+        
+        Generate the wyckoff displacement from the coefficients of the generator.
+        
+        Parameters
+        ----------
+            coeffs : ndarray
+                The coefficients of the wyckoff generators
+        
+        Returns
+        -------
+            coords : nat x 3
+                The 2d array containing the cartesian displacement for each atom.
+        """
+        
+        # Check the length of the coeffs
+        if len(coeffs) != self.wyck_ncoeff:
+            raise ValueError("Error, the coefficients must have the same length of the generators")
+        
+        return  np.einsum("ijk, i", self.wyck_gen, coeffs)
         
     def ProjectDyn(self, fc, iq = 0):
         """
@@ -149,8 +281,8 @@ class Generators:
                 The coefficients of the generators that decompose the number.
         """
         
-        res = np.einsum("ijk, kj", self.dyn_gen[iq], fc)
-        return res                
+        res = np.real(np.einsum("ijk, kj", self.dyn_gen[iq, :,:,:], fc))
+        return res[:self.dyn_ncoeff[iq]]
     
     
     def GetDynFromCoeff(self, coeffs, iq=0):
@@ -175,10 +307,20 @@ class Generators:
         
         # Check if the coeff are of the correct length
         if len(coeffs) != self.dyn_ncoeff[iq]:
-            raise ValueError("Error, the number of coeff %d does not match the number of generator %d. (iq=%d)" % (len(coeffs), self.dyn_coeff[iq], iq))
+            raise ValueError("Error, the number of coeff %d does not match the number of generator %d. (iq=%d)" % (len(coeffs), self.dyn_ncoeff[iq], iq))
         
-        fc = np.einsum("ijk, i", self.dyn_gen[iq], coeffs)
+        new_coeffs = coeffs
+        k_len = len(self.dyn_gen[iq,:, 0,0])
+        if len(coeffs != k_len):
+            new_coeffs = np.zeros( (k_len), dtype = np.float64)
+            new_coeffs[: len(coeffs)] = coeffs
+        
+        fc = np.einsum("ijk, i", self.dyn_gen[iq, :,:,:], new_coeffs)
         return fc
+    
+    
+    
+    
     
     def Generate(self, dyn, qe_sym = None):
         """
