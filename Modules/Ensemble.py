@@ -236,7 +236,7 @@ class Ensemble:
         # Check if the stresses must be saved
         save_stress = False
         if self.stresses != []:
-            print self.stresses
+            #print self.stresses
             save_stress = True
             
         for i in range(self.N):
