@@ -356,12 +356,12 @@ class Ensemble:
         new_q = self.current_q * np.sqrt(2) * __A_TO_BOHR__
         
         
-#        # Call the Fortran module to compute rho
-#        print "SHAPES:"
-#        print "NEW Q:", np.shape(new_q)
-#        print "OLD Q:", np.shape(old_q)
-#        print "NEW A:", np.shape(new_a)
-#        print "OLD A:", np.shape(old_a)
+        # Call the Fortran module to compute rho
+        print "SHAPES:"
+        print "NEW Q:", np.shape(new_q)
+        print "OLD Q:", np.shape(old_q)
+        print "NEW A:", np.shape(new_a)
+        print "OLD A:", np.shape(old_a)
         
         self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
         

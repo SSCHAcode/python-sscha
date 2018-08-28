@@ -203,6 +203,7 @@ class Generators:
             
                 
         # Append also the last generators
+        ghrs[current_i, :, :] = fc.copy()
         self.dyn_gen[iq, :, :, :] =  ghrs.copy()
         self.dyn_ncoeff.append(n_gen)
         
