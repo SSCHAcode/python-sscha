@@ -81,6 +81,9 @@ class Ensemble:
         # To avoid to recompute each time the same variables store something usefull here
         self.q_start = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
         self.current_q = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
+        
+        # Store also the displacements
+        self.u_disps = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
 
         
     def load(self, data_dir, population, N):
@@ -140,8 +143,11 @@ class Ensemble:
         self.stresses = np.zeros( (self.N, 3,3))
         
         self.sscha_energies = np.zeros(self.N)
+        self.energies = np.zeros(self.N)
         self.sscha_forces = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3))
         
+        self.u_disps = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
+
         self.structures = []
         
         for i in range(self.N):
@@ -152,9 +158,12 @@ class Ensemble:
             structure.unit_cell = self.dyn_0.structure.unit_cell
             self.structures.append(structure)
             
+            # Get the displacement
+            self.u_disps[i,:] = structure.get_displacement(self.current_dyn.structure).reshape( 3 * self.current_dyn.structure.N_atoms)
+            
             # Load forces (Forces are in Ry/bohr, convert them in Ry /A)
             self.forces[i,:,:] = np.loadtxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1)) * A_TO_BOHR
-            
+             
             # Load stress
             if os.path.exists("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)):
                 self.stresses[i,:,:] =  np.loadtxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)) 
@@ -180,7 +189,8 @@ class Ensemble:
             self.sscha_forces[i,:,:] = force
             
         # Load the energy
-        self.energies = np.loadtxt("%s/energies_supercell_population%d.dat" % (data_dir, population))
+        total_energies = np.loadtxt("%s/energies_supercell_population%d.dat" % (data_dir, population))
+        self.energies = total_energies[:N]
         
         # Setup the initial weight
         self.rho = np.ones(self.N)
@@ -294,11 +304,15 @@ class Ensemble:
         self.sscha_forces = np.zeros((self.N, self.dyn_0.structure.N_atoms, 3))
         self.energies = np.zeros(self.N)
         self.forces = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3))
+        self.u_disps = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
         for i, s in enumerate(self.structures):
             energy, force  = self.dyn_0.get_energy_forces(s)
             
             self.sscha_energies[i] = energy
             self.sscha_forces[i,:,:] = force
+            
+            # Get the displacements
+            self.u_disps[i, :] = s.get_displacement(self.dyn_0.structure).reshape((3*self.dyn_0.structure.N_atoms))
         
         self.rho = np.ones(self.N)
         self.current_dyn = self.dyn_0.Copy()
@@ -354,16 +368,23 @@ class Ensemble:
         # Convert the q vectors in the Hartree units
         old_q = self.q_start * np.sqrt(2) * __A_TO_BOHR__
         new_q = self.current_q * np.sqrt(2) * __A_TO_BOHR__
-        
+#        
+#        print "NEWQ: ", new_q
+#        print "OLDQ: ", old_q
+#        print "NEWA:", new_a
+#        print "OLDA:", old_a
+#        
         
         # Call the Fortran module to compute rho
-        print "SHAPES:"
-        print "NEW Q:", np.shape(new_q)
-        print "OLD Q:", np.shape(old_q)
-        print "NEW A:", np.shape(new_a)
-        print "OLD A:", np.shape(old_a)
+#        print "SHAPES:"
+#        print "NEW Q:", np.shape(new_q)
+#        print "OLD Q:", np.shape(old_q)
+#        print "NEW A:", np.shape(new_a)
+#        print "OLD A:", np.shape(old_a)
         
         self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
+        
+        #print "RHO:", self.rho
         
         for i in range(self.N):
             #print "Weight %d" % i
@@ -371,7 +392,8 @@ class Ensemble:
             #print "FORTRAN :", self.rho[i], "PYTHON:", tmp
             self.sscha_energies[i], self.sscha_forces[i, :,:] = new_dynamical_matrix.get_energy_forces(self.structures[i])
             
-            
+            # Get the new displacement
+            self.u_disps[i, :] = self.structures[i].get_displacement(new_dynamical_matrix.structure).reshape(3 * new_dynamical_matrix.structure.N_atoms)
         self.current_dyn = new_dynamical_matrix
         
         
@@ -514,6 +536,9 @@ class Ensemble:
             if iq == 0:
                 tmask = CC.Methods.get_translations(pols, self.current_dyn.structure.get_masses_array())
                 w = w[ ~tmask ]
+                
+            if len(w[w < 0]) >= 1:
+                raise ValueError("Error, the dynamical matrix has imaginary frequencies")
             
             free_energy += np.sum( w / 2)
             if T > 0:
@@ -537,7 +562,93 @@ class Ensemble:
             return free_energy, error
         return free_energy
 
+    def get_fc_from_self_consistency(self, subtract_sscha = False, return_error = False):
+        """
+        SELF CONSISTENT SCHA EQUATION
+        =============================
+        
+        This function evaluate the self consistent scha equation. This can be used
+        to evaluate the goodness of the minimization procedure, as well as an
+        independent minimizer.
+        
+        
+        .. math::
+            
+            \\Phi_{ab} = \\frac 12 \\sum_c \\upsilon_{ac} \\left< u_c f_a\\right>_{\\Phi}
+            
+        The previous equation is true only if the :math:`\\Phi` matrix is the solution
+        of the SCHA theory. Here :math:`\vec u` are the displacements of the configurations
+        and :math:`\\vec f` are the forces of the real system acting on the simulation.
+        
+        Parameters
+        ----------
+            subtract_sscha : bool, optional
+                This is an optional parameter, if true the forces used to evaluate the 
+                new force constant matrix are subtracted by the sscha forces. 
+                This means that the result is a gradient of the new matrix with respect 
+                to the old one.
+            return_error : bool, optional
+                If true also the stochastic error is returned.
+                
+        Results
+        -------
+            fc : ndarray (3*nat x 3*nat)
+                The real space force constant matrix obtained by the
+                self-consistent equation.
+        """
+        
+        
+        # Get the upsilon matrix
+        ups_mat = self.current_dyn.GetUpsilonMatrix(self.current_T)
+        
+        # Get the pseudo-displacements obtained as
+        # v = Upsilon * u = u * Upsilon^T  = u * Upsilon (we use the last to exploit fast indexing array)
+        #vs = np.einsum("ij,jk", self.u_disps, ups_mat) 
+        vs = self.u_disps.dot(ups_mat) # This should be faster if BLAS and MKL libraries are available (it is executed in parallel)
+        
+        # Build the force vector
+        if subtract_sscha:
+            f_vector = (self.forces - self.sscha_forces).reshape( (self.N, 3 * self.current_dyn.structure.N_atoms))
+        else:
+            f_vector = self.forces.reshape( (self.N, 3 * self.current_dyn.structure.N_atoms))
+            
+        # Average the ensemble
+        new_phi = np.einsum("i, ij, ik", self.rho, vs, f_vector) * .5 / np.sum(self.rho)
+        
+        # Compute the stochastic error
+        if (return_error):
+            delta_new_phi = np.einsum("i, ij, ik", self.rho, vs**2, f_vector**2) / np.sum(self.rho) * .5
+            delta_new_phi -= new_phi**2
+            delta_new_phi = np.sqrt(delta_new_phi)
+            return new_phi, delta_new_phi
+        
+        return new_phi
+        
     
+    def get_covmat_from_ensemble(self):
+        """
+        GET THE COVARIANCE STOCASTICALLY
+        ================================
+        
+        This method is for testing, allows to use the ensemble to
+        evaluate the covariance matrix stochastically. It should be equal
+        to the matrix Upsilon^-1 that is obtained with the GetUpsilonMatrix method
+        from the Phonons package.
+        
+        .. math::
+            
+            \Upsilon^{-1}_{ab} = \\left< u_a u_b\\right>
+        
+        Results
+        -------
+            cov_mat : 3nat x 3nat, ndarray
+                A numpy matrix of the covariance matrix.
+        """
+        
+        # A C style matrix of double precision real values
+        cov_mat = np.einsum("i, ij, ik", self.rho, self.u_disps, self.u_disps) / np.sum(self.rho)
+        
+        return cov_mat
     
     def get_free_energy_gradient_respect_to_dyn(self):
         """
@@ -656,6 +767,7 @@ class Ensemble:
                 print "(%d, %d): DA_DCR = " % (x_i+1, y_i+1), da_dcr
                 da_dcr_mat[x_i, y_i, :] = da_dcr
                 da_dcr_mat[y_i, x_i, :] = da_dcr
+                
 
                 df_dc, delta_df_dc = SCHAModules.anharmonic.get_df_dcoeff_av_new(df_da, da_dcr, e_forces,
                                                                                  q_new, mass, de_dcr, 
