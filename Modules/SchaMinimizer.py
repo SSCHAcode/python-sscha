@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 import cellconstructor as CC
 import cellconstructor.Methods
 
+import Ensemble
 
 # Rydberg to cm-1 and meV conversion factor
 __RyToCm__  = 109691.40235
@@ -91,6 +92,9 @@ class SSCHA_Minimizer:
         # The gradient before the last step was performed (Used for the CG)
         self.prev_grad = None
         
+        self.precond_wyck = False
+        
+        
         # Setup the statistical threshold
         self.kong_liu_ratio = kong_liu_ratio
         
@@ -149,8 +153,6 @@ class SSCHA_Minimizer:
         qe_sym.SymmetrizeDynQ(dyn_grad, np.array([0,0,0]))
         qe_sym.ImposeSumRule(err)
         qe_sym.SymmetrizeDynQ(err, np.array([0,0,0]))
-
-        
         
         # Store the gradient in the minimization
         self.__gc__.append(np.trace(dyn_grad.dot(dyn_grad)))
@@ -159,12 +161,15 @@ class SSCHA_Minimizer:
         
         # Get the gradient of the free-energy respect to the structure
         struct_grad, struct_grad_err =  self.ensemble.get_average_forces(True)
-        struct_precond = GetStructPrecond(self.ensemble.current_dyn)
         struct_grad_reshaped = - struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
-        struct_grad_precond = struct_precond.dot(struct_grad_reshaped)
-        struct_grad = struct_grad_precond.reshape( (self.dyn.structure.N_atoms, 3))
-
         
+        # Preconditionate the gradient for the wyckoff minimization
+        if self.precond_wyck:
+            struct_precond = GetStructPrecond(self.ensemble.current_dyn)
+            struct_grad_precond = struct_precond.dot(struct_grad_reshaped)
+            struct_grad = struct_grad_precond.reshape( (self.dyn.structure.N_atoms, 3))
+    
+            
         # Apply the symmetries to the forces
         qe_sym.SymmetrizeVector(struct_grad)
         qe_sym.SymmetrizeVector(struct_grad_err)
@@ -183,7 +188,6 @@ class SSCHA_Minimizer:
         # Perform the step for the structure
         current_struct.coords -= self.min_step_struc * struct_grad
         
-        # Get the preconditioner
         
         # Symmetrize the structure after the gradient is applied
         if self.symmetries is not None:
@@ -197,6 +201,82 @@ class SSCHA_Minimizer:
         
         # Update the previous gradient
         self.prev_grad = dyn_grad
+        
+    def setup_from_namelist(self, input_file):
+        """
+        SETUP THE MINIMIZATION 
+        ======================
+        
+        This function setups all the parameters of the minimization using a namelist.
+        It is compatible with the old sscha code, and very usefull to save the 
+        input parameters in a simple input filename.
+        
+        Parameters
+        ----------
+            input_file : string
+                Path to the input namelist. The content must match the Quantum ESPRESSO
+                file format
+        """
+        
+        # Get the dictionary
+        namelist = CC.Methods.read_namelist(input_file)
+        
+        # Check for keywords
+        keys = namelist.keys()
+        
+        if "lambda_a" in keys:
+            self.min_step_dyn = np.float64(namelist["lambda_a"])
+        
+        if "lambda_w" in keys:
+            self.min_step_struc = np.float64(namelist["lambda_w"])
+            
+        if "precond_wyck" in keys:
+            self.precond_wyck = bool(namelist["precond_wyck"])
+            
+        if "n_random_eff" in keys:
+            if not "n_random" in keys:
+                raise IOError("Error, if you want to impose the minimum KL\n"
+                              "       effective sample size, you must give also n_random")
+            self.kong_liu_ratio = int(namelist["n_random"]) / np.float64(namelist["n_random_eff"])
+            
+        if "meaningful_factor" in keys:
+            self.meaningful_factor = np.float64(namelist["meaningful_factor"])
+            
+        if "eq_energy" in keys:
+            self.eq_energy = np.float64(namelist["eq_energy"])
+            
+        if "fildyn_prefix" in keys:
+            # nqirr must be present
+            if not "nqirr" in keys:
+                raise IOError("Error, if an input dynamical matrix is specified, you must add the nqirr options")
+            
+            self.dyn = CC.Phonons.Phonons(namelist["fildyn_prefix"], nqirr = int(namelist["nqirr"]))
+        
+        # Ensemble keywords
+        if "data_dir" in keys:
+            # We can load an ensemble, check for the population number
+            if not "population" in keys:
+                raise IOError("Error, population required if the ensemble is provided")
+            if not "n_random" in keys:
+                raise IOError("Error, n_random required when providing an ensemble")
+            
+            if not "fildyn_prefix" in keys:
+                raise IOError("Error, the dynamical matrix that generated the ensemble must be provided")
+            
+            
+            # Setup the ensemble
+            self.ensemble = Ensemble.Ensemble(self.dyn, 0)
+            
+            if "t" in keys:
+                self.ensemble.current_T = np.float64(namelist["t"])
+                if not "tg" in keys:
+                    self.ensemble.T0 = self.ensemble.current_T
+            
+            if "tg" in keys:
+                self.ensemble.T0 = np.float64(namelist["tg"])
+                
+            # Load the data dir
+            self.ensemble.load(namelist["data_dir"], int(namelist["population"]), int(namelist["n_random"]))
         
         
     def is_converged(self):
