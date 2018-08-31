@@ -613,11 +613,13 @@ class Ensemble:
             f_vector = self.forces.reshape( (self.N, 3 * self.current_dyn.structure.N_atoms))
             
         # Average the ensemble
-        new_phi = np.einsum("i, ij, ik", self.rho, vs, f_vector) * .5 / np.sum(self.rho)
+        new_phi = np.einsum("i, ij, ik", self.rho, vs, f_vector) / np.sum(self.rho)
+        new_phi = (new_phi + np.transpose(new_phi)) * .5
         
         # Compute the stochastic error
         if (return_error):
-            delta_new_phi = np.einsum("i, ij, ik", self.rho, vs**2, f_vector**2) / np.sum(self.rho) * .5
+            delta_new_phi = np.einsum("i, ij, ik", self.rho, vs**2, f_vector**2) / np.sum(self.rho) 
+            delta_new_phi = (delta_new_phi + np.transpose(delta_new_phi)) * .5 
             delta_new_phi -= new_phi**2
             delta_new_phi = np.sqrt(delta_new_phi)
             return new_phi, delta_new_phi

@@ -26,6 +26,8 @@ It is possible to use it to perform the anharmonic minimization
 #import Ensemble
 import numpy as np
 import matplotlib.pyplot as plt
+import cellconstructor as CC
+import cellconstructor.Methods
 
 
 # Rydberg to cm-1 and meV conversion factor
@@ -129,21 +131,37 @@ class SSCHA_Minimizer:
         if algorithm != "sdes":
             raise ValueError("Error, %s algorithm is not supported." % algorithm)
         
+        # Setup the symmetries
+        qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+        
+        qe_sym.SetupQPoint(verbose = True)
+        
+        
         # Get the gradient of the free-energy respect to the dynamical matrix
-        dyn_grad, err = self.ensemble.get_free_energy_gradient_respect_to_dyn()
+        #dyn_grad, err = self.ensemble.get_free_energy_gradient_respect_to_dyn()
+        dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
+        
+        # Perform the symmetrization
+        qe_sym.ImposeSumRule(dyn_grad)
+        qe_sym.SymmetrizeDynQ(dyn_grad, np.array([0,0,0]))
+        qe_sym.ImposeSumRule(err)
+        qe_sym.SymmetrizeDynQ(err, np.array([0,0,0]))
+        
         
         # Store the gradient in the minimization
         self.__gc__.append(np.trace(dyn_grad.dot(dyn_grad)))
         self.__gc_err__.append(np.trace(err.dot(err)))
         
-        # TODO: use the nonlinear change of variable to minimize correctly the dynamical matrix
         
         # Get the gradient of the free-energy respect to the structure
         struct_grad = - self.ensemble.get_average_forces()
+        struct_precond = GetStructPrecond(self.ensemble.current_dyn)
+        struct_grad_reshaped = struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
+        struct_grad_precond = struct_precond.dot(struct_grad_reshaped)
+        struct_grad = struct_grad_precond.reshape( (self.dyn.structure.N_atoms, 3))
         
-        # Apply the translational symmetry on the structure
-        # TODO: implement symmetries directly on the gradient of wyckoff
-        struct_grad -= np.tile(np.einsum("ij->j", struct_grad), (self.ensemble.current_dyn.structure.N_atoms,1))
+        # Apply the symmetries to the forces
+        qe_sym.SymmetrizeVector(struct_grad)
         
         
         current_dyn = self.ensemble.current_dyn
@@ -154,7 +172,9 @@ class SSCHA_Minimizer:
         new_dyn.dynmats[0] = current_dyn.dynmats[0] - self.min_step_dyn * dyn_grad
         
         # Perform the step for the structure
-        current_struct.coords -= struct_grad * self.min_step_dyn
+        current_struct.coords -= self.min_step_struc * struct_grad
+        
+        # Get the preconditioner
         
         # Symmetrize the structure after the gradient is applied
         if self.symmetries is not None:
@@ -458,3 +478,56 @@ def get_root_dyn(dyn_fc, root_representation):
     """
     # TODO: To be ultimated
     pass
+
+
+def GetStructPrecond(current_dyn):
+    """
+    GET THE PRECONDITIONER FOR THE STRUCTURE MINIMIZATION
+    =====================================================
+    
+    The preconditioner of the structure minimization is computed directly from the
+    dynamical matrix. It is the fake inverse (projected out the translations).
+    
+    .. math::
+        
+        \\Phi_{\\alpha\\beta}^{-1} = \\frac{1}{\\sqrt{M_\\alpha M_\\beta}} \\sum_\\mu \\frac{e_\\mu^\\alpha e_\\mu^\\beta}{\\omega_\\mu^2}
+        
+    Where the sum is restricted to the non translational modes.
+    
+    Parameters
+    ----------
+        current_dyn : Phonons()
+            The current dynamical matrix
+        
+    Returns
+    -------
+        preconditioner : ndarray 3nat x 3nat
+            The inverse of the force constant matrix, it can be used as a preconditioner.
+            
+    """
+    
+    # Dyagonalize the current dynamical matrix
+    w, pols = current_dyn.DyagDinQ(0)
+    
+    # Get some usefull array
+    mass = current_dyn.structure.get_masses_array()
+    nat = current_dyn.structure.N_atoms
+    
+    _m_ = np.zeros( 3*nat, dtype = np.float64)
+    for i in range(nat):
+        _m_[3 * i: 3*i + 3] = mass[i]
+        
+    _msi_ = 1 / np.sqrt(_m_)
+    
+    # Select translations
+    not_trans = ~CC.Methods.get_translations(pols, mass)
+    
+    # Delete the translations from the dynamical matrix
+    w = w[not_trans]
+    pols = np.real(pols[:, not_trans])
+    
+    wm2 = 1 / w**2
+    
+    # Compute the precondition using the einsum
+    precond = np.einsum("a,b,c,ac,bc -> ab", _msi_, _msi_, wm2, pols, pols)
+    return precond
