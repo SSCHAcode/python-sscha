@@ -590,6 +590,8 @@ def GetStructPrecond(current_dyn):
     GET THE PRECONDITIONER FOR THE STRUCTURE MINIMIZATION
     =====================================================
     
+    NOTE: the Phi is in Ry/bohr^2 while the forces are in Ry/A
+    
     The preconditioner of the structure minimization is computed directly from the
     dynamical matrix. It is the fake inverse (projected out the translations).
     
