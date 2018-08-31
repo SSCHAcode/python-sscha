@@ -464,7 +464,7 @@ class Ensemble:
             return value, error
         return value
      
-    def get_average_forces(self):
+    def get_average_forces(self, get_error):
         """
         GET FORCES
         ==========
@@ -478,9 +478,19 @@ class Ensemble:
             
         where :math:`\\rho_i` is the ratio between the probability of extracting the configuration :math:`i`
         with the current dynamical matrix and with the dynamical matrix used to extract the ensemble.
+
+        Parameters
+        ----------
+            - get_errors : bool
+                If true the error is also returned (as get_free_energy).
         """
-        
-        return np.einsum("i, iab ->ab", self.rho, self.forces - self.sscha_forces) / np.sum(self.rho)
+
+        force = np.einsum("i, iab ->ab", self.rho, self.forces - self.sscha_forces) / np.sum(self.rho)
+        if get_error:
+            f2 = np.einsum("i, iab ->ab", self.rho, (self.forces - self.sscha_forces)**2) / np.sum(self.rho)
+            err = np.sqrt( f2 - force**2 )
+            return force, err
+        return force
     
     
     
@@ -600,7 +610,7 @@ class Ensemble:
         
         # Get the upsilon matrix
         ups_mat = self.current_dyn.GetUpsilonMatrix(self.current_T)
-        
+
         # Get the pseudo-displacements obtained as
         # v = Upsilon * u = u * Upsilon^T  = u * Upsilon (we use the last to exploit fast indexing array)
         #vs = np.einsum("ij,jk", self.u_disps, ups_mat) 
@@ -615,6 +625,7 @@ class Ensemble:
         # Average the ensemble
         new_phi = np.einsum("i, ij, ik", self.rho, vs, f_vector) / np.sum(self.rho)
         new_phi = (new_phi + np.transpose(new_phi)) * .5
+
         
         # Compute the stochastic error
         if (return_error):

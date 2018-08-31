@@ -99,7 +99,9 @@ class SSCHA_Minimizer:
         
         # Setup the minimization algorithm
         self.minimization_algorithm = minimization_algorithm
-        
+
+        # This is used to polish the ensemble energy
+        self.eq_energy = 0
         
         # Initialize the variable for convergence
         self.__converged__ = False
@@ -140,12 +142,14 @@ class SSCHA_Minimizer:
         # Get the gradient of the free-energy respect to the dynamical matrix
         #dyn_grad, err = self.ensemble.get_free_energy_gradient_respect_to_dyn()
         dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
+
         
         # Perform the symmetrization
         qe_sym.ImposeSumRule(dyn_grad)
         qe_sym.SymmetrizeDynQ(dyn_grad, np.array([0,0,0]))
         qe_sym.ImposeSumRule(err)
         qe_sym.SymmetrizeDynQ(err, np.array([0,0,0]))
+
         
         
         # Store the gradient in the minimization
@@ -154,15 +158,20 @@ class SSCHA_Minimizer:
         
         
         # Get the gradient of the free-energy respect to the structure
-        struct_grad = - self.ensemble.get_average_forces()
+        struct_grad, struct_grad_err =  self.ensemble.get_average_forces(True)
         struct_precond = GetStructPrecond(self.ensemble.current_dyn)
-        struct_grad_reshaped = struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
+        struct_grad_reshaped = - struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
         struct_grad_precond = struct_precond.dot(struct_grad_reshaped)
         struct_grad = struct_grad_precond.reshape( (self.dyn.structure.N_atoms, 3))
+
         
         # Apply the symmetries to the forces
         qe_sym.SymmetrizeVector(struct_grad)
+        qe_sym.SymmetrizeVector(struct_grad_err)
         
+        
+        self.__gw__.append(np.sqrt( struct_grad_reshaped.dot(struct_grad_reshaped)))
+        self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
         
         current_dyn = self.ensemble.current_dyn
         current_struct = self.ensemble.current_dyn.structure
@@ -182,7 +191,7 @@ class SSCHA_Minimizer:
         
         new_dyn.structure = current_struct
         self.dyn = new_dyn
-        
+
         # Update the ensemble
         self.update()
         
@@ -257,7 +266,7 @@ class SSCHA_Minimizer:
         #if np.sum( self.dyn != self.ensemble.current_dyn):
         #    raise ValueError("Error, the ensemble dynamical matrix has not been updated. You forgot to call self.update() before")
         
-        return self.ensemble.get_free_energy(return_error = return_error)
+        return self.ensemble.get_free_energy(return_error = return_error) 
     
     def init(self):
         """
@@ -277,20 +286,32 @@ class SSCHA_Minimizer:
         self.__KL__ = []
         self.__gw__ = []
         self.__gw_err__ = []
-    
+        
         # Get the free energy
         fe, err = self.get_free_energy(True)
         self.__fe__.append(fe)
         self.__fe_err__.append(err)
         
         # Get the initial gradient
-        grad, grad_err = self.ensemble.get_free_energy_gradient_respect_to_dyn()
+        grad, grad_err = self.ensemble.get_fc_from_self_consistency(True, True)
         self.prev_grad = grad
+
+        # Initialize the symmetry
+        qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+        qe_sym.SetupQPoint(verbose = True)
+
+        struct_grad, struct_grad_err = self.ensemble.get_average_forces(True)
+
+        qe_sym.SymmetrizeVector(struct_grad)
+        qe_sym.SymmetrizeVector(struct_grad_err)
         
         # Get the gradient modulus
         gc = np.trace(grad.dot(grad))
         gc_err = np.trace(grad_err.dot(grad_err))
-        
+
+        self.__gw__.append(np.sqrt( np.einsum("ij, ij", struct_grad, struct_grad)))
+        self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
+
         self.__gc__.append(gc)
         self.__gc_err__.append(gc_err)
         
@@ -347,6 +368,7 @@ class SSCHA_Minimizer:
             
             # Compute the free energy and its error
             fe, err = self.get_free_energy(True)
+            fe -= self.eq_energy
             self.__fe__.append(fe)
             self.__fe_err__.append(err)
             
@@ -368,6 +390,8 @@ class SSCHA_Minimizer:
                                                               self.__fe_err__[-1] * __RyTomev__)
                 print "FC gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gc__[-1] * __RyTomev__, 
                                                                        self.__gc_err__[-1] * __RyTomev__)
+                print "Struct gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gw__[-1] * __RyTomev__,
+                                                                            self.__gw_err__[-1] * __RyTomev__)
                 print "Kong-Liu effective sample size = ", self.__KL__[-1]
             
             if verbose >= 2:
@@ -396,8 +420,10 @@ class SSCHA_Minimizer:
         # Check the gradient
         last_gc = self.__gc__[-1]
         last_gc_err = self.__gc_err__[-1]
+        last_gw = self.__gw__[-1]
+        last_gw_err = self.__gw_err__[-1]
         
-        if last_gc < last_gc_err * self.meaningful_factor:
+        if (last_gc < last_gc_err * self.meaningful_factor) and (last_gw < last_gw_err * self.meaningful_factor):
             self.__converged__ = True
             return True
         
@@ -406,10 +432,9 @@ class SSCHA_Minimizer:
         
         if kl / float(self.ensemble.N) < self.kong_liu_ratio:
             self.__converged__ = False
-            print "KL:", kl, "KL/N:", kl / float(self.ensemble.N), "KL RAT:", self.kong_liu_ratio
+            #print "KL:", kl, "KL/N:", kl / float(self.ensemble.N), "KL RAT:", self.kong_liu_ratio
             return True
         
-        print "I say false"
         return False
             
     def plot_results(self, save_filename = None):
