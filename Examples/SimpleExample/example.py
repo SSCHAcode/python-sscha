@@ -14,22 +14,34 @@ import sscha
 import sscha.Ensemble
 import sscha.SchaMinimizer
 
+# Input info
+DYNPATH="../ensemble_data_test/dyn"
+DATADIR="../ensemble_data_test"
+POPULATION=2
+NRANDOM=1000
+T=0
+
 # Load the dynamical matrix
-dyn1 = CC.Phonons.Phonons("dyn")
+dyn1 = CC.Phonons.Phonons(DYNPATH)
 
 # Load the ensemble
-ens = sscha.Ensemble.Ensemble(dyn1, 0)
-ens.load("data", 2, 10000) # This was a second population (2)
-
+ens = sscha.Ensemble.Ensemble(dyn1, T)
+ens.load(DATADIR, POPULATION, NRANDOM) # This was a second population (2)
 
 # Setup the minimizer
 minim = sscha.SchaMinimizer.SSCHA_Minimizer(ens)
 minim.min_step_struc = 1e-4
-minim.min_step_dyn = 0
-minim.meaningful_factor = 1e-4
+#minim.min_step_dyn = 0
+minim.meaningful_factor = 1e-3
 minim.eq_energy = -144.40680397
 minim.precond_wyck = False
+minim.max_ka = 20
+
+minim.gradi_op = "gc"
 
 # Run the minimization
 minim.init()
 minim.run()
+
+# Plot the results
+minim.plot_results()

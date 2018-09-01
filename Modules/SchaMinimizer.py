@@ -85,6 +85,7 @@ class SSCHA_Minimizer:
         
         self.dyn = self.ensemble.current_dyn.Copy()
         
+        
         # Projection. This is chosen to fix some constraint on the minimization
         self.projector_dyn = None
         self.projector_struct = None
@@ -93,6 +94,9 @@ class SSCHA_Minimizer:
         self.prev_grad = None
         
         self.precond_wyck = False
+        
+        # The stopping criteria on which gradient is evaluated
+        self.gradi_op = "gc"
         
         
         # Setup the statistical threshold
@@ -106,6 +110,9 @@ class SSCHA_Minimizer:
 
         # This is used to polish the ensemble energy
         self.eq_energy = 0
+        
+        # This is the maximum number of steps (if negative = infinity)
+        self.max_ka = -1
         
         # Initialize the variable for convergence
         self.__converged__ = False
@@ -252,6 +259,12 @@ class SSCHA_Minimizer:
             
             self.dyn = CC.Phonons.Phonons(namelist["fildyn_prefix"], nqirr = int(namelist["nqirr"]))
         
+        if "gradi_op" in keys:
+            if not ["gc", "gw", "all"] in namelist["gradi_op"]:
+                raise ValueError("Error, gradi_op supports only 'gc', 'gw' or 'all'")
+            
+            self.gradi_op = namelist["gradi_op"]
+        
         # Ensemble keywords
         if "data_dir" in keys:
             # We can load an ensemble, check for the population number
@@ -369,7 +382,7 @@ class SSCHA_Minimizer:
         
         # Get the free energy
         fe, err = self.get_free_energy(True)
-        self.__fe__.append(fe)
+        self.__fe__.append(fe - self.eq_energy)
         self.__fe_err__.append(err)
         
         # Get the initial gradient
@@ -392,7 +405,7 @@ class SSCHA_Minimizer:
         self.__gw__.append(np.sqrt( np.einsum("ij, ij", struct_grad, struct_grad)))
         self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
 
-        self.__gc__.append(gc)
+        self.__gc__.append(gc)(last_gw < last_gw_err * self.meaningful_factor)
         self.__gc_err__.append(gc_err)
         
         # Compute the KL ratio
@@ -481,6 +494,10 @@ class SSCHA_Minimizer:
                 
             print "Running:", running
             
+            if len(self.__fe__) > self.max_ka:
+                print "Maximum number of steps reached."
+                running = False
+            
         
     def check_stop(self):
         """
@@ -503,7 +520,21 @@ class SSCHA_Minimizer:
         last_gw = self.__gw__[-1]
         last_gw_err = self.__gw_err__[-1]
         
-        if (last_gc < last_gc_err * self.meaningful_factor) and (last_gw < last_gw_err * self.meaningful_factor):
+        gc_cond = (last_gc < last_gc_err * self.meaningful_factor)
+        gw_cond = (last_gw < last_gw_err * self.meaningful_factor)
+        
+        total_cond = False
+        
+        if self.gradi_op == "gc":
+            total_cond = gc_cond
+        elif self.gradi_op == "gw":
+            total_cond = gw_cond
+        elif self.gradi_op == "all":
+            total_cond = gc_cond and gw_cond
+        else:
+            raise ValueError("Error, gradi_op must be one of 'gc', 'gw' or 'all'")
+        
+        if total_cond:
             self.__converged__ = True
             return True
         
