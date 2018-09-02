@@ -68,12 +68,12 @@ parser.add_argument("-i", help="Path to the input file",
                     dest="filename", required = True, metavar = "FILE",
                     type = lambda x : is_valid_file(parser, x))
 parser.add_argument("--plot-results", 
-                    help="If present at the end of the minimization the reults will be plotted.",
+                    help="Plot the results",
                     dest="plot", action = "store_true")
 
 parser.add_argument("--save-data", dest="save_data", metavar = "FILE",
                     type = lambda x : is_valid_file(parser, x),
-                    help = "Specify the file in which to save info of the minimization.")
+                    help = "Save the minimization details")
 
 
 # Get the arguments from the command line
