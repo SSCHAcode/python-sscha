@@ -29,6 +29,8 @@ import matplotlib.pyplot as plt
 import cellconstructor as CC
 import cellconstructor.Methods
 
+import sys
+
 import Ensemble
 
 # Rydberg to cm-1 and meV conversion factor
@@ -38,7 +40,7 @@ __RyTomev__ = 13605.698066
 
 class SSCHA_Minimizer:
     
-    def __init__(self, ensemble, root_representation = "normal",
+    def __init__(self, ensemble = None, root_representation = "normal",
                  kong_liu_ratio = 0.5, meaningful_factor = 0.1,
                  minimization_algorithm = "sdes", lambda_a = 1):
         """
@@ -83,8 +85,12 @@ class SSCHA_Minimizer:
         self.min_step_dyn = lambda_a
         self.min_step_struc = 1
         
-        self.dyn = self.ensemble.current_dyn.Copy()
-        
+        if ensemble is not None:
+            self.dyn = self.ensemble.current_dyn.Copy()
+        else:
+            self.dyn = None
+        self.dyn_path = ""
+        self.population = 0
         
         # Projection. This is chosen to fix some constraint on the minimization
         self.projector_dyn = None
@@ -258,6 +264,7 @@ class SSCHA_Minimizer:
                 raise IOError("Error, if an input dynamical matrix is specified, you must add the nqirr options")
             
             self.dyn = CC.Phonons.Phonons(namelist["fildyn_prefix"], nqirr = int(namelist["nqirr"]))
+            self.dyn_path = namelist["fildyn_prefix"]
         
         if "gradi_op" in keys:
             if not ["gc", "gw", "all"] in namelist["gradi_op"]:
@@ -289,6 +296,7 @@ class SSCHA_Minimizer:
                 self.ensemble.T0 = np.float64(namelist["tg"])
                 
             # Load the data dir
+            self.population = int(namelist["population"])
             self.ensemble.load(namelist["data_dir"], int(namelist["population"]), int(namelist["n_random"]))
         
         
@@ -410,6 +418,10 @@ class SSCHA_Minimizer:
         
         # Compute the KL ratio
         self.__KL__.append(self.ensemble.get_effective_sample_size())
+        
+        # Prepare the minimization step rescaling to its best
+        if not self.precond_wyck:
+            self.min_step_struc *= GetBestWykoffStep(self.dyn)
 
     
     def run(self, verbose = 1, custom_function_pre = None, custom_function_post = None):

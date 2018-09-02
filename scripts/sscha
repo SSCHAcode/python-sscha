@@ -1,0 +1,96 @@
+#!python
+# -*- coding: utf-8 -*-
+
+
+"""
+This is part of the program python-sscha
+Copyright (C) 2018  Lorenzo Monacelli
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. 
+"""
+import os
+
+import sscha, sscha.SchaMinimizer
+import sscha.Ensemble
+import argparse
+
+PROG_NAME = "sscha"
+VERSION = 0.1
+DESCRIPTION = r"""
+
+
+
+
+* * * * * * * * * * * * * * * * * * * * * * * * * * *
+*                                                   *
+* STOCHASTIC SELF-CONSISTENT HARMONIC APPROXIMATION *
+*                                                   *
+* * * * * * * * * * * * * * * * * * * * * * * * * * *
+
+
+
+Wellcome to the SSCHA code. This script will start 
+a SSCHA minimization according to the options parsed
+from the input file.
+Note, you can also use the SSCHA utilities directly 
+by programming small and easy python scripts. 
+Refer to the documentation for more details.
+
+
+
+"""
+
+# Define a custom function to raise an error if the file does not exist
+def is_valid_file(parser, arg):
+    if not os.path.exists(arg):
+        parser.error("The file %s does not exists!" % arg)
+    else:   
+        return arg
+
+# Prepare the parser for the command line
+parser = argparse.ArgumentParser(prog = PROG_NAME,
+                                 description = DESCRIPTION,
+                                 version = VERSION, formatter_class = argparse.RawTextHelpFormatter)
+
+# Add the arguments
+parser.add_argument("-i", help="Path to the input file",
+                    dest="filename", required = True, metavar = "FILE",
+                    type = lambda x : is_valid_file(parser, x))
+parser.add_argument("--plot-results", 
+                    help="If present at the end of the minimization the reults will be plotted.",
+                    dest="plot", action = "store_true")
+
+parser.add_argument("--save-data", dest="save_data", metavar = "FILE",
+                    type = lambda x : is_valid_file(parser, x),
+                    help = "Specify the file in which to save info of the minimization.")
+
+
+# Get the arguments from the command line
+args = parser.parse_args()
+
+# Get the input filename and initialize the sscha minimizer.
+minim = sscha.SchaMinimizer.SSCHA_Minimizer()
+
+# Parse the input file
+minim.setup_from_namelist(args.filename)
+
+# Start the minimization
+minim.init()
+minim.run()
+
+# Save the final dynamical matrix
+minim.dyn.save_qe(minim.dyn_path + "_popuation%d_" % minim.population)
+
+# Plot the results
+minim.plot_results(args.save_data, args.plot)
