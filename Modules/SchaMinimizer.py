@@ -622,6 +622,7 @@ def GetStructPrecond(current_dyn):
     =====================================================
     
     NOTE: the Phi is in Ry/bohr^2 while the forces are in Ry/A
+    NOTE: the output preconditioner (that must be interfaced with forces) is in A^2/Ry
     
     The preconditioner of the structure minimization is computed directly from the
     dynamical matrix. It is the fake inverse (projected out the translations).
@@ -668,4 +669,37 @@ def GetStructPrecond(current_dyn):
     
     # Compute the precondition using the einsum
     precond = np.einsum("a,b,c,ac,bc -> ab", _msi_, _msi_, wm2, pols, pols)
-    return precond
+    return precond * CC.Phonons.BOHR_TO_ANGSTROM**2
+
+
+def GetBestWykoffStep(current_dyn):
+    """
+    GET THE BEST WYCKOFF STEP
+    =========================
+    
+    This is an alternative way to the preconditioning, in which the best wyckoff step
+    is choosen rescaled on the current dynamical matrix.
+    
+    NOTE: It works with real space matrices.
+    
+    .. math::
+        
+        STEP = \\frac{1}{\\max \\lambda(\\Phi)}
+        
+    Where :math:`\\lambda(\\Phi)` is the generic eigenvalue of the force constant matrix.
+    This is because :math:`\\Phi` is correct Hessian of the free energy respect to
+    the structure in the minimum.
+    
+    The best step is returned in [Angstrom^2 / Ry]. 
+    
+    Parameters
+    ----------
+        current_dyn : ndarray 3n_at x 3n_at
+            The force constant matrix :math:`\\Phi`. It should be in Ry/bohr^2. 
+    """
+    
+    return 1 / np.max(np.real(np.linalg.eigvals(current_dyn.dynmats[0]))) * CC.Phonons.BOHR_TO_ANGSTROM**2
+    
+    
+    
+    
