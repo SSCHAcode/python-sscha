@@ -72,7 +72,6 @@ parser.add_argument("--plot-results",
                     dest="plot", action = "store_true")
 
 parser.add_argument("--save-data", dest="save_data", metavar = "FILE",
-                    type = lambda x : is_valid_file(parser, x),
                     help = "Save the minimization details")
 
 
@@ -82,8 +81,13 @@ args = parser.parse_args()
 # Get the input filename and initialize the sscha minimizer.
 minim = sscha.SchaMinimizer.SSCHA_Minimizer()
 
+# Open the input file
+fp = open(args.filename, "r")
+line_list = fp.readlines()
+fp.close()
+
 # Parse the input file
-minim.setup_from_namelist(args.filename)
+minim.setup_from_namelist(line_list)
 
 # Start the minimization
 minim.init()

@@ -99,7 +99,7 @@ class SSCHA_Minimizer:
         # The gradient before the last step was performed (Used for the CG)
         self.prev_grad = None
         
-        self.precond_wyck = False
+        self.precond_wyck = True
         
         # The stopping criteria on which gradient is evaluated
         self.gradi_op = "gc"
@@ -153,7 +153,7 @@ class SSCHA_Minimizer:
         # Setup the symmetries
         qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
         
-        qe_sym.SetupQPoint(verbose = True)
+        qe_sym.SetupQPoint(verbose = False)
         
         
         # Get the gradient of the free-energy respect to the dynamical matrix
@@ -176,38 +176,28 @@ class SSCHA_Minimizer:
         struct_grad, struct_grad_err =  self.ensemble.get_average_forces(True)
         struct_grad_reshaped = - struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
         
+        # Apply the symmetries to the forces
+        qe_sym.SymmetrizeVector(struct_grad)
+        qe_sym.SymmetrizeVector(struct_grad_err)
+        
         # Preconditionate the gradient for the wyckoff minimization
         if self.precond_wyck:
             struct_precond = GetStructPrecond(self.ensemble.current_dyn)
             struct_grad_precond = struct_precond.dot(struct_grad_reshaped)
             struct_grad = struct_grad_precond.reshape( (self.dyn.structure.N_atoms, 3))
-    
             
-        # Apply the symmetries to the forces
-        qe_sym.SymmetrizeVector(struct_grad)
-        qe_sym.SymmetrizeVector(struct_grad_err)
         
-        
+        # Append the gradient modulus to the minimization info
         self.__gw__.append(np.sqrt( struct_grad_reshaped.dot(struct_grad_reshaped)))
         self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
         
-        current_dyn = self.ensemble.current_dyn
-        current_struct = self.ensemble.current_dyn.structure
         
         # Perform the step for the dynamical matrix
-        new_dyn = current_dyn
-        new_dyn.dynmats[0] = current_dyn.dynmats[0] - self.min_step_dyn * dyn_grad
+        self.dyn.dynmats[0] -= self.min_step_dyn * dyn_grad
         
         # Perform the step for the structure
-        current_struct.coords -= self.min_step_struc * struct_grad
-        
-        
-        # Symmetrize the structure after the gradient is applied
-        if self.symmetries is not None:
-            current_struct.impose_symmetries(self.symmetries, verbose = False)
-        
-        new_dyn.structure = current_struct
-        self.dyn = new_dyn
+        #print "min step:", self.min_step_struc
+        self.dyn.structure.coords -= self.min_step_struc * struct_grad
 
         # Update the ensemble
         self.update()
@@ -234,6 +224,13 @@ class SSCHA_Minimizer:
         # Get the dictionary
         namelist = CC.Methods.read_namelist(input_file)
         
+        # Extract the principal namelist
+        if not "inputscha" in namelist.keys():
+            raise ValueError("Error, a main namelist 'inputscha' is required.")
+            
+        namelist = namelist["inputscha"]
+        #print namelist
+        
         # Check for keywords
         keys = namelist.keys()
         
@@ -250,7 +247,7 @@ class SSCHA_Minimizer:
             if not "n_random" in keys:
                 raise IOError("Error, if you want to impose the minimum KL\n"
                               "       effective sample size, you must give also n_random")
-            self.kong_liu_ratio = int(namelist["n_random"]) / np.float64(namelist["n_random_eff"])
+            self.kong_liu_ratio =  np.float64(namelist["n_random_eff"]) / int(namelist["n_random"])
             
         if "meaningful_factor" in keys:
             self.meaningful_factor = np.float64(namelist["meaningful_factor"])
@@ -265,9 +262,10 @@ class SSCHA_Minimizer:
             
             self.dyn = CC.Phonons.Phonons(namelist["fildyn_prefix"], nqirr = int(namelist["nqirr"]))
             self.dyn_path = namelist["fildyn_prefix"]
-        
+            
+            
         if "gradi_op" in keys:
-            if not ["gc", "gw", "all"] in namelist["gradi_op"]:
+            if not namelist["gradi_op"] in ["gc", "gw", "all"] :
                 raise ValueError("Error, gradi_op supports only 'gc', 'gw' or 'all'")
             
             self.gradi_op = namelist["gradi_op"]
@@ -283,6 +281,8 @@ class SSCHA_Minimizer:
             if not "fildyn_prefix" in keys:
                 raise IOError("Error, the dynamical matrix that generated the ensemble must be provided")
             
+            
+            #print "data_dir seen"
             
             # Setup the ensemble
             self.ensemble = Ensemble.Ensemble(self.dyn, 0)
@@ -481,34 +481,40 @@ class SSCHA_Minimizer:
             # Compute the KL ratio
             self.__KL__.append(self.ensemble.get_effective_sample_size())
             
-            # Get the stopping criteria
-            running = not self.check_stop()
-            
-            # Invoke the custom function (if any)
-            if custom_function_post is not None:
-                custom_function_post(self)
-            
             # Print the step
             if verbose >= 1:
+                print ""
+                print " # ---------------- NEW MINIMIZATION STEP --------------------"
                 print "Step ka = ", len(self.__fe__)
                 print "Free energy = %16.8f +- %16.8f meV" % (self.__fe__[-1] * __RyTomev__, 
                                                               self.__fe_err__[-1] * __RyTomev__)
-                print "FC gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gc__[-1] * __RyTomev__, 
+                print "FC gradient modulus = %16.8f +- %16.8f bohr^2" % (self.__gc__[-1] * __RyTomev__, 
                                                                        self.__gc_err__[-1] * __RyTomev__)
                 print "Struct gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gw__[-1] * __RyTomev__,
                                                                             self.__gw_err__[-1] * __RyTomev__)
                 print "Kong-Liu effective sample size = ", self.__KL__[-1]
+                print ""
             
             if verbose >= 2:
                 # Print the dynamical matrix at each step
                 ka = len(self.__fe__)
                 self.dyn.save_qe("minim_dyn_step%d_" % ka)
-                
+            
+            
+            # Get the stopping criteria
+            running = not self.check_stop()
             print "Running:", running
+            
             
             if len(self.__fe__) > self.max_ka and self.max_ka > 0:
                 print "Maximum number of steps reached."
                 running = False
+            
+            # Invoke the custom function (if any)
+            if custom_function_post is not None:
+                custom_function_post(self)
+            
+            
 
     def check_imaginary_frequencies(self):
         """
@@ -517,7 +523,7 @@ class SSCHA_Minimizer:
         """
 
         # Get the frequencies
-        w, pols = self.dyn.DiagDynQ(0)
+        w, pols = self.dyn.DyagDinQ(0)
 
         # Get translations
         trans_mask = ~CC.Methods.get_translations(pols, self.dyn.structure.get_masses_array())
@@ -557,6 +563,13 @@ class SSCHA_Minimizer:
         
         total_cond = False
         
+        if gc_cond:
+            print ""
+            print "The gc gradient satisfy the convergence condition."
+        if gw_cond:
+            print ""
+            print "The gw gradient satisfy the convergence condition."
+        
         if self.gradi_op == "gc":
             total_cond = gc_cond
         elif self.gradi_op == "gw":
@@ -568,6 +581,7 @@ class SSCHA_Minimizer:
         
         if total_cond:
             self.__converged__ = True
+            print "The system satisfy the convergence criteria according to the input."
             return True
         
         # Check the KL
@@ -575,7 +589,9 @@ class SSCHA_Minimizer:
         
         if kl / float(self.ensemble.N) < self.kong_liu_ratio:
             self.__converged__ = False
-            #print "KL:", kl, "KL/N:", kl / float(self.ensemble.N), "KL RAT:", self.kong_liu_ratio
+            print "KL:", kl, "KL/N:", kl / float(self.ensemble.N), "KL RAT:", self.kong_liu_ratio
+            print "  According to your input criteria"
+            print "  you are out of the statistical sampling." 
             return True
 
         # Check if there are imaginary frequencies
@@ -613,15 +629,18 @@ class SSCHA_Minimizer:
         gc = np.array(self.__gc__) * __RyTomev__
         gc_err = np.array(self.__gc_err__) * __RyTomev__
         
+        gw = np.array(self.__gw__) * __RyTomev__
+        gw_err = np.array(self.__gw_err__) * __RyTomev__
+        
         kl = np.array(self.__KL__)
         
         steps = np.arange(len(fe))
         
         # Check if the results need to be saved on a file
         if save_filename is not None:
-            save_data = [steps, fe, fe_err, gc, gc_err, kl]
+            save_data = [steps, fe, fe_err, gc, gc_err, gw, gw_err, kl]
             np.savetxt(save_filename, np.transpose(save_data),
-                       header = "Steps; Free energy +- error [meV]; FC gradient +- error [meV / A]; Kong-Liu N_eff")
+                       header = "Steps; Free energy +- error [meV]; FC gradient +- error [bohr^2]; Structure gradient +- error [meV / A]; Kong-Liu N_eff")
         
         
         # Plot
@@ -631,18 +650,28 @@ class SSCHA_Minimizer:
             plt.errorbar(steps, fe, yerr = fe_err, label = "Free energy")
             plt.ylabel(r"$F$ [meV]")
             plt.xlabel("steps")
+            plt.tight_layout()
         
             plt.figure()
-            plt.title("Gradient")
+            plt.title("FC matrix gradient")
             plt.errorbar(steps, gc, yerr = gc_err, label = "gradient")
+            plt.ylabel(r"$|\vec g|$ [bohr^2]")
+            plt.xlabel("steps")
+            plt.tight_layout()
+            
+            plt.figure()
+            plt.title("Structure gradient")
+            plt.errorbar(steps, gw, yerr = gw_err, label = "gradient")
             plt.ylabel(r"$|\vec g|$ [meV / A]")
             plt.xlabel("steps")
+            plt.tight_layout()
             
             plt.figure()
             plt.title("Kong-Liu effective sample size")
             plt.plot(steps, kl)
             plt.ylabel(r"$\frac{N_{eff}}{N_0}$")
             plt.xlabel("steps")
+            plt.tight_layout()
         
             plt.show()
             
