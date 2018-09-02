@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+ # -*- coding: utf-8 -*-
 
 """
 This is part of the program python-sscha
@@ -405,7 +405,7 @@ class SSCHA_Minimizer:
         self.__gw__.append(np.sqrt( np.einsum("ij, ij", struct_grad, struct_grad)))
         self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
 
-        self.__gc__.append(gc)(last_gw < last_gw_err * self.meaningful_factor)
+        self.__gc__.append(gc)
         self.__gc_err__.append(gc_err)
         
         # Compute the KL ratio
@@ -494,9 +494,29 @@ class SSCHA_Minimizer:
                 
             print "Running:", running
             
-            if len(self.__fe__) > self.max_ka:
+            if len(self.__fe__) > self.max_ka and self.max_ka > 0:
                 print "Maximum number of steps reached."
                 running = False
+
+    def check_imaginary_frequencies(self):
+        """
+        The following subroutine check if the current matrix has imaginary frequency. In this case
+        the minimization is stopped.
+        """
+
+        # Get the frequencies
+        w, pols = self.dyn.DiagDynQ(0)
+
+        # Get translations
+        trans_mask = ~CC.Methods.get_translations(pols, self.dyn.structure.get_masses_array())
+
+        # Remove translations
+        w = w[trans_mask]
+
+        # Frequencies are ordered, check if the first one is negative.
+        if w[0] < 0:
+            return True
+        return False
             
         
     def check_stop(self):
@@ -545,10 +565,17 @@ class SSCHA_Minimizer:
             self.__converged__ = False
             #print "KL:", kl, "KL/N:", kl / float(self.ensemble.N), "KL RAT:", self.kong_liu_ratio
             return True
-        
+
+        # Check if there are imaginary frequencies
+        im_freq = self.check_imaginary_frequencies()
+        if im_freq:
+            print "ERROR: imaginary frequencies found in the minimization"
+            sys.stderr.write("ERROR: imaginary frequencies found in the minimization\n")
+            return True
+            
         return False
             
-    def plot_results(self, save_filename = None):
+    def plot_results(self, save_filename = None, plot = True):
         """
         PLOT RESULTS
         ============
@@ -562,6 +589,9 @@ class SSCHA_Minimizer:
                 If present the plotted data will be saved in
                 a text file specified by input.
         
+            plot : optiona, bool
+                If false no plot is performed. This allows only to save result
+                even if you do not have any access in a X server.
         """
         
         # Convert the data in numpy arrays
@@ -583,25 +613,26 @@ class SSCHA_Minimizer:
         
         
         # Plot
-        plt.figure()
-        plt.title("Free energy")
-        plt.errorbar(steps, fe, yerr = fe_err, label = "Free energy")
-        plt.ylabel(r"$F$ [meV]")
-        plt.xlabel("steps")
+        if plot:
+            plt.figure()
+            plt.title("Free energy")
+            plt.errorbar(steps, fe, yerr = fe_err, label = "Free energy")
+            plt.ylabel(r"$F$ [meV]")
+            plt.xlabel("steps")
         
-        plt.figure()
-        plt.title("Gradient")
-        plt.errorbar(steps, gc, yerr = gc_err, label = "gradient")
-        plt.ylabel(r"$|\vec g|$ [meV / A]")
-        plt.xlabel("steps")
+            plt.figure()
+            plt.title("Gradient")
+            plt.errorbar(steps, gc, yerr = gc_err, label = "gradient")
+            plt.ylabel(r"$|\vec g|$ [meV / A]")
+            plt.xlabel("steps")
+            
+            plt.figure()
+            plt.title("Kong-Liu effective sample size")
+            plt.plot(steps, kl)
+            plt.ylabel(r"$\frac{N_{eff}}{N_0}$")
+            plt.xlabel("steps")
         
-        plt.figure()
-        plt.title("Kong-Liu effective sample size")
-        plt.plot(steps, kl)
-        plt.ylabel(r"$\frac{N_{eff}}{N_0}$")
-        plt.xlabel("steps")
-        
-        plt.show()
+            plt.show()
             
     
 
