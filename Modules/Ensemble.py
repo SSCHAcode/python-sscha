@@ -729,9 +729,14 @@ class Ensemble:
                 er[j, i, 0] = pols[3*j, i] 
                 er[j, i, 1] = pols[3*j+1, i] 
                 er[j, i, 2] = pols[3*j+2, i] 
+                
+        # Prepare the displacement in fortran order
+        u_disps = np.reshape(self.u_disps, (self.N, nat, 3), order = "F")
         
-        stress, err_stress = SCHAModules.get_stress_tensor(volume, self.forces - self.sscha_forces, self.u_disps, 
-                                                           self.stresses, wr, er, self.current_T, self.rho, "err_yesrho", 
+        abinit_stress = np.einsum("abc -> cba", self.stresses, order = "F")
+        
+        stress, err_stress = SCHAModules.get_stress_tensor(volume, self.forces - self.sscha_forces, u_disps, 
+                                                           abinit_stress, wr, er, self.current_T, self.rho, "err_yesrho", 
                                                            self.N, nat, len(wr))
         
         # Check the offset

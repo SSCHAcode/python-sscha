@@ -28,8 +28,14 @@
 ! will be ignored
 
 &inputscha
+    ! In the old fortran code we must specify if we want to generate a new ensemble
+    ! or perform the minimization. This flag is not used by python (probably it will in future).
+    ! "minim" - start the minimization loading the ensemble from data_dir
+    ! "scfin" - generate a new ensemble in the data_dir
+    type_cal = "minim"
+
     ! The dimension of the ensemble
-    n_random = 2000
+    n_random = 10000
     
     ! The position of the ensemble (where the data are stored).
     ! Take a look to that to see how to dispose your ensemble.
@@ -109,6 +115,12 @@
     ! - "normal" : normal minimization, can lead to imaginary frequencies
     ! - "sqrt"   : square root representation.
     ! - "root4"  : fourth-root represnetation, the best one (and the slowest).
-    root_representation = "normal"
+    root_representation = "root4"
+    
+    ! This two flags are used only by the fortran code (but only for now)
+    ! Preconditioning in python is always active (in fortran is super-time consuming)
+    ! so here we activate it only in the structure, and not in the force-constant matrix
+    preconditioning = .false.
+    precond_only_wyckoff = .true.
 /
 

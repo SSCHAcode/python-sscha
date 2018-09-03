@@ -36,6 +36,7 @@ import Ensemble
 # Rydberg to cm-1 and meV conversion factor
 __RyToCm__  = 109691.40235
 __RyTomev__ = 13605.698066
+__RyBohr3_to_GPa__ = 14710.513242194795
 
 
 class SSCHA_Minimizer:
@@ -595,6 +596,10 @@ class SSCHA_Minimizer:
             print " ==== STRESS TENSOR [GPa] ==== "
             stress, err = self.get_stress_tensor()
             
+            # Convert in GPa
+            stress *= __RyBohr3_to_GPa__
+            err *= __RyBohr3_to_GPa__
+            
             print "%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f" % (stress[0,0], stress[0,1], stress[0,2], "",
                                                                 err[0,0], err[0,1], err[0,2])
             print "%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f" % (stress[1,0], stress[1,1], stress[1,2], "    +-    ",
@@ -619,8 +624,8 @@ class SSCHA_Minimizer:
             w, pols = self.dyn.DyagDinQ(0)
             trans = CC.Methods.get_translations(pols, self.dyn.structure.get_masses_array())
             
-            for i in range(w):
-                print "Mode %d:   freq %16.8f cm-1  | is translation? " % (i+1, w[i] * __RyToCm__, trans[i]) 
+            for i in range(len(w)):
+                print "Mode %5d:   freq %16.8f cm-1  | is translation? " % (i+1, w[i] * __RyToCm__), trans[i] 
         
             print ""
         
