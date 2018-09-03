@@ -1,0 +1,114 @@
+! This input file perform the minimization
+! You can use it as a template for your personal minimizations
+
+!
+! To run the new python code use:
+! >>> sscha -i simple_input.in --save-data simple_input.out
+!
+! To run the fortran code use:
+! >>> sscha.x < simple_input.int > simple_input.out
+!
+! The python code will produce two output, one in stdout (that can be redirected)
+! and one in the save-data file, already formatted for the plot.
+! Lunch sscha -h to see details on other options (also a plotter can be activated)
+! The sscha code will only produce the stdout, that must then be parsed with
+! a separate script to analyze the minimization.
+
+! To have a better control on the minimization, you can always run the 
+! minimization directly using a python script, importing the sscha library.
+! Follow the example.py to see a description
+
+
+! Each input file requires a main namelist, called inputscha, starting with &.
+! This is the Quantum ESPRESSO format for input file.
+! Inside the namelist the input variables must be inserted.
+! Note that the order in which they are specified is not important.
+
+! Marking points '!' are used as comments, and all the text that follows them
+! will be ignored
+
+&inputscha
+    ! The dimension of the ensemble
+    n_random = 2000
+    
+    ! The position of the ensemble (where the data are stored).
+    ! Take a look to that to see how to dispose your ensemble.
+    ! Unit of measurements must be in bohr for displacements and 
+    ! Ry/bohr for forces and Ry/bohr^3 for stress tensors.
+    ! Energy is in Ry.
+    data_dir = "../ensemble_data_test"
+    
+    ! The population id. This is an integer that distinguish different ensembles
+    ! and allows for use the same data_dir for several minimizations
+    population = 2
+    
+    ! Now we must tell the program where is the dynamical matrix that
+    ! generated the ensemble. 
+    ! This matrix should be written in the Quantum ESPRESSO file format
+    fildyn_prefix = "../ensemble_data_test/dyn"
+    
+    ! We should tell the number of irriducible q points (how many files are)
+    nqirr = 1
+    
+    ! This is a dumb variable for now, it is used by the Fortran code to setup the supercell
+    supercell_size =  1 1 1
+    
+    ! The temperature used to generate the ensemble (in Kelvin)
+    Tg = 0 
+    
+    ! The temperature that will be used in the minimization (in Kelvin)
+    T = 0
+    
+    ! The stopping criteria. The code will end the minimization after
+    ! the gradient is lower than meaningful_factor times its stochastic error
+    meaningful_factor = 1e-4
+    
+    ! But which gradient? We are minimizing both the structure and the dynamical matrix
+    ! Therefore we can specify to the code which gradient is used to trigger the 
+    ! stopping condition. By default, both of them should satisfy the meaningufl
+    ! criteria. Options are "all", "gc", and "gw".
+    ! "all" - both the gradient should satisfy the meaningulf_condition (default)
+    ! "gw"  - only the wyckoff (i.e. structure) gradient must satisfy the condition
+    ! "gc"  - only the force-constant matrix gradient must satisfy the condition.
+    gradi_op = "all" 
+    
+    ! The Kong-Liu effective sample size. 
+    ! This is a stochastic test, during the minimization the effective
+    ! size of the ensemble is reduced by the importance sampling. When this size
+    ! becomes lower than the given threshold the minimization is stopped,
+    ! and you should re-generate a new ensemble.
+    ! Usually in the begining you can chose 0.1 the original ensemble, and raise it to 0.4 or 0.5
+    ! when you are close to convergence.
+    n_random_eff = 1000
+    
+    ! This flag is used by the old code to make it seek for the pressures
+    ! in the ensemble. However it is ignored by the python code, that will print
+    ! the stress if it finds the stress tensor inside the ensemble automatically.
+    print_stress = .true.
+    
+    ! The following flag set the equilibrium energy. It should be the energy
+    ! of the structure without fluctuations, it is used to separate the electronic
+    ! and the vibrational energy, since they are usually of different order of magnitude.
+    ! It is measured in Ry
+    eq_energy = -144.40680397
+    
+    ! The following are the step size for the minimization
+    ! They are dimensionless and builded so that their best value should be 1
+    ! However, especially in the first step, this can be a very drastic jump
+    ! leading to neagive frequencies, it is wise in the beginning to decrease it.
+    ! lambda_a : step for the force constant matrix
+    ! lambda_w : step for the structure
+    lambda_a = 1
+    lambda_w = 1
+    
+    ! The root representation is a trick to increase the speed of the minimization
+    ! And to avoid the imaginary frequency error (the force-constant matrix is constrained
+    ! by a nonlinear change of variable to be positive defined).
+    ! Currently, it does not work in the python program (it is ignored), while it
+    ! is very usefull in the fortran code.
+    ! - "normal" : normal minimization, can lead to imaginary frequencies
+    ! - "sqrt"   : square root representation.
+    ! - "root4"  : fourth-root represnetation, the best one (and the slowest).
+    root_representation = "normal"
+/
+

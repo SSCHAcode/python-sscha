@@ -84,6 +84,9 @@ class Ensemble:
         
         # Store also the displacements
         self.u_disps = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
+        
+        # A flag that memorize if the ensemble has also the stresses
+        self.has_stress = False
 
         
     def load(self, data_dir, population, N):
@@ -139,14 +142,18 @@ class Ensemble:
         # Load the structures
         self.N = N
         
-        self.forces = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3))
-        self.stresses = np.zeros( (self.N, 3,3))
+        self.forces = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3), order = "F", dtype = np.float64)
+        self.stresses = np.zeros( (self.N, 3,3), order = "F", dtype = np.float64)
         
-        self.sscha_energies = np.zeros(self.N)
-        self.energies = np.zeros(self.N)
-        self.sscha_forces = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3))
+        self.sscha_energies = np.zeros(self.N, dtype = np.float64)
+        self.energies = np.zeros(self.N, dtype = np.float64)
+        self.sscha_forces = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3), order = "F", dtype = np.float64)
         
-        self.u_disps = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
+        self.u_disps = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3), order = "F", dtype = np.float64)
+        
+        # Add a counter to check if all the stress tensors are present
+        count_stress = 0
+        
 
         self.structures = []
         
@@ -167,6 +174,7 @@ class Ensemble:
             # Load stress
             if os.path.exists("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)):
                 self.stresses[i,:,:] =  np.loadtxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)) 
+                count_stress += 1
             
             # Setup the sscha energies and forces
             energy, force = self.dyn_0.get_energy_forces(structure)
@@ -193,11 +201,20 @@ class Ensemble:
         self.energies = total_energies[:N]
         
         # Setup the initial weight
-        self.rho = np.ones(self.N)
+        self.rho = np.ones(self.N, dtype = np.float64)
         
         # Initialize the q_start
         self.q_start = CC.Manipulate.GetQ_vectors(self.structures, self.dyn_0)
         self.current_q = self.q_start.copy()
+        
+        # If all the stress tensors have been found, set the stress flag
+        if count_stress == self.N:
+            self.has_stress = True
+        else:
+            self.has_stress = False
+            
+            # Allow the garbage collector to free the memory
+            del self.stresses
         
     def save(self, data_dir, population):
         """
@@ -663,6 +680,66 @@ class Ensemble:
         
         return cov_mat
     
+    
+    def get_stress_tensor(self, offset_stress = None):
+        """
+        GET STRESS TENSOR
+        =================
+        
+        The following subroutine computes the anharmonic stress tensor
+        calling the fortran code get_stress_tensor
+        
+        NOTE: unit of measure is Ry/bohr^3 to match the quantum espresso one
+        
+        Parameters
+        ----------
+            offset_stress : 3x3 matrix, optional
+                An offset stress to be subtracted to the real stress tensor.
+                Usefull if you want to compute just the anharmonic contribution.
+        
+        Results
+        -------
+            stress_tensor : 3x3 matrix
+                The anharmonic stress tensor obtained by averaging both the ab-initio
+                stresses and correcting with the sscha non-linearity.
+            err_stress : 3x3 matrix
+                The matrix of the error on the stress tensor.
+        """
+        
+        if not self.has_stress:
+            raise ValueError("Error, the stress tensors are not present in the current ensemble.")
+        
+        # Volume bohr^3
+        volume = np.linalg.det(self.current_dyn.structure.unit_cell) * __A_TO_BOHR__**3
+            
+        
+        # Get frequencies and polarization vectors
+        wr, pols = self.current_dyn.DyagDinQ(0)
+        trans = ~ CC.Methods.get_translations(pols, self.current_dyn.structure.get_masses_array())
+        wr = np.real( wr[trans])
+        pols = np.real( pols[:, trans])
+        
+        nat = self.current_dyn.structure.N_atoms
+        
+        # Get the correctly shaped polarization vectors
+        er = np.zeros( (nat, len(wr), 3), dtype = np.float64, order = "F")
+        
+        for i in range(len(wr)):
+            for j in range(nat):
+                er[j, i, 0] = pols[3*j, i] 
+                er[j, i, 1] = pols[3*j+1, i] 
+                er[j, i, 2] = pols[3*j+2, i] 
+        
+        stress, err_stress = SCHAModules.get_stress_tensor(volume, self.forces - self.sscha_forces, self.u_disps, 
+                                                           self.stresses, wr, er, self.current_T, self.rho, "err_yesrho", 
+                                                           self.N, nat, len(wr))
+        
+        # Check the offset
+        if not offset_stress is None:
+            stress -= offset_stress
+        
+        return stress, err_stress
+    
     def get_free_energy_gradient_respect_to_dyn(self):
         """
         FREE ENERGY GRADIENT
@@ -671,6 +748,8 @@ class Ensemble:
         Get the free energy gradient respect to the dynamical matrix.
         The result is in [Ry/bohr^3] as the dynamical matrix are stored
         in [Ry/bohr^2].
+        
+        NOTE: Not working
         
         .. math::
             

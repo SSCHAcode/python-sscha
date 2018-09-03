@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 import cellconstructor as CC
 import cellconstructor.Methods
 
-import sys
+import sys, os
 
 import Ensemble
 
@@ -103,6 +103,9 @@ class SSCHA_Minimizer:
         
         # The stopping criteria on which gradient is evaluated
         self.gradi_op = "gc"
+        
+        # Define the stress offset
+        self.stress_offset = np.zeros((3,3), dtype = np.float64, order = "F")
         
         
         # Setup the statistical threshold
@@ -263,6 +266,18 @@ class SSCHA_Minimizer:
             self.dyn = CC.Phonons.Phonons(namelist["fildyn_prefix"], nqirr = int(namelist["nqirr"]))
             self.dyn_path = namelist["fildyn_prefix"]
             
+        if "stress_offset" in keys:
+            # Load the offset from a filename
+            try:
+                # Try to interpret it as a number
+                off = np.float64(namelist["stress_offset"])
+                self.stress_offset = off * np.eye(3, dtype = np.float64, order = "F")
+            except:
+                # Interpret it as a file
+                if not os.path.exists(namelist["stress_offset"]):
+                    raise IOError("Error, the file %s specified as a stress_offset cannot be open" % namelist["stress_offset"])
+                
+            self.stress_offset = np.loadtxt(namelist["stress_offset"])
             
         if "gradi_op" in keys:
             if not namelist["gradi_op"] in ["gc", "gw", "all"] :
@@ -394,27 +409,27 @@ class SSCHA_Minimizer:
         self.__fe_err__.append(err)
         
         # Get the initial gradient
-        grad, grad_err = self.ensemble.get_fc_from_self_consistency(True, True)
+        grad = self.ensemble.get_fc_from_self_consistency(True, False)
         self.prev_grad = grad
-
-        # Initialize the symmetry
-        qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
-        qe_sym.SetupQPoint(verbose = True)
-
-        struct_grad, struct_grad_err = self.ensemble.get_average_forces(True)
-
-        qe_sym.SymmetrizeVector(struct_grad)
-        qe_sym.SymmetrizeVector(struct_grad_err)
-        
-        # Get the gradient modulus
-        gc = np.trace(grad.dot(grad))
-        gc_err = np.trace(grad_err.dot(grad_err))
-
-        self.__gw__.append(np.sqrt( np.einsum("ij, ij", struct_grad, struct_grad)))
-        self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
-
-        self.__gc__.append(gc)
-        self.__gc_err__.append(gc_err)
+#
+#        # Initialize the symmetry
+#        qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+#        qe_sym.SetupQPoint(verbose = True)
+#
+#        struct_grad, struct_grad_err = self.ensemble.get_average_forces(True)
+#
+#        qe_sym.SymmetrizeVector(struct_grad)
+#        qe_sym.SymmetrizeVector(struct_grad_err)
+#        
+#        # Get the gradient modulus
+#        gc = np.trace(grad.dot(grad))
+#        gc_err = np.trace(grad_err.dot(grad_err))
+#
+#        self.__gw__.append(np.sqrt( np.einsum("ij, ij", struct_grad, struct_grad)))
+#        self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
+#
+#        self.__gc__.append(gc)
+#        self.__gc_err__.append(gc_err)
         
         # Compute the KL ratio
         self.__KL__.append(self.ensemble.get_effective_sample_size())
@@ -463,13 +478,23 @@ class SSCHA_Minimizer:
         # TODO: Activate a new pipe to avoid to stop the execution of the python 
         #       code when running the minimization. This allows for interactive plots
         running = True
+        
+        
         while running:
             # Invoke the custom fuction if any
             if custom_function_pre is not None:
                 custom_function_pre(self)
             
+            # Store the original dynamical matrix
+            old_dyn = self.dyn.Copy()
+            
             # Perform the minimization step
             self.minimization_step(self.minimization_algorithm)
+            
+            if self.check_imaginary_frequencies():
+                print "Immaginary frequencies found."
+                print "Minimization aborted."
+                break
             
             # Compute the free energy and its error
             fe, err = self.get_free_energy(True)
@@ -514,6 +539,91 @@ class SSCHA_Minimizer:
             if custom_function_post is not None:
                 custom_function_post(self)
             
+        # If your stopped not for convergence then 
+        # restore the last dynamical matrix
+        if not self.is_converged():
+            print ""
+            print "Restoring the last good dynamical matrix."
+            self.dyn = old_dyn
+            
+            print "Updating the importance sampling..."
+            self.update()
+            print ""
+            
+        
+    def finalize(self, verbose = 1):
+        """
+        FINALIZE
+        ========
+        
+        This method finalizes the minimization, and prints on stdout the
+        results of the current minimization.
+        
+        Parameters
+        ----------
+            verbose : int, optional
+                The verbosity level. If 0 only the final free energy and gradient is printed.
+                If 1 the stress tensor is also printed. If 2 also the final structure and frequencies
+                are printed.
+        """
+        
+        
+        
+        print ""
+        print " * * * * * * * * "
+        print " *             * "
+        print " *   RESULTS   * "
+        print " *             * "
+        print " * * * * * * * * "
+        print ""
+        
+        print ""
+        print "Minimization ended after %d steps" % len(self.__gc__)
+        print ""
+
+        print "Free energy = %16.8f +- %16.8f meV" % (self.__fe__[-1] * __RyTomev__, 
+                                                      self.__fe_err__[-1] * __RyTomev__)
+        print "FC gradient modulus = %16.8f +- %16.8f bohr^2" % (self.__gc__[-1] * __RyTomev__, 
+                                                               self.__gc_err__[-1] * __RyTomev__)
+        print "Struct gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gw__[-1] * __RyTomev__,
+                                                                    self.__gw_err__[-1] * __RyTomev__)
+        print "Kong-Liu effective sample size = ", self.__KL__[-1]
+        print ""
+        
+        if self.ensemble.has_stress and verbose >= 1:
+            print ""
+            print " ==== STRESS TENSOR [GPa] ==== "
+            stress, err = self.get_stress_tensor()
+            
+            print "%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f" % (stress[0,0], stress[0,1], stress[0,2], "",
+                                                                err[0,0], err[0,1], err[0,2])
+            print "%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f" % (stress[1,0], stress[1,1], stress[1,2], "    +-    ",
+                                                                err[1,0], err[1,1], err[1,2])
+            
+            print "%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f" % (stress[2,0], stress[2,1], stress[2,2], "",
+                                                                err[2,0], err[2,1], err[2,2])
+            
+            print ""
+        
+        
+        if verbose >= 2:
+            print " ==== FINAL STRUCTURE [A] ==== "
+            nat = self.dyn.structure.N_atoms
+            for i in range(nat):
+                print "%5s %16.8f%16.8f%16.8f" % (self.dyn.structure.atoms[i], 
+                                                  self.dyn.structure.coords[i,0],
+                                                  self.dyn.structure.coords[i,1],
+                                                  self.dyn.structure.coords[i,2])
+            print ""
+            print " ==== FINAL FREQUENCIES [cm-1] ==== "
+            w, pols = self.dyn.DyagDinQ(0)
+            trans = CC.Methods.get_translations(pols, self.dyn.structure.get_masses_array())
+            
+            for i in range(w):
+                print "Mode %d:   freq %16.8f cm-1  | is translation? " % (i+1, w[i] * __RyToCm__, trans[i]) 
+        
+            print ""
+        
             
 
     def check_imaginary_frequencies(self):
@@ -622,6 +732,30 @@ class SSCHA_Minimizer:
                 even if you do not have any access in a X server.
         """
         
+        # Check if the length of the gc is not good, and append the last
+        # gradient
+        if len(self.__gc__) != len(self.__fe__):
+            grad, grad_err = self.ensemble.get_fc_from_self_consistency(True, True)
+            
+            # Initialize the symmetry
+            qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+            qe_sym.SetupQPoint(verbose = True)
+    
+            struct_grad, struct_grad_err = self.ensemble.get_average_forces(True)
+    
+            qe_sym.SymmetrizeVector(struct_grad)
+            qe_sym.SymmetrizeVector(struct_grad_err)
+            
+            # Get the gradient modulus
+            gc = np.trace(grad.dot(grad))
+            gc_err = np.trace(grad_err.dot(grad_err))
+    
+            self.__gw__.append(np.sqrt( np.einsum("ij, ij", struct_grad, struct_grad)))
+            self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
+    
+            self.__gc__.append(gc)
+            self.__gc_err__.append(gc_err)
+        
         # Convert the data in numpy arrays
         fe = np.array(self.__fe__) * __RyTomev__
         fe_err = np.array(self.__fe_err__) * __RyTomev__
@@ -635,12 +769,16 @@ class SSCHA_Minimizer:
         kl = np.array(self.__KL__)
         
         steps = np.arange(len(fe))
+    
         
         # Check if the results need to be saved on a file
-        if save_filename is not None:
+        if save_filename is not None:            
+            #print "Lengths:", len(fe), len(gc), len(gw), len(kl), len(steps)       
+            print "Saving the minimization results..."
             save_data = [steps, fe, fe_err, gc, gc_err, gw, gw_err, kl]
             np.savetxt(save_filename, np.transpose(save_data),
                        header = "Steps; Free energy +- error [meV]; FC gradient +- error [bohr^2]; Structure gradient +- error [meV / A]; Kong-Liu N_eff")
+            print "Minimization data saved in %s." % save_filename
         
         
         # Plot
@@ -675,6 +813,23 @@ class SSCHA_Minimizer:
         
             plt.show()
             
+            
+    def get_stress_tensor(self):
+        """
+        GET THE STRESS TENSOR
+        =====================
+        
+        For a full documentation, please refer to the same function of the 
+        Ensemble class.
+        This subroutine just link to that one. A stress offset is added if defined
+        in the input variable of the current class.
+        
+        NOTE: if the ensemble has not the stress tensors, an exception will be raised
+        
+        """
+        
+        
+        return self.ensemble.get_stress_tensor(self.stress_offset)
     
 
 def get_root_dyn(dyn_fc, root_representation):

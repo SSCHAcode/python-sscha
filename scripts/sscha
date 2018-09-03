@@ -92,6 +92,7 @@ minim.setup_from_namelist(line_list)
 # Start the minimization
 minim.init()
 minim.run()
+minim.finalize(2)
 
 # Save the final dynamical matrix
 minim.dyn.save_qe(minim.dyn_path + "_popuation%d_" % minim.population)

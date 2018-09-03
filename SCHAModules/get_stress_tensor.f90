@@ -8,31 +8,36 @@
 !      volume : double precision
 !          The volume of the unit cell
 !
-subroutine get_stress_tensor(volume, forces_e, u_vector, abinit_stress_tensors, wr, er, T, rho, log_err, stress_tensor, error_on_stress_tensor, n_random, natoms_sc, nmodes)
+subroutine get_stress_tensor(volume, forces_e, u_vector, abinit_stress_tensors, wr, er, T, rho, log_err, &
+        stress_tensor, error_on_stress_tensor, nrandom, natoms_sc, nmodes)
   use stochastic
-  use polarization
+  !use polarization
+  
+  implicit none
+  
   
   double precision, intent(in) :: volume, T
-  type(dynamical_matrix), intent(in) :: dyn
+  !type(dynamical_matrix), intent(in) :: dyn
   double precision, dimension(3,3,nrandom), intent(in) :: abinit_stress_tensors
   double precision, dimension(3,3), intent(out) :: stress_tensor
   double precision, dimension(3,3), intent(out) :: error_on_stress_tensor
   double precision, dimension(nmodes), intent(in) :: wr
   double precision, dimension(nrandom), intent(in) :: rho
-  double precision, dimension(3*natoms_sc, nmodes, 3), intent(in) :: er
+  double precision, dimension(natoms_sc, nmodes, 3), intent(in) :: er
   double precision, dimension(nrandom,natoms_sc, 3), intent(in) :: forces_e, u_vector
-  integer, intent(in) :: n_random, natoms_sc, nmodes
+  character (len=10), intent(in) :: log_err
+  integer, intent(in) :: nrandom, natoms_sc, nmodes
   
 
   ! Additional variables
   double precision, dimension(3,3) :: anharmonic_stress, anharmonic_error, harmonic_stress, abinitio_stress, abinitio_error
   double precision, dimension(:,:,:), allocatable :: f_dot_r!, debug_f_dot_r, f_scha, fscha_dot_r
   !double precision, dimension(:,:), allocatable :: f_atom
-  double precision :: volume, scale_factor, iso_pressure, iso_p_err, tmp
+  !double precision :: volume, scale_factor, iso_pressure, iso_p_err, tmp
   integer :: i, j, k
   logical :: pon
 
-  implicit none
+ ! pon = .false.
   
   ! Manage the optional argument print_on_screen
   ! if (present(print_on_screen)) then
@@ -82,7 +87,7 @@ subroutine get_stress_tensor(volume, forces_e, u_vector, abinit_stress_tensors, 
 
 
   ! Get the scalar product between forces and atomic positions
-  do k = 1, opt%nrandom
+  do k = 1, nrandom
      do i = 1, 3
         do j = 1, 3
            f_dot_r(i, j, k) = sum(forces_e(k, :, i) * u_vector(k, :, j))
@@ -108,7 +113,7 @@ subroutine get_stress_tensor(volume, forces_e, u_vector, abinit_stress_tensors, 
   end do
 
   ! Close the debugging file
-  if (opt%debug_stress) close(23)
+  !if (opt%debug_stress) close(23)
 
   ! Average the Ab-Initio stress
   do i = 1, 3
@@ -174,83 +179,83 @@ subroutine get_stress_tensor(volume, forces_e, u_vector, abinit_stress_tensors, 
   ! end if
 
 
-
-  if (pon) then
-     ! Compute also the isotropic pressure
-     iso_pressure = 0
-     iso_p_err = 0
-     do i = 1, 3
-        iso_pressure = iso_pressure + stress_tensor(i, i)
-        iso_p_err = iso_p_err + error_on_stress_tensor(i, i)**2       
-     end do
-     iso_pressure = iso_pressure / 3.0d0
-     iso_p_err = dsqrt(iso_p_err) / 3.0d0
-
-     ! Print details on stdout
-     print *, ""
-     print *, "* * * * * * * * * * * * * *"
-     print *, "*                         *"
-     print *, "*          STRESS         *"
-     print *, "*                         *"    
-     print *, "* * * * * * * * * * * * * *"
-     print *, ""
-     print *, "Input unit of measure: Ry/bohr^3 (Pay attention that the input stress matches this unit)"
-
-     ! If all the components of the stress are evaluated, print them in output
-     if (.not. opt%stress_suppress_noise) then
-        print *, "Ab-initio stress:"
-        do i = 1, 3
-           print "(3D18.10)", (abinitio_stress(i, j) * 2.0d0, j = 1, 3)
-        end do
-        print *, "+-"
-        do i = 1, 3
-           print "(3D18.10)", (abinitio_error(i, j) * 2.0d0, j = 1, 3)
-        end do
-        print *, ""
-        print *, "Anharmonic stress:"
-        do i = 1, 3
-           print "(3D18.10)", (anharmonic_stress(i, j) * 2.0d0, j = 1, 3)
-        end do
-        print *, "+-"
-        do i = 1, 3
-           print "(3D18.10)", (anharmonic_error(i, j) * 2.0d0, j = 1, 3)
-        end do
-        print *, ""
-        print *, "Harmonic stress:"
-        do i = 1, 3
-           print "(3D18.10)", (harmonic_stress(i, j) * 2.0d0, j = 1, 3)
-        end do
-        print *, ""
-     end if
-
-     ! Print the total stress
-     print *, "-- TOTAL STRESS [Ry/bohr^3] --"
-     do i = 1, 3
-        print "(3D18.10)", (stress_tensor(i, j) * 2.0d0, j = 1, 3)
-     end do
-     print *, "+-"
-     do i = 1, 3
-        print "(3D18.10)", (error_on_stress_tensor(i, j) * 2.0d0, j = 1, 3)
-     end do
-     print *, ""
-     print *, "-- TOTAL STRESS [GPa] --"
-     do i = 1, 3
-        print "(3D18.10)", (stress_tensor(i, j) * 29421.6144000, j = 1, 3)
-     end do
-     print *, "+-"
-     do i = 1, 3
-        print "(3D18.10)", (error_on_stress_tensor(i, j) * 29421.6144000, j = 1, 3)
-     end do
-     print *, ""
-     print *, "Isotropic pressure (1/3 of the trace) "
-     print "(A10, D18.10, A4,D18.10, A15)", " P = ",  iso_pressure * 2.0d0, " +- ", iso_p_err*2.d0, "[Ry/bohr^3]"
-     print "(A10, D18.10, A4,D18.10, A15)", " P = ",  iso_pressure*29421.6144000, " +- ", &
-          iso_p_err*29421.6144000, "[GPa]"
-
-     print *, ""
-     print *, "* * * * * END STRESS * * * * *"
-     print *, ""
-  end if
+!
+!  if (pon) then
+!     ! Compute also the isotropic pressure
+!     iso_pressure = 0
+!     iso_p_err = 0
+!     do i = 1, 3
+!        iso_pressure = iso_pressure + stress_tensor(i, i)
+!        iso_p_err = iso_p_err + error_on_stress_tensor(i, i)**2       
+!     end do
+!     iso_pressure = iso_pressure / 3.0d0
+!     iso_p_err = dsqrt(iso_p_err) / 3.0d0
+!
+!     ! Print details on stdout
+!     print *, ""
+!     print *, "* * * * * * * * * * * * * *"
+!     print *, "*                         *"
+!     print *, "*          STRESS         *"
+!     print *, "*                         *"    
+!     print *, "* * * * * * * * * * * * * *"
+!     print *, ""
+!     print *, "Input unit of measure: Ry/bohr^3 (Pay attention that the input stress matches this unit)"
+!
+!     ! If all the components of the stress are evaluated, print them in output
+!     if (.not. opt%stress_suppress_noise) then
+!        print *, "Ab-initio stress:"
+!        do i = 1, 3
+!           print "(3D18.10)", (abinitio_stress(i, j) * 2.0d0, j = 1, 3)
+!        end do
+!        print *, "+-"
+!        do i = 1, 3
+!           print "(3D18.10)", (abinitio_error(i, j) * 2.0d0, j = 1, 3)
+!        end do
+!        print *, ""
+!        print *, "Anharmonic stress:"
+!        do i = 1, 3
+!           print "(3D18.10)", (anharmonic_stress(i, j) * 2.0d0, j = 1, 3)
+!        end do
+!        print *, "+-"
+!        do i = 1, 3
+!           print "(3D18.10)", (anharmonic_error(i, j) * 2.0d0, j = 1, 3)
+!        end do
+!        print *, ""
+!        print *, "Harmonic stress:"
+!        do i = 1, 3
+!           print "(3D18.10)", (harmonic_stress(i, j) * 2.0d0, j = 1, 3)
+!        end do
+!        print *, ""
+!     end if
+!
+!     ! Print the total stress
+!     print *, "-- TOTAL STRESS [Ry/bohr^3] --"
+!     do i = 1, 3
+!        print "(3D18.10)", (stress_tensor(i, j) * 2.0d0, j = 1, 3)
+!     end do
+!     print *, "+-"
+!     do i = 1, 3
+!        print "(3D18.10)", (error_on_stress_tensor(i, j) * 2.0d0, j = 1, 3)
+!     end do
+!     print *, ""
+!     print *, "-- TOTAL STRESS [GPa] --"
+!     do i = 1, 3
+!        print "(3D18.10)", (stress_tensor(i, j) * 29421.6144000, j = 1, 3)
+!     end do
+!     print *, "+-"
+!     do i = 1, 3
+!        print "(3D18.10)", (error_on_stress_tensor(i, j) * 29421.6144000, j = 1, 3)
+!     end do
+!     print *, ""
+!     print *, "Isotropic pressure (1/3 of the trace) "
+!     print "(A10, D18.10, A4,D18.10, A15)", " P = ",  iso_pressure * 2.0d0, " +- ", iso_p_err*2.d0, "[Ry/bohr^3]"
+!     print "(A10, D18.10, A4,D18.10, A15)", " P = ",  iso_pressure*29421.6144000, " +- ", &
+!          iso_p_err*29421.6144000, "[GPa]"
+!
+!     print *, ""
+!     print *, "* * * * * END STRESS * * * * *"
+!     print *, ""
+!  end if
 
   deallocate(f_dot_r)
 end subroutine get_stress_tensor

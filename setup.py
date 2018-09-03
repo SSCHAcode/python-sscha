@@ -5,7 +5,8 @@ from numpy.distutils.core import setup, Extension
 SCHAModules = Extension(name = "SCHAModules", 
                         sources = ["SCHAModules/module_stochastic.f90",
                                    "SCHAModules/module_new_thermodynamic.f90",
-                                   "SCHAModules/module_anharmonic.f90"],
+                                   "SCHAModules/module_anharmonic.f90",
+                                   "SCHAModules/get_stress_tensor.f90"],
                         libraries = ["lapack", "blas"],
                         extra_f90_compile_args = ["-cpp"])
 
