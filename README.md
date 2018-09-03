@@ -22,7 +22,6 @@ GitHub
 The ASE (Atomic Simulation Environment) is another dependency, since CellConstructor
 relies on it.
 
-It is recommen
 
 ## Installation
 
@@ -50,7 +49,7 @@ The installer will build and install both the python library and the executable.
 The executable can then be runned with:
 
 ```bash
-sscha -i input_file>
+sscha -i input_file
 ```
 Where the "input_file" is a valid input for the code. Please look at the SimpleExample
 inside the Examples directory to see a template and how to create it.

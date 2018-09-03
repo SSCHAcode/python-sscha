@@ -37,6 +37,8 @@ import Ensemble
 __RyToCm__  = 109691.40235
 __RyTomev__ = 13605.698066
 __RyBohr3_to_GPa__ = 14710.513242194795
+__K_to_Ry__ = 6.336857346553283e-06
+__EPSILON__ = 1e-4
 
 
 class SSCHA_Minimizer:
@@ -846,6 +848,139 @@ def get_root_dyn(dyn_fc, root_representation):
     """
     # TODO: To be ultimated
     pass
+
+
+def ApplyLambdaTensor(current_dyn, matrix, T = 0):
+    """
+    INVERSE PRECONDITIONING
+    =======================
+    
+    This function perform the inverse of the precondtioning: it applies the Hessian
+    matrix to the preconditioned gradient to obtain the real one. This is
+    a test function.
+        
+    
+    Parameters
+    ----------
+        current_dyn : 3*nat x 3*nat
+            The current force-constant matrix to compute the Lambda tensor
+        matrix : 3*nat x 3*nat
+            The matrix on which you want to apply the Lambda tensor.
+        T : float
+            The temperature
+            
+    Result
+    ------
+        new_matrix : 3*nat x 3*nat
+            The matrix after the Lambda application
+    """
+    
+    w, pols = current_dyn.DyagDinQ(0)
+    
+    # Get the translations
+    trans = ~CC.Methods.get_translations(pols, current_dyn.structure.get_masses_array())
+    
+    # Restrict only to non translational modes
+    w = np.real(w[trans])
+    pols = np.real( pols[:, trans])
+    
+    nat = current_dyn.structure.N_atoms
+    
+    # Redefine the polarization vectors
+    m = current_dyn.structure.get_masses_array()
+    for i in range(nat):
+        pols[3*i : 3*i + 3,:] /= np.sqrt(m[i])
+        
+    # Get the bose occupation number
+    nmodes = len(w)
+    f_munu = np.zeros( (nmodes, nmodes), dtype = np.float64)
+    
+    
+    n_w = np.zeros( nmodes, dtype = np.float64)
+    dn_dw = np.zeros(nmodes, dtype = np.float64)
+    if T != 0:
+        beta = 1 / (__K_to_Ry__ * T)
+        n_w = 1 / (np.exp(w * beta) - 1)
+        dn_dw = - beta / (2 * np.cosh(w * beta) - 1)
+        
+    # Prepare the multiplicating function
+    for i in range(nmodes):
+        md = np.abs((w - w[i]) / w[i]) > __EPSILON__
+        f_munu[i, md] = (n_w[md] + n_w[i] + 1) / (w[i] + w[md]) - (n_w[i] - n_w[md]) / (w[i] - w[md])
+        f_munu[i, ~md] = (2 *n_w[i] + 1) / w[i] - dn_dw[i]
+        f_munu[i, :] /= 4 * w[i] * w
+        
+    # Perform the Einstein summation contracting everithing
+    return np.einsum("ab, ia, jb, ca, db,cd -> ij", f_munu, pols, pols,
+                     pols, pols, matrix)
+    
+
+def ApplyFCPrecond(current_dyn, matrix, T = 0):
+    """
+    PURE FORCE-CONSTANT PRECONDITIONING
+    ===================================
+    
+    This function perform the precondition on a given matrix, by applying
+    the inverse of the lambda function
+        
+    
+    Parameters
+    ----------
+        current_dyn : 3*nat x 3*nat
+            The current force-constant matrix to compute the Lambda tensor
+        matrix : 3*nat x 3*nat
+            The matrix on which you want to apply the Lambda tensor.
+        T : float
+            The temperature
+            
+    Result
+    ------
+        new_matrix : 3*nat x 3*nat
+            The matrix after the Lambda application
+    """
+    
+    w, pols = current_dyn.DyagDinQ(0)
+    
+    # Get the translations
+    trans = ~CC.Methods.get_translations(pols, current_dyn.structure.get_masses_array())
+    
+    # Restrict only to non translational modes
+    w = np.real(w[trans])
+    pols = np.real( pols[:, trans])
+    
+    nat = current_dyn.structure.N_atoms
+    
+    # Multiply for the masses
+    m = current_dyn.structure.get_masses_array()
+    for i in range(nat):
+        pols[3*i : 3*i + 3, : ] *= np.sqrt(m[i])
+        
+    # Get the bose occupation number
+    nmodes = len(w)
+    f_munu = np.zeros( (nmodes, nmodes), dtype = np.float64)
+    
+    
+    n_w = np.zeros( nmodes, dtype = np.float64)
+    dn_dw = np.zeros(nmodes, dtype = np.float64)
+    if T != 0:
+        beta = 1 / (__K_to_Ry__ * T)
+        n_w = 1 / (np.exp(w * beta) - 1)
+        dn_dw = - beta / (2 * np.cosh(w * beta) - 1)
+        
+    # Prepare the multiplicating function
+    for i in range(nmodes):
+        md = np.abs((w - w[i]) / w[i]) > __EPSILON__
+        f_munu[i, md] = (n_w[md] + n_w[i] + 1) / (w[i] + w[md]) - (n_w[i] - n_w[md]) / (w[i] - w[md])
+        f_munu[i, ~md] = (2 *n_w[i] + 1) / w[i] - dn_dw[i]
+        f_munu[i, :] /= 4 * w[i] * w
+    
+    f_munu = 1 / f_munu
+        
+    # Perform the Einstein summation contracting everithing
+    return np.einsum("ab, ia, jb, ca, db,cd -> ij", f_munu, pols, pols,
+                     pols, pols,  matrix)
+    
+    
 
 
 def GetStructPrecond(current_dyn):
