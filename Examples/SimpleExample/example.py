@@ -30,18 +30,20 @@ ens.load(DATADIR, POPULATION, NRANDOM) # This was a second population (2)
 
 # Setup the minimizer
 minim = sscha.SchaMinimizer.SSCHA_Minimizer(ens)
-minim.min_step_struc = 1e-4
-#minim.min_step_dyn = 0
-minim.meaningful_factor = 1e-3
+minim.min_step_struc = 0
+minim.min_step_dyn = 0.05
+minim.meaningful_factor = 1e-7
 minim.eq_energy = -144.40680397
 minim.precond_wyck = False
-minim.max_ka = 20
+minim.max_ka = 40
+minim.fake_precond = False
+minim.precond_dyn = False
 
 minim.gradi_op = "gc"
 
 # Run the minimization
 minim.init()
 minim.run()
-
+minim.finalize()        
 # Plot the results
 minim.plot_results()

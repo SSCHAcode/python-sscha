@@ -102,7 +102,14 @@ class SSCHA_Minimizer:
         # The gradient before the last step was performed (Used for the CG)
         self.prev_grad = None
         
+        # Preconditioning variables
         self.precond_wyck = True
+        self.precond_dyn = True
+        
+        # This is a debugging flag
+        # If true the preconditioning of the original ensemble
+        # is used
+        self.fake_precond = False
         
         # The stopping criteria on which gradient is evaluated
         self.gradi_op = "gc"
@@ -165,13 +172,33 @@ class SSCHA_Minimizer:
         # Get the gradient of the free-energy respect to the dynamical matrix
         #dyn_grad, err = self.ensemble.get_free_energy_gradient_respect_to_dyn()
         dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
-
         
         # Perform the symmetrization
         qe_sym.ImposeSumRule(dyn_grad)
         qe_sym.SymmetrizeDynQ(dyn_grad, np.array([0,0,0]))
         qe_sym.ImposeSumRule(err)
         qe_sym.SymmetrizeDynQ(err, np.array([0,0,0]))
+        
+        # This gradient is already preconditioned, if the precondition
+        # is turned off we have to modify the gradient
+        
+        if not self.precond_dyn or self.fake_precond:
+            dyn_grad = ApplyLambdaTensor(self.dyn, dyn_grad)    
+            err = ApplyLambdaTensor(self.dyn, err)
+            qe_sym.ImposeSumRule(dyn_grad)
+            qe_sym.ImposeSumRule(err)
+        
+        # This is a debugging strategy (we use the preconditioning)
+        if self.fake_precond:
+            dyn_grad = ApplyFCPrecond(self.ensemble.dyn_0, dyn_grad)
+            err = ApplyFCPrecond(self.ensemble.dyn_0, err)
+            qe_sym.ImposeSumRule(dyn_grad)
+            qe_sym.ImposeSumRule(err)
+            
+        
+            
+        
+        
         
         # Store the gradient in the minimization
         self.__gc__.append(np.trace(dyn_grad.dot(dyn_grad)))

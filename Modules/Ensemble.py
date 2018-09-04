@@ -605,7 +605,7 @@ class Ensemble:
             
         The previous equation is true only if the :math:`\\Phi` matrix is the solution
         of the SCHA theory. Here :math:`\vec u` are the displacements of the configurations
-        and :math:`\\vec f` are the forces of the real system acting on the simulation.
+        and :math:`f` are the forces of the real system acting on the simulation.
         
         Parameters
         ----------

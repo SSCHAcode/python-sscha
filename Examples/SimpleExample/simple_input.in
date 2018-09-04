@@ -35,7 +35,7 @@
     type_cal = "minim"
 
     ! The dimension of the ensemble
-    n_random = 10000
+    n_random = 1000
     
     ! The position of the ensemble (where the data are stored).
     ! Take a look to that to see how to dispose your ensemble.
@@ -85,7 +85,7 @@
     ! and you should re-generate a new ensemble.
     ! Usually in the begining you can chose 0.1 the original ensemble, and raise it to 0.4 or 0.5
     ! when you are close to convergence.
-    n_random_eff = 1000
+    n_random_eff = 500
     
     ! This flag is used by the old code to make it seek for the pressures
     ! in the ensemble. However it is ignored by the python code, that will print
@@ -104,7 +104,7 @@
     ! leading to neagive frequencies, it is wise in the beginning to decrease it.
     ! lambda_a : step for the force constant matrix
     ! lambda_w : step for the structure
-    lambda_a = 1
+    lambda_a = 0.1
     lambda_w = 1
     
     ! The root representation is a trick to increase the speed of the minimization
@@ -115,20 +115,24 @@
     ! - "normal" : normal minimization, can lead to imaginary frequencies
     ! - "sqrt"   : square root representation.
     ! - "root4"  : fourth-root represnetation, the best one (and the slowest).
-    root_representation = "root4"
+    root_representation = "normal"
     
     ! This two flags are used only by the fortran code (but only for now)
     ! Preconditioning in python is always active (in fortran is super-time consuming)
     ! so here we activate it only in the structure, and not in the force-constant matrix
     preconditioning = .false.
-    precond_only_wyckoff = .true.
+    !precond_only_wyckoff = .true.
     
     ! This is used only in the fortran code, if not specified the structure
     ! is not minimized (ignored by the python code).
     ! Note, you can always freeze the structure (or dynamical matrix) minimization
     ! by setting the step to 0 (lambda_a or lambda_w)
-    minim_struc = .true.
-    
-    max_ka= 100
+    minim_struc = .false.
+
+    ! The old code uses line minimization (activated after warm_up_steps)
+    warm_up_steps = 10000    
+
+    ! The maximum number of steps after which the code is automatically stopped
+    max_ka= 10000
 /
 
