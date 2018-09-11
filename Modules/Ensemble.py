@@ -39,7 +39,7 @@ __A_TO_BOHR__ = 1.889725989
 
 
 class Ensemble:
-    def __init__(self, dyn0, T0):
+    def __init__(self, dyn0, T0, supercell = (1,1,1)):
         """
         PREPARE THE ENSEMBLE
         ====================
@@ -77,13 +77,19 @@ class Ensemble:
         
         self.current_T = T0
         
+        # Supercell size
+        self.supercell = np.ones(3, dtype = np.intc)
+        self.supercell[:] = supercell
+        
+        # How many atoms in the supercell
+        Nsc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms 
         
         # To avoid to recompute each time the same variables store something usefull here
-        self.q_start = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
-        self.current_q = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
+        self.q_start = np.zeros( (self.N, Nsc * 3))
+        self.current_q = np.zeros( (self.N, Nsc * 3))
         
         # Store also the displacements
-        self.u_disps = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
+        self.u_disps = np.zeros( (self.N, Nsc * 3))
         
         # A flag that memorize if the ensemble has also the stresses
         self.has_stress = False
@@ -142,18 +148,23 @@ class Ensemble:
         # Load the structures
         self.N = N
         
-        self.forces = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3), order = "F", dtype = np.float64)
+        Nat_sc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms
+        
+        self.forces = np.zeros( (self.N, Nat_sc, 3), order = "F", dtype = np.float64)
         self.stresses = np.zeros( (self.N, 3,3), order = "F", dtype = np.float64)
         
         self.sscha_energies = np.zeros(self.N, dtype = np.float64)
         self.energies = np.zeros(self.N, dtype = np.float64)
-        self.sscha_forces = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3), order = "F", dtype = np.float64)
+        self.sscha_forces = np.zeros( (self.N, Nat_sc, 3), order = "F", dtype = np.float64)
         
-        self.u_disps = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3), order = "F", dtype = np.float64)
+        self.u_disps = np.zeros( (self.N, Nat_sc * 3), order = "F", dtype = np.float64)
         
         # Add a counter to check if all the stress tensors are present
-        count_stress = 0
+        count_stress = 0 
         
+        # Superstructure
+        dyn_supercell = self.dyn_0.GenerateSupercellDyn(self.supercell)
+        super_structure = dyn_supercell.structure
 
         self.structures = []
         
@@ -162,11 +173,11 @@ class Ensemble:
             structure = CC.Structure.Structure()
             structure.read_scf("%s/scf_population%d_%d.dat" % (data_dir, population, i+1), alat = self.dyn_0.alat)
             structure.has_unit_cell = True
-            structure.unit_cell = self.dyn_0.structure.unit_cell
+            structure.unit_cell = super_structure.unit_cell
             self.structures.append(structure)
             
             # Get the displacement
-            self.u_disps[i,:] = structure.get_displacement(self.current_dyn.structure).reshape( 3 * self.current_dyn.structure.N_atoms)
+            self.u_disps[i,:] = structure.get_displacement(super_structure).reshape( 3 * Nat_sc)
             
             # Load forces (Forces are in Ry/bohr, convert them in Ry /A)
             self.forces[i,:,:] = np.loadtxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1)) * A_TO_BOHR
@@ -177,7 +188,7 @@ class Ensemble:
                 count_stress += 1
             
             # Setup the sscha energies and forces
-            energy, force = self.dyn_0.get_energy_forces(structure)
+            energy, force = self.dyn_0.get_energy_forces(structure, supercell = self.supercell)
 #            
 #            print "Loading: config %d:" % i
 #            for j in range(structure.N_atoms):
@@ -204,7 +215,7 @@ class Ensemble:
         self.rho = np.ones(self.N, dtype = np.float64)
         
         # Initialize the q_start
-        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, self.dyn_0)
+        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell)
         self.current_q = self.q_start.copy()
         
         # If all the stress tensors have been found, set the stress flag
@@ -304,6 +315,7 @@ class Ensemble:
             raise ValueError("Error, evenodd allowed only with an even number of random structures")
             
         self.N = N
+        Nat_sc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms
         self.structures = []
         if evenodd:
             structs = self.dyn_0.ExtractRandomStructures(N / 2, self.T0)
@@ -318,10 +330,10 @@ class Ensemble:
         
         # Compute the sscha energy and forces
         self.sscha_energies = np.zeros( ( self.N))
-        self.sscha_forces = np.zeros((self.N, self.dyn_0.structure.N_atoms, 3))
+        self.sscha_forces = np.zeros((self.N, Nat_sc, 3))
         self.energies = np.zeros(self.N)
-        self.forces = np.zeros( (self.N, self.dyn_0.structure.N_atoms, 3))
-        self.u_disps = np.zeros( (self.N, self.dyn_0.structure.N_atoms * 3))
+        self.forces = np.zeros( (self.N, Nat_sc, 3))
+        self.u_disps = np.zeros( (self.N, Nat_sc * 3))
         for i, s in enumerate(self.structures):
             energy, force  = self.dyn_0.get_energy_forces(s)
             
@@ -329,7 +341,7 @@ class Ensemble:
             self.sscha_forces[i,:,:] = force
             
             # Get the displacements
-            self.u_disps[i, :] = s.get_displacement(self.dyn_0.structure).reshape((3*self.dyn_0.structure.N_atoms))
+            self.u_disps[i, :] = s.get_displacement(self.dyn_0.structure).reshape((3* Nat_sc))
         
         self.rho = np.ones(self.N)
         self.current_dyn = self.dyn_0.Copy()
@@ -362,10 +374,11 @@ class Ensemble:
         self.current_T = newT
         
         # Get the frequencies of the original dynamical matrix
-        w, pols = self.dyn_0.DyagDinQ(0)
+        super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
+        w, pols = super_dyn.DyagDinQ(0)
         
         # Exclude translations
-        w = w[~CC.Methods.get_translations(pols, self.dyn_0.structure.get_masses_array())]
+        w = w[~CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())]
 
         # Convert from Ry to Ha and in fortran double precision
         w = np.array(w/2, dtype = np.float64)
@@ -374,10 +387,14 @@ class Ensemble:
         old_a = SCHAModules.thermodynamic.w_to_a(w, self.T0)
         
         # Now do the same for the new dynamical matrix
-        w, pols = new_dynamical_matrix.DyagDinQ(0)
-        w = w[~CC.Methods.get_translations(pols, new_dynamical_matrix.structure.get_masses_array())]
+        new_super_dyn = new_dynamical_matrix.GenerateSupercellDyn(self.supercell)
+        w, pols = new_super_dyn.DyagDinQ(0)
+        w = w[~CC.Methods.get_translations(pols, new_super_dyn.structure.get_masses_array())]
         w = np.array(w/2, dtype = np.float64)
         new_a = SCHAModules.thermodynamic.w_to_a(w, newT)
+        
+        
+        
         
         # Get the new q_vectors for the given matrix
         self.current_q = CC.Manipulate.GetQ_vectors(self.structures, new_dynamical_matrix) 
@@ -407,10 +424,10 @@ class Ensemble:
             #print "Weight %d" % i
             #tmp = new_dynamical_matrix.GetRatioProbability(self.structures[i], newT, self.dyn_0, self.T0)
             #print "FORTRAN :", self.rho[i], "PYTHON:", tmp
-            self.sscha_energies[i], self.sscha_forces[i, :,:] = new_dynamical_matrix.get_energy_forces(self.structures[i])
+            self.sscha_energies[i], self.sscha_forces[i, :,:] = new_dynamical_matrix.get_energy_forces(self.structures[i], real_space_fc = new_super_dyn.dynmats[0])
             
             # Get the new displacement
-            self.u_disps[i, :] = self.structures[i].get_displacement(new_dynamical_matrix.structure).reshape(3 * new_dynamical_matrix.structure.N_atoms)
+            self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
         self.current_dyn = new_dynamical_matrix
         
         
@@ -601,7 +618,7 @@ class Ensemble:
         
         .. math::
             
-            \\Phi_{ab} = \\frac 12 \\sum_c \\upsilon_{ac} \\left< u_c f_a\\right>_{\\Phi}
+            \\Phi_{ab} = \\frac 12 \\sum_c \\Upsilon_{ac} \\left< u_c f_a\\right>_{\\Phi}
             
         The previous equation is true only if the :math:`\\Phi` matrix is the solution
         of the SCHA theory. Here :math:`\vec u` are the displacements of the configurations
@@ -627,6 +644,8 @@ class Ensemble:
         
         # Get the upsilon matrix
         ups_mat = self.current_dyn.GetUpsilonMatrix(self.current_T)
+        
+        
 
         # Get the pseudo-displacements obtained as
         # v = Upsilon * u = u * Upsilon^T  = u * Upsilon (we use the last to exploit fast indexing array)
@@ -651,6 +670,107 @@ class Ensemble:
             delta_new_phi -= new_phi**2
             delta_new_phi = np.sqrt(delta_new_phi)
             return new_phi, delta_new_phi
+        
+        return new_phi
+    
+    def get_preconditioned_gradient(self, subtract_sscha = True, return_error = False, use_ups_supercell = False):
+        """
+        SELF CONSISTENT SCHA EQUATION
+        =============================
+        
+        This function evaluate the self consistent scha equation. This can be used
+        to evaluate the goodness of the minimization procedure, as well as an
+        independent minimizer. This is the same as get_fc_from_self_consistency,
+        but works also with supercell
+        
+        
+        .. math::
+            
+            \\Phi_{ab} = \\sum_c \\upsilon_{ac} \\left< u_c f_a\\right>_{\\Phi}
+            
+        The previous equation is true only if the :math:`\\Phi` matrix is the solution
+        of the SCHA theory. Here :math:`\vec u` are the displacements of the configurations
+        and :math:`f` are the forces of the real system acting on the simulation.
+        
+        NOTE: It does not takes into account for the symmetrization. 
+        
+        Parameters
+        ----------
+            subtract_sscha : bool, optional
+                This is an optional parameter, if true the forces used to evaluate the 
+                new force constant matrix are subtracted by the sscha forces. 
+                This means that the result is a gradient of the new matrix with respect 
+                to the old one.
+            return_error : bool, optional
+                If true also the stochastic error is returned.
+            use_ups_supercell : bool, optional
+                If true the gradient is computed enterely in real space, and then transformed
+                with fourier in q space. This is computationally heavier, but can be used
+                to test if everything is working correctly
+                
+        Results
+        -------
+            fc : ndarray (3*nat x 3*nat)
+                The real space force constant matrix obtained by the
+                self-consistent equation.
+        """
+        
+        nat = self.current_dyn.structure.N_atoms
+        natsc = np.prod(self.supercell) * nat
+        
+        f_vector = self.forces
+        if subtract_sscha:
+            f_vector -= self.sscha_forces
+        
+        f_vector = f_vector.reshape((self.N, 3 * natsc), order = "F")
+        
+        sum_rho = np.sum(self.rho)
+        
+        # Get the <u F> matrix
+        uf_supercell = np.einsum("i, ij, ik", self.rho, self.u_disps, f_vector) / sum_rho
+        
+        # Project the <uF> matrix in q space
+        if not use_ups_supercell:
+            uf_q = CC.Phonons.GetDynQFromFCSupercell(uf_supercell, np.array(self.dyn_0.q_tot), self.supercell, self.dyn_0.structure.unit_cell)
+        
+        if return_error:
+            uf_delta = np.einsum("i, ij, ik", self.rho, self.u_disps**2, f_vector**2) / sum_rho
+            uf_delta -= uf_supercell**2
+            if not use_ups_supercell:
+                uf_q_delta = CC.Phonons.GetDynQFromFCSupercell(uf_delta, np.array(self.dyn_0.q_tot), self.supercell, self.dyn_0.structure.unit_cell)
+            
+        
+        
+        # For each q point, get the gradient
+        nq = len(self.dyn_0.q_tot)
+        new_phi = np.zeros( (nq, 3 * nat, 3*nat), dtype = np.complex128, order = "C")
+            
+        if return_error:
+            error_phi = np.zeros( (nq, 3 * nat, 3*nat), dtype = np.complex128, order = "C")
+        
+        if use_ups_supercell:
+            # Perform the calculation in the supercell
+            ups_mat = self.current_dyn.GenerateSupercellDyn(self.supercell).GetUpsilonMatrix(self.current_T)
+            new_phi_sc = ups_mat.dot(uf_supercell)
+            
+            # Convert in q space
+            new_phi = CC.Phonons.GetDynQFromFCSupercell(new_phi_sc, np.array(self.dyn_0.q_tot), self.supercell, self.dyn_0.structure.unit_cell)
+            
+            if return_error:
+                error_new_phi_sc = ups_mat.dot(uf_delta)
+                error_phi = CC.Phonons.GetDynQFromFCSupercell(error_new_phi_sc, np.array(self.dyn_0.q_tot), self.supercell, self.dyn_0.structure.unit_cell)
+        else:
+            # Perform the calculation in the q space
+            for iq in range(nq):
+                ups_mat = self.current_dyn.GetUpsilonMatrix(self.current_T, iq)
+                
+                new_phi[iq, :, :] = ups_mat.dot(uf_q[iq,:,:])
+                if return_error:
+                    error_phi[iq, :, :] = ups_mat.dot(uf_q_delta)
+        
+        if return_error:
+            error_phi = np.sqrt(error_phi)
+            return new_phi, error_phi
         
         return new_phi
         
