@@ -101,9 +101,22 @@ subroutine get_stress_tensor(volume, forces_e, u_vector, abinit_stress_tensors, 
 
            ! if (opt%debug_stress) then
            !    debug_f_dot_r(i,j,k) = sum(forces(k, :, i) * u_vector(k, :, j))
+           
            ! end if 
         end do
      end do
+ 
+!     
+!     print *, ""
+!     print *, "CONF", k
+!     do i = 1, natoms_sc
+!         print "(A8, I8, A10, 3D16.8, A10, 3D16.8)", "AT:", i, "FORCE:", forces_e(k, i,  :), "DISP:", u_vector(k, i, :)
+!     end do
+!     
+!     print *, "F DOT R:"    
+!     print "(3D16.8)", f_dot_r(1, :, k)
+!     print "(3D16.8)", f_dot_r(2, :, k)
+!     print "(3D16.8)", f_dot_r(3, :, k)
 
      ! If the debugging flag is active, print the trace of the two stress tensors
      ! if (opt%debug_stress) write (23, "(I10, D20.12, D20.12, D20.12)") k, &

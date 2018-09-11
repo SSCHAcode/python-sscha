@@ -296,6 +296,9 @@ class SSCHA_Minimizer:
             self.dyn = CC.Phonons.Phonons(namelist["fildyn_prefix"], nqirr = int(namelist["nqirr"]))
             self.dyn_path = namelist["fildyn_prefix"]
             
+        if "max_ka" in keys:
+            self.max_ka = int(namelist["max_ka"])
+            
         if "stress_offset" in keys:
             # Load the offset from a filename
             try:

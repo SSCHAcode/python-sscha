@@ -91,6 +91,9 @@
     ! in the ensemble. However it is ignored by the python code, that will print
     ! the stress if it finds the stress tensor inside the ensemble automatically.
     print_stress = .true.
+    print_debug = .false.
+    generate = .false.
+    stress_suppress_noise = .true.
     
     ! The following flag set the equilibrium energy. It should be the energy
     ! of the structure without fluctuations, it is used to separate the electronic
@@ -104,8 +107,8 @@
     ! leading to neagive frequencies, it is wise in the beginning to decrease it.
     ! lambda_a : step for the force constant matrix
     ! lambda_w : step for the structure
-    lambda_a = 1
-    lambda_w = 1
+    lambda_a = 0
+    lambda_w = 0
     
     ! The root representation is a trick to increase the speed of the minimization
     ! And to avoid the imaginary frequency error (the force-constant matrix is constrained
@@ -133,6 +136,6 @@
     warm_up_steps = 10000    
 
     ! The maximum number of steps after which the code is automatically stopped
-    max_ka= 10000
+    max_ka= 1
 /
 
