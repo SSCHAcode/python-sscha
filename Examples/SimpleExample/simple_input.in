@@ -91,9 +91,6 @@
     ! in the ensemble. However it is ignored by the python code, that will print
     ! the stress if it finds the stress tensor inside the ensemble automatically.
     print_stress = .true.
-    print_debug = .false.
-    generate = .false.
-    stress_suppress_noise = .true.
     
     ! The following flag set the equilibrium energy. It should be the energy
     ! of the structure without fluctuations, it is used to separate the electronic

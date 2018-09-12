@@ -729,15 +729,17 @@ class Ensemble:
         # Get the <u F> matrix
         uf_supercell = np.einsum("i, ij, ik", self.rho, self.u_disps, f_vector) / sum_rho
         
+        superstructure = self.dyn_0.structure.generate_supercell(self.supercell)
+        
         # Project the <uF> matrix in q space
         if not use_ups_supercell:
-            uf_q = CC.Phonons.GetDynQFromFCSupercell(uf_supercell, np.array(self.dyn_0.q_tot), self.supercell, self.dyn_0.structure.unit_cell)
+            uf_q = CC.Phonons.GetDynQFromFCSupercell(uf_supercell, np.array(self.dyn_0.q_tot), self.dyn_0.structure, superstructure)
         
         if return_error:
             uf_delta = np.einsum("i, ij, ik", self.rho, self.u_disps**2, f_vector**2) / sum_rho
             uf_delta -= uf_supercell**2
             if not use_ups_supercell:
-                uf_q_delta = CC.Phonons.GetDynQFromFCSupercell(uf_delta, np.array(self.dyn_0.q_tot), self.supercell, self.dyn_0.structure.unit_cell)
+                uf_q_delta = CC.Phonons.GetDynQFromFCSupercell(uf_delta, np.array(self.dyn_0.q_tot), self.dyn_0.structure, superstructure)
             
         
         
@@ -754,11 +756,11 @@ class Ensemble:
             new_phi_sc = ups_mat.dot(uf_supercell)
             
             # Convert in q space
-            new_phi = CC.Phonons.GetDynQFromFCSupercell(new_phi_sc, np.array(self.dyn_0.q_tot), self.supercell, self.dyn_0.structure.unit_cell)
+            new_phi = CC.Phonons.GetDynQFromFCSupercell(new_phi_sc, np.array(self.dyn_0.q_tot), self.dyn_0.structure, superstructure)
             
             if return_error:
                 error_new_phi_sc = ups_mat.dot(uf_delta)
-                error_phi = CC.Phonons.GetDynQFromFCSupercell(error_new_phi_sc, np.array(self.dyn_0.q_tot), self.supercell, self.dyn_0.structure.unit_cell)
+                error_phi = CC.Phonons.GetDynQFromFCSupercell(error_new_phi_sc, np.array(self.dyn_0.q_tot), self.dyn_0.structure, superstructure)
         else:
             # Perform the calculation in the q space
             for iq in range(nq):
