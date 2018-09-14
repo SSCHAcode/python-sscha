@@ -373,6 +373,8 @@ class Ensemble:
         
         self.current_T = newT
         
+        
+        
         # Get the frequencies of the original dynamical matrix
         super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
         w, pols = super_dyn.DyagDinQ(0)
@@ -396,8 +398,8 @@ class Ensemble:
         
         
         
-        # Get the new q_vectors for the given matrix
-        self.current_q = CC.Manipulate.GetQ_vectors(self.structures, new_dynamical_matrix) 
+
+        self.current_q = CC.Manipulate.GetQ_vectors(self.structures, new_super_dyn) 
         
         # Convert the q vectors in the Hartree units
         old_q = self.q_start * np.sqrt(2) * __A_TO_BOHR__
@@ -410,11 +412,11 @@ class Ensemble:
 #        
         
         # Call the Fortran module to compute rho
-#        print "SHAPES:"
-#        print "NEW Q:", np.shape(new_q)
-#        print "OLD Q:", np.shape(old_q)
-#        print "NEW A:", np.shape(new_a)
-#        print "OLD A:", np.shape(old_a)
+        print "SHAPES:"
+        print "NEW Q:", np.shape(new_q)
+        print "OLD Q:", np.shape(old_q)
+        print "NEW A:", np.shape(new_a)
+        print "OLD A:", np.shape(old_a)
         
         self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
         
@@ -424,7 +426,7 @@ class Ensemble:
             #print "Weight %d" % i
             #tmp = new_dynamical_matrix.GetRatioProbability(self.structures[i], newT, self.dyn_0, self.T0)
             #print "FORTRAN :", self.rho[i], "PYTHON:", tmp
-            self.sscha_energies[i], self.sscha_forces[i, :,:] = new_dynamical_matrix.get_energy_forces(self.structures[i], real_space_fc = new_super_dyn.dynmats[0])
+            self.sscha_energies[i], self.sscha_forces[i, :,:] = new_super_dyn.get_energy_forces(self.structures[i], real_space_fc = new_super_dyn.dynmats[0])
             
             # Get the new displacement
             self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
@@ -498,7 +500,7 @@ class Ensemble:
             return value, error
         return value
      
-    def get_average_forces(self, get_error):
+    def get_average_forces(self, get_error, in_unit_cell = True):
         """
         GET FORCES
         ==========
@@ -518,10 +520,27 @@ class Ensemble:
             - get_errors : bool
                 If true the error is also returned (as get_free_energy).
         """
+        
+        eforces = self.forces - self.sscha_forces
+        
+        # TODO: Restrict in the unit cell
+        if in_unit_cell:
+            # Refold the forces in the unit cell
+            super_structure = self.dyn_0.structure.generate_supercell(self.supercell)
+            itau = super_structure.get_itau(self.current_dyn.structure)
+            
+            nat = self.dyn_0.structure.N_atoms
+            new_forces = np.zeros((self.N, nat, 3), dtype  =np.float64, order = "C")
+            
+            # Project in the unit cell the forces
+            for i in range(nat):
+                new_forces[:, i, :] = np.sum(eforces[:, itau==i,:], axis = 1)
+            
+            eforces = new_forces
 
-        force = np.einsum("i, iab ->ab", self.rho, self.forces - self.sscha_forces) / np.sum(self.rho)
+        force = np.einsum("i, iab ->ab", self.rho, eforces) / np.sum(self.rho)
         if get_error:
-            f2 = np.einsum("i, iab ->ab", self.rho, (self.forces - self.sscha_forces)**2) / np.sum(self.rho)
+            f2 = np.einsum("i, iab ->ab", self.rho, (eforces)**2) / np.sum(self.rho)
             err = np.sqrt( f2 - force**2 )
             return force, err
         return force
@@ -768,7 +787,7 @@ class Ensemble:
                 
                 new_phi[iq, :, :] = ups_mat.dot(uf_q[iq,:,:])
                 if return_error:
-                    error_phi[iq, :, :] = ups_mat.dot(uf_q_delta)
+                    error_phi[iq, :, :] = ups_mat.dot(uf_q_delta[iq,:,:])
         
         if return_error:
             error_phi = np.sqrt(error_phi)
@@ -836,12 +855,13 @@ class Ensemble:
             
         
         # Get frequencies and polarization vectors
-        wr, pols = self.current_dyn.DyagDinQ(0)
-        trans = ~ CC.Methods.get_translations(pols, self.current_dyn.structure.get_masses_array())
+        super_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
+        wr, pols = super_dyn.DyagDinQ(0)
+        trans = ~ CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())
         wr = np.real( wr[trans])
         pols = np.real( pols[:, trans])
         
-        nat = self.current_dyn.structure.N_atoms
+        nat = super_dyn.structure.N_atoms 
         
         # Get the correctly shaped polarization vectors
         er = np.zeros( (nat, len(wr), 3), dtype = np.float64, order = "F")
