@@ -49,10 +49,10 @@ start_dyn = harm_dyn.Copy()
 T = 0 #K
 
 # The number of configurations
-N = 4000
+N = 1000
 
 # The number of step
-M = 20
+M = 10
 
 # STEP SIZE
 MOVE_STEP = 2e-3
@@ -103,7 +103,13 @@ for i in range(M):
     free_IS[i], free_IS_err[i] = ensemble.get_free_energy(return_error = True)
     
     # Get the gradient of the free energy and its error
-    g, g_err = ensemble.get_free_energy_gradient_respect_to_dyn()
+    #g, g_err = ensemble.get_free_energy_gradient_respect_to_dyn()
+    g, g_err = ensemble.get_preconditioned_gradient(True, True, False)
+    
+    # Select the unit cell
+    g = g[0,:,:]
+    g_err = g_err[0,:,:]
+    
     
     # Project the gradient along the moving direction
     grad_IS[i] = np.sum ( g * rand_vect )
@@ -128,7 +134,9 @@ for i in range(M):
 
     # Compute the same quantities with the new ensemble
     free_STOC[i], free_STOC_err[i] = test_ensemble.get_free_energy(return_error = True)
-    g, g_new_err = test_ensemble.get_free_energy_gradient_respect_to_dyn()
+    g, g_new_err = test_ensemble.get_preconditioned_gradient(True, True, False)
+    g = g[0,:,:]
+    g_new_err = g_new_err[0,:,:]
     
     # Project the gradient on the moving direction
     grad_STOC[i] = np.sum(g * rand_vect)
