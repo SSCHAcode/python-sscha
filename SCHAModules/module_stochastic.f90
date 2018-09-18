@@ -275,6 +275,8 @@ subroutine average_error_weight(f,rho,log_err,av_f,error_f)
   else if (log_err .eq. 'err_nonrho') then
     av_f    = av_f1
     error_f = (1.0d0/dsqrt(dble(nc))) * dsqrt( s_f )
+ else
+    stop "ERROR; log_err ill defined."
   end if 
 
   deallocate(rhof)

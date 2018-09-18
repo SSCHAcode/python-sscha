@@ -951,8 +951,8 @@ def ApplyLambdaTensor(current_dyn, matrix, T = 0):
     for i in range(nmodes):
         md = np.abs((w - w[i]) / w[i]) > __EPSILON__
         f_munu[i, md] = (n_w[md] + n_w[i] + 1) / (w[i] + w[md]) - (n_w[i] - n_w[md]) / (w[i] - w[md])
-        f_munu[i, ~md] = (2 *n_w[i] + 1) / w[i] - dn_dw[i]
-        f_munu[i, :] /= 4 * w[i] * w
+        f_munu[i, ~md] = (2 *n_w[i] + 1) /(2* w[i]) - dn_dw[i]
+        f_munu[i, :] /= - 4 * w[i] * w
         
     # Perform the Einstein summation contracting everithing
     return np.einsum("ab, ia, jb, ca, db,cd -> ij", f_munu, pols, pols,

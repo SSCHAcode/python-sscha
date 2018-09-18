@@ -62,8 +62,10 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
 
   double precision, dimension(ntyp_sc),  intent(in) :: mass
   ! Mass of the atoms
+  ! The unit of measure must be in masses of the electron. (the mass saved in the QE dynamical matrix file
+  ! must be multiplied by 2 to match this unit).
 
-  double precision, dimension(natsc), intent(in) :: ityp_sc
+  integer, dimension(natsc), intent(in) :: ityp_sc
   ! Type of the atoms in the supercell
   
   character(len=10), intent(in) :: log_err
@@ -81,7 +83,7 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
   
   ! ---------------------------------- END OF INPUT DEFINITION ------------------------------------
   integer i, j, alpha, beta, ical, jcal
-  double precision, dimension(3*natsc, 3*natsc) :: uf_mat, err_uf_mat, ups_mat
+  double precision, dimension(3*natsc, 3*natsc) :: uf_mat, err_uf_mat, ups_mat, tmp
   double precision t1, t2
   logical precond
 
@@ -95,6 +97,16 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
   ! Compute the <uf> matrix in the supercell
   uf_mat = 0.0d0
   err_uf_mat = 0.0d0
+
+  ! print *, "DISP FORCES:"
+  ! do i = 1, size(u_disp(:, 1,1))
+  !    print *, "CONFIG", i, "RHO:", rho(i)
+  !    do j = 1, natsc
+  !       print *, "U:", u_disp(i,j,:), "F:", eforces(i,j,:)
+  !    end do
+  ! end do
+  
+  
   call cpu_time(t1)
   do alpha = 1, 3
      do beta = 1, 3
@@ -103,44 +115,87 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
               ical = alpha + (i-1)*3
               jcal = beta + (j-1)*3
               call average_error_weight(u_disp(:, i, alpha) * eforces(:,  j, beta), &
-                  rho, log_err, uf_mat(ical, jcal), err_uf_mat(ical, jcal))
+                   rho, log_err, uf_mat(ical, jcal), err_uf_mat(ical, jcal))
+              !print *, "Terra di mezzo:", ical, jcal, "UF:", uf_mat(ical, jcal), &
+              !     sum(u_disp(:, i, alpha) * eforces(:, j, beta)) / sum(rho)
            end do
         end do
      end do
   end do
 
   ! Impose the hermitianity
-  do ical = 1, 3*natsc
-     do jcal = ical, 3*natsc
-        uf_mat(ical, jcal) = 0.5d0 * (uf_mat(ical, jcal) + uf_mat(jcal, ical))
-        err_uf_mat(ical, jcal) = 0.5d0 *dsqrt(err_uf_mat(ical, jcal)**2 + err_uf_mat(ical, jcal)**2)
-        if (ical /= jcal) then
-           uf_mat(jcal, ical) = uf_mat(ical, jcal)
-           err_uf_mat(jcal, ical) = err_uf_mat(ical, jcal)
-        end if
-     end do
-  end do
+  ! do ical = 1, 3*natsc
+  !    do jcal = ical, 3*natsc
+  !       uf_mat(ical, jcal) = 0.5d0 * (uf_mat(ical, jcal) + uf_mat(jcal, ical))
+  !       err_uf_mat(ical, jcal) = 0.5d0 *dsqrt(err_uf_mat(ical, jcal)**2 + err_uf_mat(ical, jcal)**2)
+  !       if (ical /= jcal) then
+  !          uf_mat(jcal, ical) = uf_mat(ical, jcal)
+  !          err_uf_mat(jcal, ical) = err_uf_mat(ical, jcal)
+  !       end if
+  !    end do
+  ! end do
   call cpu_time(t2)
   
   print *, " Time to compute <uf> in real space: ", t2 - t1
 
   ! Compute the upsilon matrix in the supercell
+  call cpu_time(t1)
   call get_upsilon_matrix(n_modes, natsc, ntyp_sc, wr_sc, epols_sc, trans, mass, ityp_sc, T, ups_mat)
-
+  call cpu_time(t2)
+  !print *, "Time to compute the upsilon matrix:", t2 - t1
 
   ! Perform the matrix multiplication
   ! Grad = - Upsilon . <u(f - fscha)>
   ! Note the '-' sign is applied only in the gradient not in the error
-  call dgemm("N", "N", 3*natsc, 3*natsc, -1.0d0, ups_mat, 3*natsc,  uf_mat, 3*natsc, 0.0d0, grad, 3*natsc)
-  call dgemm("N", "N", 3*natsc, 3*natsc, 1.0d0, ups_mat, 3*natsc,  err_uf_mat, 3*natsc, 0.0d0, grad_err, 3*natsc)
 
+  ! print *, "======== UF MAT ========="
+  ! do ical = 1, 3*natsc
+  !    print "(10000E16.5)", uf_mat(:, ical)
+  ! end do
+
+  ! print *, ""
+  ! print *, "========== UPS MAT ========"
+  ! do ical = 1, 3*natsc
+  !    print "(10000E16.5)", ups_mat(:, ical)
+  ! end do
+  ! print *, ""
+  
+  call cpu_time(t1)
+  call dgemm("N", "N", 3*natsc, 3*natsc, 3*natsc, -1.0d0, ups_mat, 3*natsc,  uf_mat, 3*natsc, 0.0d0, grad, 3*natsc)
+  call dgemm("N", "N", 3*natsc, 3*natsc, 3*natsc, 1.0d0, ups_mat, 3*natsc,  err_uf_mat, 3*natsc, 0.0d0, grad_err, 3*natsc)
+  call cpu_time(t2)
+  print *, " get_gradient_supercell : Elapsed time to perform the multiplication", t2 - t1
+
+  ! Symmetrize the gradient
+  ! In fact the product of symmetric matrices is not symmetric!!!!
+  do ical = 1, 3*natsc-1
+     do jcal = ical + 1, 3*natsc
+        grad(ical, jcal) = 0.5d0 * (grad(ical, jcal) + grad(jcal, ical))
+        grad(jcal,ical) = grad(ical, jcal)
+     end do
+  end do
+
+  ! ! Print the gradient
+  ! print *, "======= GRADIENT NOW ======="
+  ! do ical = 1, 3*natsc
+  !    print "(1000E16.5)", grad(:, ical)
+  ! end do
+  ! call flush()
+  
   !TODO : It could be that now the sum rule must be applied here.
   ! Perform the inverse preconditioning if required:
   if (.not. precond) then
+     print *, "Computing the inverse preconditioning..."
      call multiply_lambda_tensor(n_modes, natsc, ntyp_sc, wr_sc, epols_sc, trans, &
-          mass, ityp_sc, T, grad, grad, .false.)
+          mass, ityp_sc, T, grad, tmp, .false.)
+     grad = tmp
+     !print *, "Setting the error..."
+     !call flush()
      call multiply_lambda_tensor(n_modes, natsc, ntyp_sc, wr_sc, epols_sc, trans, &
-          mass, ityp_sc, T, grad_err, grad_err, .false.)
+          mass, ityp_sc, T, grad_err, tmp, .false.)
+     grad_err = tmp
   end if
+  !print *, "Exiting..."
+  !call flush()
   
 end subroutine get_gradient_supercell

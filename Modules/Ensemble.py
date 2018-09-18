@@ -681,6 +681,9 @@ class Ensemble:
         new_phi = np.einsum("i, ij, ik", self.rho, vs, f_vector) / np.sum(self.rho)
         new_phi = (new_phi + np.transpose(new_phi)) * .5
 
+        # DEBUGGING
+        #np.savetxt("uf_py.dat", np.einsum("i, ij, ik", self.rho, self.u_disps, f_vector) / np.sum(self.rho), header=" <UF> matrix created by python")
+
         
         # Compute the stochastic error
         if (return_error):

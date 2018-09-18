@@ -27,11 +27,12 @@ subroutine get_fmunu(w_mu, w_nu, T, f_munu)
   
   ! If w_mu != w_nu
   if ((abs(w_mu - w_nu) / dsqrt(w_mu* w_nu)) .gt. epsilon) then
-     f_munu = (n_mu + n_nu +1) / (w_mu + w_nu) - (n_mu - n_nu) / (w_mu - w_nu)
+     f_munu = (n_mu + n_nu +1) / (4*(w_mu + w_nu)) - (n_mu - n_nu) / (4*(w_mu - w_nu))
   else
      ! Degenerate case
-     f_munu = (2 * n_mu + 1) / w_mu - dn_dw
+     f_munu = (2 * n_mu + 1) / (8*w_mu) - dn_dw/4
   end if
+  f_munu = - f_munu / (w_mu * w_nu)
 end subroutine get_fmunu
         
   
@@ -99,19 +100,22 @@ subroutine multiply_lambda_tensor(nmodes, nat, ntyp, wr, pols, trans, &
   ! Get the polarization vectors renormalized by the masses
   do i = 1, 3*nat
      if (inverse) then
-        epols_aux(i, :) =  pols(i, :) / dsqrt(mass(ityp(1 + (i-1)/3)))
+        epols_aux(i, :) = pols(i, :) * dsqrt(mass(ityp( 1+ (i -1)/3)))
      else
-        epols_aux(i, :) =  pols(i, :) * dsqrt(mass(ityp(1 + (i-1)/3)))
+        epols_aux(i, :) = pols(i, :) / dsqrt(mass(ityp(1 + (i-1) / 3)))
      end if
   end do
-
+     
+  
+  
   output_matrix = 0.0d0
   do nu = 1, nmodes
      if (trans(nu)) cycle
 
      ! Start by computing v_aux1 = matrix |e_nu>
-     call dgemv("N",  3*nat, 3*nat, 1.0d0, input_matrix, 3*nat, epols_aux(1, nu), 1, 0.0d0, v_aux1, 1)
-
+     !print *, "MODE", nu
+     !call flush()
+     call dgemv("N",  3*nat, 3*nat, 1.0d0, input_matrix, 3*nat, epols_aux(:, nu), 1, 0.0d0, v_aux1, 1)
      do mu = 1, nmodes
         if (trans(mu)) cycle
         ! Compute the matrix element <e_mu | matrix | e_nu>
@@ -119,12 +123,16 @@ subroutine multiply_lambda_tensor(nmodes, nat, ntyp, wr, pols, trans, &
         
         call get_fmunu(wr(mu), wr(nu), T, fm)
 
+        !print *, "WMU:", wr(mu), "WNU:", wr(nu), "FMUNU:", fm, "<emu| M |enu>:", matrix_munu
+        !print *, "VAUX:", v_aux1(:)
+        call flush()
         ! Multiply the f_munu
         if (inverse) then
            matrix_munu = matrix_munu / fm
         else
            matrix_munu = matrix_munu * fm
         end if
+
         
         ! Write the output matrix
         do i = 1, 3*nat

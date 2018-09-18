@@ -49,6 +49,8 @@ subroutine get_upsilon_matrix(nmodes, nat, ntyp, wr, epols, trans, mass, ityp, T
   do i = 1, nmodes
      ! Avoid translational modes
      if (trans(i)) cycle
+     !print *, "CYCLE", i
+     !print *, "WR", wr(i)
      
      eigenvalue = 2 * wr(i)
 
@@ -56,9 +58,12 @@ subroutine get_upsilon_matrix(nmodes, nat, ntyp, wr, epols, trans, mass, ityp, T
         nb = 1 / (dexp(wr(i) / (T * K_to_Ha)) - 1)
         eigenvalue = eigenvalue / (1 + 2*nb)
      end if
+     !print *, "EIGVAL:", eigenvalue
 
      do j = 1, 3*nat
         do k= 1, 3*nat
+           !print *, "= J:",j, "K:", k, "ITYP_INDEX:", 1 + (k-1)/3, "ITYP:", ityp(1 + (k-1)/3)
+           !call flush()
            ups(j,k) = ups (j, k) + eigenvalue * epols(j,i) * epols(k,i) * &
                dsqrt(mass(ityp(1+ (j-1) / 3)) * mass(ityp(1 + (k-1)/3)))
         end do
