@@ -695,7 +695,7 @@ class Ensemble:
         
         return new_phi
     
-    def get_preconditioned_gradient(self, subtract_sscha = True, return_error = False, use_ups_supercell = False):
+    def get_preconditioned_gradient(self, subtract_sscha = True, return_error = False, use_ups_supercell = True):
         """
         SELF CONSISTENT SCHA EQUATION
         =============================
@@ -728,7 +728,8 @@ class Ensemble:
             use_ups_supercell : bool, optional
                 If true the gradient is computed enterely in real space, and then transformed
                 with fourier in q space. This is computationally heavier, but can be used
-                to test if everything is working correctly
+                to test if everything is working correctly. For now this flag 
+                is ignored and always True.
                 
         Results
         -------
@@ -737,67 +738,110 @@ class Ensemble:
                 self-consistent equation.
         """
         
-        nat = self.current_dyn.structure.N_atoms
-        natsc = np.prod(self.supercell) * nat
+        supercell_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
         
-        f_vector = self.forces
+        # Dyagonalize
+        w, pols = supercell_dyn.DyagDinQ(0)
+        trans = CC.Methods.get_translations(pols, supercell_dyn.structure.get_masses_array())
+        ityp = supercell_dyn.structure.get_ityp() + 1 # Py to fortran convertion
+        mass = np.array(supercell_dyn.structure.masses.values())
+        
+        log_err = "err_yesrho"
+        
+        mass *= 2
+        w /= 2
+
+        nat = supercell_dyn.structure.N_atoms
+        eforces = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
+        u_disp = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
+        print nat
         if subtract_sscha:
-            f_vector -= self.sscha_forces
-        
-        f_vector = f_vector.reshape((self.N, 3 * natsc), order = "F")
-        
-        sum_rho = np.sum(self.rho)
-        
-        # Get the <u F> matrix
-        uf_supercell = np.einsum("i, ij, ik", self.rho, self.u_disps, f_vector) / sum_rho
-        
-        superstructure = self.dyn_0.structure.generate_supercell(self.supercell)
-        
-        # Project the <uF> matrix in q space
-        if not use_ups_supercell:
-            uf_q = CC.Phonons.GetDynQFromFCSupercell(uf_supercell, np.array(self.dyn_0.q_tot), self.dyn_0.structure, superstructure)
-        
-        if return_error:
-            uf_delta = np.einsum("i, ij, ik", self.rho, self.u_disps**2, f_vector**2) / sum_rho
-            uf_delta -= uf_supercell**2
-            if not use_ups_supercell:
-                uf_q_delta = CC.Phonons.GetDynQFromFCSupercell(uf_delta, np.array(self.dyn_0.q_tot), self.dyn_0.structure, superstructure)
-            
-        
-        
-        # For each q point, get the gradient
-        nq = len(self.dyn_0.q_tot)
-        new_phi = np.zeros( (nq, 3 * nat, 3*nat), dtype = np.complex128, order = "C")
-            
-        if return_error:
-            error_phi = np.zeros( (nq, 3 * nat, 3*nat), dtype = np.complex128, order = "C")
-        
-        if use_ups_supercell:
-            # Perform the calculation in the supercell
-            ups_mat = self.current_dyn.GenerateSupercellDyn(self.supercell).GetUpsilonMatrix(self.current_T)
-            new_phi_sc = ups_mat.dot(uf_supercell)
-            
-            # Convert in q space
-            new_phi = CC.Phonons.GetDynQFromFCSupercell(new_phi_sc, np.array(self.dyn_0.q_tot), self.dyn_0.structure, superstructure)
-            
-            if return_error:
-                error_new_phi_sc = ups_mat.dot(uf_delta)
-                error_phi = CC.Phonons.GetDynQFromFCSupercell(error_new_phi_sc, np.array(self.dyn_0.q_tot), self.dyn_0.structure, superstructure)
+            eforces[:,:,:] = self.forces - self.sscha_forces
         else:
-            # Perform the calculation in the q space
-            for iq in range(nq):
-                ups_mat = self.current_dyn.GetUpsilonMatrix(self.current_T, iq)
-                
-                new_phi[iq, :, :] = ups_mat.dot(uf_q[iq,:,:])
-                if return_error:
-                    error_phi[iq, :, :] = ups_mat.dot(uf_q_delta[iq,:,:])
+            eforces[:,:,:] = self.forces
+        for i in range(self.N):
+            u_disp[i, :, :] = np.reshape(self.u_disps[i,:], (nat, 3))
+            
+
+        
+        grad, grad_err = SCHAModules.get_gradient_supercell(self.rho, u_disp, eforces, w, pols, trans,
+                                                            self.current_T, mass, ityp, log_err, self.N,
+                                                            nat, 3*nat, len(mass), 1)
+
+        # Perform the fourier transform
+        q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+                                                   self.current_dyn.structure, supercell_dyn.structure)
+        q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
+                                                       self.current_dyn.structure, supercell_dyn.structure)
+        
+        
         
         if return_error:
-            error_phi = np.sqrt(error_phi)
-            return new_phi, error_phi
+            return q_grad, q_grad_err
+        else:
+            return q_grad
         
-        return new_phi
+#        
+#        nat = self.current_dyn.structure.N_atoms
+#        natsc = np.prod(self.supercell) * nat
+#        
+#        f_vector = self.forces
+#        if subtract_sscha:
+#            f_vector -= self.sscha_forces
+#        
+#        f_vector = f_vector.reshape((self.N, 3 * natsc), order = "F")
+#        
+#        sum_rho = np.sum(self.rho)
+#        
+#        # Get the <u F> matrix
+#        uf_supercell = np.einsum("i, ij, ik", self.rho, self.u_disps, f_vector) / sum_rho
+#        
+#        superstructure = self.dyn_0.structure.generate_supercell(self.supercell)
+#        
+#        # Project the <uF> matrix in q space
+#        if not use_ups_supercell:
+#            uf_q = CC.Phonons.GetDynQFromFCSupercell(uf_supercell, np.array(self.dyn_0.q_tot), self.dyn_0.structure, superstructure)
+#        
+#        if return_error:
+#            uf_delta = np.einsum("i, ij, ik", self.rho, self.u_disps**2, f_vector**2) / sum_rho
+#            uf_delta -= uf_supercell**2
+#            if not use_ups_supercell:
+#                uf_q_delta = CC.Phonons.GetDynQFromFCSupercell(uf_delta, np.array(self.dyn_0.q_tot), self.dyn_0.structure, superstructure)
+#            
+#        
+#        
+#        # For each q point, get the gradient
+#        nq = len(self.dyn_0.q_tot)
+#        new_phi = np.zeros( (nq, 3 * nat, 3*nat), dtype = np.complex128, order = "C")
+#            
+#        if return_error:
+#            error_phi = np.zeros( (nq, 3 * nat, 3*nat), dtype = np.complex128, order = "C")
+#        
+#        if use_ups_supercell:
+#            # Perform the calculation in the supercell
+#            ups_mat = self.current_dyn.GenerateSupercellDyn(self.supercell).GetUpsilonMatrix(self.current_T)
+#            new_phi_sc = ups_mat.dot(uf_supercell)
+#            
+#            # Convert in q space
+#            new_phi = CC.Phonons.GetDynQFromFCSupercell(new_phi_sc, np.array(self.dyn_0.q_tot), self.dyn_0.structure, superstructure)
+#            
+#            if return_error:
+#                error_new_phi_sc = ups_mat.dot(uf_delta)
+#                error_phi = CC.Phonons.GetDynQFromFCSupercell(error_new_phi_sc, np.array(self.dyn_0.q_tot), self.dyn_0.structure, superstructure)
+#        else:
+#            # Perform the calculation in the q space
+#            for iq in range(nq):
+#                ups_mat = self.current_dyn.GetUpsilonMatrix(self.current_T, iq)
+#                
+#                new_phi[iq, :, :] = ups_mat.dot(uf_q[iq,:,:])
+#                if return_error:
+#                    error_phi[iq, :, :] = ups_mat.dot(uf_q_delta[iq,:,:])
+#        
+#        if return_error:
+#            error_phi = np.sqrt(error_phi)
+#            return new_phi, error_phi
         
+ #
     
     def get_covmat_from_ensemble(self):
         """

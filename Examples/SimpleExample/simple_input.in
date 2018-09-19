@@ -104,7 +104,7 @@
     ! leading to neagive frequencies, it is wise in the beginning to decrease it.
     ! lambda_a : step for the force constant matrix
     ! lambda_w : step for the structure
-    lambda_a = 0
+    lambda_a = 17
     lambda_w = 0
     
     ! The root representation is a trick to increase the speed of the minimization
@@ -133,6 +133,6 @@
     warm_up_steps = 10000    
 
     ! The maximum number of steps after which the code is automatically stopped
-    max_ka= 1
+    max_ka= 20
 /
 

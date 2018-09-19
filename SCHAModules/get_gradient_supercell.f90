@@ -86,12 +86,35 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
   double precision, dimension(3*natsc, 3*natsc) :: uf_mat, err_uf_mat, ups_mat, tmp
   double precision t1, t2
   logical precond
+  logical, parameter :: print_input = .true.
 
   ! Setup the default value of the preconditioned variable
   if (present(preconditioned)) then
      precond = preconditioned
   else
      precond = .true.
+  end if
+
+
+  ! DEBUG INPUT
+  if (print_input) then
+     print *, "GET_GRADIENT_SUPERCELL INPUT VALUES:"
+     print *, "NRAND:", n_random
+     print *, "NAT_SC:", natsc
+     print *, "N_MODES:", n_modes
+     print *, "NTYP_SC:", ntyp_sc
+     print *, "RHO:", rho(:)
+     print *, "W:", wr_sc(:)
+     print *, "TRANS:", trans(:)
+     print *, "T:", T
+     print *, "MASS:", mass
+     print *, "ITYP_SC:", ityp_sc
+     print *, "LOG_ERR:", log_err
+
+     print *, ""
+     print *, "POL VECTORS:"
+     do i = 1, 3*natsc
+        print "(A10, I8, A10, 1000E13.4)", "MODE", i, "VECTOR", epols_sc(:, i) 
   end if
   
   ! Compute the <uf> matrix in the supercell
@@ -148,20 +171,22 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
   ! Grad = - Upsilon . <u(f - fscha)>
   ! Note the '-' sign is applied only in the gradient not in the error
 
-  ! print *, "======== UF MAT ========="
-  ! do ical = 1, 3*natsc
-  !    print "(10000E16.5)", uf_mat(:, ical)
-  ! end do
-
-  ! print *, ""
-  ! print *, "========== UPS MAT ========"
-  ! do ical = 1, 3*natsc
-  !    print "(10000E16.5)", ups_mat(:, ical)
-  ! end do
-  ! print *, ""
-  
+  if (print_input) then
+     print *, "======== UF MAT ========="
+     do ical = 1, 3*natsc
+        print "(10000E16.5)", uf_mat(:, ical)
+     end do
+     
+     print *, ""
+     print *, "========== UPS MAT ========"
+     do ical = 1, 3*natsc
+        print "(10000E16.5)", ups_mat(:, ical)
+     end do
+     print *, ""
+  end if
+     
   call cpu_time(t1)
-  call dgemm("N", "N", 3*natsc, 3*natsc, 3*natsc, -1.0d0, ups_mat, 3*natsc,  uf_mat, 3*natsc, 0.0d0, grad, 3*natsc)
+  call dgemm("N", "N", 3*natsc, 3*natsc, 3*natsc, 1.0d0, ups_mat, 3*natsc,  uf_mat, 3*natsc, 0.0d0, grad, 3*natsc)
   call dgemm("N", "N", 3*natsc, 3*natsc, 3*natsc, 1.0d0, ups_mat, 3*natsc,  err_uf_mat, 3*natsc, 0.0d0, grad_err, 3*natsc)
   call cpu_time(t2)
   print *, " get_gradient_supercell : Elapsed time to perform the multiplication", t2 - t1
