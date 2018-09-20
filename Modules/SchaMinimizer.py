@@ -28,6 +28,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cellconstructor as CC
 import cellconstructor.Methods
+import time
 
 import sys, os
 
@@ -208,8 +209,8 @@ class SSCHA_Minimizer:
         
         
         # Store the gradient in the minimization
-        self.__gc__.append(np.einsum("abc,acb", dyn_grad, dyn_grad))
-        self.__gc_err__.append(np.einsum("abc, acb", err, err))
+        self.__gc__.append(np.real(np.einsum("abc,acb", dyn_grad, dyn_grad)))
+        self.__gc_err__.append(np.real(np.einsum("abc, acb", err, err)))
         
         
         # Get the gradient of the free-energy respect to the structure
@@ -535,7 +536,9 @@ class SSCHA_Minimizer:
             old_dyn = self.dyn.Copy()
             
             # Perform the minimization step
+            t1 = time.time()
             self.minimization_step(self.minimization_algorithm)
+            t2 = time.time()
             
             if self.check_imaginary_frequencies():
                 print "Immaginary frequencies found."
@@ -545,8 +548,8 @@ class SSCHA_Minimizer:
             # Compute the free energy and its error
             fe, err = self.get_free_energy(True)
             fe -= self.eq_energy
-            self.__fe__.append(fe)
-            self.__fe_err__.append(err)
+            self.__fe__.append(np.real(fe))
+            self.__fe_err__.append(np.real(err))
             
             
             # Compute the KL ratio
@@ -559,6 +562,7 @@ class SSCHA_Minimizer:
                 print "Step ka = ", len(self.__fe__)
                 print "Free energy = %16.8f +- %16.8f meV" % (self.__fe__[-1] * __RyTomev__, 
                                                               self.__fe_err__[-1] * __RyTomev__)
+                print "Time for the minimization step: %.4f s" % (t2 - t1)
                 print "FC gradient modulus = %16.8f +- %16.8f bohr^2" % (self.__gc__[-1] * __RyTomev__, 
                                                                        self.__gc_err__[-1] * __RyTomev__)
                 print "Struct gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gw__[-1] * __RyTomev__,
@@ -817,7 +821,7 @@ class SSCHA_Minimizer:
         gw = np.array(self.__gw__) * __RyTomev__
         gw_err = np.array(self.__gw_err__) * __RyTomev__
         
-        kl = np.array(self.__KL__)
+        kl = np.array(self.__KL__, dtype = np.float64)
         
         steps = np.arange(len(fe))
     

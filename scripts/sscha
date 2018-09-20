@@ -20,6 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. 
 """
 import os
+import time
 
 import sscha, sscha.SchaMinimizer
 import sscha.Ensemble
@@ -87,14 +88,26 @@ line_list = fp.readlines()
 fp.close()
 
 # Parse the input file
+t1 = time.time()
+print "Loading everything..."
 minim.setup_from_namelist(line_list)
+t2 = time.time()
+print "Loaded in %-4f seconds." % (t2 - t1)
 
 # Start the minimization
+print ""
+print "Initialization..."
 minim.init()
+print "System initialized."
+print ""
 minim.run()
+
+print ""
+print "Minimization ended."
 minim.finalize(2)
 
 # Save the final dynamical matrix
+print "Saving the final dynamical matrix in %s" % (minim.dyn_path + "_popuation%d_" % minim.population)
 minim.dyn.save_qe(minim.dyn_path + "_popuation%d_" % minim.population)
 
 # Plot the results
