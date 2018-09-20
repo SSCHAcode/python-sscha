@@ -115,6 +115,7 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
      print *, "POL VECTORS:"
      do i = 1, 3*natsc
         print "(A10, I8, A10, 1000E13.4)", "MODE", i, "VECTOR", epols_sc(:, i) 
+    end do
   end if
   
   ! Compute the <uf> matrix in the supercell
