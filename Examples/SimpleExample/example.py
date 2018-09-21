@@ -26,7 +26,7 @@ dyn1 = CC.Phonons.Phonons(DYNPATH)
 
 # Load the ensemble
 ens = sscha.Ensemble.Ensemble(dyn1, T)
-ens.load(DATADIR, POPULATION, NRANDOM) # This was a second population (2)
+ens.load(DATADIR, POPULATION, NRANDOM, verbose = True) # This was a second population (2)
 
 # Setup the minimizer
 minim = sscha.SchaMinimizer.SSCHA_Minimizer(ens)

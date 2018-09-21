@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import numpy as np
+import time
 
 """
 This is part of the program python-sscha
@@ -95,7 +96,7 @@ class Ensemble:
         self.has_stress = False
 
         
-    def load(self, data_dir, population, N):
+    def load(self, data_dir, population, N, verbose = False):
         """
         LOAD THE ENSEMBLE
         =================
@@ -134,6 +135,9 @@ class Ensemble:
             N : int
                 The dimension of the ensemble. This should match the n_random
                 variable from the fortran sscha.x input file.
+            verbose : bool, optional
+                If true (default false) prints the real timing of the different part
+                during the loading.
         """
         A_TO_BOHR = 1.889725989
         
@@ -165,36 +169,55 @@ class Ensemble:
         # Superstructure
         dyn_supercell = self.dyn_0.GenerateSupercellDyn(self.supercell)
         super_structure = dyn_supercell.structure
+        super_fc = dyn_supercell.dynmats[0]
 
         self.structures = []
         
+        total_t_for_loading = 0
+        total_t_for_sscha_ef = 0
+        t_before_for = time.time()
         for i in range(self.N):
             # Load the structure
             structure = CC.Structure.Structure()
             if os.path.exists("%s/scf_population%d_%d.dat" % (data_dir, population, i+1)):
+                t1 = time.time()
                 structure.read_scf("%s/scf_population%d_%d.dat" % (data_dir, population, i+1), alat = self.dyn_0.alat)
+                t2 = time.time()
+                total_t_for_loading += t2 - t1
+                
                 structure.has_unit_cell = True
                 structure.unit_cell = super_structure.unit_cell
             else:
                 structure = super_structure.copy()
+                t1 = time.time()
                 disp =np.loadtxt("%s/u_population%d_%d.dat" % (data_dir, population, i+1)) /__A_TO_BOHR__
+                t2 = time.time()
+                total_t_for_loading += t2 - t1
+                
                 structure.coords += disp
+                
             self.structures.append(structure)
             
             # Get the displacement [ANGSTROM]
             self.u_disps[i,:] = structure.get_displacement(super_structure).reshape( 3 * Nat_sc)
             
             # Load forces (Forces are in Ry/bohr, convert them in Ry /A)
+            t1 = time.time()
             self.forces[i,:,:] = np.loadtxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1)) * A_TO_BOHR
-             
+            
             # Load stress
             if os.path.exists("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)):
                 self.stresses[i,:,:] =  np.loadtxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)) 
                 count_stress += 1
+            t2 = time.time()
+            total_t_for_loading += t2 - t1
             
             # Setup the sscha energies and forces
-            energy, force = self.dyn_0.get_energy_forces(structure, supercell = self.supercell)
-#            
+            t1 = time.time()
+            energy, force = self.dyn_0.get_energy_forces(structure, supercell = self.supercell, real_space_fc=super_fc)
+            t2 = time.time()
+            total_t_for_sscha_ef += t2 - t1
+            
 #            print "Loading: config %d:" % i
 #            for j in range(structure.N_atoms):
 #                print "Atom %d" % j
@@ -211,17 +234,31 @@ class Ensemble:
             
             self.sscha_energies[i] = energy 
             self.sscha_forces[i,:,:] = force
-            
+        
+        if verbose:
+            print "[LOAD ENSEMBLE]: time elapsed for the cycle over the configurations:", time.time() - t_before_for
+        
+        t1 = time.time()
         # Load the energy
         total_energies = np.loadtxt("%s/energies_supercell_population%d.dat" % (data_dir, population))
+        t2 = time.time()
+        total_t_for_sscha_ef += t2 - t1
         self.energies = total_energies[:N]
         
         # Setup the initial weight
         self.rho = np.ones(self.N, dtype = np.float64)
         
         # Initialize the q_start
+        
+        t1 = time.time()
         self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell)
+        t2 = time.time()
         self.current_q = self.q_start.copy()
+        
+        if verbose:
+            print "[LOAD ENSEMBLE]: time elapsed to compute the current q vectors:", t2 - t1
+            print "[LOAD ENSEMBLE]: time elapsed while loading with numpy:", total_t_for_loading
+            print "[LOAD ENSEMBLE]: time elapsed for computing sscha energy and forces:", total_t_for_sscha_ef
         
         # If all the stress tensors have been found, set the stress flag
         if count_stress == self.N:
