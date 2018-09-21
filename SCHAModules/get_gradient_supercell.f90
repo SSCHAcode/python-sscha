@@ -7,7 +7,7 @@
 ! The equation is modified to exploit the noise reduction as:
 !
 !
-! dF/dPhi = - Lambda  Upsilon < u (f - f_scha) > 
+! dF/dPhi = Lambda  Upsilon < u (f - f_scha) > 
 !
 ! The Lambda matrix is the Hessian of the minimization Phi variable (Monacelli et al 2018 PRB)
 ! Upsilon matrix is the inverse of the covariance matrix Upsilon^{-1}_ab = <u_a u_b>
@@ -84,9 +84,10 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
   ! ---------------------------------- END OF INPUT DEFINITION ------------------------------------
   integer i, j, alpha, beta, ical, jcal
   double precision, dimension(3*natsc, 3*natsc) :: uf_mat, err_uf_mat, ups_mat, tmp
+  double precision, dimension(3*natsc) :: v_aux1, v_aux2
   double precision t1, t2
   logical precond
-  logical, parameter :: print_input = .true.
+  logical, parameter :: print_input = .false.
 
   ! Setup the default value of the preconditioned variable
   if (present(preconditioned)) then
@@ -115,6 +116,21 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
      print *, "POL VECTORS:"
      do i = 1, 3*natsc
         print "(A10, I8, A10, 1000E13.4)", "MODE", i, "VECTOR", epols_sc(:, i) 
+    end do
+    
+    print *, ""
+    print *, "INPUT U and F"
+    do i = 1, n_random
+        ! Create the auxiliary vector
+        do j = 1, natsc
+            do alpha = 1, 3
+                v_aux1(alpha + 3* (j-1)) = eforces(i, j, alpha)
+                v_aux2(alpha + 3*(j-1)) = u_disp(i, j, alpha)
+            end do
+        end do
+        
+        print "(A10, I8, A10, 1000E13.4)", "CONF", i, "FORCE", v_aux1(:)
+        print "(A10, I8, A10, 1000E13.4)", "CONF", i, "DISP", v_aux2(:)
     end do
   end if
   
@@ -214,7 +230,8 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
      print *, "Computing the inverse preconditioning..."
      call multiply_lambda_tensor(n_modes, natsc, ntyp_sc, wr_sc, epols_sc, trans, &
           mass, ityp_sc, T, grad, tmp, .false.)
-     grad = tmp
+     ! The lambda matrix is negative defined so multiply it by -1
+     grad = -tmp
      !print *, "Setting the error..."
      !call flush()
      call multiply_lambda_tensor(n_modes, natsc, ntyp_sc, wr_sc, epols_sc, trans, &

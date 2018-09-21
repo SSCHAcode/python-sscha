@@ -176,7 +176,7 @@ class Ensemble:
             structure.unit_cell = super_structure.unit_cell
             self.structures.append(structure)
             
-            # Get the displacement
+            # Get the displacement [ANGSTROM]
             self.u_disps[i,:] = structure.get_displacement(super_structure).reshape( 3 * Nat_sc)
             
             # Load forces (Forces are in Ry/bohr, convert them in Ry /A)
@@ -760,7 +760,7 @@ class Ensemble:
         else:
             eforces[:,:,:] = self.forces
         for i in range(self.N):
-            u_disp[i, :, :] = np.reshape(self.u_disps[i,:], (nat, 3))
+            u_disp[i, :, :] = np.reshape(self.u_disps[i,:], (nat, 3)) 
             
 
         
