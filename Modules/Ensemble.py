@@ -171,9 +171,14 @@ class Ensemble:
         for i in range(self.N):
             # Load the structure
             structure = CC.Structure.Structure()
-            structure.read_scf("%s/scf_population%d_%d.dat" % (data_dir, population, i+1), alat = self.dyn_0.alat)
-            structure.has_unit_cell = True
-            structure.unit_cell = super_structure.unit_cell
+            if os.path.exists("%s/scf_population%d_%d.dat" % (data_dir, population, i+1)):
+                structure.read_scf("%s/scf_population%d_%d.dat" % (data_dir, population, i+1), alat = self.dyn_0.alat)
+                structure.has_unit_cell = True
+                structure.unit_cell = super_structure.unit_cell
+            else:
+                structure = super_structure.copy()
+                disp =np.loadtxt("%s/u_population%d_%d.dat" % (data_dir, population, i+1)) /__A_TO_BOHR__
+                structure.coords += disp
             self.structures.append(structure)
             
             # Get the displacement [ANGSTROM]
