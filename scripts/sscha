@@ -22,6 +22,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 import time
 
+import cellconstructor as CC
+import cellconstructor.Methods
+
 import sscha, sscha.SchaMinimizer
 import sscha.Ensemble
 import argparse
@@ -51,6 +54,10 @@ Refer to the documentation for more details.
 
 
 """
+
+# Define the required arguments in the input namelist
+REQUIRED_ARGUMENTS = {"inputscha" : ["data_dir", "fildyn_prefix", "n_random"]}
+
 
 # Define a custom function to raise an error if the file does not exist
 def is_valid_file(parser, arg):
@@ -87,12 +94,23 @@ fp = open(args.filename, "r")
 line_list = fp.readlines()
 fp.close()
 
+# Check if the mandatory arguments are defined
+namelist = CC.Methods.read_namelist(line_list)
+for x_con in REQUIRED_ARGUMENTS.keys():
+    if not x_con in namelist.keys():
+        raise IOError("Error, required the control '&%s' in the input file." % x_con)
+
+    for x_req in REQUIRED_ARGUMENTS[x_con]:
+        if not x_req in namelist[x_con].keys():
+            raise IOError("Error, the namelist '%s' must contain the '%s' keyword." % (x_con, x_req))
+
+
 # Parse the input file
 t1 = time.time()
 print "Loading everything..."
 minim.setup_from_namelist(line_list)
 t2 = time.time()
-print "Loaded in %-4f seconds." % (t2 - t1)
+print "Loaded in %.4f seconds." % (t2 - t1)
 
 # Start the minimization
 print ""
