@@ -114,13 +114,15 @@ class Generators:
         This subroutine loads the list of generators from a file.
         The FC means that the generators are expected to be on the force constant
         matrix, not the wyckoff positions.
+        The generators are written in the q space
+        
         
         Parameters
         ----------
             filename : string
                 The path to the file that contains all the generators
             natoms : int
-                The number of atoms in the current structure
+                The number of atoms in the current structure (unit_cell)
             nqirr : int
                 The number of irreducible q points
         """
@@ -161,11 +163,13 @@ class Generators:
                 # Append the generator
                 ghrs[current_i, :, :] = fc.copy()
                 
-                if current_i == n_gen:
+                if current_i+1 == n_gen:
+                    #print "NEW GEN LINE:", line
+                    
+                    self.dyn_ncoeff.append(n_gen)
                     n_gen = int(line)
-                    current_i = 0
+                    current_i = -1
                     self.dyn_gen[iq, :,:,:] =ghrs.copy()
-                    self.dyn_ncoeff.append(len(ghrs))
                     iq += 1
                     continue
             
@@ -190,6 +194,8 @@ class Generators:
 #            
 #            if na == 0 and nb ==0 and current_i == 0:
 #                print na, nb, index, line, line_list
+            
+            #print "INDEX:", na, nb, index, "GEN:", iq, current_i
             
             fc[3 * na + index, 3 * nb] = line_list[0] + 1j*line_list[1]
             fc[3 * na + index, 3 * nb + 1] = line_list[2] + 1j*line_list[3]
@@ -264,17 +270,21 @@ class Generators:
         
         return  np.einsum("ijk, i", self.wyck_gen, coeffs)
         
-    def ProjectDyn(self, fc, iq = 0):
+    def ProjectDyn(self, fc, iq = -1):
         """
-        Project the force constant matrix in the
+        Project the force constant matrix in the supercell in the
         basis of the generators
             
         
         Parameters
         ----------
-            fc : ndarray (3n x 3n)
-                The force constant matrix to be projected on the generator subspace
-            iq : the index of the irreducible q point.
+            fc : ndarray ((iq) x 3n x 3n)
+                The force constant matrix to be projected on the generator subspace.
+                This must be in the supercell. If iq is not specified (or negative) then
+                the fc supercell must be passed as 3nx3n and it is multiplied only for that specific irreducible q point
+            iq : integer, optional
+                the index of the irreducible q point. If negative, all the q
+                point are used.
                 
         Results
         -------
@@ -282,8 +292,21 @@ class Generators:
                 The coefficients of the generators that decompose the number.
         """
         
-        res = np.real(np.einsum("ijk, kj", self.dyn_gen[iq, :,:,:], fc))
-        return res[:self.dyn_ncoeff[iq]]
+        if iq >= len(self.dyn_ncoeff):
+            raise ValueError("Error, the given iq (%d) must be negative or lower than the number of irreducible points (%d)" % (iq, len(self.dyn_ncoeff)))
+        
+        
+        total_index = 0
+        if iq < 0:
+            res = np.zeros(np.prod(self.dyn_ncoeff), dtype = np.float64)
+            for iq in range(len(self.dyn_ncoeff)):
+                res[total_index : total_index + self.dyn_ncoeff[iq]] = np.real(np.einsum("ijk, kj", self.dyn_gen[iq, :,:,:], fc[iq, :, :]))
+                total_index += self.dyn_ncoeff[iq]
+        else:
+            res = np.real(np.einsum("ijk, kj", self.dyn_gen[iq, :,:,:], fc))
+            total_index = self.dyn_ncoeff[iq]
+            
+        return res[:total_index]
     
     
     def GetDynFromCoeff(self, coeffs, iq=0):
@@ -319,8 +342,33 @@ class Generators:
         fc = np.einsum("ijk, i", self.dyn_gen[iq, :,:,:], new_coeffs)
         return fc
     
+    def GetNCoeffDyn(self):
+        """
+        Returns the total number of coefficients of the generators for the
+        force constant matrix.
+        
+        Results
+        -------
+            int
+                The number of coefficients (even for each q point)
+        """
+        return np.sum(self.dyn_ncoeff)
     
-    
+    def GetCoeffLimits(self, iq):
+        """
+        Get the limit index for the coefficients in the specified q index.
+        
+        Returns
+        -------
+            int, int
+                Start and End index for the generators at the given q point
+        """
+        
+        start_index = 0
+        for i in range(iq):
+            start_index += self.dyn_ncoeff[i]
+        
+        return start_index, start_index + self.dyn_ncoeff[iq]
     
     
     def Generate(self, dyn, qe_sym = None):

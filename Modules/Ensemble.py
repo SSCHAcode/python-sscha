@@ -737,7 +737,8 @@ class Ensemble:
         
         return new_phi
     
-    def get_preconditioned_gradient(self, subtract_sscha = True, return_error = False, use_ups_supercell = True):
+    def get_preconditioned_gradient(self, subtract_sscha = True, return_error = False, 
+                                    use_ups_supercell = True, preconditioned = 1):
         """
         SELF CONSISTENT SCHA EQUATION
         =============================
@@ -753,7 +754,7 @@ class Ensemble:
             \\Phi_{ab} = \\sum_c \\upsilon_{ac} \\left< u_c f_a\\right>_{\\Phi}
             
         The previous equation is true only if the :math:`\\Phi` matrix is the solution
-        of the SCHA theory. Here :math:`\vec u` are the displacements of the configurations
+        of the SCHA theory. Here :math:`\\vec u` are the displacements of the configurations
         and :math:`f` are the forces of the real system acting on the simulation.
         
         NOTE: It does not takes into account for the symmetrization. 
@@ -772,6 +773,9 @@ class Ensemble:
                 with fourier in q space. This is computationally heavier, but can be used
                 to test if everything is working correctly. For now this flag 
                 is ignored and always True.
+            preconitioned : int, optional
+                If 1 (default) the gradient is returned multiplied by the preconditioned,
+                otherwise it is returned as it should be.
                 
         Results
         -------

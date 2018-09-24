@@ -54,7 +54,7 @@ subroutine get_upsilon_matrix(nmodes, nat, ntyp, wr, epols, trans, mass, ityp, T
      
      eigenvalue = 2 * wr(i)
 
-     if ( T /= 0) then
+     if ( T .gt. 0.01) then
         nb = 1 / (dexp(wr(i) / (T * K_to_Ha)) - 1)
         eigenvalue = eigenvalue / (1 + 2*nb)
      end if
