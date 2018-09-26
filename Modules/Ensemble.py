@@ -472,7 +472,7 @@ class Ensemble:
             
             # Get the new displacement
             self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
-        self.current_dyn = new_dynamical_matrix
+        self.current_dyn = new_dynamical_matrix.Copy()
         
         
         
@@ -561,14 +561,17 @@ class Ensemble:
         ----------
             - get_errors : bool
                 If true the error is also returned (as get_free_energy).
+            - in_unit_cell : bool, optional
+                If True (default True) the mean force is averaged on all the atoms in the supercell,
+                then it returns the forces that acts on the unit cell atoms only.
         """
         
         eforces = self.forces - self.sscha_forces
         
         # TODO: Restrict in the unit cell
-        if in_unit_cell:
+        if in_unit_cell and not np.prod(self.supercell) == 1:
             # Refold the forces in the unit cell
-            super_structure = self.dyn_0.structure.generate_supercell(self.supercell)
+            super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
             itau = super_structure.get_itau(self.current_dyn.structure) - 1 # Fort -> Py
             
             nat = self.dyn_0.structure.N_atoms
@@ -576,7 +579,9 @@ class Ensemble:
             
             # Project in the unit cell the forces
             for i in range(nat):
-                new_forces[:, i, :] = np.sum(eforces[:, itau==i,:], axis = 1)
+                print "%d) ITAU LIST:" % i, itau == i
+                new_forces[:, i, :] = np.sum(eforces[:, itau==i,:], axis = 1) / np.prod(self.supercell)
+                #new_forces[:, i, :] = 
             
             eforces = new_forces
 
@@ -812,7 +817,7 @@ class Ensemble:
         
         grad, grad_err = SCHAModules.get_gradient_supercell(self.rho, u_disp, eforces, w, pols, trans,
                                                             self.current_T, mass, ityp, log_err, self.N,
-                                                            nat, 3*nat, len(mass), 1)
+                                                            nat, 3*nat, len(mass), preconditioned)
 
         # Perform the fourier transform
         q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),

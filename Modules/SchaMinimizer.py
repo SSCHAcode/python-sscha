@@ -107,6 +107,8 @@ class SSCHA_Minimizer:
         self.precond_wyck = True
         self.precond_dyn = True
         
+        self.minim_struct = True
+        
         # This is a debugging flag
         # If true the preconditioning of the original ensemble
         # is used
@@ -167,41 +169,52 @@ class SSCHA_Minimizer:
         # Setup the symmetries
         qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
         
-        qe_sym.SetupQPoint(verbose = False)
+        #qe_sym.SetupQPoint(verbose = False)
         
         
         # Get the gradient of the free-energy respect to the dynamical matrix
         #dyn_grad, err = self.ensemble.get_free_energy_gradient_respect_to_dyn()
         #dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
         #dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
-        dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, False)
+        if self.precond_dyn:
+            dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=1)
+        else:
+            dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=0)
+
         
         # Perform the symmetrization
 #        qe_sym.ImposeSumRule(dyn_grad)
 #        qe_sym.SymmetrizeDynQ(dyn_grad, np.array([0,0,0]))
 #        qe_sym.ImposeSumRule(err)
 #        qe_sym.SymmetrizeDynQ(err, np.array([0,0,0]))
-        qe_sym.SymmetrizeFCQ(dyn_grad, self.dyn.q_stars, asr = "crystal")
-        qe_sym.SymmetrizeFCQ(err, self.dyn.q_stars, asr = "crystal")
+        qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "crystal")
+        qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "crystal")
+        
+        # get the gradient in the supercell
+        new_grad_tmp = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot),
+                                                        self.dyn.structure, 
+                                                        self.dyn.structure.generate_supercell(self.ensemble.supercell))
+        
+        np.savetxt("NewGradSC.dat", np.real(new_grad_tmp))
        
         
         # This gradient is already preconditioned, if the precondition
         # is turned off we have to modify the gradient
-        
-        if not self.precond_dyn or self.fake_precond:
-            if self.dyn.nqirr != 1:
-                raise ValueError("Implement this for the supercell")
-            dyn_grad = ApplyLambdaTensor(self.dyn, dyn_grad)    
-            err = ApplyLambdaTensor(self.dyn, err)
-            qe_sym.ImposeSumRule(dyn_grad[0,:,:])
-            qe_sym.ImposeSumRule(err[0,:,:])
-        
-        # This is a debugging strategy (we use the preconditioning)
-        if self.fake_precond:
-            dyn_grad = ApplyFCPrecond(self.ensemble.dyn_0, dyn_grad)
-            err = ApplyFCPrecond(self.ensemble.dyn_0, err)
-            qe_sym.ImposeSumRule(dyn_grad)
-            qe_sym.ImposeSumRule(err)
+#        
+#        if self.fake_precond:
+#            if self.dyn.nqirr != 1:
+#                raise ValueError("Implement this for the supercell")
+#            dyn_grad = ApplyLambdaTensor(self.dyn, dyn_grad)    
+#            err = ApplyLambdaTensor(self.dyn, err)
+#            qe_sym.ImposeSumRule(dyn_grad[0,:,:])
+#            qe_sym.ImposeSumRule(err[0,:,:])
+#        
+#        # This is a debugging strategy (we use the preconditioning)
+#        if self.fake_precond:
+#            dyn_grad = ApplyFCPrecond(self.ensemble.dyn_0, dyn_grad)
+#            err = ApplyFCPrecond(self.ensemble.dyn_0, err)
+#            qe_sym.ImposeSumRule(dyn_grad)
+#            qe_sym.ImposeSumRule(err)
             
         
             
@@ -212,35 +225,45 @@ class SSCHA_Minimizer:
         self.__gc__.append(np.real(np.einsum("abc,acb", dyn_grad, dyn_grad)))
         self.__gc_err__.append(np.real(np.einsum("abc, acb", err, err)))
         
-        
-        # Get the gradient of the free-energy respect to the structure
-        struct_grad, struct_grad_err =  self.ensemble.get_average_forces(True)
-        print "SHAPE:", np.shape(struct_grad)
-        struct_grad_reshaped = - struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
-        
-        # Apply the symmetries to the forces
-        qe_sym.SymmetrizeVector(struct_grad)
-        qe_sym.SymmetrizeVector(struct_grad_err)
-        
-        # Preconditionate the gradient for the wyckoff minimization
-        if self.precond_wyck:
-            struct_precond = GetStructPrecond(self.ensemble.current_dyn)
-            struct_grad_precond = struct_precond.dot(struct_grad_reshaped)
-            struct_grad = struct_grad_precond.reshape( (self.dyn.structure.N_atoms, 3))
+        # If the structure must be minimized perform the step
+        if self.minim_struct:
+            # Get the gradient of the free-energy respect to the structure
+            struct_grad, struct_grad_err =  self.ensemble.get_average_forces(True)
+            #print "SHAPE:", np.shape(struct_grad)
+            struct_grad_reshaped = - struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
             
+            
+            # Preconditionate the gradient for the wyckoff minimization
+            if self.precond_wyck:
+                struct_precond = GetStructPrecond(self.ensemble.current_dyn)
+                struct_grad_precond = struct_precond.dot(struct_grad_reshaped)
+                struct_grad = struct_grad_precond.reshape( (self.dyn.structure.N_atoms, 3))
+            
+            
+            # Apply the symmetries to the forces
+            qe_sym.SetupQPoint()
+            qe_sym.SymmetrizeVector(struct_grad)
+            qe_sym.SymmetrizeVector(struct_grad_err)
+                
+            
+            # Append the gradient modulus to the minimization info
+            self.__gw__.append(np.sqrt( np.sum(struct_grad**2)))
+            self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
         
-        # Append the gradient modulus to the minimization info
-        self.__gw__.append(np.sqrt( struct_grad_reshaped.dot(struct_grad_reshaped)))
-        self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
-        
-        
+            
+            # Perform the step for the structure
+            #print "min step:", self.min_step_struc
+            self.dyn.structure.coords -= self.min_step_struc * struct_grad
+        else:
+            # Append the gradient modulus to the minimization info
+            self.__gw__.append(0)
+            self.__gw_err__.append(0)
+            
+            
         # Perform the step for the dynamical matrix
         for iq in range(len(self.dyn.q_tot)):
             self.dyn.dynmats[iq] -= self.min_step_dyn * dyn_grad[iq,:,:]
         
-        # Perform the step for the structure
-        #print "min step:", self.min_step_struc
-        self.dyn.structure.coords -= self.min_step_struc * struct_grad
 
         # Update the ensemble
         self.update()
