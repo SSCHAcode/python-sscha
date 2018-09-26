@@ -224,7 +224,6 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
   ! end do
   ! call flush()
   
-  !TODO : It could be that now the sum rule must be applied here.
   ! Perform the inverse preconditioning if required:
   if (.not. precond) then
      print *, "Computing the inverse preconditioning..."

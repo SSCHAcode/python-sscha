@@ -569,7 +569,7 @@ class Ensemble:
         if in_unit_cell:
             # Refold the forces in the unit cell
             super_structure = self.dyn_0.structure.generate_supercell(self.supercell)
-            itau = super_structure.get_itau(self.current_dyn.structure)
+            itau = super_structure.get_itau(self.current_dyn.structure) - 1 # Fort -> Py
             
             nat = self.dyn_0.structure.N_atoms
             new_forces = np.zeros((self.N, nat, 3), dtype  =np.float64, order = "C")
