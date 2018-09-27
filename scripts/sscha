@@ -127,7 +127,7 @@ minim.finalize(2)
 
 # Save the final dynamical matrix
 print "Saving the final dynamical matrix in %s" % (minim.dyn_path + "_popuation%d_" % minim.population)
-minim.dyn.save_qe(minim.dyn_path + "_popuation%d_" % minim.population)
+minim.dyn.save_qe(minim.dyn_path + "_population%d_" % minim.population)
 
 # Plot the results
 minim.plot_results(args.save_data, args.plot)
