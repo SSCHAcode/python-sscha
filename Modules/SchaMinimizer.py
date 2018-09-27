@@ -383,6 +383,58 @@ class SSCHA_Minimizer:
             self.population = int(namelist["population"])
             self.ensemble.load(namelist["data_dir"], int(namelist["population"]), int(namelist["n_random"]))
         
+    def print_info(self):
+        """
+        PRINT SETTINGS ON OUTPUT
+        ========================
+        
+        This subroutine is for debugging purposes, it will print the settings about 
+        the minimizer on the standard output.
+        """
+        
+        print ""
+        print ""
+        print " ====== MINIMIZER SETTINGS ====== "
+        print ""
+        print ""
+        print " --- GENERAL SETTINGS --- "
+        print " original temperature = ", self.ensemble.T0
+        print " current temperature = ", self.ensemble.current_T
+        print " number of configurations = ", self.ensemble.N
+        print " max number of steps (infinity if negative) = ", self.max_ka
+        print " meaningful factor = ", self.meaningful_factor
+        print " gradient to watch (for stopping) = ", self.gradi_op
+        print " Kong-Liu minimum effective sample size = ", self.ensemble.N * self.kong_liu_ratio
+        print " (Kong-Liu ratio = ", self.kong_liu_ratio, ")"
+        print " compute the stress tensor = ", self.ensemble.has_stress
+        print " total number of atoms = ", self.dyn.structure.N_atoms * np.prod(self.ensemble.supercell)
+        print ""
+        print ""
+        print " --- STRUCT MINIMIZATION --- "
+        print " minim_struct = ", self.minim_struct
+        print " preconditioning = ", self.precond_wyck
+        print " minimization step (lambda_w) = ", self.min_step_struc
+        print ""
+        print ""
+        print " --- FC MINIMIZATION --- "
+        print " preconditioning = ", self.precond_dyn
+        print " minimization step (lambda_a) = ", self.min_step_dyn
+        print " supercell size = ", " ".join([str(x) for x in self.ensemble.supercell])
+        
+        # Get the current frequencies
+        w, pols = self.dyn.GenerateSupercellDyn(self.ensemble.supercell).DyagDinQ(0)
+        w *= __RyToCm__
+        
+        # Get the starting frequencies
+        w0, p0 = self.ensemble.dyn_0.GenerateSupercellDyn(self.ensemble.supercell).DyagDinQ(0)
+        w0 *= __RyToCm__
+        
+        print ""
+        print " Current dyn frequencies [cm-1] = ", "\t".join(["%.2f" % x for x in w])
+        print ""
+        print " Start dyn frequencies [cm-1] = ", "\t".join(["%.2f" % x for x in w0])
+        print ""
+        print ""
         
     def is_converged(self):
         """

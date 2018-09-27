@@ -117,6 +117,7 @@ print ""
 print "Initialization..."
 minim.init()
 print "System initialized."
+minim.print_info()
 print ""
 minim.run()
 

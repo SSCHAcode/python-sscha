@@ -453,12 +453,12 @@ class Ensemble:
 #        print "OLDA:", old_a
 #        
         
-        # Call the Fortran module to compute rho
-        print "SHAPES:"
-        print "NEW Q:", np.shape(new_q)
-        print "OLD Q:", np.shape(old_q)
-        print "NEW A:", np.shape(new_a)
-        print "OLD A:", np.shape(old_a)
+#        # Call the Fortran module to compute rho
+#        print "SHAPES:"
+#        print "NEW Q:", np.shape(new_q)
+#        print "OLD Q:", np.shape(old_q)
+#        print "NEW A:", np.shape(new_a)
+#        print "OLD A:", np.shape(old_a)
         
         self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
         
@@ -568,7 +568,6 @@ class Ensemble:
         
         eforces = self.forces - self.sscha_forces
         
-        # TODO: Restrict in the unit cell
         if in_unit_cell and not np.prod(self.supercell) == 1:
             # Refold the forces in the unit cell
             super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
@@ -579,7 +578,7 @@ class Ensemble:
             
             # Project in the unit cell the forces
             for i in range(nat):
-                print "%d) ITAU LIST:" % i, itau == i
+                #print "%d) ITAU LIST:" % i, itau == i
                 new_forces[:, i, :] = np.sum(eforces[:, itau==i,:], axis = 1) / np.prod(self.supercell)
                 #new_forces[:, i, :] = 
             
@@ -805,7 +804,7 @@ class Ensemble:
         nat = supercell_dyn.structure.N_atoms
         eforces = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
         u_disp = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
-        print nat
+        #print nat
         if subtract_sscha:
             eforces[:,:,:] = self.forces - self.sscha_forces
         else:
