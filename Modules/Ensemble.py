@@ -321,6 +321,8 @@ class Ensemble:
             #print self.stresses
             save_stress = True
             
+        super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
+            
         for i in range(self.N):
             # Save the forces
             np.savetxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1), self.forces[i,:,:] / A_TO_BOHR)
@@ -328,7 +330,7 @@ class Ensemble:
             # Save the configurations
             struct = self.structures[i]
             struct.save_scf("%s/scf_population%d_%d.dat" % (data_dir, population, i+1), self.dyn_0.alat, True)
-            u_disp = struct.get_displacement(self.dyn_0.structure)
+            u_disp = struct.get_displacement(super_dyn.structure)
             np.savetxt("%s/u_population%d_%d.dat" % (data_dir, population, i+1), u_disp * A_TO_BOHR)
             
             # Save the stress tensors if any
@@ -361,16 +363,17 @@ class Ensemble:
         self.N = N
         Nat_sc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms
         self.structures = []
+        super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
         if evenodd:
-            structs = self.dyn_0.ExtractRandomStructures(N / 2, self.T0)
+            structs = super_dyn.ExtractRandomStructures(N / 2, self.T0)
             for i, s in enumerate(structs):
                 self.structures.append(s)
                 new_s = s.copy()
                 # Get the opposite displacement structure
-                new_s.coords = self.dyn_0.structure.coords - new_s.get_displacement(self.dyn_0.structure)
+                new_s.coords = super_dyn.structure.coords - new_s.get_displacement(super_dyn.structure)
                 self.structures.append(new_s)
         else:
-            self.structures = self.dyn_0.ExtractRandomStructures(N, self.T0)
+            self.structures = super_dyn.ExtractRandomStructures(N, self.T0)
         
         # Compute the sscha energy and forces
         self.sscha_energies = np.zeros( ( self.N))
@@ -379,13 +382,14 @@ class Ensemble:
         self.forces = np.zeros( (self.N, Nat_sc, 3))
         self.u_disps = np.zeros( (self.N, Nat_sc * 3))
         for i, s in enumerate(self.structures):
-            energy, force  = self.dyn_0.get_energy_forces(s)
+            energy, force  = self.dyn_0.get_energy_forces(s, supercell = self.supercell, 
+                                                         real_space_fc=super_dyn.dynmats[0])
             
             self.sscha_energies[i] = energy
             self.sscha_forces[i,:,:] = force
             
             # Get the displacements
-            self.u_disps[i, :] = s.get_displacement(self.dyn_0.structure).reshape((3* Nat_sc))
+            self.u_disps[i, :] = s.get_displacement(super_dyn.structure).reshape((3* Nat_sc))
         
         self.rho = np.ones(self.N)
         self.current_dyn = self.dyn_0.Copy()
@@ -393,7 +397,7 @@ class Ensemble:
         
         
         # Generate the q_start
-        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, self.dyn_0)
+        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, super_dyn)
         self.current_q = self.q_start.copy()
         
         
