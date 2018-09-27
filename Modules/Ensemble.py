@@ -55,6 +55,8 @@ class Ensemble:
                 This is the dynamical matrix used to generate the ensemble.
             T0 : float
                 The temperature used to generate the ensemble.
+            supercell: optional, list of int
+                The supercell dimension
         """
         
         # N is the number of element in the ensemble

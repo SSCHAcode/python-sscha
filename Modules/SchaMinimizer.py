@@ -149,22 +149,12 @@ class SSCHA_Minimizer:
         self.__KL__ = []
         
         
-    def minimization_step(self, algorithm = "sdes"):
+    def minimization_step(self):
         """
         Perform the single minimization step.
         This modify the self.dyn matrix and updates the ensemble
     
-        
-        Parameters
-        ----------
-            algorithm : str
-                The minimization algorithm. By default it is steepest descent.
-                Supported altorithms:
-                    - "sdes"
         """
-        
-        if algorithm != "sdes":
-            raise ValueError("Error, %s algorithm is not supported." % algorithm)
         
         # Setup the symmetries
         qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
@@ -190,12 +180,12 @@ class SSCHA_Minimizer:
         qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "crystal")
         qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "crystal")
         
-        # get the gradient in the supercell
-        new_grad_tmp = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot),
-                                                        self.dyn.structure, 
-                                                        self.dyn.structure.generate_supercell(self.ensemble.supercell))
-        
-        np.savetxt("NewGradSC.dat", np.real(new_grad_tmp))
+#        # get the gradient in the supercell
+#        new_grad_tmp = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot),
+#                                                        self.dyn.structure, 
+#                                                        self.dyn.structure.generate_supercell(self.ensemble.supercell))
+#        
+#        #np.savetxt("NewGradSC.dat", np.real(new_grad_tmp))
        
         
         # This gradient is already preconditioned, if the precondition
@@ -260,9 +250,14 @@ class SSCHA_Minimizer:
             self.__gw_err__.append(0)
             
             
-        # Perform the step for the dynamical matrix
+        # Perform the step for the dynamical matrix respecting the root representation
+        new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
+                                  self.min_step_dyn, root_representation = self.root_representation,
+                                  minimization_algorithm = self.minimization_algorithm)
+        
+        # Update the dynamical matrix
         for iq in range(len(self.dyn.q_tot)):
-            self.dyn.dynmats[iq] -= self.min_step_dyn * dyn_grad[iq,:,:]
+            self.dyn.dynmats[iq] = new_dyn[iq, : ,: ]
         
 
         # Update the ensemble
@@ -308,6 +303,9 @@ class SSCHA_Minimizer:
             
         if "precond_wyck" in keys:
             self.precond_wyck = bool(namelist["precond_wyck"])
+            
+        if "root_representation" in keys:
+            self.root_representation = namelist["root_representation"]
             
         if "n_random_eff" in keys:
             if not "n_random" in keys:
@@ -533,6 +531,12 @@ class SSCHA_Minimizer:
         #grad = self.ensemble.get_fc_from_self_consistency(True, False)
         grad = self.ensemble.get_preconditioned_gradient(True)
         self.prev_grad = grad
+        
+        # For now check that if root representation is activated
+        # The preconditioning must be deactivated
+        if self.root_representation != "normal" and self.precond_dyn:
+            raise ValueError("Error, deactivate the preconditioning if a root_representation is used.")
+        
 #
 #        # Initialize the symmetry
 #        qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
@@ -612,7 +616,7 @@ class SSCHA_Minimizer:
             
             # Perform the minimization step
             t1 = time.time()
-            self.minimization_step(self.minimization_algorithm)
+            self.minimization_step()
             t2 = time.time()
             
             if self.check_imaginary_frequencies():
@@ -745,8 +749,9 @@ class SSCHA_Minimizer:
                                                   self.dyn.structure.coords[i,2])
             print ""
             print " ==== FINAL FREQUENCIES [cm-1] ==== "
-            w, pols = self.dyn.DyagDinQ(0)
-            trans = CC.Methods.get_translations(pols, self.dyn.structure.get_masses_array())
+            super_dyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
+            w, pols = super_dyn.DyagDinQ(0)
+            trans = CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())
             
             for i in range(len(w)):
                 print "Mode %5d:   freq %16.8f cm-1  | is translation? " % (i+1, w[i] * __RyToCm__), trans[i] 
@@ -971,6 +976,113 @@ def get_root_dyn(dyn_fc, root_representation):
     """
     # TODO: To be ultimated
     pass
+
+def PerformRootStep(dyn_q, grad_q, step_size=1, root_representation = "sqrt", minimization_algorithm = "sdes"):
+    """
+    ROOT MINIMIZATION STEP
+    ======================
+    
+    As for the [Monacelli, Errea, Calandra, Mauri, PRB 2017], the nonlinear
+    change of variable is used to perform the step.
+    
+    It works as follows:
+    
+    .. math::
+        
+        \\Phi \\rightarrow \\sqrt{x}{\\Phi}
+        
+        \\frac{\\partial F}{\\partial \\Phi} \\rightarrow \\frac{\\partial F}{\\partial \\sqrt{x}{\\Phi}}
+        
+        \\sqrt{x}{\\Phi^{(n)}} \\stackrel{\\frac{\\partial F}{\\partial \\sqrt{x}{\\Phi}}}{\\longrightarrow} \\sqrt{x}{\\Phi^{(n+1)}}
+        
+        \\Phi^{(n+1)} = \\left(\\sqrt{x}{\\Phi^{(n+1)}})^{x}
+        
+    Where the specific update step is determined by the minimization_algorithm, while the :math:`x` order 
+    of the root representation is determined by the root_representation argument.
+    
+    Parameters
+    ----------
+        dyn_q : ndarray( NQ x 3nat x 3nat )
+            The dynamical matrix in q space. The Nq are the total number of q.
+        grad_q : ndarray( NQ x 3nat x 3nat )
+            The gradient of the dynamical matrix.
+        step_size : float
+            The step size for the minimization
+        root_representation : string
+            choice between "normal", "sqrt" and "root4". The value of :math:`x` will be, respectively,
+            1, 2, 4.
+        minimization_algorithm : string
+            The minimization algorithm to be used for the update.
+    
+    Result
+    ------
+        new_dyn_q : ndarray( NQ x 3nat x 3nat )
+            The updated dynamical matrix in q space
+    """
+    ALLOWED_REPRESENTATION = ["normal", "root4", "sqrt", "root2"]
+    
+    if not root_representation in ALLOWED_REPRESENTATION:
+        raise ValueError("Error, root_representation is %s must be one of %s." % (root_representation,
+                                                                                  ", ".join(ALLOWED_REPRESENTATION)))
+    # Allow also for the usage of root2 instead of sqrt
+    if root_representation == "root2":
+        root_representation = "sqrt"
+    
+    # Apply the diagonalization
+    nq = np.shape(dyn_q)[0]
+    
+    # Check if gradient and dyn_q have the same number of q points
+    if nq != np.shape(grad_q)[0]:
+        raise ValueError("Error, the number of q point of the dynamical matrix %d and gradient %d does not match!" % (nq, np.shape(grad_q)[0]))
+    
+    # Create the root representation
+    new_dyn = np.zeros(np.shape(dyn_q), dtype = np.complex128)
+    new_grad = np.zeros(np.shape(dyn_q), dtype = np.complex128)
+
+    # Copy
+    new_dyn[:,:,:] = dyn_q
+    new_grad[:,:,:] = grad_q
+
+    # Cycle over all the q points
+    if root_representation != "normal":
+        for iq in range(nq):
+            # Dyagonalize the matrix
+            eigvals, eigvects = np.linalg.eigh(dyn_q[iq, :, :])
+            
+            # Regularize acustic modes
+            if iq == 0:
+                eigvals[eigvals < 0] = 0.
+            
+            # The sqrt conversion
+            new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(eigvals), np.conj(eigvects), eigvects)
+            new_grad[iq, :, :] = new_dyn[iq, :, :].dot(grad_q[iq, :, :]) + grad_q[iq, :, :].dot(new_dyn[iq, :, :])
+            
+            # If root4 another loop needed
+            if root_representation == "root4":                
+                new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(np.sqrt(eigvals)), np.conj(eigvects), eigvects)
+                new_grad[iq, :, :] = new_dyn[iq, :, :].dot(new_grad[iq, :, :]) + new_grad[iq, :, :].dot(new_dyn[iq, :, :])
+    
+    # Perform the step
+    # For now only steepest descent implemented
+    if minimization_algorithm == "sdes":
+        new_dyn -= new_grad * step_size
+    else:
+        raise ValueError("Error, the given minimization_algorithm %s is not implemented." % minimization_algorithm)
+    
+    
+    if root_representation != "normal":
+        for iq in range(nq):
+            # The square root conversion
+            new_dyn[iq, :, :] = new_dyn[iq, :,:].dot(new_dyn[iq, :,:])
+            
+            # The root4 conversion
+            if root_representation == "root4":
+                new_dyn[iq, :, :] = new_dyn[iq, :,:].dot(new_dyn[iq, :,:])
+    
+    # Return the matrix
+    return new_dyn
+            
+            
 
 
 def ApplyLambdaTensor(current_dyn, matrix, T = 0):
