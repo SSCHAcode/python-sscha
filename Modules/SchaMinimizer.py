@@ -923,7 +923,7 @@ class SSCHA_Minimizer:
             #print "Lengths:", len(fe), len(gc), len(gw), len(kl), len(steps)       
             print "Saving the minimization results..."
             save_data = [steps, fe, fe_err, gc, gc_err, gw, gw_err, kl]
-            np.savetxt(save_filename, np.transpose(save_data),
+            np.savetxt(save_filename, np.real(np.transpose(save_data)),
                        header = "Steps; Free energy +- error [meV]; FC gradient +- error [bohr^2]; Structure gradient +- error [meV / A]; Kong-Liu N_eff")
             print "Minimization data saved in %s." % save_filename
         
