@@ -166,6 +166,7 @@ class SSCHA_Minimizer:
         #dyn_grad, err = self.ensemble.get_free_energy_gradient_respect_to_dyn()
         #dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
         #dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
+        t1 = time.time()
         if self.precond_dyn:
             dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=1)
         else:
@@ -179,6 +180,8 @@ class SSCHA_Minimizer:
 #        qe_sym.SymmetrizeDynQ(err, np.array([0,0,0]))
         qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "crystal")
         qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "crystal")
+        t2 = time.time()
+        print "Time elapsed to compute the dynamical matrix gradient:", t2 - t1, "s"
         
 #        # get the gradient in the supercell
 #        new_grad_tmp = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot),
@@ -217,10 +220,14 @@ class SSCHA_Minimizer:
         
         # If the structure must be minimized perform the step
         if self.minim_struct:
+            t1 = time.time()
             # Get the gradient of the free-energy respect to the structure
             struct_grad, struct_grad_err =  self.ensemble.get_average_forces(True)
             #print "SHAPE:", np.shape(struct_grad)
             struct_grad_reshaped = - struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
+            t2 = time.time()
+            
+            print "Time elapsed to compute the structure gradient:", t2 - t1, "s"
             
             
             # Preconditionate the gradient for the wyckoff minimization
@@ -614,10 +621,18 @@ class SSCHA_Minimizer:
             # Store the original dynamical matrix
             old_dyn = self.dyn.Copy()
             
+            if verbose >= 1:
+                print ""
+                print " # ---------------- NEW MINIMIZATION STEP --------------------"
+                print "Step ka = ", len(self.__fe__)
+            
             # Perform the minimization step
             t1 = time.time()
             self.minimization_step()
             t2 = time.time()
+            if verbose >=1:
+                print "Time elapsed to perform the minimization step:", t2 - t1, "s"
+            
             
             if self.check_imaginary_frequencies():
                 print "Immaginary frequencies found."
@@ -637,11 +652,8 @@ class SSCHA_Minimizer:
             # Print the step
             if verbose >= 1:
                 print ""
-                print " # ---------------- NEW MINIMIZATION STEP --------------------"
-                print "Step ka = ", len(self.__fe__)
                 print "Free energy = %16.8f +- %16.8f meV" % (self.__fe__[-1] * __RyTomev__, 
                                                               self.__fe_err__[-1] * __RyTomev__)
-                print "Time for the minimization step: %.4f s" % (t2 - t1)
                 print "FC gradient modulus = %16.8f +- %16.8f bohr^2" % (self.__gc__[-1] * __RyTomev__, 
                                                                        self.__gc_err__[-1] * __RyTomev__)
                 print "Struct gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gw__[-1] * __RyTomev__,
@@ -657,7 +669,7 @@ class SSCHA_Minimizer:
             
             # Get the stopping criteria
             running = not self.check_stop()
-            print "Running:", running
+            print "Check the stopping criteria: Running = ", running
             
             
             if len(self.__fe__) > self.max_ka and self.max_ka > 0:

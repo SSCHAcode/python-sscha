@@ -421,6 +421,7 @@ class Ensemble:
         
         self.current_T = newT
         
+        t1 = time.time()
         
         
         # Get the frequencies of the original dynamical matrix
@@ -452,6 +453,9 @@ class Ensemble:
         # Convert the q vectors in the Hartree units
         old_q = self.q_start * np.sqrt(2) * __A_TO_BOHR__
         new_q = self.current_q * np.sqrt(2) * __A_TO_BOHR__
+        
+        t2 = time.time()
+        print "Time elapsed to prepare the rho update:", t2 - t1, "s"
 #        
 #        print "NEWQ: ", new_q
 #        print "OLDQ: ", old_q
@@ -466,9 +470,14 @@ class Ensemble:
 #        print "NEW A:", np.shape(new_a)
 #        print "OLD A:", np.shape(old_a)
         
+        t1 = time.time()
         self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
+        t2 = time.time()
         
+        print "Time elapsed to update the stochastic weights:", t2 - t1, "s"
         #print "RHO:", self.rho
+        
+        
         
         for i in range(self.N):
             #print "Weight %d" % i
@@ -478,6 +487,9 @@ class Ensemble:
             
             # Get the new displacement
             self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
+        t1 = time.time()
+        
+        print "Time elapsed to update the sscha energies, forces and displacements:", t1 - t2, "s"
         self.current_dyn = new_dynamical_matrix.Copy()
         
         
@@ -487,8 +499,9 @@ class Ensemble:
         Get the Kong-Liu effective sample size with the given importance sampling.
         """
         
-        #return self.N * np.sum(self.rho) / float(np.sum(self.rho**2)) 
-        return np.sum(self.rho) * np.sum(self.rho) /  np.float64(np.sum(self.rho**2))
+        sum_rho = np.float64(np.sum(self.rho))
+        sum_rho2 = np.float64(np.sum(self.rho**2))
+        return sum_rho**2 / sum_rho2
     
     def get_average_energy(self, subtract_sscha = False, return_error = False):
         """
