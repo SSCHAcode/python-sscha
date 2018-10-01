@@ -311,6 +311,9 @@ class SSCHA_Minimizer:
         if "precond_wyck" in keys:
             self.precond_wyck = bool(namelist["precond_wyck"])
             
+        if "preconditioning" in keys:
+            self.precond_dyn = bool(namelist["preconditioning"])
+            
         if "root_representation" in keys:
             self.root_representation = namelist["root_representation"]
             
