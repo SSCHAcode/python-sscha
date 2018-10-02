@@ -29,6 +29,18 @@ import cellconstructor.Manipulate
 
 import SCHAModules
 
+# Try to load the parallel library if any
+try:
+    from mpi4py import MPI
+    __MPI__ = True
+except:
+    __MPI__ = False
+
+try:
+    from ase.units import Rydberg, Bohr
+except:
+    pass
+
 """
 This source contains the Ensemble class
 It is used to Load and Save info about the ensemble.
@@ -376,11 +388,12 @@ class Ensemble:
             self.structures = super_dyn.ExtractRandomStructures(N, self.T0)
         
         # Compute the sscha energy and forces
-        self.sscha_energies = np.zeros( ( self.N))
-        self.sscha_forces = np.zeros((self.N, Nat_sc, 3))
-        self.energies = np.zeros(self.N)
-        self.forces = np.zeros( (self.N, Nat_sc, 3))
-        self.u_disps = np.zeros( (self.N, Nat_sc * 3))
+        self.sscha_energies = np.zeros( ( self.N), dtype = np.float64)
+        self.sscha_forces = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "F")
+        self.energies = np.zeros(self.N, dtype = np.float64)
+        self.forces = np.zeros( (self.N, Nat_sc, 3), dtype = np.float64, order = "F")
+        self.stresses = np.zeros( (self.N, 3, 3), dtype = np.float64, order = "F")
+        self.u_disps = np.zeros( (self.N, Nat_sc * 3), dtype = np.float64, order = "F")
         for i, s in enumerate(self.structures):
             energy, force  = self.dyn_0.get_energy_forces(s, supercell = self.supercell, 
                                                          real_space_fc=super_dyn.dynmats[0])
@@ -391,7 +404,7 @@ class Ensemble:
             # Get the displacements
             self.u_disps[i, :] = s.get_displacement(super_dyn.structure).reshape((3* Nat_sc))
         
-        self.rho = np.ones(self.N)
+        self.rho = np.ones(self.N, dtype = np.float64)
         self.current_dyn = self.dyn_0.Copy()
         self.current_T = self.T0
         
@@ -1219,3 +1232,127 @@ class Ensemble:
         #TODO: apply symmetries
             
         return df_dfc, err_df_dfc
+
+
+
+    def get_energy_forces(self, ase_calculator, compute_stress = True):
+        """
+        GET ENERGY AND FORCES FOR THE CURRENT ENSEMBLE
+        ==============================================
+        
+        This subroutine uses the ase calculator to compute the abinitio energies and forces
+        of the self ensemble.
+        This subroutine requires to have ASE installed and properly configured to
+        interface with your favourite ab-initio software.
+        
+        
+        NOTE: The parallel version has still an issue in loading the pseudo potentials simultaneously
+        
+        Parameters
+        ----------
+            ase_calculator : ase.calculator
+                The ASE interface to the calculator to run the calculation.
+            compute_stress : bool
+                If true, the stress is requested from the ASE calculator. Be shure
+                that the calculator you provide supports stress calculation
+            
+        """
+        
+        # Setup the calculator for each structure
+        if __MPI__:
+            comm = MPI.COMM_WORLD
+            size = comm.Get_size()
+            rank = comm.Get_rank()
+            
+            # Broad cast to all the structures
+            structures = comm.bcast(self.structures, root = 0)            
+            nat3 = comm.bcast(self.current_dyn.structure.N_atoms* 3, root = 0)
+            N_rand = comm.bcast(self.N, root=0)
+            
+            # Setup the label of the calculator
+            ase_calculator = comm.bcast(ase_calculator, root = 0)
+            ase_calculator.set_label("esp_%d" % rank) # Avoid overwriting the same file
+            
+            compute_stress = comm.bcast(compute_stress, root = 0)
+            
+            # Check if the parallelization is correct        
+            if N_rand % size != 0:
+                raise ValueError("Error, for paralelization the ensemble dimension must be a multiple of the processors")
+            
+        else:
+            size = 1
+            rank = 0
+            structures = self.structures
+            nat3 = self.current_dyn.structure.N_atoms* 3
+            N_rand = self.N
+            
+        # Only for the master
+        
+        # Prepare the energy, forces and stress array
+        energies = np.zeros( N_rand / size, dtype = np.float64)
+        forces = np.zeros( ( N_rand / size) * nat3 , dtype = np.float64)
+        if compute_stress:
+            stress = np.zeros( (N_rand / size) * 9, dtype = np.float64)
+
+        if rank == 0:
+            total_forces = np.zeros( N_rand * nat3, dtype = np.float64)
+            total_stress = np.zeros( N_rand * 9, dtype = np.float64)
+        else:
+            total_forces = np.empty( N_rand * nat3, dtype = np.float64)
+            total_stress = np.empty( N_rand * 9, dtype = np.float64)
+            
+
+        # If an MPI istance is running, split the calculation
+        count = 0
+        for i0 in range(N_rand / size):
+            i = i0 + size * rank
+            
+            
+            struct = self.structures[i]
+            atms = struct.get_ase_atoms()
+            
+            # Setup the ASE calculator
+            atms.set_calculator(ase_calculator)
+            
+            # Get energy, forces (and stress)
+            energy = atms.get_total_energy() * Rydberg # eV => Ry
+            forces_ = atms.get_forces() * Rydberg # eV / A => Ry / A
+            if compute_stress:
+                stress[count : count + 9] = atms.get_stress(False).reshape(9) * Rydberg / Bohr**3 # ev/A^3 => Ry/bohr
+            
+            # Copy into the ensemble array
+            energies[count] = energy
+            forces[count : count + nat3] = forces_.reshape( nat3 )
+            
+            # Print the status
+            if rank == 0:
+                print "conf %d / %d" % (i0, N_rand / size)
+            
+        
+        # Collect all togheter
+        
+        if __MPI__:
+            comm.Allgather([energies, MPI.DOUBLE], [self.energies, MPI.DOUBLE])
+            comm.Allgather([forces, MPI.DOUBLE], [total_forces, MPI.DOUBLE])
+            
+            if compute_stress:
+                comm.Allgather([stress, MPI.DOUBLE], [total_stress, MPI.DOUBLE])
+            
+        else:
+            self.energies = energies
+            total_forces = forces
+            if compute_stresses:
+                total_stress = stress
+        
+        # Reshape the arrays
+        self.forces[:, :, :] = np.reshape(total_forces, (N_rand, self.current_dyn.structure.N_atoms, 3), order = "C")
+        
+        if compute_stress:
+            self.stresses[:,:,:] = np.reshape(total_stress, (N_rand, 3, 3), order = "C")
+            self.has_stress = True
+        else:
+            self.has_stress = False
+            
+            
+        
+        
