@@ -489,6 +489,7 @@ class Ensemble:
         self.forces = np.zeros( (self.N, Nat_sc, 3), dtype = np.float64, order = "F")
         self.stresses = np.zeros( (self.N, 3, 3), dtype = np.float64, order = "F")
         self.u_disps = np.zeros( (self.N, Nat_sc * 3), dtype = np.float64, order = "F")
+        self.xats = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "C")
         for i, s in enumerate(self.structures):
             energy, force  = self.dyn_0.get_energy_forces(s, supercell = self.supercell, 
                                                          real_space_fc=super_dyn.dynmats[0])
@@ -498,6 +499,7 @@ class Ensemble:
             
             # Get the displacements
             self.u_disps[i, :] = s.get_displacement(super_dyn.structure).reshape((3* Nat_sc))
+            self.xats[i, :, :] = s.coords
         
         self.rho = np.ones(self.N, dtype = np.float64)
         self.current_dyn = self.dyn_0.Copy()
