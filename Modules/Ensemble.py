@@ -77,6 +77,7 @@ class Ensemble:
         self.energies = []
         self.forces = []
         self.stresses = []
+        self.xats = []
         
         self.sscha_energies = []
         self.sscha_forces = []
@@ -169,6 +170,8 @@ class Ensemble:
         Nat_sc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms
         
         self.forces = np.zeros( (self.N, Nat_sc, 3), order = "F", dtype = np.float64)
+        self.xats = np.zeros( (self.N, Nat_sc, 3), order = "C", dtype = np.float64)
+
         self.stresses = np.zeros( (self.N, 3,3), order = "F", dtype = np.float64)
         
         self.sscha_energies = np.zeros(self.N, dtype = np.float64)
@@ -210,6 +213,7 @@ class Ensemble:
                 
                 structure.coords += disp
                 
+            self.xats[i, :, :] = structure.coords
             self.structures.append(structure)
             
             # Get the displacement [ANGSTROM]
@@ -351,6 +355,97 @@ class Ensemble:
             
         
 
+    def save_bin(self, data_dir, population_id = 1):
+        """
+        FAST SAVE OF THE ENSEMBLE
+        =========================
+        
+        This function is a fast way of saving the ensemble.
+        It is faster and make use of less disk space than the save.
+        The drawback is that can only be opened with numpy
+        
+        Parameters
+        ----------
+            data_dir : string
+                path to the folder in which the ensemble is saved
+            population_id : int
+                The id of the population. This can be used to save
+                several ensembles in the same data_dir
+        """
+        
+        np.save("%s/energies_pop%d.npy" % (data_dir, population_id), self.energies)
+        np.save("%s/forces_pop%d.npy" % (data_dir, population_id), self.forces)
+        
+        # Save the structures
+        np.save("%s/xats_pop%d.npy" % (data_dir, population_id), self.xats)
+        
+        if self.has_stress:
+            np.save("%s/stresses_pop%d.npy" % (data_dir, population_id), self.stresses)
+        
+        self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
+        
+        
+        
+    def load_bin(self, data_dir, population_id = 1):
+        """
+        LOAD THE BINARY ENSEMBLE
+        ========================
+        
+        This function loads the ensemble saved with save_bin(...)
+        
+        Parameters
+        ----------
+            data_dir : string
+                The directory containing the ensemble
+            population_id : int
+                The esnemble population identifier.
+        """
+        
+        self.energies = np.load("%s/energies_pop%d.npy" % (data_dir, population_id))
+        self.forces = np.load("%s/forces_pop%d.npy" % (data_dir, population_id))
+        self.xats = np.load("%s/xats_pop%d.npy" % (data_dir, population_id))
+        
+        stress_path = "%s/stresses_pop%d.npy" % (data_dir, population_id)
+        if os.path.exists(stress_path):
+            self.stresses = np.load(stress_path)
+            self.has_stress = True
+        else:
+            self.has_stress = False
+            
+        # Load the original dynamical matrix
+        self.dyn_0 = CC.Phonons.Phonons("%s/dyn_gen_pop%d_" % (data_dir, population_id))
+        self.current_dyn = self.dyn_0.Copy()
+        
+        dyn_supercell = self.dyn_0.GenerateSupercellDyn(self.supercell)
+        super_structure = dyn_supercell.structure
+        super_fc = dyn_supercell.dynmats[0]
+        Nat_sc = super_structure.N_atoms
+        
+        self.sscha_energies = np.zeros(self.N, dtype = np.float64)
+        self.sscha_forces = np.zeros( (self.N, Nat_sc, 3), order = "F", dtype = np.float64)
+        self.u_disps = np.zeros( (self.N, 3 * Nat_sc), order = "F", dtype = np.float64)
+        
+        # Build the structures
+        self.structures = [None] * self.N
+        for i in range(self.N):
+            self.structures[i] = super_structure.copy()
+            self.structures[i].coords = self.xats[i,:,:]
+            self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
+            
+            energy, force = self.dyn_0.get_energy_forces(self.structures[i], supercell = self.supercell, 
+                                                         real_space_fc=super_fc)
+            
+            self.sscha_energies[i] = energy
+            self.sscha_forces[i, :, :] = force
+
+
+        # Setup the initial weights
+        self.rho = np.ones(self.N, dtype = np.float64)
+        
+        # Initialize the q_start
+        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell)
+        self.current_q = self.q_start.copy()
+
         
     def generate(self, N, evenodd = True):
         """
@@ -435,8 +530,6 @@ class Ensemble:
         self.current_T = newT
         
         t1 = time.time()
-        
-        
         # Get the frequencies of the original dynamical matrix
         super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
         w, pols = super_dyn.DyagDinQ(0)
@@ -457,10 +550,9 @@ class Ensemble:
         w = np.array(w/2, dtype = np.float64)
         new_a = SCHAModules.thermodynamic.w_to_a(w, newT)
         
+        super_structure = new_super_dyn.structure
+        Nat_sc = super_structure.N_atoms
         
-        
-        
-
         self.current_q = CC.Manipulate.GetQ_vectors(self.structures, new_super_dyn) 
         
         # Convert the q vectors in the Hartree units
@@ -469,19 +561,6 @@ class Ensemble:
         
         t2 = time.time()
         print "Time elapsed to prepare the rho update:", t2 - t1, "s"
-#        
-#        print "NEWQ: ", new_q
-#        print "OLDQ: ", old_q
-#        print "NEWA:", new_a
-#        print "OLDA:", old_a
-#        
-        
-#        # Call the Fortran module to compute rho
-#        print "SHAPES:"
-#        print "NEW Q:", np.shape(new_q)
-#        print "OLD Q:", np.shape(old_q)
-#        print "NEW A:", np.shape(new_a)
-#        print "OLD A:", np.shape(old_a)
         
         t1 = time.time()
         self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
@@ -490,16 +569,12 @@ class Ensemble:
         print "Time elapsed to update the stochastic weights:", t2 - t1, "s"
         #print "RHO:", self.rho
         
-        
-        
         for i in range(self.N):
-            #print "Weight %d" % i
-            #tmp = new_dynamical_matrix.GetRatioProbability(self.structures[i], newT, self.dyn_0, self.T0)
-            #print "FORTRAN :", self.rho[i], "PYTHON:", tmp
             self.sscha_energies[i], self.sscha_forces[i, :,:] = new_super_dyn.get_energy_forces(self.structures[i], real_space_fc = new_super_dyn.dynmats[0])
             
             # Get the new displacement
-            self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
+            #self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
+            self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
         t1 = time.time()
         
         print "Time elapsed to update the sscha energies, forces and displacements:", t1 - t2, "s"
@@ -1245,9 +1320,7 @@ class Ensemble:
         This subroutine requires to have ASE installed and properly configured to
         interface with your favourite ab-initio software.
         
-        
-        NOTE: The parallel version has still an issue in loading the pseudo potentials simultaneously
-        
+                
         Parameters
         ----------
             ase_calculator : ase.calculator
