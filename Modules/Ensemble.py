@@ -1391,12 +1391,17 @@ class Ensemble:
             
             # Avoid for errors
             run = True
+            count_fails = 0
             while run:
                 try:
                     energy = atms.get_total_energy() * Rydberg # eV => Ry
                     run = False
                 except:
                     print "Rerun the job %d" % i
+                    count_fails += 1
+                    if count_fails >= 5:
+                        run = False
+                        raise ValueError("Error in the ASE calculator for more than 5 times")
             
             # Get energy, forces (and stress)
             energy = atms.get_total_energy() * Rydberg # eV => Ry
