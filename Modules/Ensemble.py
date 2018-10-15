@@ -1378,12 +1378,11 @@ class Ensemble:
             
 
         # If an MPI istance is running, split the calculation
-        count = 0
         for i0 in range(N_rand / size):
             i = i0 + size * rank
             
             
-            struct = self.structures[i]
+            struct = structures[i]
             atms = struct.get_ase_atoms()
             
             # Setup the ASE calculator
@@ -1394,7 +1393,7 @@ class Ensemble:
             count_fails = 0
             while run:
                 try:
-                    energy = atms.get_total_energy() * Rydberg # eV => Ry
+                    energy = atms.get_total_energy() / Rydberg # eV => Ry
                     run = False
                 except:
                     print "Rerun the job %d" % i
@@ -1404,10 +1403,10 @@ class Ensemble:
                         raise ValueError("Error in the ASE calculator for more than 5 times")
             
             # Get energy, forces (and stress)
-            energy = atms.get_total_energy() * Rydberg # eV => Ry
-            forces_ = atms.get_forces() * Rydberg # eV / A => Ry / A
+            energy = atms.get_total_energy() / Rydberg # eV => Ry
+            forces_ = atms.get_forces() / Rydberg # eV / A => Ry / A
             if compute_stress:
-                stress[9*i0 : 9*i0 + 9] = atms.get_stress(False).reshape(9) * Rydberg / Bohr**3 # ev/A^3 => Ry/bohr
+                stress[9*i0 : 9*i0 + 9] = atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
             
             # Copy into the ensemble array
             energies[i0] = energy
