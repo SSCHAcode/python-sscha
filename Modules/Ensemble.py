@@ -892,7 +892,7 @@ class Ensemble:
                 
         Results
         -------
-            fc : ndarray (3*nat x 3*nat)
+            fc : ndarray (nq x 3*nat x 3*nat)
                 The real space force constant matrix obtained by the
                 self-consistent equation.
         """
@@ -1388,6 +1388,15 @@ class Ensemble:
             
             # Setup the ASE calculator
             atms.set_calculator(ase_calculator)
+            
+            # Avoid for errors
+            run = True
+            while run:
+                try:
+                    energy = atms.get_total_energy() * Rydberg # eV => Ry
+                    run = False
+                except:
+                    print "Rerun the job %d" % i
             
             # Get energy, forces (and stress)
             energy = atms.get_total_energy() * Rydberg # eV => Ry
