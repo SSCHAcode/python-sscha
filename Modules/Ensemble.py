@@ -1407,15 +1407,16 @@ class Ensemble:
             energy = atms.get_total_energy() * Rydberg # eV => Ry
             forces_ = atms.get_forces() * Rydberg # eV / A => Ry / A
             if compute_stress:
-                stress[count : count + 9] = atms.get_stress(False).reshape(9) * Rydberg / Bohr**3 # ev/A^3 => Ry/bohr
+                stress[9*i0 : 9*i0 + 9] = atms.get_stress(False).reshape(9) * Rydberg / Bohr**3 # ev/A^3 => Ry/bohr
             
             # Copy into the ensemble array
-            energies[count] = energy
-            forces[count : count + nat3] = forces_.reshape( nat3 )
+            energies[i0] = energy
+            forces[nat3*i0 : nat3*i0 + nat3] = forces_.reshape( nat3 )
             
             # Print the status
             if rank == 0:
                 print "conf %d / %d" % (i0, N_rand / size)
+
             
         
         # Collect all togheter
@@ -1430,7 +1431,7 @@ class Ensemble:
         else:
             self.energies = energies
             total_forces = forces
-            if compute_stresses:
+            if compute_stress:
                 total_stress = stress
         
         # Reshape the arrays
