@@ -405,6 +405,9 @@ class Ensemble:
         self.forces = np.load("%s/forces_pop%d.npy" % (data_dir, population_id))
         self.xats = np.load("%s/xats_pop%d.npy" % (data_dir, population_id))
         
+        # Load the number of configurations
+        self.N = len(self.energies)
+        
         stress_path = "%s/stresses_pop%d.npy" % (data_dir, population_id)
         if os.path.exists(stress_path):
             self.stresses = np.load(stress_path)
