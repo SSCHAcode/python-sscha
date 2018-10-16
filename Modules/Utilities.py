@@ -106,7 +106,7 @@ class IOInfo:
         """
         
         # Generate the supercell in real space
-        dyn_sc = minim.dyn.GetRealSpaceFC( minim.ens.supercell )
+        dyn_sc = minim.dyn.GetRealSpaceFC( minim.ensemble.supercell )
 
         # Dyagonalize
         w, pols = dyn_sc.DyagDinQ(0)
