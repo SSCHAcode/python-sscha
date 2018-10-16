@@ -6,7 +6,8 @@ The function are classified as:
 CGF : custom_gradient_function
 
 """
-
+import cellconstructor as CC
+import cellconstructor.Phonons
 import numpy as np
 
 class ModeProjection:
@@ -56,3 +57,59 @@ class ModeProjection:
 
 
 
+class IOInfo:
+    def __init__(self):
+        """
+        This class is meant to deal with standard verbose I/O operation,
+        like printing the frequencies as a function of the time step of a dynamical matrix (and so on)
+
+        """
+
+        self.total_freqs = []
+        self.__save_fname = None
+        self.__save_each_step = False
+
+    def Reset(self):
+        """
+        Reset the data to empty.
+        """
+
+        self.__init__()
+
+    def SetupSaving(self, fname, save_each_step = True):
+        """
+        Setup the system to save the data each time the function is called.
+
+        Parameters
+        ----------
+            fname : string 
+                path to the file to save the frequencies vs time
+            save_each_step : bool
+                If true the file is saved (and updated) each time step.
+
+        """
+
+        self.__save_fname = fname
+        self.__save_each_step = save_each_step
+
+    def Save(self):
+        """
+        Save the data on a file
+        """
+        np.savetxt(self.__save_fname, self.total_freqs, header = "Time vs Frequencies")
+
+
+    def CFP_SaveFrequencies(self, minim):
+        """
+        This custom method stores the total frequencies updating an exeternal file
+        """
+        
+        # Generate the supercell in real space
+        dyn_sc = minim.dyn.GetRealSpaceFC( minim.ens.supercell )
+
+        # Dyagonalize
+        w, pols = dyn_sc.DyagDinQ(0)
+        self.total_freqs.append(w)
+
+        if self.__save_each_step:
+            self.Save()
