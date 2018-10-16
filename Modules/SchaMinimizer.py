@@ -149,11 +149,18 @@ class SSCHA_Minimizer:
         self.__KL__ = []
         
         
-    def minimization_step(self):
+    def minimization_step(self, custom_function_gradient = None):
         """
         Perform the single minimization step.
         This modify the self.dyn matrix and updates the ensemble
     
+        Parameters
+        ----------
+            custom_function_gradient : pointer to function ( ndarray(nq x 3nat x 3nat), ndarray(nat, 3))
+                A function that can be used both to print particular component of the gradient
+                or to impose some constraints on the minimization (like lock the position of some atoms).
+                It takes as input the two gradient (the dynamical matrix one and the structure one), and
+                modifies them (or does some I/O on it).
         """
         
         # Setup the symmetries
@@ -241,7 +248,10 @@ class SSCHA_Minimizer:
             qe_sym.SetupQPoint()
             qe_sym.SymmetrizeVector(struct_grad)
             qe_sym.SymmetrizeVector(struct_grad_err)
-                
+
+            # Perform the gradient restriction
+            if custom_function_gradient is not None:
+                custom_function_gradient(dyn_grad, struct_grad)    
             
             # Append the gradient modulus to the minimization info
             self.__gw__.append(np.sqrt( np.sum(struct_grad**2)))
@@ -255,6 +265,11 @@ class SSCHA_Minimizer:
             # Append the gradient modulus to the minimization info
             self.__gw__.append(0)
             self.__gw_err__.append(0)
+
+            # Prepare the gradient imposing the constraints
+            if custom_function_gradient is not None:
+                custom_function_gradient(dyn_grad, np.zeros(self.dyn.structure.N_atoms, 3))    
+
             
             
         # Perform the step for the dynamical matrix respecting the root representation
@@ -575,7 +590,8 @@ class SSCHA_Minimizer:
             self.min_step_struc *= GetBestWykoffStep(self.dyn)
 
     
-    def run(self, verbose = 1, custom_function_pre = None, custom_function_post = None):
+    def run(self, verbose = 1, custom_function_pre = None, custom_function_post = None,
+            custom_function_gradient = None):
         """
         RUN THE SSCHA MINIMIZATION
         ==========================
@@ -606,6 +622,10 @@ class SSCHA_Minimizer:
                 The same as the previous argument, but this function is invoked after 
                 the minimization step has been perfomed. The data about free energy,
                 gradient and effective sample size have been updated.
+            custom_function_gradient : pointer to function (ndarray(NQ, 3*nat, 3*nat), ndarray(nat, 3))
+                A pointer to a function that takes as an input the two gradients, and modifies them.
+                It is called after the two gradients have been computed, and it is used to 
+                impose some constraint on the minimization.
         """
         
         # Eliminate the convergence flag
@@ -631,7 +651,7 @@ class SSCHA_Minimizer:
             
             # Perform the minimization step
             t1 = time.time()
-            self.minimization_step()
+            self.minimization_step(custom_function_gradient)
             t2 = time.time()
             if verbose >=1:
                 print "Time elapsed to perform the minimization step:", t2 - t1, "s"
