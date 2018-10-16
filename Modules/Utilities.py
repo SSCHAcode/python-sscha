@@ -49,7 +49,8 @@ class ModeProjection:
             for mu in range(self.nmodes):
                 for nu in range(self.nmodes):
                     mat = np.outer(self.pols[:, mu, iq], np.conj(self.pols[:, nu, iq]))
-                    dyn_grad[iq, :, :] = mat.dot( dyn_grad[iq, :, :].dot(np.matrix.getH(mat)))
+                    mat_star = np.conj(np.transpose(mat))
+                    dyn_grad[iq, :, :] = mat.dot( dyn_grad[iq, :, :].dot(mat_star))
 
 
 
