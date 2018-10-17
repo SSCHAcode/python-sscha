@@ -185,7 +185,7 @@ class SSCHA_Minimizer:
 #        qe_sym.SymmetrizeDynQ(dyn_grad, np.array([0,0,0]))
 #        qe_sym.ImposeSumRule(err)
 #        qe_sym.SymmetrizeDynQ(err, np.array([0,0,0]))
-        qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "crystal")
+        qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
         qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "crystal")
         t2 = time.time()
         print "Time elapsed to compute the dynamical matrix gradient:", t2 - t1, "s"
@@ -221,10 +221,6 @@ class SSCHA_Minimizer:
         
         
         
-        # Store the gradient in the minimization
-        self.__gc__.append(np.real(np.einsum("abc,acb", dyn_grad, dyn_grad)))
-        self.__gc_err__.append(np.real(np.einsum("abc, acb", err, err)))
-        
         # If the structure must be minimized perform the step
         if self.minim_struct:
             t1 = time.time()
@@ -252,6 +248,10 @@ class SSCHA_Minimizer:
             # Perform the gradient restriction
             if custom_function_gradient is not None:
                 custom_function_gradient(dyn_grad, struct_grad)    
+                
+                #print "applying sum rule and symmetries:"
+                #qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
+                #print "SECOND DIAG:", np.linalg.eigvalsh(dyn_grad[0, :, :])
             
             # Append the gradient modulus to the minimization info
             self.__gw__.append(np.sqrt( np.sum(struct_grad**2)))
@@ -262,15 +262,20 @@ class SSCHA_Minimizer:
             #print "min step:", self.min_step_struc
             self.dyn.structure.coords -= self.min_step_struc * struct_grad
         else:
+
+            # Prepare the gradient imposing the constraints
+            if custom_function_gradient is not None:
+                custom_function_gradient(dyn_grad, np.zeros(self.dyn.structure.N_atoms, 3)) 
+            
             # Append the gradient modulus to the minimization info
             self.__gw__.append(0)
             self.__gw_err__.append(0)
 
-            # Prepare the gradient imposing the constraints
-            if custom_function_gradient is not None:
-                custom_function_gradient(dyn_grad, np.zeros(self.dyn.structure.N_atoms, 3))    
 
-            
+        
+        # Store the gradient in the minimization
+        self.__gc__.append(np.real(np.einsum("abc,acb", dyn_grad, dyn_grad)))
+        self.__gc_err__.append(np.real(np.einsum("abc, acb", err, err)))
             
         # Perform the step for the dynamical matrix respecting the root representation
         new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
@@ -280,6 +285,7 @@ class SSCHA_Minimizer:
         # Update the dynamical matrix
         for iq in range(len(self.dyn.q_tot)):
             self.dyn.dynmats[iq] = new_dyn[iq, : ,: ]
+        
         
 
         # Update the ensemble
@@ -802,16 +808,37 @@ class SSCHA_Minimizer:
         """
 
         # Get the frequencies
-        w, pols = self.dyn.DyagDinQ(0)
+        superdyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
+        w, pols = superdyn.DyagDinQ(0)
 
         # Get translations
         trans_mask = ~CC.Methods.get_translations(pols, self.dyn.structure.get_masses_array())
 
         # Remove translations
         w = w[trans_mask]
+        pols = pols[:, trans_mask]
 
         # Frequencies are ordered, check if the first one is negative.
         if w[0] < 0:
+            print "Total frequencies (excluding translations):"
+            superdyn0 = self.ensemble.dyn_0.GenerateSupercellDyn(self.ensemble.supercell)
+            wold, pold = superdyn0.DyagDinQ(0)
+            
+            trans_mask = ~CC.Methods.get_translations(pold, self.dyn.structure.get_masses_array())
+            wold = wold[trans_mask] * __RyToCm__
+            pold = pold[:, trans_mask]
+            total_mask = range(len(w))
+            ws = np.zeros(len(w))
+            for i in range(len(w)):
+                # Look for the fequency association
+                scalar = np.abs(np.einsum("a, ab", np.conj(pols[:, i]), pold[:, total_mask]))
+                index = total_mask[np.argmax(scalar)]
+                ws[index] = w[i] * __RyToCm__
+                total_mask.pop(np.argmax(scalar))
+                
+                
+            print "\n".join(["%d) %.4f  | %.4f cm-1" % (i, x, wold[i]) for i, x in enumerate(ws)])
+            print ""
             return True
         return False
             
