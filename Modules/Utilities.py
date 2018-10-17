@@ -74,8 +74,11 @@ class ModeProjection:
                 self.projector[iq, :, :] += np.outer(pvec / _msq_, np.conj(pvec) * _msq_ )
                 self.projectorH[iq, :, :] += np.outer(pvec*_msq_, np.conj(pvec) / _msq_)
                 
-        # Prepare the projector
-        self.proj_vec[:,:] = np.real(self.projector[0, :, :])
+        # Prepare the projector on the structure
+        for mu in range(self.nmodes):
+            pvec = np.real(self.pols[:, mu, 0])
+            pvec /= pvec.dot(pvec)
+            self.proj_vec[:,:] += np.outer(pvec, pvec)
                 
 
         # Impose the sum rule 
