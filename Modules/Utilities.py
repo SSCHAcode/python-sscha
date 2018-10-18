@@ -105,7 +105,31 @@ class ModeProjection:
             # Lets check if the matrix satisfy the sum rule
             #print "DIAG:", np.linalg.eigvalsh(dyn_grad[iq, :, :])
             
+    def CFG_ProjectStructure(self, dyn_grad, struct_grad):
+        """
+        PROJECT ONLY THE STRUCTURE GRADIENT IN THE SELECTED MODES
+        =========================================================
+        
+        This subroutine constraints only the structure gradient, leaving the
+        dynamical matrix to minimize on all the possible degrees of freedom.
+        """
+        
+        # Project the structure in the polarization vectors
+        struct_grad_new = self.proj_vec.dot(struct_grad.ravel())
+        struct_grad = struct_grad_new.reshape((self.nat, 3))
             
+    def CFG_ProjectDyn(self, dyn_grad, struct_grad):
+        """
+        PROJECT ONLY THE FC GRADIENT IN THE SELECTED MODES
+        ==================================================
+        
+        This subroutine constrains only the dynamical matrix, leaving the structure
+        to minimize on all the possible degrees of freedom.
+        """
+        
+        for iq in range(self.nq):
+            dyn_grad[iq, :, :] = self.projectorH[iq, :, :].dot(dyn_grad[iq, :, :].dot(self.projector[iq, :, :]))
+
 
 
 
