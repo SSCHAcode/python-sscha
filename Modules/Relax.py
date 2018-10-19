@@ -7,6 +7,7 @@ constant pressure relax.
 """
 import numpy as np
 import sscha, sscha.Ensemble, sscha.SchaMinimizer
+import sscha.Optimizer
 
 class SSCHA:
     def __init__(self, minimizer, ase_calculator, N_configs, max_pop = 20):
@@ -120,7 +121,7 @@ class SSCHA:
         return self.minim.is_converged()
     
     
-    def vc_relax(self, target_press = 0, 
+    def vc_relax(self, target_press = 0, static_bulk_modulus = 1000,
                  restart_from_ens = False,
                  ensemble_loc = ".", start_pop = 1):
         """
@@ -142,6 +143,16 @@ class SSCHA:
         
         Parameters
         ----------
+            target_press : float, optional
+                The target pressure of the minimization (in GPa). The minimization is stopped if the 
+                target pressure is the stress tensor is the identity matrix multiplied by the
+                target pressure, with a tollerance equal to the stochastic noise. By default 
+                it is 0 (ambient pressure)
+            static_bulk_modulus : float, optional
+                The static bulk modulus, expressed in GPa. It is used to initialize the
+                hessian matrix on the BFGS cell relaxation, to guess the volume deformation caused
+                by the anharmonic stress tensor in the first steps. By default is 1000 GPa (higher value
+                are safer, since they means a lower change in the cell shape).
             restart_from_ens : bool, optional
                 If True the ensemble is used to start the first population, without recomputing
                 energies and forces. If False (default) the first ensemble is overwritten with
@@ -163,9 +174,17 @@ class SSCHA:
                 True if the minimization converged, False if the maximum number of 
                 populations has been reached.
         """
+        # Rescale the target pressure in eV / A^3
+        target_press_evA3 = target_press / sscha.SchaMinimizer.__evA3_to_GPa__
         
-        
-        
+        # initilaize the cell minimizer
+        BFGS = sscha.Optimizer.BFGS_UC()
+
+        # Initialize the bulk modulus
+        # The gradient (stress) is in eV/A^3, we have the cell in Angstrom so the Hessian must be
+        # in eV / A^6
+        BFGS.hessian *= static_bulk_modulus / (sscha.SchaMinimizer.__evA3_to_GPa__  * np.linalg.det(self.minim.dyn.structure.unit_cell))
+
         pop = start_pop
                 
         running = True
@@ -177,7 +196,7 @@ class SSCHA:
             self.minim.ensemble.get_energy_forces(self.calc, True)
             
             if ensemble_loc is not None:
-                ens.save_bin(ensemble_loc, pop)
+                self.minim.ensemble.save_bin(ensemble_loc, pop)
             
             self.minim.population = pop
             self.minim.init()
@@ -190,8 +209,10 @@ class SSCHA:
             self.minim.finalize()
             
             # Get the stress tensor [ev/A^3]
-            stress_tensor = self.minim.get_stress_tensor() * sscha.SchaMinimizer.__RyBohr3_to_evA3__
-            
+            stress_tensor, stress_err = self.minim.get_stress_tensor() 
+            stress_tensor *= sscha.SchaMinimizer.__RyBohr3_to_evA3__
+            stress_err *=  sscha.SchaMinimizer.__RyBohr3_to_evA3__
+
             # Get the pressure
             Press = np.trace(stress_tensor) / 3
             
@@ -199,7 +220,7 @@ class SSCHA:
             Vol = np.linalg.det(self.minim.dyn.structure.unit_cell)
             
             # Get the Gibbs free energy
-            gibbs = self.minim.get_free_energy() * sscha.SchaMinimizer.__RyToev__ - Press * Vol - self.minim.eq_energy
+            gibbs = self.minim.get_free_energy() * sscha.SchaMinimizer.__RyToev__ + Press * Vol - self.minim.eq_energy
             
             
             # Print the enthalpic contribution
@@ -207,21 +228,39 @@ class SSCHA:
             print " ENTHALPIC CONTRIBUTION "
             print " ====================== "
             print ""
+            print "  P = %.4f GPa    V = %.4f A^3" % (Press * sscha.SchaMinimizer.__evA3_to_GPa__, Vol)
+            print ""
             print "  P V = %.8e eV " % (Press * Vol)
             print ""
             print " Gibbs Free energy = %.8e eV " % gibbs
             print " (Zero energy = %.8e eV) " % self.minim.eq_energy
+            print ""
         
-        
+            # Perform the cell step
+            cell_gradient = - (stress_tensor - np.eye(3, dtype = np.float64) *target_press_evA3)
+            BFGS.UpdateCell(self.minim.dyn.unit_cell,  cell_gradient)
+
+            print " New unit cell:"
+            print " v1 [A] = (%16.8f %16.8f %16.8f)" % (self.minim.dyn.unit_cell[0,0], self.minim.dyn.unit_cell[0,1], self.minim.dyn.unit_cell[0,2])
+            print " v2 [A] = (%16.8f %16.8f %16.8f)" % (self.minim.dyn.unit_cell[1,0], self.minim.dyn.unit_cell[1,1], self.minim.dyn.unit_cell[1,2])
+            print " v3 [A] = (%16.8f %16.8f %16.8f)" % (self.minim.dyn.unit_cell[2,0], self.minim.dyn.unit_cell[2,1], self.minim.dyn.unit_cell[2,2])
+
             # Save the dynamical matrix
             self.minim.dyn.save_qe("dyn_pop%d_" % pop)
-        
-            # Check if it is converged
+
+            # Check if the constant volume calculation is converged
             running1 = not self.minim.is_converged()
+
+            # Check if the cell variation is converged
+            running2 = True
+            if max(cell_gradient / stress_err) <= 1:
+                running2 = False
+
+            running = running1 or running2
+
             pop += 1
-            
             
             if pop > self.max_pop:
                 running = False
                 
-        return self.minim.is_converged()
+        return (not running1) and (not running2)

@@ -12,7 +12,7 @@ class BFGS_UC:
         self.hessian = np.eye(6, dtype = np.float64)
         self.last_grad = np.zeros(6, dtype = np.float64)
         self.last_direction = np.zeros(6, dtype = np.float64)
-        self.alpha = 0.1
+        self.alpha = 1
         self.n_step = 0
     
     def get_direction(self, grad):

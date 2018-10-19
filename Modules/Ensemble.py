@@ -1031,13 +1031,14 @@ class Ensemble:
         return cov_mat
     
     
-    def get_stress_tensor(self, offset_stress = None):
+    def get_stress_tensor(self, offset_stress = None, add_centroid_contrib = True):
         """
         GET STRESS TENSOR
         =================
         
         The following subroutine computes the anharmonic stress tensor
-        calling the fortran code get_stress_tensor
+        calling the fortran code get_stress_tensor.
+        Note that the stress tensor is symmetrized to satisfy the cell constraint.
         
         NOTE: unit of measure is Ry/bohr^3 to match the quantum espresso one
         
@@ -1046,6 +1047,9 @@ class Ensemble:
             offset_stress : 3x3 matrix, optional
                 An offset stress to be subtracted to the real stress tensor.
                 Usefull if you want to compute just the anharmonic contribution.
+            add_centroid_contrib : bool, optional
+                If true the contribution of the centroid is added. This is always zero when
+                the system is relaxed.
         
         Results
         -------
@@ -1090,12 +1094,32 @@ class Ensemble:
         
         stress, err_stress = SCHAModules.get_stress_tensor(volume, self.forces / __A_TO_BOHR__, u_disps * __A_TO_BOHR__, 
                                                            abinit_stress, wr, er, self.current_T, self.rho, "err_yesrho", 
-                                                           self.N, nat, len(wr))
+                                                           self.N, nat, len(wr))    
         
+        # Correct the stress adding the centroid contribution
+        if add_centroid_contrib:
+            f, err_f = self.get_average_forces(True)
+            stress_centroid = 0.5 * np.einsum( "ai,aj", self.current_dyn.structure.coords * __A_TO_BOHR__, f)
+            stress_centroid += np.transpose(stress_centroid)
+            err_stress_centroid = np.einsum( "ai,aj", self.current_dyn.structure.coords**2 , err_f**2)
+            err_stress_centroid = np.sqrt(err_stress_centroid) * __A_TO_BOHR__
+            err_stress_centroid = np.sqrt( err_stress_centroid**2 + np.transpose(err_stress_centroid**2))
+            divideby = np.ones( (3,3)) * 2
+            divideby[eye(3) == 1] = np.sqrt(2)
+            err_stress_centroid /= divideby
+
+            stress += err_stress_centroid
+            err_stress = np.sqrt(err_stress**2 + err_stress_centroid**2)
+
+
         
         # Check the offset
         if not offset_stress is None:
             stress -= offset_stress
+
+        # Symmetrize the stress tensor
+        qe_sym = CC.symmetries.QE_Symmetry(self.current_dyn.structure)
+        qe_sym.ApplySymmetryToMatrix(stress, err_stress)
         
         return stress, err_stress
     
