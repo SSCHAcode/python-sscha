@@ -812,7 +812,7 @@ class SSCHA_Minimizer:
         w, pols = superdyn.DyagDinQ(0)
 
         # Get translations
-        trans_mask = ~CC.Methods.get_translations(pols, self.dyn.structure.get_masses_array())
+        trans_mask = ~CC.Methods.get_translations(pols, superdyn.structure.get_masses_array())
 
         # Remove translations
         w = w[trans_mask]
