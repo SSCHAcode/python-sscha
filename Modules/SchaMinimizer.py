@@ -37,10 +37,12 @@ import Ensemble
 # Rydberg to cm-1 and meV conversion factor
 __RyToCm__  = 109691.40235
 __RyTomev__ = 13605.698066
+__RyToev__ = 13.605698066
 __RyBohr3_to_GPa__ = 14710.513242194795
 __K_to_Ry__ = 6.336857346553283e-06
 __EPSILON__ = 1e-4
-
+__evA3_to_GPa__ = 160.21766208
+__RyBohr3_to_evA3__ = __RyBohr3_to_GPa__ / __evA3_to_GPa__
 
 class SSCHA_Minimizer:
     
