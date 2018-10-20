@@ -1031,7 +1031,7 @@ class Ensemble:
         return cov_mat
     
     
-    def get_stress_tensor(self, offset_stress = None, add_centroid_contrib = True):
+    def get_stress_tensor(self, offset_stress = None, add_centroid_contrib = False):
         """
         GET STRESS TENSOR
         =================
@@ -1099,16 +1099,16 @@ class Ensemble:
         # Correct the stress adding the centroid contribution
         if add_centroid_contrib:
             f, err_f = self.get_average_forces(True)
-            stress_centroid = 0.5 * np.einsum( "ai,aj", self.current_dyn.structure.coords * __A_TO_BOHR__, f)
+            stress_centroid = 0.5 * np.einsum( "ai,aj", self.current_dyn.structure.coords * __A_TO_BOHR__, f) / volume
             stress_centroid += np.transpose(stress_centroid)
             err_stress_centroid = np.einsum( "ai,aj", self.current_dyn.structure.coords**2 , err_f**2)
-            err_stress_centroid = np.sqrt(err_stress_centroid) * __A_TO_BOHR__
+            err_stress_centroid = np.sqrt(err_stress_centroid) * __A_TO_BOHR__ / volume
             err_stress_centroid = np.sqrt( err_stress_centroid**2 + np.transpose(err_stress_centroid**2))
             divideby = np.ones( (3,3)) * 2
-            divideby[eye(3) == 1] = np.sqrt(2)
+            divideby[np.eye(3) == 1] = np.sqrt(2)
             err_stress_centroid /= divideby
 
-            stress += err_stress_centroid
+            stress += stress_centroid 
             err_stress = np.sqrt(err_stress**2 + err_stress_centroid**2)
 
 
