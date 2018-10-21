@@ -636,21 +636,16 @@ class Ensemble:
         
         value = 0
         value2 = 0
-        
-        norm = np.sum(self.rho)
-        
+
+        e_energy = np.zeros( self.N, dtype = np.float64)
+        e_energy[:] = self.energies[:]
         if subtract_sscha:
-            value = np.sum( self.rho * (self.energies - self.sscha_energies)) / norm
-            if return_error:
-                value2 = np.sum( self.rho * (self.energies - self.sscha_energies)**2) / norm
-        else:
-            value = np.sum( self.rho * (self.energies)) / norm
-            if return_error:
-                value2 = np.sum( self.rho * (self.energies)**2) / norm
+            e_energy -= self.sscha_energies[:]
+
+        # Compute the error using the Fortran Module
+        value, error = SCHAModules.stochastic.average_error_weight(e_energy, self.rho, "err_yesrho")
         
-        # Get the error using the equation sqrt(<x^2> - <x>^2)/sqrt(N-1)
         if return_error:
-            error = np.sqrt((value2 - value**2)/ (norm))
             return value, error
         return value
      

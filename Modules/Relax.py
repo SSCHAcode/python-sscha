@@ -10,7 +10,7 @@ import sscha, sscha.Ensemble, sscha.SchaMinimizer
 import sscha.Optimizer
 
 class SSCHA:
-    def __init__(self, minimizer, ase_calculator, N_configs, max_pop = 20):
+    def __init__(self, minimizer, ase_calculator, N_configs, max_pop = 20, save_ensemble = True):
         """
         This module initialize the relaxer. It may perform
         constant volume or pressure relaxation using fully anharmonic potentials.
@@ -27,6 +27,8 @@ class SSCHA:
                 The number of configuration to be used for each population
             max_pop: int, optional
                 The maximum number of iteration (The code will stop)
+            save_ensemble : bool, optional
+                If True (default) the ensemble is saved after each energy and forces calculation.
         """
         
         self.minim = minimizer
@@ -34,6 +36,10 @@ class SSCHA:
         self.N_configs = N_configs
         self.max_pop = max_pop
         
+        # If the ensemble must be saved at each iteration.
+        # 
+        self.save_ensemble = save_ensemble
+
         self.__cfpre__ = None
         self.__cfpost__ = None
         self.__cfg__ = None
@@ -89,12 +95,13 @@ class SSCHA:
         running = True
         while running:
             # Generate the ensemble
+            self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
             self.minim.ensemble.generate(self.N_configs)
             
             # Compute energies and forces
             self.minim.ensemble.get_energy_forces(self.calc, get_stress)
             
-            if ensemble_loc is not None:
+            if ensemble_loc is not None and self.save_ensemble:
                 self.minim.ensemble.save_bin(ensemble_loc, pop)
             
             self.minim.population = pop
@@ -108,9 +115,10 @@ class SSCHA:
         
             
             self.minim.finalize()
-        
+
             # Save the dynamical matrix
-            self.minim.dyn.save_qe("dyn_pop%d_" % pop)
+            if self.save_ensemble:
+                self.minim.dyn.save_qe("dyn_pop%d_" % pop)
         
             # Check if it is converged
             running = not self.minim.is_converged()
@@ -197,12 +205,13 @@ class SSCHA:
         running = True
         while running:
             # Generate the ensemble
+            self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
             self.minim.ensemble.generate(self.N_configs)
             
             # Compute energies and forces
             self.minim.ensemble.get_energy_forces(self.calc, True, stress_numerical = stress_numerical)
             
-            if ensemble_loc is not None:
+            if ensemble_loc is not None and save_ensemble:
                 self.minim.ensemble.save_bin(ensemble_loc, pop)
             
             self.minim.population = pop
