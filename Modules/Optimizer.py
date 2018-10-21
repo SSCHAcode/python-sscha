@@ -10,8 +10,8 @@ class UC_OPTIMIZER:
     """
     def __init__(self):
         
-        self.last_grad = np.zeros(6, dtype = np.float64)
-        self.last_direction = np.zeros(6, dtype = np.float64)
+        self.last_grad = np.zeros(9, dtype = np.float64)
+        self.last_direction = np.zeros(9, dtype = np.float64)
         self.alpha = 1
         self.n_step = 0
 
@@ -21,23 +21,23 @@ class UC_OPTIMIZER:
         From a 3x3 unit cell (or stress) matrix
         obtain the 6 degrees of freedom.
         """
-        line = np.zeros(6, dtype= np.float64)
-        line[:3] = matrix[0, :]
-        line[3:5] = matrix[1, 1:]
-        line[5] = matrix[2,2]
-        return line
+        # line = np.zeros(6, dtype= np.float64)
+        # line[:3] = matrix[0, :]
+        # line[3:5] = matrix[1, 1:]
+        # line[5] = matrix[2,2]
+        return matrix.ravel(order = "C")
     
     def line_to_mat(self, line):
         """
         from a line 6 element array to a 3x3 matrix
         """
-        matrix = np.zeros( (3,3), dtype = np.float64)
-        matrix[0,:] = line[:3]
-        matrix[:,0] = line[:3]
-        matrix[1, 1:] = line[3:5]
-        matrix[1:, 1] = line[3:5]
-        matrix[2,2] = line[5]
-        return matrix
+        # matrix = np.zeros( (3,3), dtype = np.float64)
+        # matrix[0,:] = line[:3]
+        # matrix[:,0] = line[:3]
+        # matrix[1, 1:] = line[3:5]
+        # matrix[1:, 1] = line[3:5]
+        # matrix[2,2] = line[5]
+        return line.reshape((3,3), order = "C")
 
     def get_line_step(self, grad):
         """
@@ -107,7 +107,7 @@ class BFGS_UC(UC_OPTIMIZER):
         UC_OPTIMIZER.__init__(self)
 
         # BFGS estimates also the hessian
-        self.hessian = np.eye(6, dtype = np.float64)
+        self.hessian = np.eye((9,9), dtype = np.float64)
     
     def get_direction(self, grad):
         """
@@ -118,6 +118,12 @@ class BFGS_UC(UC_OPTIMIZER):
         p_vec /= np.sqrt(p_vec.dot(p_vec))
         return p_vec
     
+    def setup_hessian_from_bulk_modulus(self, unit_cell, static_bm):
+        """
+        Setup the hessian matrix from a consant uniform bulk modulus
+        """
+        # TODO: To be implemented
+        pass
             
     def get_hessian(self, grad):
         

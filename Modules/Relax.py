@@ -95,10 +95,12 @@ class SSCHA:
             self.minim.ensemble.get_energy_forces(self.calc, get_stress)
             
             if ensemble_loc is not None:
-                ens.save_bin(ensemble_loc, pop)
+                self.minim.ensemble.save_bin(ensemble_loc, pop)
             
             self.minim.population = pop
             self.minim.init()
+
+            self.minim.print_info()
         
             self.minim.run(custom_function_pre = self.__cfpre__,
                            custom_function_post = self.__cfpost__,
@@ -123,7 +125,7 @@ class SSCHA:
     
     def vc_relax(self, target_press = 0, static_bulk_modulus = 1000,
                  restart_from_ens = False,
-                 ensemble_loc = ".", start_pop = 1):
+                 ensemble_loc = ".", start_pop = 1, stress_numerical = False):
         """
         VARIABLE CELL RELAX
         ====================
@@ -167,6 +169,9 @@ class SSCHA:
             start_pop : int, optional
                 The starting index for the population, used only for saving the ensemble and the dynamical 
                 matrix.
+            stress_numerical : bool
+                If True the stress is computed by finite difference (usefull for calculators that 
+                does not support it by default)
             
         Returns
         -------
@@ -177,13 +182,15 @@ class SSCHA:
         # Rescale the target pressure in eV / A^3
         target_press_evA3 = target_press / sscha.SchaMinimizer.__evA3_to_GPa__
         
+        # Rescale the static bulk modulus in eV / A^3
+        static_bulk_modulus /= sscha.SchaMinimizer.__evA3_to_GPa__ 
+
         # initilaize the cell minimizer
         BFGS = sscha.Optimizer.BFGS_UC()
 
         # Initialize the bulk modulus
         # The gradient (stress) is in eV/A^3, we have the cell in Angstrom so the Hessian must be
         # in eV / A^6
-        BFGS.hessian *= static_bulk_modulus / (sscha.SchaMinimizer.__evA3_to_GPa__  * np.linalg.det(self.minim.dyn.structure.unit_cell))
 
         pop = start_pop
                 
@@ -193,7 +200,7 @@ class SSCHA:
             self.minim.ensemble.generate(self.N_configs)
             
             # Compute energies and forces
-            self.minim.ensemble.get_energy_forces(self.calc, True)
+            self.minim.ensemble.get_energy_forces(self.calc, True, stress_numerical = stress_numerical)
             
             if ensemble_loc is not None:
                 self.minim.ensemble.save_bin(ensemble_loc, pop)

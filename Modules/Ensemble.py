@@ -1339,7 +1339,7 @@ class Ensemble:
 
 
 
-    def get_energy_forces(self, ase_calculator, compute_stress = True):
+    def get_energy_forces(self, ase_calculator, compute_stress = True, stress_numerical = False):
         """
         GET ENERGY AND FORCES FOR THE CURRENT ENSEMBLE
         ==============================================
@@ -1357,6 +1357,9 @@ class Ensemble:
             compute_stress : bool
                 If true, the stress is requested from the ASE calculator. Be shure
                 that the calculator you provide supports stress calculation
+            stress_numerical : bool
+                If the calculator does not support stress, it can be computed numerically
+                by doing finite differences.
             
         """
         
@@ -1433,7 +1436,10 @@ class Ensemble:
             energy = atms.get_total_energy() / Rydberg # eV => Ry
             forces_ = atms.get_forces() / Rydberg # eV / A => Ry / A
             if compute_stress:
-                stress[9*i0 : 9*i0 + 9] = atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
+                if not stress_numerical:
+                    stress[9*i0 : 9*i0 + 9] = atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
+                else:
+                    stress[9*i0 : 9*i0 + 9] = ase_calculator.calculate_numerical_stress(atms, voigt = False).ravel()* Bohr**3 / Rydberg 
             
             # Copy into the ensemble array
             energies[i0] = energy
