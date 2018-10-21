@@ -54,14 +54,21 @@ class UC_OPTIMIZER:
             factor = y0 / (y0 - y1)
             
             # Regularization (avoid run away)
-            self.alpha *= 1 + np.tanh( (factor - 1) )
+            #self.alpha *= 1 + np.tanh( (factor - 1) )
+            self.alpha *= factor
 
     def perform_step(self, x_old, grad):
         """
         The step, hierarchical structure.
         Here a standard steepest descent
         """
-        return x_old - self.alpha * grad
+        #self.get_line_step(grad)
+        self.last_direction = grad
+        self.last_grad = grad
+
+        x_new = x_old - grad * self.alpha
+        self.n_step += 1
+        return x_new
 
             
     def UpdateCell(self, unit_cell, stress_tensor):
@@ -90,6 +97,9 @@ class UC_OPTIMIZER:
         
         x_old = self.mat_to_line(unit_cell)
         grad = self.mat_to_line(grad_mat)
+
+        print "GRAD MAT:"
+        print grad_mat
         
         x_new = self.perform_step(x_old, grad)
         
@@ -107,7 +117,7 @@ class BFGS_UC(UC_OPTIMIZER):
         UC_OPTIMIZER.__init__(self)
 
         # BFGS estimates also the hessian
-        self.hessian = np.eye((9,9), dtype = np.float64)
+        self.hessian = np.eye(9, dtype = np.float64)
     
     def get_direction(self, grad):
         """
@@ -115,7 +125,6 @@ class BFGS_UC(UC_OPTIMIZER):
         """
         
         p_vec =  - np.linalg.inv(self.hessian).dot(grad)
-        p_vec /= np.sqrt(p_vec.dot(p_vec))
         return p_vec
     
     def setup_hessian_from_bulk_modulus(self, unit_cell, static_bm):
