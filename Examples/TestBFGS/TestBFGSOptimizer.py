@@ -20,28 +20,19 @@ def stress(uc):
     """
     Omega = np.linalg.det(uc)
 
-    grad1 = 2 * (uc - I)
+    grad = 2 * (uc - I)
 
-    du_deps = np.zeros( (3,3,3,3))
+    return - (np.transpose(grad).dot(uc) + np.transpose(uc).dot(grad)) / (2 * Omega)
 
-    for i in range(3):
-        for j in range(3):
-            for x in range(3):
-                for y in range(3):
-                    du_deps[i,j,x,y] = 0.5 * (uc[i,y] * I[x,j] + uc[i,x] * I[y,j])
-    
-    dF_deps = np.einsum("ab, abcd", grad1, du_deps)
-
-    return - dF_deps / Omega
 
 
 # Initialize a random unit cell
 uc = np.random.uniform(size=(3,3))
 
-N_STEPS = 20
+N_STEPS = 100
 #opt = sscha.Optimizer.BFGS_UC()
 opt = sscha.Optimizer.UC_OPTIMIZER()
-opt.alpha = 0.1
+opt.alpha = 0.01
 for i in range(N_STEPS):
     print "---------- STEP %d ----------" % i
     print "UC:"
@@ -50,7 +41,14 @@ for i in range(N_STEPS):
     print "Stress:"
     print stress(uc)
     print "ALPHA:", opt.alpha
-    
+
+    print "TEST GRAD:"
+    print "Simple:"
+    print 2 * (uc -I)
+    print "Complex:"
+    g = 2 * (uc - I)
+    new_g = 0.5 * (g  + np.transpose(np.linalg.inv(uc)).dot(np.transpose(g).dot(uc)))
+    print new_g 
     # Step
     opt.UpdateCell(uc, stress(uc))
     

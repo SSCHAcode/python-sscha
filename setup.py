@@ -9,7 +9,8 @@ SCHAModules = Extension(name = "SCHAModules",
                                    "SCHAModules/get_stress_tensor.f90",
                                    "SCHAModules/get_gradient_supercell.f90",
                                    "SCHAModules/get_upsilon_matrix.f90",
-                                   "SCHAModules/multiply_lambda_tensor.f90"],
+                                   "SCHAModules/multiply_lambda_tensor.f90",
+                                   "SCHAModules/cell_force.f90"],
                         libraries = ["lapack", "blas"],
                         extra_f90_compile_args = ["-cpp"])
 
