@@ -2,6 +2,7 @@
 Here the optimizer for the cell and the gradient
 """
 import numpy as np
+import SCHAModules
 
 class UC_OPTIMIZER:
     """
@@ -94,6 +95,14 @@ class UC_OPTIMIZER:
         volume = np.linalg.det(unit_cell)
         uc_inv = np.linalg.inv(unit_cell)
         grad_mat = - volume * np.transpose(uc_inv).dot(stress_tensor)
+
+        # Other grad mat
+        new_grad = SCHAModules.cell_force(np.transpose(uc_inv), stress_tensor, volume, 0, 1)
+        new_grad = np.transpose(new_grad)
+
+        print "NEW GRADIENT FORTRAN:"
+        print new_grad
+        
         
         x_old = self.mat_to_line(unit_cell)
         grad = self.mat_to_line(grad_mat)

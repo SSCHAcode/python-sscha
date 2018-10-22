@@ -46,7 +46,14 @@ for i in range(N_STEPS):
     print "Stress:"
     print stress(uc)
     print "ALPHA:", opt.alpha
-    
+
+    print "TEST GRAD:"
+    print "Simple:"
+    print 2 * (uc -I)
+    print "Complex:"
+    g = 2 * (uc - I)
+    new_g = 0.5 * (g  + np.transpose(np.linalg.inv(uc)).dot(np.transpose(g).dot(uc)))
+    print new_g 
     # Step
     opt.UpdateCell(uc, stress(uc))
     
