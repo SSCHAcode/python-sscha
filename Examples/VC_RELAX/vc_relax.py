@@ -51,8 +51,9 @@ relax.save_ensemble = False
 # to check what the minimization is doing
 relax.setup_custom_functions(custom_function_post=freq_saving.CFP_SaveFrequencies)
 
+
 # Start the variable cell relaxation
-relax.vc_relax(static_bulk_modulus=50)
+relax.vc_relax(static_bulk_modulus="recalc")
 
 # Save the final result
 relax.minim.dyn.save_qe("final_dyn")

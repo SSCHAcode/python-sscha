@@ -4,6 +4,8 @@ Here the optimizer for the cell and the gradient
 import numpy as np
 import SCHAModules
 
+__EPSILON__ = 1e-8
+
 class UC_OPTIMIZER:
     """
     This class is used as father of all the 
@@ -181,3 +183,41 @@ class BFGS_UC(UC_OPTIMIZER):
         
         return x
             
+class SD_PREC_UC(UC_OPTIMIZER):
+    def __init__(self, unit_cell, bulk_modulus):
+        """
+        This is a quasi-Newton algorithm, where as a
+        preconditioner is used the static bulk modulus
+        """
+
+        # Initialize the standard methods in the UC optimizer
+        UC_OPTIMIZER.__init__(self, unit_cell)
+
+        # Get the hessian matrix
+        volume = np.abs(np.linalg.det(unit_cell))
+        hessian = bulk_modulus * volume
+    
+        if np.shape(bulk_modulus)[0] != 9 or np.shape(bulk_modulus)[1] != 9:
+            raise ValueError("Error, the bulk modulus must be a 9x9 matrix")
+
+        # Correct adding 1 if the diagonal element are 0 (avoids signular matrix errors)
+        for i in range(9):
+            if np.abs(hessian[i,i]) < __EPSILON__:
+                hessian[i,i] = 1
+
+        self.preconditioner = np.linalg.inv(hessian)
+        print "PRECOND:"
+        print self.preconditioner
+
+    
+    def perform_step(self, old_x, grad):
+        """
+        Perform the STEP
+        """
+        
+        x = old_x - self.alpha * self.preconditioner.dot(grad)
+        
+        self.n_step += 1
+        self.last_direction = - self.preconditioner.dot(grad)
+        self.last_grad = grad
+        return x

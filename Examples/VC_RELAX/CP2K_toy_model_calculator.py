@@ -173,7 +173,7 @@ class CP2K_water_calculator(FileIOCalculator):
             data = line.split()
             if len(data) != 4:
                 continue
-            if data[0] != "X" :
+            if data[0] not in ["X", "Y", "Z"] :
                 continue
 
             stress[i,0] = float(data[1])
