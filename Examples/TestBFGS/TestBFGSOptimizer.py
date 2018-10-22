@@ -20,28 +20,24 @@ def stress(uc):
     """
     Omega = np.linalg.det(uc)
 
-    grad1 = 2 * (uc - I)
+    gradient = -2 *np.transpose(uc).dot(uc - I) / Omega
 
-    du_deps = np.zeros( (3,3,3,3))
-
-    for i in range(3):
-        for j in range(3):
-            for x in range(3):
-                for y in range(3):
-                    du_deps[i,j,x,y] = 0.5 * (uc[i,y] * I[x,j] + uc[i,x] * I[y,j])
-    
-    dF_deps = np.einsum("ab, abcd", grad1, du_deps)
-
-    return - dF_deps / Omega
+    return gradient
 
 
 # Initialize a random unit cell
-uc = np.random.uniform(size=(3,3))
+#uc = np.random.uniform(size=(3,3))
+d = np.array([5,10,20], dtype = np.float64)
+uc = np.diag( d)
+#v1 = uc[0,:] + uc[1,:]
+#v2 = uc[0,:] - uc[1,:]
+#uc[0,:] = v1
+#uc[1,:] = v2
 
-N_STEPS = 20
-#opt = sscha.Optimizer.BFGS_UC()
-opt = sscha.Optimizer.UC_OPTIMIZER()
-opt.alpha = 0.1
+N_STEPS = 5
+opt = sscha.Optimizer.BFGS_UC()
+#opt = sscha.Optimizer.UC_OPTIMIZER()
+opt.alpha = 1
 for i in range(N_STEPS):
     print "---------- STEP %d ----------" % i
     print "UC:"
