@@ -8,6 +8,8 @@ constant pressure relax.
 import numpy as np
 import sscha, sscha.Ensemble, sscha.SchaMinimizer
 import sscha.Optimizer
+import cellconstructor as CC
+import cellconstructor.symmetries
 
 class SSCHA:
     def __init__(self, minimizer, ase_calculator, N_configs, max_pop = 20, save_ensemble = True):
@@ -131,7 +133,7 @@ class SSCHA:
         return self.minim.is_converged()
     
     
-    def vc_relax(self, target_press = 0, static_bulk_modulus = 1000,
+    def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
                  ensemble_loc = ".", start_pop = 1, stress_numerical = False):
         """
@@ -194,7 +196,9 @@ class SSCHA:
         static_bulk_modulus /= sscha.SchaMinimizer.__evA3_to_GPa__ 
 
         # initilaize the cell minimizer
-        BFGS = sscha.Optimizer.BFGS_UC()
+        #BFGS = sscha.Optimizer.BFGS_UC(self.minim.dyn.structure.unit_cell, static_bulk_modulus)
+        BFGS = sscha.Optimizer.UC_OPTIMIZER(self.minim.dyn.structure.unit_cell)
+        BFGS.alpha = 1 / (3 * static_bulk_modulus * np.linalg.det(self.minim.dyn.structure.unit_cell))
 
         # Initialize the bulk modulus
         # The gradient (stress) is in eV/A^3, we have the cell in Angstrom so the Hessian must be
@@ -211,7 +215,7 @@ class SSCHA:
             # Compute energies and forces
             self.minim.ensemble.get_energy_forces(self.calc, True, stress_numerical = stress_numerical)
             
-            if ensemble_loc is not None and save_ensemble:
+            if ensemble_loc is not None and self.save_ensemble:
                 self.minim.ensemble.save_bin(ensemble_loc, pop)
             
             self.minim.population = pop
@@ -253,13 +257,24 @@ class SSCHA:
             print ""
         
             # Perform the cell step
-            cell_gradient = - (stress_tensor - np.eye(3, dtype = np.float64) *target_press_evA3)
-            BFGS.UpdateCell(self.minim.dyn.unit_cell,  cell_gradient)
+            cell_gradient = (stress_tensor - np.eye(3, dtype = np.float64) *target_press_evA3)
+            
+            new_uc = self.minim.dyn.structure.unit_cell.copy()
+            BFGS.UpdateCell(new_uc,  cell_gradient)
+            
+            # Strain the structure preserving the symmetries
+            self.minim.dyn.structure.change_unit_cell(new_uc)
+            
 
             print " New unit cell:"
-            print " v1 [A] = (%16.8f %16.8f %16.8f)" % (self.minim.dyn.unit_cell[0,0], self.minim.dyn.unit_cell[0,1], self.minim.dyn.unit_cell[0,2])
-            print " v2 [A] = (%16.8f %16.8f %16.8f)" % (self.minim.dyn.unit_cell[1,0], self.minim.dyn.unit_cell[1,1], self.minim.dyn.unit_cell[1,2])
-            print " v3 [A] = (%16.8f %16.8f %16.8f)" % (self.minim.dyn.unit_cell[2,0], self.minim.dyn.unit_cell[2,1], self.minim.dyn.unit_cell[2,2])
+            print " v1 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[0,0], new_uc[0,1], new_uc[0,2])
+            print " v2 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[1,0], new_uc[1,1], new_uc[1,2])
+            print " v3 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[2,0], new_uc[2,1], new_uc[2,2])
+            
+            print ""
+            print "Check the symmetries in the new cell:"
+            qe_sym = CC.symmetries.QE_Symmetry(self.minim.dyn.structure)
+            qe_sym.SetupQPoint(verbose = True)
 
             # Save the dynamical matrix
             self.minim.dyn.save_qe("dyn_pop%d_" % pop)
@@ -269,7 +284,8 @@ class SSCHA:
 
             # Check if the cell variation is converged
             running2 = True
-            if max(cell_gradient / stress_err) <= 1:
+            not_zero_mask = stress_err != 0
+            if np.max(np.abs(cell_gradient[not_zero_mask]) / stress_err[not_zero_mask]) <= 1:
                 running2 = False
 
             running = running1 or running2

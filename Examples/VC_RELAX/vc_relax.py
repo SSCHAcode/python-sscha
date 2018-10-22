@@ -32,16 +32,16 @@ minim = sscha.SchaMinimizer.SSCHA_Minimizer(ensemble)
 # Setup a small step (we are using few configurations)
 minim.min_step_dyn = 0.05
 minim.min_step_struc = 0.05
+minim.meaningful_factor = 1
 
 # With few configurations it is possible to have imaginary frequencies
 # We deactivate the preconditioning and set up the nonlinear change of variable
 # This will smooth the minimization
-minim.precond_dyn = False
-minim.root_representation = "root4"
+minim.precond_dyn = True
 
 # We setup the SSCHA relaxation.
-N_CONFIGS = 400
-MAX_ITERATIONS = 40
+N_CONFIGS = 200
+MAX_ITERATIONS = 20
 relax = sscha.Relax.SSCHA(minim, calc, N_CONFIGS, MAX_ITERATIONS)
 
 # Avoid to save the ensemble at each new population
@@ -52,7 +52,7 @@ relax.save_ensemble = False
 relax.setup_custom_functions(custom_function_post=freq_saving.CFP_SaveFrequencies)
 
 # Start the variable cell relaxation
-relax.vc_relax()
+relax.vc_relax(static_bulk_modulus=50)
 
 # Save the final result
 relax.minim.dyn.save_qe("final_dyn")

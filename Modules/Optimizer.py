@@ -9,13 +9,17 @@ class UC_OPTIMIZER:
     This class is used as father of all the 
     other subclasses
     """
-    def __init__(self):
+    def __init__(self, starting_unit_cell):
+        """
+        To be initialized it needs to get the starting unit cell
+        """
         
         self.last_grad = np.zeros(9, dtype = np.float64)
         self.last_direction = np.zeros(9, dtype = np.float64)
         self.alpha = 1
         self.n_step = 0
-
+        self.uc_0 = starting_unit_cell.copy()
+        self.uc_0_inv = np.linalg.inv(self.uc_0)
         
     def mat_to_line(self, matrix):
         """
@@ -93,18 +97,25 @@ class UC_OPTIMIZER:
         # Convert the stress tensor into the Free energy gradient with respect
         # to the unit cell
         volume = np.linalg.det(unit_cell)
-        uc_inv = np.linalg.inv(unit_cell)
-        grad_mat = - volume * np.transpose(uc_inv).dot(stress_tensor)
-
-        # Other grad mat
-        new_grad = SCHAModules.cell_force(np.transpose(uc_inv), stress_tensor, volume, 0, 1)
-        new_grad = np.transpose(new_grad)
-
-        print "NEW GRADIENT FORTRAN:"
-        print new_grad
+        #uc_inv = np.linalg.inv(unit_cell)
+        I = np.eye(3, dtype = np.float64)
         
+        # Get the strain tensor up to know
+        strain = np.transpose(self.uc_0_inv.dot(unit_cell) - I)
         
-        x_old = self.mat_to_line(unit_cell)
+        print "ALPHA:", self.alpha
+        print "VOLUME:", volume
+        
+        print "CURRENT STRAIN:"
+        print strain
+        
+        # Get the gradient with respect to the strain
+        grad_mat =  - volume * stress_tensor.dot(np.linalg.inv(I + strain.transpose()))
+        
+        #grad_mat = - volume * np.transpose(uc_inv).dot(stress_tensor)
+
+        
+        x_old = self.mat_to_line(strain)
         grad = self.mat_to_line(grad_mat)
 
         print "GRAD MAT:"
@@ -112,21 +123,27 @@ class UC_OPTIMIZER:
         
         x_new = self.perform_step(x_old, grad)
         
-        unit_cell[:,:] = self.line_to_mat(x_new)
+        strain_new  = self.line_to_mat(x_new)
+        
+        print "NEW STRAIN:"
+        print strain_new
+         
+        unit_cell[:,:] = self.uc_0.dot( I + strain_new.transpose())
 
 
 class BFGS_UC(UC_OPTIMIZER):
-    def __init__(self):
+    def __init__(self, unit_cell, bulk_modulus = 1):
         """
         This is the BFGS algorithm adapted to
         optimize the unit cell.
         """
 
         # Initialize the standard methods in the UC optimizer
-        UC_OPTIMIZER.__init__(self)
+        UC_OPTIMIZER.__init__(self, unit_cell)
 
         # BFGS estimates also the hessian
-        self.hessian = np.eye(9, dtype = np.float64)
+        volume = np.linalg.det(unit_cell)
+        self.hessian = np.eye(9, dtype = np.float64) * (3 *volume * bulk_modulus)
     
     def get_direction(self, grad):
         """
@@ -136,12 +153,6 @@ class BFGS_UC(UC_OPTIMIZER):
         p_vec =  - np.linalg.inv(self.hessian).dot(grad)
         return p_vec
     
-    def setup_hessian_from_bulk_modulus(self, unit_cell, static_bm):
-        """
-        Setup the hessian matrix from a consant uniform bulk modulus
-        """
-        # TODO: To be implemented
-        pass
             
     def get_hessian(self, grad):
         
