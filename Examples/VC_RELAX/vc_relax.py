@@ -53,6 +53,7 @@ relax.setup_custom_functions(custom_function_post=freq_saving.CFP_SaveFrequencie
 
 
 # Start the variable cell relaxation
+# Use a trial static bulk modulus of 50 GPa to run the minimization
 relax.vc_relax(static_bulk_modulus=50)
 
 # Save the final result

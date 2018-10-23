@@ -137,7 +137,7 @@ class SSCHA:
         return self.minim.is_converged()
     
     
-    def vc_relax(self, target_press = 0, static_bulk_modulus = "recalc",
+    def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
                  ensemble_loc = ".", start_pop = 1, stress_numerical = False):
         """
@@ -164,10 +164,10 @@ class SSCHA:
                 target pressure is the stress tensor is the identity matrix multiplied by the
                 target pressure, with a tollerance equal to the stochastic noise. By default 
                 it is 0 (ambient pressure)
-            static_bulk_modulus : float, or (9x9) or string, optional
+            static_bulk_modulus : float (default 100), or (9x9) matrix or string, optional
                 The static bulk modulus, expressed in GPa. It is used to initialize the
                 hessian matrix on the BFGS cell relaxation, to guess the volume deformation caused
-                by the anharmonic stress tensor in the first steps. By default is 1000 GPa (higher value
+                by the anharmonic stress tensor in the first steps. By default is 100 GPa (higher value
                 are safer, since they means a lower change in the cell shape).
                 It can be also the whole non isotropic matrix. If you specify a string, it 
                 can be both:
@@ -178,10 +178,6 @@ class SSCHA:
                 If True the ensemble is used to start the first population, without recomputing
                 energies and forces. If False (default) the first ensemble is overwritten with
                 a new one, and the minimization starts.
-            get_stress : bool, optional
-                If true the stress tensor is calculated. This may increase the computational
-                cost, as it will be computed for each ab-initio configuration (it may be not available
-                with some ase calculator)
             ensemble_loc : string
                 Where the ensemble of each population is saved on the disk. You can specify None
                 if you do not want to save the ensemble (useful to avoid disk I/O for force fields)
