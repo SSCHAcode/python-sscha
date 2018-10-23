@@ -43,6 +43,8 @@ class SSCHA:
         # If the ensemble must be saved at each iteration.
         # 
         self.save_ensemble = save_ensemble
+        
+        
 
         self.__cfpre__ = None
         self.__cfpost__ = None
@@ -167,8 +169,11 @@ class SSCHA:
                 hessian matrix on the BFGS cell relaxation, to guess the volume deformation caused
                 by the anharmonic stress tensor in the first steps. By default is 1000 GPa (higher value
                 are safer, since they means a lower change in the cell shape).
-                It can be also the whole non isotropic matrix. If you specify a string "recalc", then
-                it is recomputed using finite differences at each population recal.
+                It can be also the whole non isotropic matrix. If you specify a string, it 
+                can be both:
+                    - "recalc" : the static bulk modulus is recomputed with finite differences after
+                        each step
+                    - "bfgs" : the bfgs algorithm is used to infer the Hessian from previous calculations.
             restart_from_ens : bool, optional
                 If True the ensemble is used to start the first population, without recomputing
                 energies and forces. If False (default) the first ensemble is overwritten with
@@ -204,6 +209,9 @@ class SSCHA:
             elif static_bulk_modulus == "none":
                 kind_minimizer = "SD"
                 static_bulk_modulus = 100
+            elif static_bulk_modulus == "bfgs":
+                static_bulk_modulus = 100
+                kind_minimizer = "BFGS"
             else:
                 raise ValueError("Error, value '%s' not supported for bulk modulus." % static_bulk_modulus)
         elif len(np.shape(static_bulk_modulus)) == 0:
@@ -225,7 +233,8 @@ class SSCHA:
             BFGS.alpha = 1 / (3 * static_bulk_modulus * np.linalg.det(self.minim.dyn.structure.unit_cell))
         elif kind_minimizer == "PSD":
             BFGS = sscha.Optimizer.SD_PREC_UC(self.minim.dyn.structure.unit_cell, static_bulk_modulus)
-
+        elif kind_minimizer == "BFGS":
+            BFGS = sscha.Optimizer.BFGS_UC(self.minim.dyn.structure.unit_cell, static_bulk_modulus)
 
         # Initialize the bulk modulus
         # The gradient (stress) is in eV/A^3, we have the cell in Angstrom so the Hessian must be

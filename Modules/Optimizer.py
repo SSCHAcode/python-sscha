@@ -11,6 +11,17 @@ class UC_OPTIMIZER:
     This class is used as father of all the 
     other subclasses
     """
+    
+    # Avoid to reduce the step less than this value
+    # Usefull, because in stochastic determination of the gradient it can
+    # happen a negative bigger gradient that wuould bring alpha to 0.
+    # NOTE: the maximum is always 2
+    min_alpha_factor = 0.5
+    
+    # This variable set up how the minimum total decreasing alpha step
+    min_alpha_step = 3e-3
+    
+    
     def __init__(self, starting_unit_cell):
         """
         To be initialized it needs to get the starting unit cell
@@ -18,9 +29,9 @@ class UC_OPTIMIZER:
         
         self.last_grad = np.zeros(9, dtype = np.float64)
         self.last_direction = np.zeros(9, dtype = np.float64)
-        self.alpha = 1
+        self.alpha = np.float64(1)
         self.n_step = 0
-        self.uc_0 = starting_unit_cell.copy()
+        self.uc_0 = np.float64(starting_unit_cell.copy())
         self.uc_0_inv = np.linalg.inv(self.uc_0)
         
     def mat_to_line(self, matrix):
@@ -61,15 +72,21 @@ class UC_OPTIMIZER:
             factor = y0 / (y0 - y1)
             
             # Regularization (avoid run away)
-            #self.alpha *= 1 + np.tanh( (factor - 1) )
+            factor = 1 + np.tanh( (factor - 1) )
+            if factor < self.min_alpha_factor:
+                factor = self.min_alpha_factor
             self.alpha *= factor
+            
+            if self.alpha < self.min_alpha_step:
+                self.alpha = self.min_alpha_step
+            #self.alpha *= factor
 
     def perform_step(self, x_old, grad):
         """
         The step, hierarchical structure.
         Here a standard steepest descent
         """
-        #self.get_line_step(grad)
+        self.get_line_step(grad)
         self.last_direction = grad
         self.last_grad = grad
 
@@ -134,10 +151,20 @@ class UC_OPTIMIZER:
 
 
 class BFGS_UC(UC_OPTIMIZER):
-    def __init__(self, unit_cell, bulk_modulus = 1):
+    def __init__(self, unit_cell, bulk_modulus = 1, update_h_step = 0.2):
         """
         This is the BFGS algorithm adapted to
         optimize the unit cell.
+        
+        Parameters
+        ----------
+            unit_cell : array(3x3)
+                The unit cell to initialize the minimizer
+            bulk_modulus : float
+                The static bulk modulus, initialize the step alpha
+            update_h_step : float
+                How much do you want to update the hessian matrix at each step?
+                1 for standard BFGS
         """
 
         # Initialize the standard methods in the UC optimizer
@@ -145,7 +172,9 @@ class BFGS_UC(UC_OPTIMIZER):
 
         # BFGS estimates also the hessian
         volume = np.linalg.det(unit_cell)
-        self.hessian = np.eye(9, dtype = np.float64) * (3 *volume * bulk_modulus)
+        self.hessian = np.eye(9, dtype = np.float64)# * (3 *volume * bulk_modulus)
+        self.alpha = 1 / (3 *volume * bulk_modulus)
+        self.hessian_update = update_h_step
     
     def get_direction(self, grad):
         """
@@ -166,7 +195,7 @@ class BFGS_UC(UC_OPTIMIZER):
             V1 = self.hessian.dot(s_vec)
             V = np.outer(V1, V1) / s_vec.dot(V1)
             
-            self.hessian += U - V
+            self.hessian += self.hessian_update * (U - V)
             
     def perform_step(self, old_x, grad):
         """
@@ -180,6 +209,8 @@ class BFGS_UC(UC_OPTIMIZER):
         self.n_step += 1
         self.last_direction = new_dir
         self.last_grad = grad
+        
+        print "HESSIAN eigvals:", 1 / np.linalg.eigvalsh(self.hessian)
         
         return x
             
