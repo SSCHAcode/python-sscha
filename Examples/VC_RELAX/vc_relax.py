@@ -23,7 +23,7 @@ atms.set_calculator(calc)
 
 # Prepare the saving of the frequencies
 freq_saving = sscha.Utilities.IOInfo()
-freq_saving.SetupSaving("data/Total_freqs.dat")
+freq_saving.SetupSaving("Total_freqs.dat")
 
 # Prepare the Relax
 ensemble = sscha.Ensemble.Ensemble(dynmat, 0)
