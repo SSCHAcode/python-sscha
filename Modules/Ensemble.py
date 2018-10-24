@@ -1464,9 +1464,9 @@ class Ensemble:
             forces_ = atms.get_forces() / Rydberg # eV / A => Ry / A
             if compute_stress:
                 if not stress_numerical:
-                    stress[9*i0 : 9*i0 + 9] = atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
+                    stress[9*i0 : 9*i0 + 9] = -atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
                 else:
-                    stress[9*i0 : 9*i0 + 9] = ase_calculator.calculate_numerical_stress(atms, voigt = False).ravel()* Bohr**3 / Rydberg 
+                    stress[9*i0 : 9*i0 + 9] = -ase_calculator.calculate_numerical_stress(atms, voigt = False).ravel()* Bohr**3 / Rydberg 
             
             # Copy into the ensemble array
             energies[i0] = energy

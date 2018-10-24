@@ -288,9 +288,9 @@ class SSCHA:
             print " ENTHALPIC CONTRIBUTION "
             print " ====================== "
             print ""
-            print "  P = %.4f GPa    V = %.4f A^3" % (target_press * sscha.SchaMinimizer.__evA3_to_GPa__, Vol)
+            print "  P = %.4f GPa    V = %.4f A^3" % (target_press , Vol)
             print ""
-            print "  P V = %.8e eV " % (target_press * Vol)
+            print "  P V = %.8e eV " % (target_press_evA3 * Vol)
             print ""
             print " Gibbs Free energy = %.8e eV " % gibbs
             print " (Zero energy = %.8e eV) " % self.minim.eq_energy
