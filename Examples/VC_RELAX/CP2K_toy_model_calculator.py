@@ -181,7 +181,7 @@ class CP2K_water_calculator(FileIOCalculator):
             stress[i, 2] = float(data[3])
             i += 1
         voigth_stress = [stress[0,0], stress[1,1], stress[2,2], stress[1,2], stress[0,2], stress[0,1]]
-        voigth_stress = np.array(voigth_stress, dtype = np.float64) * GPa
+        voigth_stress = - np.array(voigth_stress, dtype = np.float64) * GPa
         self.results = {"energy" : energy, "forces" : forces, "stress" : voigth_stress}
         #print "RESULTS!!! ", self.results
 

@@ -23,7 +23,7 @@ atms.set_calculator(calc)
 
 # Prepare the saving of the frequencies
 freq_saving = sscha.Utilities.IOInfo()
-freq_saving.SetupSaving("data/Total_freqs.dat")
+freq_saving.SetupSaving("Total_freqs.dat")
 
 # Prepare the Relax
 ensemble = sscha.Ensemble.Ensemble(dynmat, 0)
@@ -40,7 +40,7 @@ minim.meaningful_factor = 1
 minim.precond_dyn = True
 
 # We setup the SSCHA relaxation.
-N_CONFIGS = 200
+N_CONFIGS = 400
 MAX_ITERATIONS = 20
 relax = sscha.Relax.SSCHA(minim, calc, N_CONFIGS, MAX_ITERATIONS)
 
@@ -51,9 +51,11 @@ relax.save_ensemble = False
 # to check what the minimization is doing
 relax.setup_custom_functions(custom_function_post=freq_saving.CFP_SaveFrequencies)
 
-
 # Start the variable cell relaxation
+
 relax.vc_relax(static_bulk_modulus=100)
+
+
 
 # Save the final result
 relax.minim.dyn.save_qe("final_dyn")

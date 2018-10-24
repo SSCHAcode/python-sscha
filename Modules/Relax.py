@@ -43,6 +43,8 @@ class SSCHA:
         # If the ensemble must be saved at each iteration.
         # 
         self.save_ensemble = save_ensemble
+        
+        
 
         self.__cfpre__ = None
         self.__cfpost__ = None
@@ -135,7 +137,7 @@ class SSCHA:
         return self.minim.is_converged()
     
     
-    def vc_relax(self, target_press = 0, static_bulk_modulus = "recalc",
+    def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
                  ensemble_loc = ".", start_pop = 1, stress_numerical = False):
         """
@@ -162,21 +164,20 @@ class SSCHA:
                 target pressure is the stress tensor is the identity matrix multiplied by the
                 target pressure, with a tollerance equal to the stochastic noise. By default 
                 it is 0 (ambient pressure)
-            static_bulk_modulus : float, or (9x9) or string, optional
+            static_bulk_modulus : float (default 100), or (9x9) matrix or string, optional
                 The static bulk modulus, expressed in GPa. It is used to initialize the
                 hessian matrix on the BFGS cell relaxation, to guess the volume deformation caused
-                by the anharmonic stress tensor in the first steps. By default is 1000 GPa (higher value
+                by the anharmonic stress tensor in the first steps. By default is 100 GPa (higher value
                 are safer, since they means a lower change in the cell shape).
-                It can be also the whole non isotropic matrix. If you specify a string "recalc", then
-                it is recomputed using finite differences at each population recal.
+                It can be also the whole non isotropic matrix. If you specify a string, it 
+                can be both:
+                    - "recalc" : the static bulk modulus is recomputed with finite differences after
+                        each step
+                    - "bfgs" : the bfgs algorithm is used to infer the Hessian from previous calculations.
             restart_from_ens : bool, optional
                 If True the ensemble is used to start the first population, without recomputing
                 energies and forces. If False (default) the first ensemble is overwritten with
                 a new one, and the minimization starts.
-            get_stress : bool, optional
-                If true the stress tensor is calculated. This may increase the computational
-                cost, as it will be computed for each ab-initio configuration (it may be not available
-                with some ase calculator)
             ensemble_loc : string
                 Where the ensemble of each population is saved on the disk. You can specify None
                 if you do not want to save the ensemble (useful to avoid disk I/O for force fields)
@@ -204,6 +205,9 @@ class SSCHA:
             elif static_bulk_modulus == "none":
                 kind_minimizer = "SD"
                 static_bulk_modulus = 100
+            elif static_bulk_modulus == "bfgs":
+                static_bulk_modulus = 100
+                kind_minimizer = "BFGS"
             else:
                 raise ValueError("Error, value '%s' not supported for bulk modulus." % static_bulk_modulus)
         elif len(np.shape(static_bulk_modulus)) == 0:
@@ -225,7 +229,8 @@ class SSCHA:
             BFGS.alpha = 1 / (3 * static_bulk_modulus * np.linalg.det(self.minim.dyn.structure.unit_cell))
         elif kind_minimizer == "PSD":
             BFGS = sscha.Optimizer.SD_PREC_UC(self.minim.dyn.structure.unit_cell, static_bulk_modulus)
-
+        elif kind_minimizer == "BFGS":
+            BFGS = sscha.Optimizer.BFGS_UC(self.minim.dyn.structure.unit_cell, static_bulk_modulus)
 
         # Initialize the bulk modulus
         # The gradient (stress) is in eV/A^3, we have the cell in Angstrom so the Hessian must be
@@ -283,9 +288,9 @@ class SSCHA:
             print " ENTHALPIC CONTRIBUTION "
             print " ====================== "
             print ""
-            print "  P = %.4f GPa    V = %.4f A^3" % (target_press * sscha.SchaMinimizer.__evA3_to_GPa__, Vol)
+            print "  P = %.4f GPa    V = %.4f A^3" % (target_press , Vol)
             print ""
-            print "  P V = %.8e eV " % (target_press * Vol)
+            print "  P V = %.8e eV " % (target_press_evA3 * Vol)
             print ""
             print " Gibbs Free energy = %.8e eV " % gibbs
             print " (Zero energy = %.8e eV) " % self.minim.eq_energy

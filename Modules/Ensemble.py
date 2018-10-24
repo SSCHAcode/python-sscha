@@ -1093,18 +1093,50 @@ class Ensemble:
         
         # Correct the stress adding the centroid contribution
         if add_centroid_contrib:
-            f, err_f = self.get_average_forces(True)
-            stress_centroid = 0.5 * np.einsum( "ai,aj", self.current_dyn.structure.coords * __A_TO_BOHR__, f) / volume
-            stress_centroid += np.transpose(stress_centroid)
-            err_stress_centroid = np.einsum( "ai,aj", self.current_dyn.structure.coords**2 , err_f**2)
-            err_stress_centroid = np.sqrt(err_stress_centroid) * __A_TO_BOHR__ / volume
-            err_stress_centroid = np.sqrt( err_stress_centroid**2 + np.transpose(err_stress_centroid**2))
-            divideby = np.ones( (3,3)) * 2
-            divideby[np.eye(3) == 1] = np.sqrt(2)
-            err_stress_centroid /= divideby
+                
+            eforces = self.forces - self.sscha_forces
+            
+            if not np.prod(self.supercell) == 1:
+                # Refold the forces in the unit cell
+                super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
+                itau = super_structure.get_itau(self.current_dyn.structure) - 1 # Fort -> Py
+                
+                nat = self.dyn_0.structure.N_atoms
+                new_forces = np.zeros((self.N, nat, 3), dtype  =np.float64, order = "C")
+                
+                # Project in the unit cell the forces
+                for i in range(nat):
+                    #print "%d) ITAU LIST:" % i, itau == i
+                    new_forces[:, i, :] = np.sum(eforces[:, itau==i,:], axis = 1) / np.prod(self.supercell)
+                    #new_forces[:, i, :] = 
+                
+                eforces = new_forces
+            
+            stress_centr = np.zeros( (3,3), dtype = np.float64)
+            error_centr = np.zeros( (3,3), dtype = np.float64)
+            for i in range(0, 3):
+                for j in range(i, 3):
+                    av_array = 0.5 * np.einsum("h, ah", self.current_dyn.structure.coords[:, i],
+                                               eforces[:,:,j])
+                    av_array += 0.5 * np.einsum("h, ah", self.current_dyn.structure.coords[:, j],
+                                                eforces[:,:,i])
+                    stress_centr[i,j], error_centr[i,j] = SCHAModules.stochastic.average_error_weight(av_array, self.rho, "err_yesrho")
+                    stress_centr[j,i] = stress_centr[i,j]
+                    error_centr[j,i] = error_centr[i,j]
+            
+            
+#            f, err_f = self.get_average_forces(True)
+#            stress_centroid = 0.5 * np.einsum( "ai,aj", self.current_dyn.structure.coords * __A_TO_BOHR__, f) / volume
+#            stress_centroid += np.transpose(stress_centroid)
+#            err_stress_centroid = np.einsum( "ai,aj", self.current_dyn.structure.coords**2 , err_f**2)
+#            err_stress_centroid = np.sqrt(err_stress_centroid) * __A_TO_BOHR__ / volume
+#            err_stress_centroid = np.sqrt( err_stress_centroid**2 + np.transpose(err_stress_centroid**2))
+#            divideby = np.ones( (3,3)) * 2
+#            divideby[np.eye(3) == 1] = np.sqrt(2)
+#            err_stress_centroid /= divideby
 
-            stress += stress_centroid 
-            err_stress = np.sqrt(err_stress**2 + err_stress_centroid**2)
+            stress += stress_centr
+            err_stress = np.sqrt(err_stress**2 + error_centr**2)
 
 
         
@@ -1432,9 +1464,9 @@ class Ensemble:
             forces_ = atms.get_forces() / Rydberg # eV / A => Ry / A
             if compute_stress:
                 if not stress_numerical:
-                    stress[9*i0 : 9*i0 + 9] = atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
+                    stress[9*i0 : 9*i0 + 9] = -atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
                 else:
-                    stress[9*i0 : 9*i0 + 9] = ase_calculator.calculate_numerical_stress(atms, voigt = False).ravel()* Bohr**3 / Rydberg 
+                    stress[9*i0 : 9*i0 + 9] = -ase_calculator.calculate_numerical_stress(atms, voigt = False).ravel()* Bohr**3 / Rydberg 
             
             # Copy into the ensemble array
             energies[i0] = energy
