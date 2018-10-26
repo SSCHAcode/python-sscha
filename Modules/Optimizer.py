@@ -19,7 +19,10 @@ class UC_OPTIMIZER:
     min_alpha_factor = 0.5
     
     # This variable set up how the minimum total decreasing alpha step
-    min_alpha_step = 3e-3
+    # with respect to the initial one
+    min_alpha_step = 1e-1
+    
+    alpha0 = 1
     
     
     def __init__(self, starting_unit_cell):
@@ -66,6 +69,9 @@ class UC_OPTIMIZER:
         it implements the line minimization.
         """
         
+        if self.n_step == 0:
+            self.alpha0 = self.alpha
+        
         if self.n_step != 0:
             y0 = self.last_direction.dot(self.last_grad)
             y1 =  self.last_direction.dot(grad)
@@ -77,7 +83,7 @@ class UC_OPTIMIZER:
                 factor = self.min_alpha_factor
             self.alpha *= factor
             
-            if self.alpha < self.min_alpha_step:
+            if self.alpha < self.min_alpha_step * self.alpha0:
                 self.alpha = self.min_alpha_step
             #self.alpha *= factor
 
@@ -252,3 +258,29 @@ class SD_PREC_UC(UC_OPTIMIZER):
         self.last_direction = - self.preconditioner.dot(grad)
         self.last_grad = grad
         return x
+    
+    
+class CG_UC(UC_OPTIMIZER):
+    """
+    The optimizer that uses the conjugate gradient algoirthm.
+    This converge faster in non isotropic bulk modulus.
+    """
+    
+    def perform_step(self, old_x, grad):
+        
+        self.get_line_step(grad)
+        
+        if self.n_step >= 1:
+            beta = grad.dot(grad) / self.last_grad.dot(self.last_grad)
+            new_dir = grad + beta * self.last_direction
+        else:
+            new_dir = grad
+        
+        x = old_x - self.alpha * new_dir
+        
+        self.last_direction = new_dir
+        self.last_grad = grad
+        self.n_step += 1
+        
+        return x
+        

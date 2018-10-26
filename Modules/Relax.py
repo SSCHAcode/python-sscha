@@ -139,7 +139,8 @@ class SSCHA:
     
     def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
-                 ensemble_loc = ".", start_pop = 1, stress_numerical = False):
+                 ensemble_loc = ".", start_pop = 1, stress_numerical = False,
+                 cell_relax_algorithm = "cg"):
         """
         VARIABLE CELL RELAX
         ====================
@@ -187,6 +188,9 @@ class SSCHA:
             stress_numerical : bool
                 If True the stress is computed by finite difference (usefull for calculators that 
                 does not support it by default)
+            cell_relax_algorithm : string
+                This identifies the stress algorithm. It can be both sd (steepest-descent),
+                cg (conjugate-gradient) or bfgs (Quasi-newton)
             
         Returns
         -------
@@ -196,6 +200,10 @@ class SSCHA:
         """
         # Rescale the target pressure in eV / A^3
         target_press_evA3 = target_press / sscha.SchaMinimizer.__evA3_to_GPa__
+        
+        SUPPORTED_ALGORITHMS = ["sd", "cg", "bfgs"]
+        if not cell_relax_algorithm in SUPPORTED_ALGORITHMS:
+            raise ValueError("Error, cell_relax_algorithm %s not supported." %  cell_relax_algorithm)
 
         # Read the bulk modulus
         kind_minimizer = "SD"
@@ -211,11 +219,13 @@ class SSCHA:
             else:
                 raise ValueError("Error, value '%s' not supported for bulk modulus." % static_bulk_modulus)
         elif len(np.shape(static_bulk_modulus)) == 0:
-            kind_minimizer = "SD"
+            kind_minimizer = cell_relax_algorithm.upper()
         elif len(np.shape(static_bulk_modulus)) == 2:
             kind_minimizer = "PSD"
         else:
             raise ValueError("Error, the given value not supported as a bulk modulus.")
+            
+        
         
 
         if static_bulk_modulus is not "recalc":
@@ -226,6 +236,9 @@ class SSCHA:
         #BFGS = sscha.Optimizer.BFGS_UC(self.minim.dyn.structure.unit_cell, static_bulk_modulus)
         if kind_minimizer == "SD":
             BFGS = sscha.Optimizer.UC_OPTIMIZER(self.minim.dyn.structure.unit_cell)
+            BFGS.alpha = 1 / (3 * static_bulk_modulus * np.linalg.det(self.minim.dyn.structure.unit_cell))
+        if kind_minimizer == "CG":
+            BFGS = sscha.Optimizer.CG_UC(self.minim.dyn.structure.unit_cell)
             BFGS.alpha = 1 / (3 * static_bulk_modulus * np.linalg.det(self.minim.dyn.structure.unit_cell))
         elif kind_minimizer == "PSD":
             BFGS = sscha.Optimizer.SD_PREC_UC(self.minim.dyn.structure.unit_cell, static_bulk_modulus)
