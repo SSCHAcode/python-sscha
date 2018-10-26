@@ -53,7 +53,7 @@ relax.setup_custom_functions(custom_function_post=freq_saving.CFP_SaveFrequencie
 
 # Start the variable cell relaxation
 
-relax.vc_relax(static_bulk_modulus=100)
+relax.vc_relax(static_bulk_modulus=100, fix_volume = True)
 
 
 

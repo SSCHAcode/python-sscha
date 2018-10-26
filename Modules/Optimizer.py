@@ -101,7 +101,7 @@ class UC_OPTIMIZER:
         return x_new
 
             
-    def UpdateCell(self, unit_cell, stress_tensor):
+    def UpdateCell(self, unit_cell, stress_tensor, fix_volume = False):
         """
         PERFORM THE CELL UPDATE
         =======================
@@ -117,6 +117,9 @@ class UC_OPTIMIZER:
             stress_tensor : 3x3 matrix
                 The stress tensor according to which you want
                 to optimize the gradient.
+            fix_volume : bool, optional
+                If true, only the cell shape is affected by the update, the volume is taken as
+                a constant
         """
         
         # Convert the stress tensor into the Free energy gradient with respect
@@ -137,6 +140,10 @@ class UC_OPTIMIZER:
         # Get the gradient with respect to the strain
         grad_mat =  - volume * stress_tensor.dot(np.linalg.inv(I + strain.transpose()))
         
+        # Modify the gradient if you need to fix the volume, in order to cancel the mean strain
+        if fix_volume:
+            grad_mat -= I * np.trace(grad_mat) / np.float64(3)
+        
         #grad_mat = - volume * np.transpose(uc_inv).dot(stress_tensor)
 
         
@@ -154,6 +161,11 @@ class UC_OPTIMIZER:
         print strain_new
          
         unit_cell[:,:] = self.uc_0.dot( I + strain_new.transpose())
+        
+        print "NEW VOLUME:", np.linalg.det(unit_cell)
+        if fix_volume:
+            # Fix the volume
+            unit_cell[:,:] *= (np.linalg.det(self.uc_0) / np.linalg.det(unit_cell))**(1/np.float64(3))
 
 
 class BFGS_UC(UC_OPTIMIZER):

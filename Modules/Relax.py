@@ -140,7 +140,7 @@ class SSCHA:
     def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
                  ensemble_loc = ".", start_pop = 1, stress_numerical = False,
-                 cell_relax_algorithm = "cg"):
+                 cell_relax_algorithm = "cg", fix_volume = False):
         """
         VARIABLE CELL RELAX
         ====================
@@ -191,6 +191,9 @@ class SSCHA:
             cell_relax_algorithm : string
                 This identifies the stress algorithm. It can be both sd (steepest-descent),
                 cg (conjugate-gradient) or bfgs (Quasi-newton)
+            fix_volume : bool, optional
+                If true (default False) the volume is fixed, therefore only the cell shape is relaxed.
+                
             
         Returns
         -------
@@ -200,6 +203,7 @@ class SSCHA:
         """
         # Rescale the target pressure in eV / A^3
         target_press_evA3 = target_press / sscha.SchaMinimizer.__evA3_to_GPa__
+        I = np.eye(3, dtype = np.float64)
         
         SUPPORTED_ALGORITHMS = ["sd", "cg", "bfgs"]
         if not cell_relax_algorithm in SUPPORTED_ALGORITHMS:
@@ -292,8 +296,9 @@ class SSCHA:
             # Get the volume
             Vol = np.linalg.det(self.minim.dyn.structure.unit_cell)
             
-            # Get the Gibbs free energy
-            gibbs = self.minim.get_free_energy() * sscha.SchaMinimizer.__RyToev__ + target_press_evA3 * Vol - self.minim.eq_energy
+            # Get the Helmoltz-Gibbs free energy
+            helmoltz = self.minim.get_free_energy() * sscha.SchaMinimizer.__RyToev__
+            gibbs = helmoltz + target_press_evA3 * Vol - self.minim.eq_energy
             
             
             # Print the enthalpic contribution
@@ -305,15 +310,24 @@ class SSCHA:
             print ""
             print "  P V = %.8e eV " % (target_press_evA3 * Vol)
             print ""
-            print " Gibbs Free energy = %.8e eV " % gibbs
+            print " Helmoltz Free energy = %.8e eV " % helmoltz,
+            if fix_volume:
+                print "  <-- "
+            else:
+                print ""
+            print " Gibbs Free energy = %.8e eV " % gibbs,
+            if fix_volume:
+                print ""
+            else:
+                print "  <-- "
             print " (Zero energy = %.8e eV) " % self.minim.eq_energy
             print ""
         
             # Perform the cell step
-            cell_gradient = (stress_tensor - np.eye(3, dtype = np.float64) *target_press_evA3)
+            cell_gradient = (stress_tensor - I *target_press_evA3)
             
             new_uc = self.minim.dyn.structure.unit_cell.copy()
-            BFGS.UpdateCell(new_uc,  cell_gradient)
+            BFGS.UpdateCell(new_uc,  cell_gradient, fix_volume)
             
             # Strain the structure preserving the symmetries
             self.minim.dyn.structure.change_unit_cell(new_uc)
@@ -338,8 +352,14 @@ class SSCHA:
             # Check if the cell variation is converged
             running2 = True
             not_zero_mask = stress_err != 0
-            if np.max(np.abs(cell_gradient[not_zero_mask]) / stress_err[not_zero_mask]) <= 1:
-                running2 = False
+            if not fix_volume:
+                if np.max(np.abs(cell_gradient[not_zero_mask]) / stress_err[not_zero_mask]) <= 1:
+                    running2 = False
+            else:
+                if np.max(np.abs((stress_tensor - I * Press)[not_zero_mask] / 
+                                 stress_err[not_zero_mask])) <= 1:
+                    running2 = False
+                
 
             running = running1 or running2
 
