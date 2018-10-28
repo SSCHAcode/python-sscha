@@ -84,7 +84,7 @@ class UC_OPTIMIZER:
             self.alpha *= factor
             
             if self.alpha < self.min_alpha_step * self.alpha0:
-                self.alpha = self.min_alpha_step
+                self.alpha = self.min_alpha_step * self.alpha0
             #self.alpha *= factor
 
     def perform_step(self, x_old, grad):
