@@ -140,7 +140,7 @@ class SSCHA:
     def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
                  ensemble_loc = ".", start_pop = 1, stress_numerical = False,
-                 cell_relax_algorithm = "cg", fix_volume = False):
+                 cell_relax_algorithm = "sd", fix_volume = False):
         """
         VARIABLE CELL RELAX
         ====================

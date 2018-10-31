@@ -122,6 +122,9 @@ class SSCHA_Minimizer:
         # Define the stress offset
         self.stress_offset = np.zeros((3,3), dtype = np.float64, order = "F")
         
+        # If true the symmetries are neglected
+        self.neglect_symmetries = False
+        
         
         # Setup the statistical threshold
         self.kong_liu_ratio = kong_liu_ratio
@@ -187,8 +190,13 @@ class SSCHA_Minimizer:
 #        qe_sym.SymmetrizeDynQ(dyn_grad, np.array([0,0,0]))
 #        qe_sym.ImposeSumRule(err)
 #        qe_sym.SymmetrizeDynQ(err, np.array([0,0,0]))
-        qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
-        qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "crystal")
+        if not self.neglect_symmetries:
+            qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
+            qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "crystal")
+        else:
+            for i in range(len(self.dyn.q_tot)):
+                qe_sym.ImposeSumRule(dyn_grad[i, :,:], asr = "custom")
+                qe_sym.ImposeSumRule(err[i, :, :], asr = "crystal")
         t2 = time.time()
         print "Time elapsed to compute the dynamical matrix gradient:", t2 - t1, "s"
         
@@ -243,9 +251,10 @@ class SSCHA_Minimizer:
             
             
             # Apply the symmetries to the forces
-            qe_sym.SetupQPoint()
-            qe_sym.SymmetrizeVector(struct_grad)
-            qe_sym.SymmetrizeVector(struct_grad_err)
+            if not self.neglect_symmetries:
+                qe_sym.SetupQPoint()
+                qe_sym.SymmetrizeVector(struct_grad)
+                qe_sym.SymmetrizeVector(struct_grad_err)
 
             # Perform the gradient restriction
             if custom_function_gradient is not None:
@@ -307,9 +316,9 @@ class SSCHA_Minimizer:
         
         Parameters
         ----------
-            input_file : string
-                Path to the input namelist. The content must match the Quantum ESPRESSO
-                file format
+            line_list : list of string
+                List of strings obtained from the method readlines. 
+                The content must match the Quantum ESPRESSO file format
         """
         
         # Get the dictionary
@@ -339,6 +348,9 @@ class SSCHA_Minimizer:
             
         if "root_representation" in keys:
             self.root_representation = namelist["root_representation"]
+        
+        if "neglect_symmetries" in keys:
+            self.neglect_symmetries = namelist["neglect_symmetries"]
             
         if "n_random_eff" in keys:
             if not "n_random" in keys:
