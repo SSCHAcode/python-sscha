@@ -1398,7 +1398,7 @@ class Ensemble:
             
             # Broad cast to all the structures
             structures = comm.bcast(self.structures, root = 0)            
-            nat3 = comm.bcast(self.current_dyn.structure.N_atoms* 3, root = 0)
+            nat3 = comm.bcast(self.current_dyn.structure.N_atoms* 3* np.prod(self.supercell), root = 0)
             N_rand = comm.bcast(self.N, root=0)
             
             # Setup the label of the calculator
@@ -1415,7 +1415,7 @@ class Ensemble:
             size = 1
             rank = 0
             structures = self.structures
-            nat3 = self.current_dyn.structure.N_atoms* 3
+            nat3 = self.current_dyn.structure.N_atoms* 3 * np.prod(self.supercell)
             N_rand = self.N
             
         # Only for the master
