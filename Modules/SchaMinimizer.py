@@ -297,6 +297,7 @@ class SSCHA_Minimizer:
         for iq in range(len(self.dyn.q_tot)):
             self.dyn.dynmats[iq] = new_dyn[iq, : ,: ]
         
+        self.dyn.save_qe("Prova")
         
 
         # Update the ensemble

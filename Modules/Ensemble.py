@@ -594,7 +594,8 @@ class Ensemble:
         
         sum_rho = np.float64(np.sum(self.rho))
         sum_rho2 = np.float64(np.sum(self.rho**2))
-        return sum_rho**2 / sum_rho2
+        kl = sum_rho**2 / sum_rho2
+        return kl
     
     def get_average_energy(self, subtract_sscha = False, return_error = False):
         """
