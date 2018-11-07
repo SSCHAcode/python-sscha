@@ -386,7 +386,7 @@ class Ensemble:
         
         
         
-    def load_bin(self, data_dir, population_id = 1):
+    def load_bin(self, data_dir, population_id = 1, avoid_loading_dyn = False):
         """
         LOAD THE BINARY ENSEMBLE
         ========================
@@ -399,6 +399,8 @@ class Ensemble:
                 The directory containing the ensemble
             population_id : int
                 The esnemble population identifier.
+            avoid_loading_dyn : bool
+                If true, the dynamical matrix is not loaded.
         """
         
         self.energies = np.load("%s/energies_pop%d.npy" % (data_dir, population_id))
@@ -416,8 +418,9 @@ class Ensemble:
             self.has_stress = False
             
         # Load the original dynamical matrix
-        self.dyn_0 = CC.Phonons.Phonons("%s/dyn_gen_pop%d_" % (data_dir, population_id))
-        self.current_dyn = self.dyn_0.Copy()
+        if not avoid_loading_dyn:
+            self.dyn_0 = CC.Phonons.Phonons("%s/dyn_gen_pop%d_" % (data_dir, population_id))
+            self.current_dyn = self.dyn_0.Copy()
         
         dyn_supercell = self.dyn_0.GenerateSupercellDyn(self.supercell)
         super_structure = dyn_supercell.structure
