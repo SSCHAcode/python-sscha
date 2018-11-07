@@ -597,7 +597,8 @@ class Ensemble:
         
         sum_rho = np.float64(np.sum(self.rho))
         sum_rho2 = np.float64(np.sum(self.rho**2))
-        return sum_rho**2 / sum_rho2
+        kl = sum_rho**2 / sum_rho2
+        return kl
     
     def get_average_energy(self, subtract_sscha = False, return_error = False):
         """
@@ -1497,7 +1498,7 @@ class Ensemble:
                 total_stress = stress
         
         # Reshape the arrays
-        self.forces[:, :, :] = np.reshape(total_forces, (N_rand, self.current_dyn.structure.N_atoms, 3), order = "C")
+        self.forces[:, :, :] = np.reshape(total_forces, (N_rand, self.current_dyn.structure.N_atoms*np.prod(self.supercell), 3), order = "C")
         
         if compute_stress:
             self.stresses[:,:,:] = np.reshape(total_stress, (N_rand, 3, 3), order = "C")
