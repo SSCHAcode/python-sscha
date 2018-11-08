@@ -377,6 +377,20 @@ class SSCHA_Minimizer:
             self.dyn = CC.Phonons.Phonons(namelist["fildyn_prefix"], nqirr = int(namelist["nqirr"]))
             self.dyn_path = namelist["fildyn_prefix"]
             
+            if not "data_dir" in keys:
+                self.ensemble = Ensemble.Ensemble(self.dyn, 0)
+                
+                if "t" in keys:
+                    self.ensemble.current_T = np.float64(namelist["t"])
+                    if not "tg" in keys:
+                        self.ensemble.T0 = self.ensemble.current_T
+                
+                if "tg" in keys:
+                    self.ensemble.T0 = np.float64(namelist["tg"])
+                    
+                if "supercell_size" in keys:
+                    self.ensemble.supercell = [int(x) for x in namelist["supercell_size"]]
+            
         if "max_ka" in keys:
             self.max_ka = int(namelist["max_ka"])
             
