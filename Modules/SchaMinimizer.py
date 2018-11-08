@@ -744,6 +744,9 @@ class SSCHA_Minimizer:
             if custom_function_post is not None:
                 custom_function_post(self)
             
+            # Flush the output to avoid asyncronous printing
+            sys.stdout.flush()
+            
         # If your stopped not for convergence then 
         # restore the last dynamical matrix
         if not self.is_converged():
