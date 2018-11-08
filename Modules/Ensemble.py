@@ -419,9 +419,9 @@ class Ensemble:
             
         # Load the original dynamical matrix
         if not avoid_loading_dyn:
-            self.dyn_0 = CC.Phonons.Phonons("%s/dyn_gen_pop%d_" % (data_dir, population_id))
+            self.dyn_0 = CC.Phonons.Phonons("%s/dyn_gen_pop%d_" % (data_dir, population_id), self.dyn_0.nqirr)
             self.current_dyn = self.dyn_0.Copy()
-        
+            
         dyn_supercell = self.dyn_0.GenerateSupercellDyn(self.supercell)
         super_structure = dyn_supercell.structure
         super_fc = dyn_supercell.dynmats[0]

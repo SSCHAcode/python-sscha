@@ -558,6 +558,8 @@ class SSCHA_Minimizer:
         Call this before the first time you invoke the run function.
         """
         
+        self.check_imaginary_frequencies()
+        
         # Clean all the minimization variables
         self.__fe__ = []
         self.__fe_err__ = []

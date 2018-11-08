@@ -273,6 +273,7 @@ contains
 
     implicit none
 
+    integer, intent(in) :: r,s,t
     double precision, dimension(r,s), intent(in) :: df, q
     double precision, dimension(s), intent(in) :: da
     double precision, dimension(t), intent(in) ::  mass
@@ -284,7 +285,6 @@ contains
     character (len=10), intent(in) :: log_err
     double precision, intent(out) :: dfdc, delta_dfdc
     
-    integer, intent(in) :: r,s,t
 
     double precision, dimension(:), allocatable :: f
     integer :: nat, nmodes, nrandom
