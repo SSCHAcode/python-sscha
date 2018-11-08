@@ -25,7 +25,11 @@ It is possible to use it to perform the anharmonic minimization
 
 #import Ensemble
 import numpy as np
-import matplotlib.pyplot as plt
+try:
+    __MATPLOTLIB__ = True
+    import matplotlib.pyplot as plt
+except:
+    __MATPLOTLIB__ = False
 import cellconstructor as CC
 import cellconstructor.Methods
 import time
@@ -997,6 +1001,9 @@ class SSCHA_Minimizer:
         
         # Plot
         if plot:
+            if not __MATPLOTLIB__:
+                print "MATPLOTLIB NOT FOUND."
+                raise ImportError("Error, matplotlib required to plot")
             plt.figure()
             plt.title("Free energy")
             plt.errorbar(steps, fe, yerr = fe_err, label = "Free energy")

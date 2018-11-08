@@ -36,19 +36,21 @@ try:
 except:
     __MPI__ = False
 
+# The small value considered zero
+__EPSILON__ =  1e-6
+__A_TO_BOHR__ = 1.889725989
+
 try:
     from ase.units import Rydberg, Bohr
 except:
-    pass
+    Rydberg = 13.605698066
+    Bohr = __A_TO_BOHR__
 
 """
 This source contains the Ensemble class
 It is used to Load and Save info about the ensemble.
 """
 
-# The small value considered zero
-__EPSILON__ =  1e-6
-__A_TO_BOHR__ = 1.889725989
 
 
 class Ensemble:
