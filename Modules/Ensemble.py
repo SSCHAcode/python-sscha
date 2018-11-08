@@ -741,31 +741,8 @@ class Ensemble:
             float
                 The free energy in the current dynamical matrix and at the ensemble temperature
         """
-        K_to_Ry=6.336857346553283e-06
         
-        T = self.current_T
-
-        
-        # Dyagonalize the current dynamical matrix
-        nq = len(self.current_dyn.dynmats)
-        
-        # For each q point
-        free_energy = 0
-        for iq in range(nq):
-            w, pols = self.current_dyn.DyagDinQ(iq)
-            
-            # Remove translations
-            if iq == 0:
-                tmask = CC.Methods.get_translations(pols, self.current_dyn.structure.get_masses_array())
-                w = w[ ~tmask ]
-                
-            if len(w[w < 0]) >= 1:
-                raise ValueError("Error, the dynamical matrix has imaginary frequencies")
-            
-            free_energy += np.sum( w / 2)
-            if T > 0:
-                beta = 1 / (K_to_Ry * T)
-                free_energy += np.sum( 1 / beta * np.log(1 - np.exp(-beta * w)))
+        free_energy = self.current_dyn.GetHarmonicFreeEnergy(self.current_T)
         
         # We got the F_0 
         # Now we can compute the free energy difference

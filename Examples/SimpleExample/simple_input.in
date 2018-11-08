@@ -105,7 +105,7 @@
     ! lambda_a : step for the force constant matrix
     ! lambda_w : step for the structure
     lambda_a = 1
-    lambda_w = 0
+    lambda_w = 1
     
     ! The root representation is a trick to increase the speed of the minimization
     ! And to avoid the imaginary frequency error (the force-constant matrix is constrained
@@ -120,14 +120,14 @@
     ! This two flags are used only by the fortran code (but only for now)
     ! Preconditioning in python is always active (in fortran is super-time consuming)
     ! so here we activate it only in the structure, and not in the force-constant matrix
-    preconditioning = .false.
+    preconditioning = .true.
     !precond_only_wyckoff = .true.
     
     ! This is used only in the fortran code, if not specified the structure
     ! is not minimized (ignored by the python code).
     ! Note, you can always freeze the structure (or dynamical matrix) minimization
     ! by setting the step to 0 (lambda_a or lambda_w)
-    minim_struc = .false.
+    minim_struc = .true.
 
     ! The old code uses line minimization (activated after warm_up_steps)
     warm_up_steps = 10000    

@@ -709,6 +709,8 @@ class SSCHA_Minimizer:
             self.__fe__.append(np.real(fe))
             self.__fe_err__.append(np.real(err))
             
+            harm_fe = self.dyn.GetHarmonicFreeEnergy(self.ensemble.current_T) / np.prod(self.ensemble.supercell)
+            anharm_fe = np.real(fe - harm_fe)
             
             # Compute the KL ratio
             self.__KL__.append(self.ensemble.get_effective_sample_size())
@@ -716,8 +718,12 @@ class SSCHA_Minimizer:
             # Print the step
             if verbose >= 1:
                 print ""
+                print "Harmonic contribution to free energy = %16.8f meV" % (harm_fe * __RyTomev__)
+                print "Anharmonic contribution to free energy = %16.8f +- %16.8f meV" % (anharm_fe * __RyTomev__,
+                                                                                         np.real(err) * __RyTomev__)
                 print "Free energy = %16.8f +- %16.8f meV" % (self.__fe__[-1] * __RyTomev__, 
                                                               self.__fe_err__[-1] * __RyTomev__)
+                
                 print "FC gradient modulus = %16.8f +- %16.8f bohr^2" % (self.__gc__[-1] * __RyTomev__, 
                                                                        self.__gc_err__[-1] * __RyTomev__)
                 print "Struct gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gw__[-1] * __RyTomev__,
