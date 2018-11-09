@@ -868,7 +868,7 @@ class SSCHA_Minimizer:
             superdyn0 = self.ensemble.dyn_0.GenerateSupercellDyn(self.ensemble.supercell)
             wold, pold = superdyn0.DyagDinQ(0)
             
-            trans_mask = ~CC.Methods.get_translations(pold, self.dyn.structure.get_masses_array())
+            trans_mask = ~CC.Methods.get_translations(pold, superdyn0.structure.get_masses_array())
             wold = wold[trans_mask] * __RyToCm__
             pold = pold[:, trans_mask]
             total_mask = range(len(w))
