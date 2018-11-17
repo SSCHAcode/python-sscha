@@ -329,8 +329,9 @@ class SSCHA:
             new_uc = self.minim.dyn.structure.unit_cell.copy()
             BFGS.UpdateCell(new_uc,  cell_gradient, fix_volume)
             
-            # Strain the structure preserving the symmetries
-            self.minim.dyn.structure.change_unit_cell(new_uc)
+            # Strain the structure and the q points preserving the symmetries
+            self.minim.dyn.AdjustToNewCell(new_uc)
+            #self.minim.dyn.structure.change_unit_cell(new_uc)
             
 
             print " New unit cell:"
