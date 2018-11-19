@@ -121,6 +121,17 @@ class SSCHA:
         
             
             self.minim.finalize()
+            
+            # Perform the symmetrization
+            print "Checking the symmetries of the dynamical matrix:"
+            qe_sym = CC.symmetries.QE_Symmetry(self.minim.dyn.structure)
+            qe_sym.SetupQPoint(verbose = True)
+            
+            print "Forcing the symmetries in the dynamical matrix."
+            fcq = np.array(self.minim.dyn.dynmats, dtype = np.complex128)
+            qe_sym.SymmetrizeFCQ(fcq, self.minim.dyn.q_stars, asr = "custom")
+            for iq,q in enumerate(self.minim.dyn.q_tot):
+                self.minim.dyn.dynmats[iq] = fcq[iq, :, :]
 
             # Save the dynamical matrix
             if self.save_ensemble:
@@ -342,6 +353,12 @@ class SSCHA:
             print "Check the symmetries in the new cell:"
             qe_sym = CC.symmetries.QE_Symmetry(self.minim.dyn.structure)
             qe_sym.SetupQPoint(verbose = True)
+            
+            print "Forcing the symmetries in the dynamical matrix."
+            fcq = np.array(self.minim.dyn.dynmats, dtype = np.complex128)
+            qe_sym.SymmetrizeFCQ(fcq, self.minim.dyn.q_stars, asr = "custom")
+            for iq,q in enumerate(self.minim.dyn.q_tot):
+                self.minim.dyn.dynmats[iq] = fcq[iq, :, :]
 
             # Save the dynamical matrix
             self.minim.dyn.save_qe("dyn_pop%d_" % pop)

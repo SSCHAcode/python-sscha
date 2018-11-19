@@ -200,7 +200,7 @@ class SSCHA_Minimizer:
         else:
             for i in range(len(self.dyn.q_tot)):
                 qe_sym.ImposeSumRule(dyn_grad[i, :,:], asr = "custom")
-                qe_sym.ImposeSumRule(err[i, :, :], asr = "crystal")
+                qe_sym.ImposeSumRule(err[i, :, :], asr = "custom")
         t2 = time.time()
         print "Time elapsed to compute the dynamical matrix gradient:", t2 - t1, "s"
         
@@ -575,6 +575,13 @@ class SSCHA_Minimizer:
         This subroutine initialize the variables needed by the minimization.
         Call this before the first time you invoke the run function.
         """
+        
+        # Symmetrize the starting dynamical matrix and apply the sum rule
+        qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+        fcq = np.array(self.dyn.dynmats)
+        qe_sym.SymmetrizeFCQ(fcq, self.dyn.q_stars, asr = "custom")
+        for iq in range(len(self.dyn.q_tot)):
+            self.dyn.dynmats[iq] = fcq[iq, :, :]
         
         self.check_imaginary_frequencies()
         
