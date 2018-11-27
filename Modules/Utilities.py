@@ -140,6 +140,14 @@ class ModeProjection:
 
 
 class IOInfo:
+    
+    save_weights = False
+    weights_file = "weights.dat"
+    weights = []
+    save_dynmats = False
+    ka = 0
+    save_dyn_prefix = "minim_dyn"
+    
     def __init__(self):
         """
         This class is meant to deal with standard verbose I/O operation,
@@ -157,6 +165,20 @@ class IOInfo:
         """
 
         self.__init__()
+        
+    def SetupWeights(self, fname, save_each_step = True):
+        """
+        Setup the weights saving
+        
+        Parameters
+        ----------
+            fname : string
+                Path to the file to which save the frequencies.
+        """
+        
+        self.weights_file = fname
+        self.save_weights = True
+        self.__save_each_step = save_each_step
 
     def SetupSaving(self, fname, save_each_step = True):
         """
@@ -190,6 +212,31 @@ class IOInfo:
             np.savetxt(self.__save_fname, self.total_freqs, header = "Time vs Frequencies")
         else:
             np.savetxt(fname, self.total_freqs, header = "Time vs Frequencies")
+            
+            
+        if self.save_weights:
+            np.savetxt(self.weights_file, np.transpose(self.weights), header = "Each row is a step containing all the weights of the configurations")
+            
+        
+    def CFP_SaveAll(self, minim):
+        """
+        This method saves everithing stored in this class.
+        
+        It can be passed as custom_function_post to the run method of the SchaMinimizer.
+        """
+        
+        # Get the weights if required
+        if self.save_weights:
+            self.weights.append(minim.ensemble.rho[:])
+            
+        if self.save_dynmats:
+            minim.dyn.save_qe(self.save_dyn_prefix + "_ka%05d_" % self.ka)
+            
+        # This perform also the saving
+        self.CFP_SaveFrequencies(minim)
+        
+        # Update the step
+        self.ka += 1
 
 
     def CFP_SaveFrequencies(self, minim):
@@ -203,6 +250,7 @@ class IOInfo:
         # Dyagonalize
         w, pols = dyn_sc.DyagDinQ(0)
         self.total_freqs.append(w)
+        
 
         if self.__save_each_step:
             self.Save()

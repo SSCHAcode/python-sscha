@@ -184,6 +184,9 @@ subroutine get_gaussian_weight(q,q_start,a,a_start,rho, n_config, n_modes)
 
   N = n_config
   nmodes = n_modes
+  print *, "GGW: n_config = ", n_config
+  print *, "GGW: n_modes = ", n_modes
+  call flush()
 
   do i = 1, N
     rho(i) = 1.0d0

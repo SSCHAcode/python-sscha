@@ -301,11 +301,15 @@ class SSCHA_Minimizer:
         for iq in range(len(self.dyn.q_tot)):
             self.dyn.dynmats[iq] = new_dyn[iq, : ,: ]
         
-        self.dyn.save_qe("Prova")
+        #self.dyn.save_qe("Prova")
         
 
         # Update the ensemble
         self.update()
+        
+        # Save the ensemble [TODO: IT IS DEBUG]
+        #print "SAVING RHO...."
+        #np.savetxt("LAST_RHO_UPDATED_AFTER_STEP.dat", self.ensemble.rho)
         
         # Update the previous gradient
         self.prev_grad = dyn_grad
@@ -720,6 +724,8 @@ class SSCHA_Minimizer:
             anharm_fe = np.real(fe - harm_fe)
             
             # Compute the KL ratio
+            #print "SAVE RHO BEFORE PRINT:"
+            #np.savetxt("LAST_RHO_BEFORE_PRINT.dat", self.ensemble.rho)
             self.__KL__.append(self.ensemble.get_effective_sample_size())
             
             # Print the step
@@ -802,13 +808,15 @@ class SSCHA_Minimizer:
         print "Minimization ended after %d steps" % len(self.__gc__)
         print ""
 
-        print "Free energy = %16.8f +- %16.8f meV" % (self.__fe__[-1] * __RyTomev__, 
-                                                      self.__fe_err__[-1] * __RyTomev__)
+        fe, ferr = self.get_free_energy(True)
+        fe -= self.eq_energy
+        print "Free energy = %16.8f +- %16.8f meV" % (fe * __RyTomev__, 
+                                                      ferr * __RyTomev__)
         print "FC gradient modulus = %16.8f +- %16.8f bohr^2" % (self.__gc__[-1] * __RyTomev__, 
                                                                self.__gc_err__[-1] * __RyTomev__)
         print "Struct gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gw__[-1] * __RyTomev__,
                                                                     self.__gw_err__[-1] * __RyTomev__)
-        print "Kong-Liu effective sample size = ", self.__KL__[-1]
+        print "Kong-Liu effective sample size = ", self.ensemble.get_effective_sample_size()
         print ""
         
         if self.ensemble.has_stress and verbose >= 1:

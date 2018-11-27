@@ -26,6 +26,8 @@ import cellconstructor.Structure
 import cellconstructor.Phonons
 import cellconstructor.Methods
 import cellconstructor.Manipulate
+import cellconstructor.Settings
+
 
 import SCHAModules
 
@@ -46,6 +48,9 @@ except:
     Rydberg = 13.605698066
     Bohr = __A_TO_BOHR__
 
+
+__DEBUG_RHO__ = False
+
 """
 This source contains the Ensemble class
 It is used to Load and Save info about the ensemble.
@@ -54,6 +59,8 @@ It is used to Load and Save info about the ensemble.
 
 
 class Ensemble:
+    __debug_index__ = 0
+    
     def __init__(self, dyn0, T0, supercell = (1,1,1)):
         """
         PREPARE THE ENSEMBLE
@@ -450,6 +457,7 @@ class Ensemble:
         # Setup the initial weights
         self.rho = np.ones(self.N, dtype = np.float64)
         
+        
         # Initialize the q_start
         self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell)
         self.current_q = self.q_start.copy()
@@ -539,6 +547,8 @@ class Ensemble:
         
         self.current_T = newT
         
+            
+        
         t1 = time.time()
         # Get the frequencies of the original dynamical matrix
         super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
@@ -563,32 +573,88 @@ class Ensemble:
         super_structure = new_super_dyn.structure
         Nat_sc = super_structure.N_atoms
         
-        self.current_q = CC.Manipulate.GetQ_vectors(self.structures, new_super_dyn) 
+        # Get the new displacements in the supercell
+        for i in range(self.N):
+            self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
+            
+            # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
+            self.sscha_energies[i], self.sscha_forces[i, :,:] = new_super_dyn.get_energy_forces(self.structures[i], real_space_fc = new_super_dyn.dynmats[0], displacement = self.u_disps[i, :])
+            
+        
+        self.current_q = CC.Manipulate.GetQ_vectors(self.structures, new_super_dyn, self.u_disps) 
         
         # Convert the q vectors in the Hartree units
-        old_q = self.q_start * np.sqrt(2) * __A_TO_BOHR__
-        new_q = self.current_q * np.sqrt(2) * __A_TO_BOHR__
+        #old_q = self.q_start * np.sqrt(np.float64(2)) * __A_TO_BOHR__
+        #new_q = self.current_q * np.sqrt(np.float64(2)) * __A_TO_BOHR__
         
         t2 = time.time()
         print "Time elapsed to prepare the rho update:", t2 - t1, "s"
         
-        t1 = time.time()
-        self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
-        t2 = time.time()
+        #t1 = time.time()
+        #self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
+        #t2 = time.time()
+        
+        if __DEBUG_RHO__:
+            print " ==== [UPDATE RHO DEBUGGING] ==== "
+            print " INPUT INFO: "
+            np.savetxt("rho_%05d.dat" % self.__debug_index__, self.rho)
+            print " rho saved in ", "rho_%05d.dat" % self.__debug_index__
         
         print "Time elapsed to update the stochastic weights:", t2 - t1, "s"
+        
+        # Get the rho in the other way
+        ups_new = new_super_dyn.GetUpsilonMatrix(self.current_T)
+        ups_old = super_dyn.GetUpsilonMatrix(self.T0)
+        dups = ups_new - ups_old
+        
+        rho_tmp = np.ones( self.N, dtype = np.float64) * np.prod( old_a / new_a)
+        for i in range(self.N):
+            v = dups.dot(self.u_disps[i, :]) * __A_TO_BOHR__
+            rho_tmp[i] *= np.exp(-0.5 *__A_TO_BOHR__ * self.u_disps[i, :].dot(v) )
+        # Lets try to use this one
+        self.rho = rho_tmp
+        
+        #np.savetxt("upsilon_%05d.dat" % self.__debug_index__, ups_new)
+        #np.savetxt("d_upsilon_%05d.dat" % self.__debug_index__, dups)
+
+        
         #print "RHO:", self.rho
         
-        for i in range(self.N):
-            self.sscha_energies[i], self.sscha_forces[i, :,:] = new_super_dyn.get_energy_forces(self.structures[i], real_space_fc = new_super_dyn.dynmats[0])
-            
+        #for i in range(self.N):
             # Get the new displacement
             #self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
-            self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
+            #self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
         t1 = time.time()
         
         print "Time elapsed to update the sscha energies, forces and displacements:", t1 - t2, "s"
         self.current_dyn = new_dynamical_matrix.Copy()
+        
+        
+        if __DEBUG_RHO__:
+            new_dynamical_matrix.save_qe("ud_%05d" % self.__debug_index__)
+            print " new_dynmat saved in ud_%05d " % self.__debug_index__
+            print " new_T : ", newT
+            print " old_T : ", self.T0
+            print " supercell :", self.supercell
+            self.dyn_0.save_qe("sd_%05d" % self.__debug_index__)
+            print " starting dyn saved in sd_%05d" % self.__debug_index__
+            print " old_a:", " ".join(["%16.8f" %  x for x in old_a])
+            print " new_a:", " ".join(["%16.8f" %  x for x in new_a])
+            np.savetxt("old_q_%05d.dat" %self.__debug_index__, old_q)
+            print " old_q saved in ", "old_q_%05d.dat" %self.__debug_index__
+            np.savetxt("new_q_%05d.dat" %self.__debug_index__, new_q)
+            print " new_q saved in ", "new_q_%05d.dat" %self.__debug_index__
+            print " u_disps saved in ", "u_disps_%05.dat" % self.__debug_index__
+            np.savetxt("u_disps_%05d.dat" % self.__debug_index__, self.u_disps)
+            
+            print " The last rho in", "rho_last_%05d.dat" % self.__debug_index__
+            np.savetxt("rho_last_%05d.dat" % self.__debug_index__, self.rho)
+            print " The other rho kind saved in", "other_rho_kind_%05d.dat"  % self.__debug_index__
+            np.savetxt("other_rho_kind_%05d.dat"  % self.__debug_index__, rho_tmp)
+            print " The KL according to other rho kind:", np.sum(rho_tmp)**2 / np.sum(rho_tmp**2)
+            self.__debug_index__ += 1
+            
+            
         
         
         
@@ -908,6 +974,7 @@ class Ensemble:
                                                             self.current_T, mass, ityp, log_err, self.N,
                                                             nat, 3*nat, len(mass), preconditioned)
 
+    
         # Perform the fourier transform
         q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
                                                    self.current_dyn.structure, supercell_dyn.structure)
