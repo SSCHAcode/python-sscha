@@ -278,7 +278,7 @@ class Ensemble:
         # Initialize the q_start
         
         t1 = time.time()
-        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell)
+        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell, self.u_disps)
         t2 = time.time()
         self.current_q = self.q_start.copy()
         
@@ -459,7 +459,7 @@ class Ensemble:
         
         
         # Initialize the q_start
-        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell)
+        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell, self.u_disps)
         self.current_q = self.q_start.copy()
 
         
