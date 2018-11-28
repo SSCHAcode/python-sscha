@@ -37,6 +37,7 @@ class Cluster:
     n_nodes = 1
     n_cpu = 1
     n_pool = 1
+    max_recalc = 10
     
     
     def __init__(self, hostname, pwd=None, extra_options="", workdir = "",
@@ -222,6 +223,7 @@ class Cluster:
                 success[num] = True
         
         # Run until some work has not finished
+        recalc = 0
         while np.sum(np.array(success, dtype = int) - 1) != 0:
             threads = []
             
@@ -238,6 +240,11 @@ class Cluster:
             # Wait until all the job have finished
             for t in threads:
                 t.join(timeout)
+            
+            recalc += 1
+            if recalc > self.max_recalc:
+                raise ValueError("Error, recalculations exceeded the maximum number of %d" % self.max_recalc)
+                break
             
             
         

@@ -1415,6 +1415,43 @@ class Ensemble:
         return df_dfc, err_df_dfc
 
 
+    def compute_ensemble(self, calculator, compute_stress = True, stress_numerical = False,
+                         cluster = None):
+        """
+        GET ENERGY AND FORCES
+        =====================
+        
+        This is the generic function to compute forces and stresses.
+        It can be used both with clusters, and with simple ase calculators
+        
+        Paramters
+        ---------
+            calculator:
+                The ase calculator
+            compute_stress: bool
+                If true compute the stress
+            stress_numerical : bool
+                Compute the stress tensor with finite difference, 
+                this is not possible with clusters
+            cluster: Cluster, optional
+                The cluster in which to send the calculation.
+                If None the calculation is performed on the same computer of
+                the sscha code.
+        """
+        
+        # Check if the calculator is a cluster
+        is_cluster = False
+        if not cluster is None:
+            is_cluster = True
+        
+        # Check consistency
+        if stress_numerical and is_cluster:
+            raise ValueError("Error, stress_numerical is not implemented with clusters")
+    
+        if is_cluster:
+            calculator.compute_ensemble(self, calculator, compute_stress)
+        else:
+            self.get_energy_froces(calculator, compute_stress, stress_numerical)
 
     def get_energy_forces(self, ase_calculator, compute_stress = True, stress_numerical = False):
         """

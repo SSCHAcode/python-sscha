@@ -14,7 +14,8 @@ import cellconstructor.symmetries
 __EPSILON__ = 1e-5
 
 class SSCHA:
-    def __init__(self, minimizer, ase_calculator, N_configs, max_pop = 20, save_ensemble = True):
+    def __init__(self, minimizer, ase_calculator, N_configs, max_pop = 20, 
+                 save_ensemble = True, cluster = None):
         """
         This module initialize the relaxer. It may perform
         constant volume or pressure relaxation using fully anharmonic potentials.
@@ -33,12 +34,16 @@ class SSCHA:
                 The maximum number of iteration (The code will stop)
             save_ensemble : bool, optional
                 If True (default) the ensemble is saved after each energy and forces calculation.
+            cluster : Cluster.Cluster, optional
+                If different from None, the ensemble force and energy calculations
+                will be runned in the provided cluster.
         """
         
         self.minim = minimizer
         self.calc = ase_calculator
         self.N_configs = N_configs
         self.max_pop = max_pop
+        self.cluster = cluster
         
         # If the ensemble must be saved at each iteration.
         # 
@@ -105,7 +110,9 @@ class SSCHA:
             self.minim.ensemble.generate(self.N_configs)
             
             # Compute energies and forces
-            self.minim.ensemble.get_energy_forces(self.calc, get_stress)
+            self.minim.ensemble.compute_ensemble(self.calc, get_stress, 
+                                                 cluster = self.cluster)
+            #self.minim.ensemble.get_energy_forces(self.calc, get_stress)
             
             if ensemble_loc is not None and self.save_ensemble:
                 self.minim.ensemble.save_bin(ensemble_loc, pop)
@@ -281,7 +288,9 @@ class SSCHA:
             self.minim.ensemble.generate(self.N_configs)
             
             # Compute energies and forces
-            self.minim.ensemble.get_energy_forces(self.calc, True, stress_numerical = stress_numerical)
+            self.minim.ensemble.compute_ensemble(self.calc, True, stress_numerical,
+                                                 cluster = self.cluster)
+            #self.minim.ensemble.get_energy_forces(self.calc, True, stress_numerical = stress_numerical)
             
             if ensemble_loc is not None and self.save_ensemble:
                 self.minim.ensemble.save_bin(ensemble_loc, pop)
