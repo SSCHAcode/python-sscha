@@ -43,6 +43,8 @@ class Cluster:
     max_recalc = 10
     time="00:02:00" # 2minutes
     ram="10000Mb" # 10Gb
+    prefix_name = "prefix" # Variable in the calculator for differentiating the calculations
+    local_workdir = "cluster_work/"
     
     
     def __init__(self, hostname, pwd=None, extra_options="", workdir = "",
@@ -100,6 +102,8 @@ class Cluster:
             
         self.binary = binary
         self.mpi_cmd = mpi_cmd
+        
+        
             
     def CheckCommunication(self):
         """
@@ -147,7 +151,7 @@ class Cluster:
         ase_atoms.set_calculator(ase_calc)
         
         # Write the input file
-        ase.io.write("%s%s" % (label, in_extension),ase_atoms,**ase_calc.parameters)
+        ase.io.write("%s/%s%s" % (self.local_workdir, label, in_extension),ase_atoms,**ase_calc.parameters)
         
         # prepare the submission script
         submission = self.terminal + "\n"
@@ -189,17 +193,17 @@ class Cluster:
             sys.stderr.write(cmd + ": exit with code " + str(cp_res))
         
         # Copy the input files into the target directory
-        f = file("%s.sh" % label, "w")
+        f = file("%s/%s.sh" % (self.local_workdir, label), "w")
         f.write(submission)
         f.close()
-        cmd = self.scpcmd + " %s.sh %s:%s" % (label, self.hostname, self.workdir)
+        cmd = self.scpcmd + " %s/%s.sh %s:%s" % (self.local_workdir, label, self.hostname, self.workdir)
         cp_res = os.system(cmd)
         if cp_res != 0:
             print "Error while executing:", cmd
             print "Return code:", cp_res
             sys.stderr.write(cmd + ": exit with code " + str(cp_res))
             
-        cmd = self.scpcmd + " %s%s %s:%s" % (label, in_extension, self.hostname, self.workdir)
+        cmd = self.scpcmd + " %s/%s%s %s:%s" % (self.local_workdir, label, in_extension, self.hostname, self.workdir)
         cp_res = os.system(cmd)
         if cp_res != 0:
             print "Error while executing:", cmd
@@ -216,7 +220,8 @@ class Cluster:
             sys.stderr.write(cmd + ": exit with code " + str(cp_res))
             
         # Get the response
-        cmd = self.scpcmd + " %s:%s/%s%s ./" % (self.hostname, self.workdir, label, out_extension) 
+        cmd = self.scpcmd + " %s:%s/%s%s %s/" % (self.hostname, self.workdir, label, out_extension, 
+                                                 self.local_workdir) 
         cp_res = os.system(cmd)
         if cp_res != 0:
             print "Error while executing:", cmd
@@ -225,7 +230,7 @@ class Cluster:
             return
             
         # Get the results
-        ase_calc.set_label(label)
+        ase_calc.set_label("%s/%s" % (self.local_workdir, label))
         ase_calc.read_results()
         
         return ase_calc.results
@@ -243,6 +248,10 @@ class Cluster:
         # Track the remaining configurations
         success = [False] * ensemble.N
         
+        # Check if the working directory exists
+        if not os.path.isdir(self.local_workdir):
+            os.makedirs(self.local_workdir)
+            
         # Prepare the function for the simultaneous submission
         def compute_single(num, calc):
             atm = ensemble.structures[num].get_ase_atoms()
