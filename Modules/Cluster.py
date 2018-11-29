@@ -248,6 +248,9 @@ class Cluster:
         # Track the remaining configurations
         success = [False] * ensemble.N
         
+        # Setup if the ensemble has the stress
+        ensemble.has_stress = get_stress
+        
         # Check if the working directory exists
         if not os.path.isdir(self.local_workdir):
             os.makedirs(self.local_workdir)

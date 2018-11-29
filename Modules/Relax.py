@@ -116,8 +116,8 @@ class SSCHA:
                                                  cluster = self.cluster)
                 #self.minim.ensemble.get_energy_forces(self.calc, get_stress)
             
-            if ensemble_loc is not None and self.save_ensemble:
-                self.minim.ensemble.save_bin(ensemble_loc, pop)
+                if ensemble_loc is not None and self.save_ensemble:
+                    self.minim.ensemble.save_bin(ensemble_loc, pop)
             
             self.minim.population = pop
             self.minim.init()
@@ -293,10 +293,10 @@ class SSCHA:
                 # Compute energies and forces
                 self.minim.ensemble.compute_ensemble(self.calc, True, stress_numerical,
                                                  cluster = self.cluster)
-            #self.minim.ensemble.get_energy_forces(self.calc, True, stress_numerical = stress_numerical)
+                #self.minim.ensemble.get_energy_forces(self.calc, True, stress_numerical = stress_numerical)
             
-            if ensemble_loc is not None and self.save_ensemble:
-                self.minim.ensemble.save_bin(ensemble_loc, pop)
+                if ensemble_loc is not None and self.save_ensemble:
+                    self.minim.ensemble.save_bin(ensemble_loc, pop)
             
             self.minim.population = pop
             self.minim.init()
