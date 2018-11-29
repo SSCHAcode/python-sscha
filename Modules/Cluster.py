@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import sys, os
+import subprocess
 import threading
+
 import numpy as np
 
 from ase.units import Rydberg, Bohr
@@ -37,7 +39,10 @@ class Cluster:
     n_nodes = 1
     n_cpu = 1
     n_pool = 1
+    label = "ESP_"
     max_recalc = 10
+    time="00:02:00" # 2minutes
+    ram="10000Mb" # 10Gb
     
     
     def __init__(self, hostname, pwd=None, extra_options="", workdir = "",
@@ -96,10 +101,38 @@ class Cluster:
         self.binary = binary
         self.mpi_cmd = mpi_cmd
             
+    def CheckCommunication(self):
+        """
+        CHECK IF THE SERVER IS AVAILABLE
+        ================================
+        
+        This function return true if the server respond correctly, 
+        false otherwise.
+        """
+        
+        cmd = self.sshcmd + " %s 'echo ciao'" % self.hostname
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+        output, err = p.communicate()
+        status = p.wait()
+        if not err is None:
+            sys.stderr.write(err + "\n")
+        if status != 0:
+            sys.stderr.write("Error, cmd: " + cmd + "\n")
+            sys.stderr.write("Exit status:" + str(status))
+            return False
+    
+        if output != "ciao":
+            sys.stderr.write("Code exited correctly but echo did not answer properly\n")
+            sys.stderr.write("cmd: " + cmd + "\n")
+            sys.stderr.write("out: " + output + "\n")
+            sys.stderr.write("expected " + "ciao" + "\n")
+            return False
+        
+        return True
             
     def run_atoms(self, ase_calc, ase_atoms, label="ESP", 
                   in_extension = ".pwi", out_extension=".pwo",
-                  n_nodes = 1, n_cpu=1, npool=1, ram=10000, time="00:02:00"):
+                  n_nodes = 1, n_cpu=1, npool=1):
         """
         RUN ATOMS ON THE CLUSTER
         ========================
@@ -124,11 +157,11 @@ class Cluster:
         if self.use_cpu:
             submission += "#%s %s%d\n" % (self.submit_name, self.v_cpu, n_cpu)
         if self.use_time:
-            submission += "#%s %s%s\n" % (self.submit_name, self.v_time, time)
+            submission += "#%s %s%s\n" % (self.submit_name, self.v_time, self.time)
         if self.use_account:
             submission += "#%s %s%s\n" % (self.submit_name, self.v_account, self.account_name)
         if self.use_memory:
-            submission += "#%s %s%d\n" % (self.submit_name, self.v_memory, ram)
+            submission += "#%s %s%s\n" % (self.submit_name, self.v_memory, self.ram)
         if self.use_partition:
             submission += "#%s %s%s\n" % (self.submit_name, self.v_partition, self.partition_name)
         
@@ -144,6 +177,15 @@ class Cluster:
         
         submission += mpicmd + " " + binary + "\n"
         
+        # First of all clean eventually input/output file of this very same calculation
+        cmd = self.sshcmd + " %s 'rm -f %s/%s%s %s/%s%s'" % (self.hostname, 
+                                                             self.workdir, label, in_extension,
+                                                             self.workdir, label, out_extension)
+        cp_res = os.system(cmd)
+        if cp_res != 0:
+            print "Error while executing:", cmd
+            print "Return code:", cp_res
+            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
         
         # Copy the input files into the target directory
         f = file("%s.sh" % label, "w")
@@ -162,6 +204,7 @@ class Cluster:
             print "Error while executing:", cmd
             print "Return code:", cp_res
             sys.stderr.write(cmd + ": exit with code " + str(cp_res))
+            return
         
         # Run the simulation
         cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, self.workdir, label)
@@ -178,6 +221,7 @@ class Cluster:
             print "Error while executing:", cmd
             print "Return code:", cp_res
             sys.stderr.write(cmd + ": exit with code " + str(cp_res))
+            return
             
         # Get the results
         ase_calc.set_label(label)
@@ -201,7 +245,7 @@ class Cluster:
         # Prepare the function for the simultaneous submission
         def compute_single(num, calc):
             atm = ensemble.structures[num].get_ase_atoms()
-            res = self.run_atoms(calc, atm, "ESP_" + str(num), 
+            res = self.run_atoms(calc, atm, self.label + str(num), 
                                  n_nodes = self.n_nodes, 
                                  n_cpu=self.n_cpu,
                                  npool = self.n_pool)
