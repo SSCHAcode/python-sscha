@@ -107,12 +107,14 @@ class SSCHA:
         while running:
             # Generate the ensemble
             self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
-            self.minim.ensemble.generate(self.N_configs)
             
-            # Compute energies and forces
-            self.minim.ensemble.compute_ensemble(self.calc, get_stress, 
+            if pop != start_pop or not restart_from_ens:
+                self.minim.ensemble.generate(self.N_configs)
+            
+                # Compute energies and forces
+                self.minim.ensemble.compute_ensemble(self.calc, get_stress, 
                                                  cluster = self.cluster)
-            #self.minim.ensemble.get_energy_forces(self.calc, get_stress)
+                #self.minim.ensemble.get_energy_forces(self.calc, get_stress)
             
             if ensemble_loc is not None and self.save_ensemble:
                 self.minim.ensemble.save_bin(ensemble_loc, pop)
@@ -285,10 +287,11 @@ class SSCHA:
 
             # Generate the ensemble
             self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
-            self.minim.ensemble.generate(self.N_configs)
+            if pop != start_pop or not restart_from_ens:
+                self.minim.ensemble.generate(self.N_configs)
             
-            # Compute energies and forces
-            self.minim.ensemble.compute_ensemble(self.calc, True, stress_numerical,
+                # Compute energies and forces
+                self.minim.ensemble.compute_ensemble(self.calc, True, stress_numerical,
                                                  cluster = self.cluster)
             #self.minim.ensemble.get_energy_forces(self.calc, True, stress_numerical = stress_numerical)
             
