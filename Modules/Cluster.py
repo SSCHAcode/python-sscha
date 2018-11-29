@@ -113,9 +113,10 @@ class Cluster:
         cmd = self.sshcmd + " %s 'echo ciao'" % self.hostname
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
         output, err = p.communicate()
+        output = output.strip()
         status = p.wait()
         if not err is None:
-            sys.stderr.write(err + "\n")
+            sys.stderr.write(err)
         if status != 0:
             sys.stderr.write("Error, cmd: " + cmd + "\n")
             sys.stderr.write("Exit status:" + str(status))
