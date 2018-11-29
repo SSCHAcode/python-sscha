@@ -115,6 +115,7 @@ class Cluster:
         """
         
         cmd = self.sshcmd + " %s 'echo ciao'" % self.hostname
+        print cmd
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
         output, err = p.communicate()
         output = output.strip()
