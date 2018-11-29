@@ -1449,7 +1449,7 @@ class Ensemble:
             raise ValueError("Error, stress_numerical is not implemented with clusters")
     
         if is_cluster:
-            calculator.compute_ensemble(self, calculator, compute_stress)
+            cluster.compute_ensemble(self, calculator, compute_stress)
         else:
             self.get_energy_froces(calculator, compute_stress, stress_numerical)
 
