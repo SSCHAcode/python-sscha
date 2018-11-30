@@ -43,7 +43,11 @@ __EPSILON__ =  1e-6
 __A_TO_BOHR__ = 1.889725989
 
 try:
-    from ase.units import Rydberg, Bohr
+    from ase.units import create_units
+    units = ase.units.create_units("2006")#Rydberg, Bohr
+    Rydberg = units["Ry"]
+    Bohr = units["Bohr"]
+    
 except:
     Rydberg = 13.605698066
     Bohr = __A_TO_BOHR__

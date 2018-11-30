@@ -8,6 +8,9 @@ import numpy as np
 from ase.units import Rydberg, Bohr
 import ase, ase.io
 
+# SETUP THE CODATA 2006, To match the QE definition of Rydberg
+units = ase.units.create_units("2006")
+
 """
 This is an untility script that is able to manage the submission into
 a cluster of an ensemble
@@ -264,8 +267,8 @@ class Cluster:
                                  n_cpu=self.n_cpu,
                                  npool = self.n_pool)
             if res:
-                ensemble.energies[num] = res["energy"] / Rydberg
-                ensemble.forces[num, :, :] = res["forces"] / Rydberg
+                ensemble.energies[num] = res["energy"] / units["Ry"]
+                ensemble.forces[num, :, :] = res["forces"] / units["Ry"]
                 if get_stress:
                     stress = np.zeros((3,3), dtype = np.float64)
                     stress[0,0] = res["stress"][0]
@@ -278,7 +281,7 @@ class Cluster:
                     stress[0,1] = res["stress"][5]
                     stress[1,0] = res["stress"][5]
                     # Remember, ase has a very strange definition of the stress
-                    ensemble.stresses[num, :, :] = -stress * Bohr**3 / Rydberg
+                    ensemble.stresses[num, :, :] = -stress * units["Bohr"]**3 / units["Ry"]
                 success[num] = True
         
         # Run until some work has not finished
