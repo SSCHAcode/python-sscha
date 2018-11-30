@@ -277,7 +277,8 @@ class Cluster:
                     stress[2,0] = res["stress"][4]
                     stress[0,1] = res["stress"][5]
                     stress[1,0] = res["stress"][5]
-                    ensemble.stresses[num, :, :] = stress * Bohr**3 / Rydberg
+                    # Remember, ase has a very strange definition of the stress
+                    ensemble.stresses[num, :, :] = -stress * Bohr**3 / Rydberg
                 success[num] = True
         
         # Run until some work has not finished
