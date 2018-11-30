@@ -19,6 +19,7 @@ a cluster of an ensemble
 
 class Cluster:
     
+    # The host name for the connection
     hostname=""
     pwd=""
     sshcmd="ssh"
@@ -38,15 +39,34 @@ class Cluster:
     use_memory = False
     v_partition="--partition="
     use_partition= False
+    
+    # This is a set of lines to be runned before the calculation
+    # It can be used to load the needed modules in the cluster
     load_modules=""
+    
+    # Setup the number of cpu, nodes and pools for the calculation
     n_nodes = 1
     n_cpu = 1
     n_pool = 1
+    
+    # This is the default label, change it if you are going to submit
+    # two different calculations in the same working directory
     label = "ESP_"
+    
+    # This is the maximum number of resubmissions after the expected one
+    # from the batch size. It can be use to resubmit the failed jobs.
     max_recalc = 10
+    
+    # This is the time string. Faster job will be the less in the queue,
     time="00:02:00" # 2minutes
+    
+    # The ram required for the calculation
     ram="10000Mb" # 10Gb
+    
+    # Still unused
     prefix_name = "prefix" # Variable in the calculator for differentiating the calculations
+    
+    # This directory is used to work with clusters.
     local_workdir = "cluster_work/"
     
     # The batch size is the maximum number of job to be submitted together.
