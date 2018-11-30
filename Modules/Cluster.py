@@ -49,6 +49,11 @@ class Cluster:
     prefix_name = "prefix" # Variable in the calculator for differentiating the calculations
     local_workdir = "cluster_work/"
     
+    # The batch size is the maximum number of job to be submitted together.
+    # The new jobs will be submitted only after a batch is compleated
+    # Useful if the cluster has a limit for the maximum number of jobs allowed.
+    batch_size = 1000
+    
     
     def __init__(self, hostname, pwd=None, extra_options="", workdir = "",
                  account_name = "", partition_name = "", binary="pw.x -npool $NPOOL -i PREFIX.pwi > PREFIX.pwo",
@@ -283,6 +288,9 @@ class Cluster:
                     # Remember, ase has a very strange definition of the stress
                     ensemble.stresses[num, :, :] = -stress * units["Bohr"]**3 / units["Ry"]
                 success[num] = True
+                
+        # Get the expected number of batch
+        num_batch_offset = int(ensemble.N / self.batch_size)
         
         # Run until some work has not finished
         recalc = 0
@@ -293,19 +301,26 @@ class Cluster:
             false_mask = np.array(success) == False
             false_id = np.arange(ensemble.N)[false_mask]
             
+            count = 0
             # Submit in parallel
             for i in false_id:
+                # Submit only the batch size
+                if count > self.batch_size:
+                    break
                 t = threading.Thread(target = compute_single, args=(i, ase_calc, ))
                 t.start()
                 threads.append(t)
+                count += 1
+                
             
             # Wait until all the job have finished
             for t in threads:
                 t.join(timeout)
             
             recalc += 1
-            if recalc > self.max_recalc:
-                raise ValueError("Error, recalculations exceeded the maximum number of %d" % self.max_recalc)
+            if recalc > num_batch_offset + self.max_recalc:
+                print "Expected batch ordinary resubmissions:", num_batch_offset
+                raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
                 break
             
             
