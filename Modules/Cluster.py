@@ -8,6 +8,9 @@ import numpy as np
 from ase.units import Rydberg, Bohr
 import ase, ase.io
 
+import cellconstructor as CC
+import cellconstructor.Methods
+
 # SETUP THE CODATA 2006, To match the QE definition of Rydberg
 units = ase.units.create_units("2006")
 
@@ -15,6 +18,9 @@ units = ase.units.create_units("2006")
 This is an untility script that is able to manage the submission into
 a cluster of an ensemble
 """
+__CLUSTER_NAMELIST = "cluster"
+__CLUSTER_HOST = "hostname"
+__CLUSTER_PWD = "pwd"
 
 
 class Cluster:
@@ -112,7 +118,7 @@ class Cluster:
         self.hostname = hostname
         if not pwd is None:
             self.pwd = pwd
-            res = os.system("sshpass")
+            res = os.system("sshpass > /dev/null")
             if res != 0:
                 raise ValueError("Error, sshpass command not found, required to connect through password to server.")
             
@@ -263,6 +269,44 @@ class Cluster:
         ase_calc.read_results()
         
         return ase_calc.results
+    
+    def setup_from_namelist(self, namelist):
+        """
+        SETUP THE CLUSTER WITH AN INPUTFILE
+        ===================================
+        
+        This method setup the cluster using a custom input file.
+        The inputfile must have the same shape of QuantumESPRESSO ones.
+        The information about the cluster must be located in a namespace called
+        as __CLUSTER_NAMELIST
+        
+        Parameters
+        ----------
+            namelist: 
+                The parsed namelist dictionary.
+        """
+        
+        
+        # Check if the cluster namelist is present
+        if not __CLUSTER_NAMELIST in namelist.keys():
+            raise ValueError("Error, the parsed namelist must contain %s" % __CLUSTER_NAMELIST)
+            
+        c_info = namelist[__CLUSTER_NAMELIST]
+        keys = c_info.keys()
+        # Setup all the info
+        if __CLUSTER_HOST in keys:
+            self.hostname = c_info[__CLUSTER_HOST]
+        
+        if __CLUSTER_PWD in keys:
+            self.pwd = c_info[__CLUSTER_PWD]
+            # Check if sshpass is present
+            res = os.system("sshpass > /dev/null") 
+            if res != 0:
+                raise ValueError("Error, sshpass command not found, required to connect through password to server.")
+            
+            self.sshcmd = "sshpass -p '" + pwd + "' ssh " + extra_options
+            self.scpcmd = "sshpass -p '" + pwd + "' scp " + extra_options.replace("-p", "-P")
+        
     
     def compute_ensemble(self, ensemble, ase_calc, get_stress = True, timeout=None):
         """

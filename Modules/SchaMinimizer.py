@@ -182,7 +182,6 @@ class SSCHA_Minimizer:
         #dyn_grad, err = self.ensemble.get_free_energy_gradient_respect_to_dyn()
         #dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
         #dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
-        t1 = time.time()
         if self.precond_dyn:
             dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=1)
         else:
@@ -194,15 +193,16 @@ class SSCHA_Minimizer:
 #        qe_sym.SymmetrizeDynQ(dyn_grad, np.array([0,0,0]))
 #        qe_sym.ImposeSumRule(err)
 #        qe_sym.SymmetrizeDynQ(err, np.array([0,0,0]))
+        t1 = time.time()
         if not self.neglect_symmetries:
             qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
-            qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "crystal")
+            qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "custom")
         else:
             for i in range(len(self.dyn.q_tot)):
                 qe_sym.ImposeSumRule(dyn_grad[i, :,:], asr = "custom")
                 qe_sym.ImposeSumRule(err[i, :, :], asr = "custom")
         t2 = time.time()
-        print "Time elapsed to compute the dynamical matrix gradient:", t2 - t1, "s"
+        print "Time elapsed to symmetrize the gradient:", t2 - t1, "s"
         
 #        # get the gradient in the supercell
 #        new_grad_tmp = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot),

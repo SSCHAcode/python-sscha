@@ -947,7 +947,7 @@ class Ensemble:
                 The real space force constant matrix obtained by the
                 self-consistent equation.
         """
-        
+        t1 = time.time()
         supercell_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
         
         # Dyagonalize
@@ -971,20 +971,25 @@ class Ensemble:
             eforces[:,:,:] = self.forces
         for i in range(self.N):
             u_disp[i, :, :] = np.reshape(self.u_disps[i,:], (nat, 3)) 
+        
+        t2 = time.time()
+        print " [GRADIENT] Time to prepare the gradient calculation:", t2 -t1,"s"
             
 
-        
+        t1 = time.time()
         grad, grad_err = SCHAModules.get_gradient_supercell(self.rho, u_disp, eforces, w, pols, trans,
                                                             self.current_T, mass, ityp, log_err, self.N,
                                                             nat, 3*nat, len(mass), preconditioned)
-
+        t2 = time.time()
+        print " [GRADIENT] Time to call the fortran code:", t2 - t1, "s"
     
         # Perform the fourier transform
         q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
                                                    self.current_dyn.structure, supercell_dyn.structure)
         q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
                                                        self.current_dyn.structure, supercell_dyn.structure)
-        
+        t1 = time.time()
+        print " [GRADIENT] Time to get back in fourier space:", t1 - t2, "s"
         
         
         if return_error:
@@ -1455,7 +1460,7 @@ class Ensemble:
         if is_cluster:
             cluster.compute_ensemble(self, calculator, compute_stress)
         else:
-            self.get_energy_froces(calculator, compute_stress, stress_numerical)
+            self.get_energy_forces(calculator, compute_stress, stress_numerical)
 
     def get_energy_forces(self, ase_calculator, compute_stress = True, stress_numerical = False):
         """
