@@ -368,6 +368,9 @@ class Cluster:
         if self.use_partition:
             submission += "#%s %s%s\n" % (self.submit_name, self.v_partition, self.partition_name)
         
+        # Add the set -x option
+        submission += "set -x\n"
+        
         # Add the loading of the modules
         submission += self.load_modules + "\n"
         
