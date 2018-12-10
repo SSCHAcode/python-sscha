@@ -577,7 +577,7 @@ class Cluster:
                         print "Error, Environ variable", __TEMPLATE_ENV__, "exists, but no file", fname, "found."
                         raise IOError("Error while reading the cluster template.")
                     
-                    self.setup_from_namelist(CC.Methods.read_namelist(fname))
+                    self.setup_from_namelist(CC.Methods.read_namelist(newfname))
                 else:
                     print "Error, Environ variable", __TEMPLATE_ENV__, "exists, but not the directory it is pointing to."
                     raise IOError("Error while reading the cluster template.")
