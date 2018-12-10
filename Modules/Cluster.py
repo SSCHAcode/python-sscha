@@ -900,6 +900,12 @@ class Cluster:
             ensemble :
                 The ensemble to be runned.
         """
+        
+        # Check if the compute_ensemble batch must be done
+        if self.job_number != 1:
+            self.compute_ensemble_batch(ensemble, ase_calc, get_stress, timeout)
+            return
+        
         # Track the remaining configurations
         success = [False] * ensemble.N
         

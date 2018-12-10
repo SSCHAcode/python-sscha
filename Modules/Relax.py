@@ -6,15 +6,45 @@ SCHA minimization. It can be both a constant temperature and a
 constant pressure relax. 
 """
 import numpy as np
+import difflib
 import sscha, sscha.Ensemble, sscha.SchaMinimizer
 import sscha.Optimizer
+import sscha.Calculator
+import sscha.Cluster
 import cellconstructor as CC
 import cellconstructor.symmetries
 
+
 __EPSILON__ = 1e-5
 
+__RELAX_NAMESPACE__ = "relax"
+__RELAX_TYPE__ = "type"
+__RELAX_NCONFIGS__ = "n_configs"
+__RELAX_MAX_POP__ = "max_pop_id"
+__RELAX_START_POP__ = "start_pop"
+__RELAX_SAVE_ENSEMBLE__ = "ensemble_datadir"
+__RELAX_TARGET_PRESSURE__ = "target_pressure"
+__RELAX_FIXVOLUME__ = "fix_volume"
+__RELAX_BULK_MODULUS__ = "bulk_modulus"
+
+__TYPE_SINGLE__ = "sscha"
+__TYPE_RELAX__ = "relax"
+__TYPE_VCRELAX__ = "vc-relax"
+__ALLOWED_RELAX_TYPES__ = [__TYPE_RELAX__, __TYPE_VCRELAX__]
+
+__REQ_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__]
+__ALLOWED_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__, __RELAX_MAX_POP__,
+                    __RELAX_START_POP__, __RELAX_SAVE_ENSEMBLE__,
+                    __RELAX_FIXVOLUME__, __RELAX_TARGET_PRESSURE__,
+                    __RELAX_BULK_MODULUS__]
+
 class SSCHA:
-    def __init__(self, minimizer, ase_calculator, N_configs, max_pop = 20, 
+    minim = sscha.SchaMinimizer.SSCHA_Minimizer()
+    bulk_modulus = 100
+    target_pressure = 0
+    fix_volume = False
+    
+    def __init__(self, minimizer = None, ase_calculator=None, N_configs=1, max_pop = 20, 
                  save_ensemble = True, cluster = None):
         """
         This module initialize the relaxer. It may perform
@@ -39,21 +69,119 @@ class SSCHA:
                 will be runned in the provided cluster.
         """
         
-        self.minim = minimizer
+        if minimizer is not None:
+            self.minim = minimizer
         self.calc = ase_calculator
         self.N_configs = N_configs
         self.max_pop = max_pop
         self.cluster = cluster
+        self.start_pop = 1
         
         # If the ensemble must be saved at each iteration.
         # 
         self.save_ensemble = save_ensemble
+        self.data_dir = ""
         
         
 
         self.__cfpre__ = None
         self.__cfpost__ = None
         self.__cfg__ = None
+        
+    def setup_from_namelist(self, namelist):
+        """
+        SETUP THE RELAXER FROM THE NAMELIST
+        ===================================
+        
+        Setup the SSCHA relaxer from the given namelist.
+        
+        Note the calculation will be also started by this method.
+        
+        Parameters
+        ----------
+            namelist : dict
+                A dictionary that contains the namespaces
+        """
+        if not __RELAX_NAMESPACE__ in namelist.keys():
+            raise IOError("Error, %s namespace not found" % __RELAX_NAMESPACE__)
+        
+        c_info = namelist[__RELAX_NAMESPACE__]
+        keys = c_info.keys()
+        
+        # Load the minim and the ensemble if a inputscha namespace is found
+        if "inputscha" in namelist.keys():
+            self.minim.setup_from_namelist(namelist)
+            if self.minim.ensemble is None:
+                raise IOError("Error, please specify the input dynamical matrix.")
+            
+        
+        # Load the cluster if any
+        if sscha.Cluster.__CLUSTER_NAMELIST__ in namelist.keys():
+            self.cluster = sscha.Cluster.Cluster()
+            self.cluster.setup_from_namelist(namelist)
+        
+        # Load the calculator if any
+        if sscha.Calculator.__CALCULATOR_HEAD__ in namelist.keys():
+            self.calc = sscha.Calculator.prepare_calculator_from_namelist(namelist)
+        
+        
+        # Get the number of configurations
+        if __RELAX_NCONFIGS__ in keys:
+            self.N_configs = int(c_info[__RELAX_NCONFIGS__])
+        
+        # Get the maximum population
+        if __RELAX_MAX_POP__ in keys:
+            self.max_pop = int(c_info[__RELAX_MAX_POP__])
+            
+        if __RELAX_START_POP__ in keys:
+            self.start_pop = int(c_info[__RELAX_START_POP__])
+        
+        if __RELAX_SAVE_ENSEMBLE__ in keys:
+            self.save_ensemble = True
+            self.data_dir = c_info[__RELAX_SAVE_ENSEMBLE__]
+        
+        if __RELAX_BULK_MODULUS__ in keys:
+            self.bulk_modulus = np.float64(c_info[__RELAX_BULK_MODULUS__])
+            
+        if __RELAX_TARGET_PRESSURE__ in keys:
+            self.target_pressure = np.float64(c_info[__RELAX_TARGET_PRESSURE__])
+            
+        if __RELAX_FIXVOLUME__ in keys:
+            self.fix_volume = bool(c_info[__RELAX_FIXVOLUME__])
+        
+        
+        # Check the allowed keys
+        for k in keys: 
+            if not k in __ALLOWED_KEYS__:
+                print "Error with the key:", k
+                print "Did you mean something like:", difflib.get_close_matches(k, __ALLOWED_KEYS__)
+                raise IOError("Error in calculator namespace: key '" + k +"' not recognized.")
+        
+        # Check for mandatory keys
+        for req_key in __REQ_KEYS__:
+            if not req_key in keys:
+                raise IOError("Error, the calculator configuration namelist requires the keyword: '" + req_key + "'")
+        
+        
+        
+        # Get the calculation type
+        if __RELAX_TYPE__ in keys:
+            rtype = c_info[__RELAX_TYPE__]
+            if not rtype in __ALLOWED_RELAX_TYPES__:
+                print "Unknown relaxation option:", rtype
+                print "Did you mean:", difflib.get_close_matches(rtype, __ALLOWED_RELAX_TYPES__)
+                raise ValueError("Error with key %s" % __RELAX_TYPE__)
+        
+            # Initialize the minimizer
+            #self.minim.init()
+            self.minim.print_info()
+        
+            if rtype == __TYPE_RELAX__:
+                self.relax(False, self.minim.ensemble.has_stress, self.data_dir,
+                           self.start_pop)
+            elif rtype == __TYPE_VCRELAX__:
+                self.vc_relax(self.target_pressure, self.bulk_modulus, 
+                              False, self.start_pop, fix_volume=self.fix_volume)
         
     def setup_custom_functions(self, custom_function_pre = None,
                                custom_function_post = None,

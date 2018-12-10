@@ -1,0 +1,125 @@
+! THE FULL AUTOMATIC SCHA RELAXATION
+! ==================================
+!
+! execute this with:
+! sscha -i full_relax.in > full_relax.out 2> full_relax.err
+!
+! 
+
+! The sscha minimization
+! This is equal to the old one
+&inputscha
+	! These are needed only for the kl ratio
+	n_random = 100
+	n_random_eff = 50
+
+	fildyn_prefix = "../ensemble_data_test/dyn"
+	nqirr = 1
+	supercell_size = 1 1 1
+
+	T = 0.0d0
+	
+	lambda_a = 0.01
+	lambda_w = 0
+	minim_struc = .false.
+
+	meaningful_factor = 1
+	preconditioning = .true.
+	root_representation = "normal"
+
+	print_stress = .true.
+&end
+
+! The new relaxer namelist
+&relax
+	! This is the real number of configurations used
+	n_configs = 100
+
+	! This is the type, a single standard relaxation
+	type = "relax"
+
+	! Stop after 4 populations
+	max_pop_id = 4
+
+	! Where do I save the ensemble?
+	ensemble_datadir = "data"
+&end
+	
+
+
+! Connection file to the MARCONI supercomputer
+! this is just an example.
+! MARCONI works with standard slurm utilities
+! therefore no custom variable declaration is needed
+
+&cluster
+	! Connection info
+	hostname = "marconi"
+	account = "IscrB_COMRED"
+	partition_name = "knl_usr_prod"
+
+	! This is necessary, the directory in which to carry the
+	! simulation.
+	! You can use the evironmental variables of the cluster,
+	! they will be parsed correctly.
+	! This directory will be created if not present
+	workdir = "$WORK/test"
+
+	! The path to the executable (qe in this case)
+	! NPOOL will be replaced by n_pools, while PREFIX with the name
+	binary_path = "$HOME/qe-6.2.1/bin/pw.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo"
+
+	! The command for the parallel mpi execution
+	! NPROC will be substituted with the right choice.
+	mpicmd = "srun --mpi=pmi2 -n NPROC"
+
+
+	!NOTE:
+	!You can specify a password in this way:
+	!pwd = "ciaociao"
+	!But it is not save to store the password in clear text.
+	!I recommend you  to use a public-private key crittografy instead.
+	!(To use pwd keyword you need to have sshpass installed)
+
+	! Resources (I think they are pretty self explaining)
+	n_nodes = 1
+	n_cpu = 32
+	n_pools = 4
+	n_time = "00:20:00"  ! 10 seconds (it must be a string)
+	! Note you can also specify the ram as n_ram
+
+	! We can specify the submission strategy
+	! This means 10 jobs per works
+	job_numbers = 10
+	! Runned togheter 1 by 1
+	n_together = 1
+	timeout = 120 ! Max number of second per single job
+&end
+
+
+!
+! This is the setup of a QE calculator
+! It is used in the cluster
+!
+&calculator
+	! The calculator type
+	program = "quantum-espresso"
+	
+	! k grid for the electronic calculation
+	k_points = 2 2 2
+	k_offset = 0 0 0
+
+	! Here the pseudopotentials
+	! Note they are pseudo_ followed by the atom name
+	! (it is not case sensitive)
+	pseudo_H = "H.pbe-rrkjus_psl.0.1.UPF"
+	pseudo_O = "O.pbe-n-rrkjus_psl.0.1.UPF"
+
+	! Here all the specific qe variables
+	tprnfor = .true.
+	tstress = .true.
+	ecutwfc = 45
+	ecutrho = 360
+	conv_thr = 1d-8
+	disk_io = "none" ! This is very important!!!
+&end

@@ -27,6 +27,7 @@ import cellconstructor.Methods
 
 import sscha, sscha.SchaMinimizer
 import sscha.Ensemble
+import sscha.Relax
 import argparse
 
 PROG_NAME = "sscha"
@@ -100,9 +101,27 @@ for x_con in REQUIRED_ARGUMENTS.keys():
     if not x_con in namelist.keys():
         raise IOError("Error, required the control '&%s' in the input file." % x_con)
 
-    for x_req in REQUIRED_ARGUMENTS[x_con]:
-        if not x_req in namelist[x_con].keys():
-            raise IOError("Error, the namelist '%s' must contain the '%s' keyword." % (x_con, x_req))
+    if not sscha.Relax.__RELAX_NAMESPACE__ in namelist.keys():
+        for x_req in REQUIRED_ARGUMENTS[x_con]:
+            if not x_req in namelist[x_con].keys():
+                raise IOError("Error, the namelist '%s' must contain the '%s' keyword." % (x_con, x_req))
+
+# Check if the relax is hypothized
+if sscha.Relax.__RELAX_NAMESPACE__ in namelist.keys():
+    relax = sscha.Relax.SSCHA()
+    print "Found a %s namespace!" % sscha.Relax.__RELAX_NAMESPACE__
+    print "Performing a whole relaxation."
+    
+    relax.setup_from_namelist(namelist)
+    
+    # Save the final dynamical matrix
+    print "Saving the final dynamical matrix in %s" % (minim.dyn_path + "_popuation%d_" % minim.population)
+    relax.minim.dyn.save_qe(minim.dyn_path + "_population%d_" % minim.population)
+    
+    # Plot the results
+    relax.minim.plot_results(args.save_data, args.plot)
+    
+    exit(0)
 
 
 # Parse the input file

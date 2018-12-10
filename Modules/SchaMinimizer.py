@@ -331,7 +331,13 @@ class SSCHA_Minimizer:
         """
         
         # Get the dictionary
-        namelist = CC.Methods.read_namelist(input_file)
+        namelist = None
+        if isinstance(input_file, str):
+            namelist = CC.Methods.read_namelist(input_file)
+        elif isinstance(input_file, dict):
+            namelist = input_file
+        else:
+            raise ValueError("Error, required both a dict or a path to file.")
         
         # Extract the principal namelist
         if not "inputscha" in namelist.keys():
@@ -348,6 +354,7 @@ class SSCHA_Minimizer:
         
         if "lambda_w" in keys:
             self.min_step_struc = np.float64(namelist["lambda_w"])
+            
         
         if "minim_struc" in keys:
             self.minim_struct = bool(namelist["minim_struc"])
@@ -456,6 +463,11 @@ class SSCHA_Minimizer:
             # Load the data dir
             self.population = int(namelist["population"])
             self.ensemble.load(namelist["data_dir"], int(namelist["population"]), int(namelist["n_random"]))
+        
+        if "print_stress" in keys:
+            if not "fildyn_prefix" in keys:
+                raise ValueError("Error, please specify a dynamical matrix.")
+            self.ensemble.has_stress = True
         
     def print_info(self):
         """
@@ -999,26 +1011,28 @@ class SSCHA_Minimizer:
         # gradient
         if len(self.__gc__) != len(self.__fe__):
             #grad, grad_err = self.ensemble.get_fc_from_self_consistency(True, True)
-            grad, grad_err = self.ensemble.get_preconditioned_gradient(True, True)
-            
-            # Initialize the symmetry
-            qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
-            qe_sym.SetupQPoint(verbose = True)
+#            grad, grad_err = self.ensemble.get_preconditioned_gradient(True, True)
+#            grad = self.__gc__[-1]
+#            grad_err = self.__gc_err__[-1]
+#            
+#            # Initialize the symmetry
+#            qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+#            qe_sym.SetupQPoint(verbose = True)
+#    
+#            struct_grad, struct_grad_err = self.ensemble.get_average_forces(True)
+#    
+#            qe_sym.SymmetrizeVector(struct_grad)
+#            qe_sym.SymmetrizeVector(struct_grad_err)
+#            
+#            # Get the gradient modulus
+#            gc = np.einsum("abc, acb", grad, grad)
+#            gc_err = np.einsum("abc, acb", grad_err, grad_err)
     
-            struct_grad, struct_grad_err = self.ensemble.get_average_forces(True)
+            self.__gw__.append(self.__gw__[-1])#np.sqrt( np.einsum("ij, ij", struct_grad, struct_grad)))
+            self.__gw_err__.append(self.__gw_err__[-1])#np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
     
-            qe_sym.SymmetrizeVector(struct_grad)
-            qe_sym.SymmetrizeVector(struct_grad_err)
-            
-            # Get the gradient modulus
-            gc = np.einsum("abc, acb", grad, grad)
-            gc_err = np.einsum("abc, acb", grad_err, grad_err)
-    
-            self.__gw__.append(np.sqrt( np.einsum("ij, ij", struct_grad, struct_grad)))
-            self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
-    
-            self.__gc__.append(gc)
-            self.__gc_err__.append(gc_err)
+            self.__gc__.append(self.__gc__[-1])
+            self.__gc_err__.append(self.__gc_err__[-1])
         
         # Convert the data in numpy arrays
         fe = np.array(self.__fe__) * __RyTomev__
