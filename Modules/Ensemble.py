@@ -902,7 +902,8 @@ class Ensemble:
         return new_phi
     
     def get_preconditioned_gradient(self, subtract_sscha = True, return_error = False, 
-                                    use_ups_supercell = True, preconditioned = 1):
+                                    use_ups_supercell = True, preconditioned = 1,
+                                    fast_grad = False):
         """
         SELF CONSISTENT SCHA EQUATION
         =============================
@@ -977,9 +978,16 @@ class Ensemble:
             
 
         t1 = time.time()
-        grad, grad_err = SCHAModules.get_gradient_supercell(self.rho, u_disp, eforces, w, pols, trans,
-                                                            self.current_T, mass, ityp, log_err, self.N,
-                                                            nat, 3*nat, len(mass), preconditioned)
+        if not fast_grad:
+            grad, grad_err = SCHAModules.get_gradient_supercell(self.rho, u_disp, eforces, w, pols, trans,
+                                                                self.current_T, mass, ityp, log_err, self.N,
+                                                                nat, 3*nat, len(mass), preconditioned)
+        else:
+            grad, grad_err = SCHAModules.get_gradient_supercell_fast(self.rho, u_disp, eforces, w, pols, trans,
+                                                                     self.current_T, mass, ityp, log_err, self.N,
+                                                                     nat, 3*nat, len(mass), preconditioned)
+        
+            
         t2 = time.time()
         print " [GRADIENT] Time to call the fortran code:", t2 - t1, "s"
     

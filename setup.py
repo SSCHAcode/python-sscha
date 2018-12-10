@@ -10,7 +10,8 @@ SCHAModules = Extension(name = "SCHAModules",
                                    "SCHAModules/get_gradient_supercell.f90",
                                    "SCHAModules/get_upsilon_matrix.f90",
                                    "SCHAModules/multiply_lambda_tensor.f90",
-                                   "SCHAModules/cell_force.f90"],
+                                   "SCHAModules/cell_force.f90",
+                                   "SCHAModules/get_gradient_supercell_fast.f90"],
                         libraries = ["lapack", "blas"],
                         extra_f90_compile_args = ["-cpp"])
 
@@ -25,7 +26,7 @@ setup( name = "python-sscha",
        package_dir = {"sscha": "Modules"},
        install_requires = ["numpy", "ase", "scipy", "cellconstructor", "lapack", "blas"],
        ext_modules = [SCHAModules],
-       scripts = ["scripts/sscha"],
+       scripts = ["scripts/sscha", "scripts/cluster_check.x"],
        license = "GPLv3"
        )
 

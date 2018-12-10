@@ -4,7 +4,17 @@
 !
 ! Multiply the given matrix for the Lambda tensor, and overwrite the result
 
-
+!
+! The following matrix get the F_munu defined as
+!
+! f_munu = - 1/(4w_\mu w_\nu) * 
+!    * (2 * n_mu + 1) / (8*w_mu) - dn_dw/4       if w_mu = w_nu
+!    * (n_mu + n_nu +1) / (4*(w_mu + w_nu)) - (n_mu - n_nu) / (4*(w_mu - w_nu)) if w_mu != w_nu
+! The disequality of w_mu and w_nu is checked with a threshold epsilon defined as a parameter
+!
+! Note that the Lambda tensor, in this way, is defined as (hbar = 1)
+!   Lambda^{abcd} = \sum_{\mu\nu} f_\mu\nu (e_nu^a e_mu^b e_nu^c e_mu^d)/sqrt(Ma Mb Mc Md)
+!
 subroutine get_fmunu(w_mu, w_nu, T, f_munu) 
   implicit none
   double precision, intent(out) :: f_munu
@@ -125,7 +135,7 @@ subroutine multiply_lambda_tensor(nmodes, nat, ntyp, wr, pols, trans, &
 
         !print *, "WMU:", wr(mu), "WNU:", wr(nu), "FMUNU:", fm, "<emu| M |enu>:", matrix_munu
         !print *, "VAUX:", v_aux1(:)
-        call flush()
+        !call flush()
         ! Multiply the f_munu
         if (inverse) then
            matrix_munu = matrix_munu / fm
@@ -143,3 +153,4 @@ subroutine multiply_lambda_tensor(nmodes, nat, ntyp, wr, pols, trans, &
      end do
   end do
 end subroutine multiply_lambda_tensor
+

@@ -1,0 +1,81 @@
+! Connection file to the IRENE supercomputer
+! this is just an example.
+! IRENE works with standard slurm utilities
+! therefore no custom variable declaration is needed
+!
+! Note that you will node the file inside init_script
+! "$SSCHA_CLUSTERS_DIR/load_irene.sh"
+! In the local computer, this is used to specify any extra
+! variable to be setted up before the calculation.
+! In this case, it just contains the module loading:
+! module load espresso
+
+&cluster
+	! Connection info
+	hostname = "irene"
+	account = "ra4186@skylake"
+	partition_name = "skylake"
+	pwd = "C0ns3rv@t0ri0!!!"
+	
+	! This is necessary, the directory in which to carry the
+	! simulation.
+	! You can use the evironmental variables of the cluster,
+	! they will be parsed correctly.
+	! This directory will be created if not present
+	workdir = "$CCCSCRATCHDIR/test"
+
+	! The path to the executable (qe in this case)
+	! NPOOL will be replaced by n_pools, while PREFIX with the name
+	binary_path = "pw.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo"
+
+	! The command for the parallel mpi execution
+	! NPROC will be substituted with the right choice.
+	mpicmd = "ccc_mprun -n NPROC -E'--exclusive' "
+
+	! Load the espresso module
+	! This is a script copied in the beginning of the calculation
+	init_script = "$SSCHA_CLUSTERS_DIR/load_irene.sh"
+
+	! Resources (I think they are pretty self explaining)
+	use_nodes = .false. ! Do not specify the nodes count
+	n_cpu = 16 
+	n_pools = 1
+	n_time = "00:01:00"  ! 1 minute (it must be a string)
+	! Note you can also specify the ram as n_ram
+
+	! We can specify the submission strategy
+	! This means 10 jobs per works
+	job_numbers = 10
+	! Runned togheter 2 by 2 (sharing the same nodes)
+	n_together = 2
+	timeout=6 ! Max number of second per single job
+&end
+
+
+!
+! This is the setup of a QE calculator
+! It is used in the cluster
+!
+&calculator
+	! The calculator type
+	program = "quantum-espresso"
+	
+	! We take only a gamma point calculation
+	k_points = 2 2 1
+	k_offset = 0 0 1
+
+	! Here the pseudopotentials
+	! Note they are pseudo_ followed by the atom name
+	pseudo_H = "H.bare.upf"
+
+	! Here all the specific qe variables
+	tprnfor = .true.
+	tstress = .true.
+	ecutwfc = 60
+	ecutrho = 240
+	occupations = "smearing"
+	smearing = "mv"
+	degauss = 0.03
+	input_dft = "blyp"
+	disk_io = "none" ! This is very important!!!
+&end

@@ -348,6 +348,14 @@ class SSCHA_Minimizer:
         
         if "lambda_w" in keys:
             self.min_step_struc = np.float64(namelist["lambda_w"])
+        
+        if "minim_struc" in keys:
+            self.minim_struct = bool(namelist["minim_struc"])
+        if "minim_struct" in keys:
+            self.minim_struct = bool(namelist["minim_struct"])
+            
+            if "minim_struc" in keys:
+                raise ValueError("Error, both minim_struc and minim_struct defined in input.")
             
         if "precond_wyck" in keys:
             self.precond_wyck = bool(namelist["precond_wyck"])

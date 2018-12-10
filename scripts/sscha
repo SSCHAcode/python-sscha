@@ -30,7 +30,7 @@ import sscha.Ensemble
 import argparse
 
 PROG_NAME = "sscha"
-VERSION = 0.1
+VERSION = "SSCHA, alpha version, not yet released."
 DESCRIPTION = r"""
 
 
@@ -44,9 +44,9 @@ DESCRIPTION = r"""
 
 
 
-Wellcome to the SSCHA code. This script will start 
-a SSCHA minimization according to the options parsed
-from the input file.
+Wellcome to the SSCHA code. 
+This script will start a SSCHA minimization 
+according to the options parsed from the input file.
 Note, you can also use the SSCHA utilities directly 
 by programming small and easy python scripts. 
 Refer to the documentation for more details.
