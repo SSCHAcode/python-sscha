@@ -181,7 +181,7 @@ class SSCHA:
                            self.start_pop)
             elif rtype == __TYPE_VCRELAX__:
                 self.vc_relax(self.target_pressure, self.bulk_modulus, 
-                              False, self.start_pop, fix_volume=self.fix_volume)
+                              False, self.data_dir, self.start_pop, fix_volume=self.fix_volume)
         
     def setup_custom_functions(self, custom_function_pre = None,
                                custom_function_post = None,
