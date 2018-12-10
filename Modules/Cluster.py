@@ -419,9 +419,12 @@ class Cluster:
                 continue
             
             # Get the results
-            calc.set_label("%s/%s" % (self.local_workdir, lbl))
-            calc.read_results()
-            results[i] = copy.deepcopy(calc.results)
+            try:
+                calc.set_label("%s/%s" % (self.local_workdir, lbl))
+                calc.read_results()
+                results[i] = copy.deepcopy(calc.results)
+            except:
+                pass
         
         return results
         
