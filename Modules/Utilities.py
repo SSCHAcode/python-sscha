@@ -10,6 +10,69 @@ import cellconstructor as CC
 import cellconstructor.Phonons
 import numpy as np
 
+__UTILS_NAMESPACE__ = "utils"
+__UTILS_SAVEFREQ_FILENAME__ = "save_freq_filename"
+__UTILS_SAVERHO_FILENAME__ = "save_rho_filename"
+__UTILS_LOCKMODE_START__ = "mu_lock_start"
+__UTILS_LOCKMODE_END__ = "mu_lock_end"
+__UTILS_FREEMODE_START__ = "mu_free_start"
+__UTILS_FREEMODE_END__ = "mu_free_end"
+__UTILS_PROJECT_DYN__ = "project_dyn"
+__UTILS_PROJECT_STRUCTURE__ = "project_structure"
+
+
+def get_custom_functions_from_namelist(namelist, dyn):
+    """
+    GET CFUNCTIONS FROM NAMELIST
+    ============================
+    
+    This method reads a namelist and returns the three pointers
+    to thee custom functions.
+    
+    NOTE: Up to know the mode locking is not abilitated
+    
+    Parameters
+    ----------
+        namelist : dict
+            The dictionary containing the parsed namelist
+        dyn : CC.Phonons.Phonons
+            The dynamical matrix, used if you want to setup the
+            mode locking
+    
+    Results
+    -------
+        cf_pre, cf_grad, cf_post:
+            Three custom function to be executed, respectively,
+            before, during and after the minimization step.
+    """
+    if not __UTILS_NAMESPACE__ in namelist.keys():
+        raise IOError("Error, the namespace %s is missing" % __UTILS_NAMESPACE__)
+    
+    c_info = namelist[__UTILS_NAMESPACE__]
+    keys = c_info.keys()
+    
+    use_io = False
+    use_modelocking = False
+    
+    io_info = IOInfo()
+    
+    if __UTILS_SAVEFREQ_FILENAME__ in keys:
+        use_io = True
+        io_info.SetupSaving(c_info[__UTILS_SAVEFREQ_FILENAME__])
+    
+    if __UTILS_SAVERHO_FILENAME__ in keys:
+        use_io = True
+        io_info.SetupWeights(c_info[__UTILS_SAVERHO_FILENAME__])
+    
+    def cfp(minim):
+        if use_io:
+            return io_info.CFP_SaveAll
+    
+    return None, None, cfp
+        
+    
+
+
 class ModeProjection:
     def __init__(self, pols, masses_array):
         """

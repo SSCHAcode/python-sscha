@@ -272,7 +272,7 @@ class Cluster:
                 Extension of the output filename.
             label : string, optional
                 The root of the input file.
-            n_togheder : int, optional
+            n_togheder : int, optional (DO NOT USE)
                 If present, the job will lunch a new job immediately after the other 
                 is ended. This is usefull to further reduce the number of submitted 
                 jobs.
@@ -283,6 +283,10 @@ class Cluster:
                 Returns a list of results dicts, one for each structure.
         """
         N_structs  = len(list_of_structures)
+        
+        if n_togheder != 1:
+            raise NotImplementedError("Error, n_togheder != 1 does not work!")
+            
         
         # Prepare the input atoms
         app_list = ""
@@ -334,21 +338,21 @@ class Cluster:
             print app_list
             
         # Save the app list and copy it to the destination
-        app_list_name = "%s_app.list" % (label + "_" + str(indices[0]))
-        app_list_path = "%s/%s" % (self.local_workdir, app_list_name)
-        f = file(app_list_path, "w")
-        f.write(app_list)
-        f.close()
+        #app_list_name = "%s_app.list" % (label + "_" + str(indices[0]))
+        #app_list_path = "%s/%s" % (self.local_workdir, app_list_name)
+        #f = file(app_list_path, "w")
+        #f.write(app_list)
+        #f.close()
         
-        # Copy the app_list into the destination
-        cmd = self.scpcmd + " %s %s:%s" % (app_list_path, self.hostname, 
-                                           self.workdir)
-        cp_res = os.system(cmd)
-        if cp_res != 0:
-            print "Error while executing:", cmd
-            print "Return code:", cp_res
-            sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
-            return results #[None] * N_structs
+#        # Copy the app_list into the destination
+#        cmd = self.scpcmd + " %s %s:%s" % (app_list_path, self.hostname, 
+#                                           self.workdir)
+#        cp_res = os.system(cmd)
+#        if cp_res != 0:
+#            print "Error while executing:", cmd
+#            print "Return code:", cp_res
+#            sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
+#            return results #[None] * N_structs
         
         
         # prepare the submission script
@@ -378,8 +382,8 @@ class Cluster:
         submission += "cd " + self.workdir + "\n"
         
         # Use the xargs trick
-        submission += "xargs -d " + r"'\n'" + " -L1 -P%d -a %s -- bash -c\n" % (n_togheder, 
-                                                                               app_list_name)
+        #submission += "xargs -d " + r"'\n'" + " -L1 -P%d -a %s -- bash -c\n" % (n_togheder, 
+        submission += app_list 
         
         # Copy the submission script
         sub_fpath = "%s/%s.sh" % (self.local_workdir, label + "_" + str(indices[0]))
