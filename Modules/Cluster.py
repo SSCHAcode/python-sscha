@@ -821,7 +821,10 @@ class Cluster:
                 num = jobs_id[i]
                 
                 # Check if the run was good
-                resk = res.keys()
+                try:
+                    resk = res.keys()
+                except:
+                    continue
                 check_e = "energy" in resk
                 check_f = "forces" in resk
                 check_s = "stress" in resk
