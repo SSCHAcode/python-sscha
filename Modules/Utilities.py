@@ -6,6 +6,7 @@ The function are classified as:
 CGF : custom_gradient_function
 
 """
+import difflib
 import cellconstructor as CC
 import cellconstructor.Phonons
 import numpy as np
@@ -19,6 +20,11 @@ __UTILS_FREEMODE_START__ = "mu_free_start"
 __UTILS_FREEMODE_END__ = "mu_free_end"
 __UTILS_PROJECT_DYN__ = "project_dyn"
 __UTILS_PROJECT_STRUCTURE__ = "project_structure"
+
+__ALLOWED_KEYS__ = [__UTILS_SAVEFREQ_FILENAME__, __UTILS_SAVERHO_FILENAME__,
+                    __UTILS_LOCKMODE_START__, __UTILS_LOCKMODE_END__,
+                    __UTILS_FREEMODE_START__, __UTILS_FREEMODE_END__,
+                    __UTILS_PROJECT_DYN__, __UTILS_PROJECT_STRUCTURE__]
 
 
 def get_custom_functions_from_namelist(namelist, dyn):
@@ -56,6 +62,15 @@ def get_custom_functions_from_namelist(namelist, dyn):
     
     io_info = IOInfo()
     
+    # Check for unknown keys
+    for k in keys:
+        if not k in __ALLOWED_KEYS__:
+            print "Error with the key:", k
+            print "Did you mean something like:", difflib.get_close_matches(k, __ALLOWED_KEYS__)
+            raise IOError("Error in "+__UTILS_NAMESPACE__+" namespace: key '" + k +"' not recognized.")
+    
+    
+    
     if __UTILS_SAVEFREQ_FILENAME__ in keys:
         use_io = True
         io_info.SetupSaving(c_info[__UTILS_SAVEFREQ_FILENAME__])
@@ -67,6 +82,98 @@ def get_custom_functions_from_namelist(namelist, dyn):
     def cfp(minim):
         if use_io:
             return io_info.CFP_SaveAll
+        
+    # Setup the mode projection
+    locking = False
+    mu_start = 0
+    mu_end = dyn.structure.N_atoms * 3
+    if __UTILS_LOCKMODE_START__ in keys:
+        use_modelocking = True
+        locking = True
+        mu_start = int(c_info[__UTILS_LOCKMODE_START__]) - 1
+    if __UTILS_LOCKMODE_END__ in keys:
+        use_modelocking = True
+        locking = True
+        mu_end = int(c_info[__UTILS_LOCKMODE_END__]) - 1
+    if __UTILS_FREEMODE_START__ in keys:
+        use_modelocking = True
+        if locking:
+            raise ValueError("Error, you cannot set both to free and lock modes.")
+        
+        mu_start = int(c_info[__UTILS_FREEMODE_START__]) - 1
+    if __UTILS_FREEMODE_END__ in keys:
+        use_modelocking = True
+        if locking:
+            raise ValueError("Error, you cannot set both to free and lock modes.")
+        
+        mu_end = int(c_info[__UTILS_FREEMODE_END__]) - 1
+        
+    project_structure = True
+    project_dyn = True
+    if __UTILS_PROJECT_DYN__ in keys:
+        project_dyn = bool(c_info[__UTILS_PROJECT_DYN__])
+    if __UTILS_PROJECT_STRUCTURE__ in keys:
+        project_structure = bool(c_info[__UTILS_PROJECT_STRUCTURE__])
+    
+    
+    # Get the pols
+    nat = dyn.structure.N_atoms
+    nq = len(dyn.q_tot)
+    n_selected = mu_end - mu_start
+    if n_selected < 0:
+        raise ValueError("Error, the start mode cannot be smaller than the final one.")
+        
+    pols = np.zeros( (3*nat, n_selected, nq), dtype = np.complex128, order = "F")
+    
+    if use_modelocking:
+        
+        if mu_start < 0 or mu_start >= 3*nat:
+            raise ValueError("Error, the modes specified for modelocking must be between %d and %d" % (1, 3*nat))
+        
+        if mu_end < 0 or mu_end >= 3*nat:
+            raise ValueError("Error, the modes specified for modelocking must be between %d and %d" % (1, 3*nat))
+
+        for iq in xrange(nq):
+            w, p_v = dyn.DyagDinQ(iq)
+            pols[:, :, iq] = p_v[:, mu_start : mu_end]
+        
+        # Setup the mode projection
+        ModProj = ModeProjection(pols, dyn.structure.get_masses_array())
+    
+        def modlock(dyn_grad, struct_grad):
+            if project_dyn and project_structure:
+                if locking:
+                     # Project out the modes
+                     dyn1 = dyn_grad.copy()
+                     struc1 = struct_grad.copy()
+                     
+                     ModProj.CFG_ProjectOnModes(dyn1, struc1)
+                     dyn_grad -= dyn1
+                     struct_grad -= struc1
+                else:
+                     ModProj.CFG_ProjectOnModes(dyn_grad, struct_grad)
+            elif project_dyn:
+                if locking:
+                     # Project out the modes
+                     dyn1 = dyn_grad.copy()
+                     
+                     ModProj.CFG_ProjectDyn(dyn1, None)
+                     dyn_grad -= dyn1
+                else:
+                     ModProj.CFG_ProjectDyn(dyn_grad, None)
+            elif project_structure:
+                if locking:
+                     # Project out the modes
+                     struc1 = struct_grad.copy()
+                     
+                     ModProj.CFG_ProjectStructure(None, struc1)
+                     struct_grad -= struc1
+                else:
+                     ModProj.CFG_ProjectStructure(None, struct_grad)
+            else:
+                raise ValueError("Internal error, asked for mode locking but neither the dyn or the structure is locked.")
+        
+        return None, modlock, cfp
     
     return None, None, cfp
         

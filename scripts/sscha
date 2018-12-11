@@ -28,6 +28,7 @@ import cellconstructor.Methods
 import sscha, sscha.SchaMinimizer
 import sscha.Ensemble
 import sscha.Relax
+import sscha.Utilities
 import argparse
 
 PROG_NAME = "sscha"
@@ -127,7 +128,7 @@ if sscha.Relax.__RELAX_NAMESPACE__ in namelist.keys():
 # Parse the input file
 t1 = time.time()
 print "Loading everything..."
-minim.setup_from_namelist(line_list)
+minim.setup_from_namelist(namelist)
 t2 = time.time()
 print "Loaded in %.4f seconds." % (t2 - t1)
 
@@ -138,8 +139,16 @@ minim.init()
 print "System initialized."
 minim.print_info()
 print ""
-minim.run()
 
+# If present, setup the custom functions
+if sscha.Utilities.__UTILS_NAMESPACE__ in namelist:
+    cfs = sscha.Utilities.get_custom_functions_from_namelist(namelist, minim.dyn)    
+    minim.run(custom_function_pre = cfs[0], 
+              custom_function_gradient = cfs[1],
+              custom_function_post = cfs[2])
+else:
+    minim.run()
+    
 print ""
 print "Minimization ended."
 minim.finalize(2)

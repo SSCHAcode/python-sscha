@@ -206,7 +206,7 @@ class Ensemble:
         total_t_for_loading = 0
         total_t_for_sscha_ef = 0
         t_before_for = time.time()
-        for i in range(self.N):
+        for i in xrange(self.N):
             # Load the structure
             structure = CC.Structure.Structure()
             if os.path.exists("%s/scf_population%d_%d.dat" % (data_dir, population, i+1)):
@@ -352,7 +352,7 @@ class Ensemble:
             
         super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
             
-        for i in range(self.N):
+        for i in xrange(self.N):
             # Save the forces
             np.savetxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1), self.forces[i,:,:] / A_TO_BOHR)
             
@@ -446,7 +446,7 @@ class Ensemble:
         
         # Build the structures
         self.structures = [None] * self.N
-        for i in range(self.N):
+        for i in xrange(self.N):
             self.structures[i] = super_structure.copy()
             self.structures[i].coords = self.xats[i,:,:]
             self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
@@ -578,7 +578,7 @@ class Ensemble:
         Nat_sc = super_structure.N_atoms
         
         # Get the new displacements in the supercell
-        for i in range(self.N):
+        for i in xrange(self.N):
             self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
             
             # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
@@ -612,7 +612,7 @@ class Ensemble:
         dups = ups_new - ups_old
         
         rho_tmp = np.ones( self.N, dtype = np.float64) * np.prod( old_a / new_a)
-        for i in range(self.N):
+        for i in xrange(self.N):
             v = dups.dot(self.u_disps[i, :]) * __A_TO_BOHR__
             rho_tmp[i] *= np.exp(-0.5 *__A_TO_BOHR__ * self.u_disps[i, :].dot(v) )
         # Lets try to use this one
@@ -760,7 +760,7 @@ class Ensemble:
             new_forces = np.zeros((self.N, nat, 3), dtype  =np.float64, order = "C")
             
             # Project in the unit cell the forces
-            for i in range(nat):
+            for i in xrange(nat):
                 #print "%d) ITAU LIST:" % i, itau == i
                 new_forces[:, i, :] = np.sum(eforces[:, itau==i,:], axis = 1) / np.prod(self.supercell)
                 #new_forces[:, i, :] = 
@@ -970,7 +970,7 @@ class Ensemble:
             eforces[:,:,:] = self.forces - self.sscha_forces
         else:
             eforces[:,:,:] = self.forces
-        for i in range(self.N):
+        for i in xrange(self.N):
             u_disp[i, :, :] = np.reshape(self.u_disps[i,:], (nat, 3)) 
         
         t2 = time.time()
@@ -1141,15 +1141,15 @@ class Ensemble:
         # Get the correctly shaped polarization vectors
         er = np.zeros( (nat, len(wr), 3), dtype = np.float64, order = "F")
         
-        for i in range(len(wr)):
-            for j in range(nat):
+        for i in xrange(len(wr)):
+            for j in xrange(nat):
                 er[j, i, 0] = pols[3*j, i] 
                 er[j, i, 1] = pols[3*j+1, i] 
                 er[j, i, 2] = pols[3*j+2, i] 
                 
         # Prepare the displacement in fortran order
         u_disps = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
-        for i in range(self.N):
+        for i in xrange(self.N):
             u_disps[i,:,:] = np.reshape(self.u_disps[i,:], (nat, 3))
         
         abinit_stress = np.einsum("abc -> cba", self.stresses, order = "F")
@@ -1172,7 +1172,7 @@ class Ensemble:
                 new_forces = np.zeros((self.N, nat, 3), dtype  =np.float64, order = "C")
                 
                 # Project in the unit cell the forces
-                for i in range(nat):
+                for i in xrange(nat):
                     #print "%d) ITAU LIST:" % i, itau == i
                     new_forces[:, i, :] = np.sum(eforces[:, itau==i,:], axis = 1) / np.prod(self.supercell)
                     #new_forces[:, i, :] = 
@@ -1181,8 +1181,8 @@ class Ensemble:
             
             stress_centr = np.zeros( (3,3), dtype = np.float64)
             error_centr = np.zeros( (3,3), dtype = np.float64)
-            for i in range(0, 3):
-                for j in range(i, 3):
+            for i in xrange(0, 3):
+                for j in xrange(i, 3):
                     av_array = 0.5 * np.einsum("h, ah", self.current_dyn.structure.coords[:, i],
                                                eforces[:,:,j])
                     av_array += 0.5 * np.einsum("h, ah", self.current_dyn.structure.coords[:, j],
@@ -1307,8 +1307,8 @@ class Ensemble:
 
         # Print the sscha forces converted
         print "SCHA forces:"
-        for i in range(self.N):
-            for j in range(self.current_dyn.structure.N_atoms):
+        for i in xrange(self.N):
+            for j in xrange(self.current_dyn.structure.N_atoms):
                 print "Conf\t%d\tAtom\t%d\t" % (i, j), self.sscha_forces[i, j, :]/ (__A_TO_BOHR__)
                 
                 
@@ -1328,8 +1328,8 @@ class Ensemble:
         # Just to do something good
         da_dcr_mat = np.zeros( (nat * 3, nat * 3, len(w)), dtype = np.float64)
         
-        for x_i in range(self.current_dyn.structure.N_atoms * 3):
-            for y_i in range(x_i, self.current_dyn.structure.N_atoms * 3):
+        for x_i in xrange(self.current_dyn.structure.N_atoms * 3):
+            for y_i in xrange(x_i, self.current_dyn.structure.N_atoms * 3):
                 da_dcr, de_dcr = SCHAModules.anharmonic.get_da_dcr_and_de_dcr(w, pols, self.current_T,
                                                                               mass, x_i+1, y_i+1)
                 
@@ -1539,7 +1539,7 @@ class Ensemble:
             
 
         # If an MPI istance is running, split the calculation
-        for i0 in range(N_rand / size):
+        for i0 in xrange(N_rand / size):
             i = i0 + size * rank
             
             

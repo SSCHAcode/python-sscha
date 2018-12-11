@@ -11,6 +11,7 @@ import sscha, sscha.Ensemble, sscha.SchaMinimizer
 import sscha.Optimizer
 import sscha.Calculator
 import sscha.Cluster
+import sscha.Utilities as Utilities
 import cellconstructor as CC
 import cellconstructor.symmetries
 
@@ -172,6 +173,11 @@ class SSCHA:
                 print "Did you mean:", difflib.get_close_matches(rtype, __ALLOWED_RELAX_TYPES__)
                 raise ValueError("Error with key %s" % __RELAX_TYPE__)
         
+            # Setup custom functions
+            if Utilities.__UTILS_NAMESPACE__ in namelist.keys():
+                cfgs = Utilities.get_custom_functions_from_namelist(namelist, self.minim.dyn)
+                self.setup_custom_functions(cfgs[0], cfgs[1], cfgs[2])
+        
             # Initialize the minimizer
             #self.minim.init()
             self.minim.print_info()
@@ -184,8 +190,8 @@ class SSCHA:
                               False, self.data_dir, self.start_pop, fix_volume=self.fix_volume)
         
     def setup_custom_functions(self, custom_function_pre = None,
-                               custom_function_post = None,
-                               custom_function_gradient = None):
+                               custom_function_gradient = None,
+                               custom_function_post = None):
         """
         This subroutine setup which custom functions should be called during the minimization.
         Look for the SCHA_Minimizer.run() method for other details.
