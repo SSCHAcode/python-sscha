@@ -312,7 +312,7 @@ class Cluster:
             cmd = self.sshcmd + " %s 'rm -f %s/%s%s %s/%s%s'" % (self.hostname, 
                                                                  self.workdir, lbl, in_extension,
                                                                  self.workdir, lbl, out_extension)
-            cp_res = os.system(cmd)
+            cp_res = os.system(cmd + " > /dev/null")
             if cp_res != 0:
                 print "Error while executing:", cmd
                 print "Return code:", cp_res
@@ -322,7 +322,7 @@ class Cluster:
             cmd = self.scpcmd + " %s/%s%s %s:%s/" % (self.local_workdir, lbl, 
                                                     in_extension, self.hostname, 
                                                     self.workdir)
-            cp_res = os.system(cmd)
+            cp_res = os.system(cmd + " > /dev/null")
             if cp_res != 0:
                 print "Error while executing:", cmd
                 print "Return code:", cp_res
@@ -334,8 +334,6 @@ class Cluster:
                 tmt_str = "timeout %d " % self.timeout
             app_list += "%s%s %s\n" % (tmt_str, new_mpicmd, binary)
             submitted.append(i)
-            print "App list appended: "
-            print app_list
             
         # Save the app list and copy it to the destination
         #app_list_name = "%s_app.list" % (label + "_" + str(indices[0]))
@@ -391,7 +389,7 @@ class Cluster:
         f.write(submission)
         f.close()
         cmd = self.scpcmd + " %s %s:%s" % (sub_fpath, self.hostname, self.workdir)
-        cp_res = os.system(cmd)
+        cp_res = os.system(cmd  + " > /dev/null")
         if cp_res != 0:
             print "Error while executing:", cmd
             print "Return code:", cp_res
@@ -402,7 +400,7 @@ class Cluster:
         # Run the simulation
         cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, 
                                                    self.workdir, label+ "_" + str(indices[0]))
-        cp_res = os.system(cmd)
+        cp_res = os.system(cmd + " > /dev/null")
         if cp_res != 0:
             print "Error while executing:", cmd
             print "Return code:", cp_res
@@ -418,7 +416,7 @@ class Cluster:
             # Get the response
             cmd = self.scpcmd + " %s:%s %s/" % (self.hostname, out_filename,
                                                 self.local_workdir)
-            cp_res = os.system(cmd)
+            cp_res = os.system(cmd + " > /dev/null")
             if cp_res != 0:
                 print "Error while executing:", cmd
                 print "Return code:", cp_res

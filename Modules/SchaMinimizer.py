@@ -857,6 +857,15 @@ class SSCHA_Minimizer:
                                                                 err[2,0], err[2,1], err[2,2])
             
             print ""
+            
+            abinit_stress = self.ensemble.get_average_stress()
+            abinit_stress *= __RyBohr3_to_GPa__
+            print " Ab initio average stress:"
+            print "%16.8f%16.8f%16.8f" % (abinit_stress[0,0], abinit_stress[0,1], abinit_stress[0,2])
+            print "%16.8f%16.8f%16.8f" % (abinit_stress[1,0], abinit_stress[1,1], abinit_stress[1,2])          
+            print "%16.8f%16.8f%16.8f" % (abinit_stress[2,0], abinit_stress[2,1], abinit_stress[2,2])
+            print ""
+            
         
         
         if verbose >= 2:

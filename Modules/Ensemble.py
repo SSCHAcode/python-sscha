@@ -1217,6 +1217,25 @@ class Ensemble:
         
         return stress, err_stress
     
+    def get_average_stress(self):
+        """
+        GET THE AVERAGE STRESS
+        ======================
+        
+        This gets only the ab-initio average of the stress tensor
+        
+        .. math::
+                
+            P_{\\alpha\\beta} = \\left<P_{\\apha\\beta}\\right>
+        
+        """
+        stress = np.einsum("abc, a", self.stresses, self.rho) / np.sum(self.rho)
+        qe_sym = CC.symmetries.QE_Symmetry(self.current_dyn.structure)
+        qe_sym.SetupQPoint()
+        qe_sym.ApplySymmetryToMatrix(stress)
+        return stress
+        
+    
     def get_free_energy_gradient_respect_to_dyn(self):
         """
         FREE ENERGY GRADIENT
