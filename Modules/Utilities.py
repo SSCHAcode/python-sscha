@@ -66,8 +66,9 @@ def get_custom_functions_from_namelist(namelist, dyn):
     for k in keys:
         if not k in __ALLOWED_KEYS__:
             print "Error with the key:", k
-            print "Did you mean something like:", difflib.get_close_matches(k, __ALLOWED_KEYS__)
-            raise IOError("Error in "+__UTILS_NAMESPACE__+" namespace: key '" + k +"' not recognized.")
+            s =  "Did you mean something like:" + str( difflib.get_close_matches(k, __ALLOWED_KEYS__))
+            print s
+            raise IOError("Error in "+__UTILS_NAMESPACE__+" namespace: key '" + k +"' not recognized.\n" + s)
     
     
     

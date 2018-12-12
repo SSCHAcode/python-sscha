@@ -155,8 +155,9 @@ class SSCHA:
         for k in keys: 
             if not k in __ALLOWED_KEYS__:
                 print "Error with the key:", k
-                print "Did you mean something like:", difflib.get_close_matches(k, __ALLOWED_KEYS__)
-                raise IOError("Error in calculator namespace: key '" + k +"' not recognized.")
+                s = "Did you mean something like:" + str( difflib.get_close_matches(k, __ALLOWED_KEYS__))
+                print s
+                raise IOError("Error in calculator namespace: key '" + k +"' not recognized.\n" + s)
         
         # Check for mandatory keys
         for req_key in __REQ_KEYS__:

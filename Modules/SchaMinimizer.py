@@ -25,6 +25,7 @@ It is possible to use it to perform the anharmonic minimization
 
 #import Ensemble
 import numpy as np
+import difflib
 try:
     __MATPLOTLIB__ = True
     import matplotlib.pyplot as plt
@@ -47,6 +48,48 @@ __K_to_Ry__ = 6.336857346553283e-06
 __EPSILON__ = 1e-4
 __evA3_to_GPa__ = 160.21766208
 __RyBohr3_to_evA3__ = __RyBohr3_to_GPa__ / __evA3_to_GPa__
+
+
+# Here the namelist variables
+__SCHA_NAMELIST__ = "inputscha"
+__SCHA_LAMBDA_A__ = "lambda_a"
+__SCHA_LAMBDA_W__ = "lambda_w"
+__SCHA_MINSTRUC__ = "minim_struc"
+__SCHA_PRECOND_WYCK__ = "precond_wyck"
+__SCHA_PRECOND_DYN__ = "preconditioning"
+__SCHA_ROOTREP__ = "root_representation"
+__SCHA_NEGLECT_SYMMETRIES__ = "neglect_symmetries"
+__SCHA_NRANDOM_EFF__ = "n_random_eff"
+__SCHA_NRANDOM__ = "n_random"
+__SCHA_MEANINGFUL__ = "meaningful_factor"
+__SCHA_EQENERGY__ = "eq_energy"
+__SCHA_FILDYN__ = "fildyn_prefix"
+__SCHA_NQIRR__ = "nqirr"
+__SCHA_DATADIR__ = "data_dir"
+__SCHA_T__ = "t"
+__SCHA_TG__ = "tg"
+__SCHA_SUPERCELLSIZE__ = "supercell_size"
+__SCHA_MAXSTEPS__ = "max_ka"
+__SCHA_STRESSOFFSET__ = "stress_offset"
+__SCHA_GRADIOP__ = "gradi_op"
+__SCHA_POPULATION__ = "population"
+__SCHA_PRINTSTRESS__ = "print_stress"
+
+
+__SCHA_ALLOWED_KEYS__ = [__SCHA_LAMBDA_A__,
+                         __SCHA_LAMBDA_W__, __SCHA_MINSTRUC__,
+                         __SCHA_PRECOND_WYCK__, __SCHA_PRECOND_DYN__,
+                         __SCHA_ROOTREP__, __SCHA_NEGLECT_SYMMETRIES__,
+                         __SCHA_NRANDOM_EFF__, __SCHA_NRANDOM__,
+                         __SCHA_MEANINGFUL__, __SCHA_EQENERGY__,
+                         __SCHA_FILDYN__, __SCHA_NQIRR__,
+                         __SCHA_DATADIR__, __SCHA_T__,
+                         __SCHA_TG__, __SCHA_SUPERCELLSIZE__,
+                         __SCHA_MAXSTEPS__, __SCHA_STRESSOFFSET__,
+                         __SCHA_GRADIOP__, __SCHA_POPULATION__,
+                         __SCHA_PRINTSTRESS__]
+__SCHA_MANDATORY_KEYS__ = [__SCHA_FILDYN__, __SCHA_NQIRR__, __SCHA_NQIRR__,
+                           __SCHA_T__]
 
 class SSCHA_Minimizer:
     
@@ -340,8 +383,8 @@ class SSCHA_Minimizer:
             raise ValueError("Error, required both a dict or a path to file.")
         
         # Extract the principal namelist
-        if not "inputscha" in namelist.keys():
-            raise ValueError("Error, a main namelist 'inputscha' is required.")
+        if not __SCHA_NAMELIST__ in namelist.keys():
+            raise ValueError("Error, a main namelist '%s' is required." % __SCHA_NAMELIST__)
             
         namelist = namelist["inputscha"]
         #print namelist
@@ -349,98 +392,110 @@ class SSCHA_Minimizer:
         # Check for keywords
         keys = namelist.keys()
         
-        if "lambda_a" in keys:
-            self.min_step_dyn = np.float64(namelist["lambda_a"])
         
-        if "lambda_w" in keys:
-            self.min_step_struc = np.float64(namelist["lambda_w"])
+        # Check if there is an unknown key
+        for k in keys:
+            if not k in __SCHA_ALLOWED_KEYS__:
+                print "Error with the key:", k
+                s = "Did you mean something like:" + str( difflib.get_close_matches(k, __SCHA_ALLOWED_KEYS__))
+                print s
+                raise IOError("Error in inputscha namespace: key '" + k +"' not recognized.\n" + s)
+    
+    
+        # Check if the required keywords are present
+        for req_key in __SCHA_MANDATORY_KEYS__:
+            if not req_key in keys:
+                raise IOError("Error, the cluster configuration namelist requires the keyword: '" + req_key + "'")
+                
+
+        
+        if __SCHA_LAMBDA_A__ in keys:
+            self.min_step_dyn = np.float64(namelist[__SCHA_LAMBDA_A__])
+        
+        if __SCHA_LAMBDA_W__ in keys:
+            self.min_step_struc = np.float64(namelist[__SCHA_LAMBDA_W__])
             
         
-        if "minim_struc" in keys:
-            self.minim_struct = bool(namelist["minim_struc"])
-        if "minim_struct" in keys:
-            self.minim_struct = bool(namelist["minim_struct"])
+        if __SCHA_MINSTRUC__ in keys:
+            self.minim_struct = bool(namelist[__SCHA_MINSTRUC__])
             
-            if "minim_struc" in keys:
-                raise ValueError("Error, both minim_struc and minim_struct defined in input.")
+        if __SCHA_PRECOND_WYCK__ in keys:
+            self.precond_wyck = bool(namelist[__SCHA_PRECOND_WYCK__])
             
-        if "precond_wyck" in keys:
-            self.precond_wyck = bool(namelist["precond_wyck"])
+        if __SCHA_PRECOND_DYN__ in keys:
+            self.precond_dyn = bool(namelist[__SCHA_PRECOND_DYN__])
             
-        if "preconditioning" in keys:
-            self.precond_dyn = bool(namelist["preconditioning"])
-            
-        if "root_representation" in keys:
-            self.root_representation = namelist["root_representation"]
+        if __SCHA_ROOTREP__ in keys:
+            self.root_representation = namelist[__SCHA_ROOTREP__]
         
-        if "neglect_symmetries" in keys:
-            self.neglect_symmetries = namelist["neglect_symmetries"]
+        if __SCHA_NEGLECT_SYMMETRIES__ in keys:
+            self.neglect_symmetries = namelist[__SCHA_NEGLECT_SYMMETRIES__]
             
-        if "n_random_eff" in keys:
-            if not "n_random" in keys:
+        if __SCHA_NRANDOM_EFF__ in keys:
+            if not __SCHA_NRANDOM__ in keys:
                 raise IOError("Error, if you want to impose the minimum KL\n"
                               "       effective sample size, you must give also n_random")
-            self.kong_liu_ratio =  np.float64(namelist["n_random_eff"]) / int(namelist["n_random"])
+            self.kong_liu_ratio =  np.float64(namelist[__SCHA_NRANDOM_EFF__]) / int(namelist[__SCHA_NRANDOM__])
             
-        if "meaningful_factor" in keys:
-            self.meaningful_factor = np.float64(namelist["meaningful_factor"])
+        if __SCHA_MEANINGFUL__ in keys:
+            self.meaningful_factor = np.float64(namelist[__SCHA_MEANINGFUL__])
             
-        if "eq_energy" in keys:
-            self.eq_energy = np.float64(namelist["eq_energy"])
+        if __SCHA_EQENERGY__ in keys:
+            self.eq_energy = np.float64(namelist[__SCHA_EQENERGY__])
             
-        if "fildyn_prefix" in keys:
+        if __SCHA_FILDYN__ in keys:
             # nqirr must be present
-            if not "nqirr" in keys:
+            if not __SCHA_NQIRR__ in keys:
                 raise IOError("Error, if an input dynamical matrix is specified, you must add the nqirr options")
             
-            self.dyn = CC.Phonons.Phonons(namelist["fildyn_prefix"], nqirr = int(namelist["nqirr"]))
-            self.dyn_path = namelist["fildyn_prefix"]
+            self.dyn = CC.Phonons.Phonons(namelist[__SCHA_FILDYN__], nqirr = int(namelist[__SCHA_NQIRR__]))
+            self.dyn_path = namelist[__SCHA_FILDYN__]
             
-            if not "data_dir" in keys:
+            if not __SCHA_DATADIR__ in keys:
                 self.ensemble = Ensemble.Ensemble(self.dyn, 0)
                 
-                if "t" in keys:
-                    self.ensemble.current_T = np.float64(namelist["t"])
-                    if not "tg" in keys:
+                if __SCHA_T__ in keys:
+                    self.ensemble.current_T = np.float64(namelist[__SCHA_T__])
+                    if not __SCHA_TG__ in keys:
                         self.ensemble.T0 = self.ensemble.current_T
                 
-                if "tg" in keys:
-                    self.ensemble.T0 = np.float64(namelist["tg"])
+                if __SCHA_TG__ in keys:
+                    self.ensemble.T0 = np.float64(namelist[__SCHA_TG__])
                     
-                if "supercell_size" in keys:
-                    self.ensemble.supercell = [int(x) for x in namelist["supercell_size"]]
+                if __SCHA_SUPERCELLSIZE__ in keys:
+                    self.ensemble.supercell = [int(x) for x in namelist[__SCHA_SUPERCELLSIZE__]]
             
-        if "max_ka" in keys:
-            self.max_ka = int(namelist["max_ka"])
+        if __SCHA_MAXSTEPS__ in keys:
+            self.max_ka = int(namelist[__SCHA_MAXSTEPS__])
             
-        if "stress_offset" in keys:
+        if __SCHA_STRESSOFFSET__ in keys:
             # Load the offset from a filename
             try:
                 # Try to interpret it as a number
-                off = np.float64(namelist["stress_offset"])
+                off = np.float64(namelist[__SCHA_STRESSOFFSET__])
                 self.stress_offset = off * np.eye(3, dtype = np.float64, order = "F")
             except:
                 # Interpret it as a file
-                if not os.path.exists(namelist["stress_offset"]):
-                    raise IOError("Error, the file %s specified as a stress_offset cannot be open" % namelist["stress_offset"])
+                if not os.path.exists(namelist[__SCHA_STRESSOFFSET__]):
+                    raise IOError("Error, the file %s specified as a stress_offset cannot be open" % namelist[__SCHA_STRESSOFFSET__])
                 
-            self.stress_offset = np.loadtxt(namelist["stress_offset"])
+            self.stress_offset = np.loadtxt(namelist[__SCHA_STRESSOFFSET__])
             
-        if "gradi_op" in keys:
-            if not namelist["gradi_op"] in ["gc", "gw", "all"] :
-                raise ValueError("Error, gradi_op supports only 'gc', 'gw' or 'all'")
+        if __SCHA_GRADIOP__ in keys:
+            if not namelist[__SCHA_GRADIOP__] in ["gc", "gw", "all"] :
+                raise ValueError("Error, %s supports only 'gc', 'gw' or 'all'" % __SCHA_GRADIOP__)
             
-            self.gradi_op = namelist["gradi_op"]
+            self.gradi_op = namelist[__SCHA_GRADIOP__]
         
         # Ensemble keywords
-        if "data_dir" in keys:
+        if __SCHA_DATADIR__ in keys:
             # We can load an ensemble, check for the population number
-            if not "population" in keys:
+            if not __SCHA_POPULATION__ in keys:
                 raise IOError("Error, population required if the ensemble is provided")
-            if not "n_random" in keys:
-                raise IOError("Error, n_random required when providing an ensemble")
+            if not __SCHA_NRANDOM__ in keys:
+                raise IOError("Error, %s required when providing an ensemble" %__SCHA_NRANDOM__)
             
-            if not "fildyn_prefix" in keys:
+            if not __SCHA_FILDYN__ in keys:
                 raise IOError("Error, the dynamical matrix that generated the ensemble must be provided")
             
             
@@ -449,23 +504,23 @@ class SSCHA_Minimizer:
             # Setup the ensemble
             self.ensemble = Ensemble.Ensemble(self.dyn, 0)
             
-            if "t" in keys:
-                self.ensemble.current_T = np.float64(namelist["t"])
-                if not "tg" in keys:
+            if __SCHA_T__ in keys:
+                self.ensemble.current_T = np.float64(namelist[__SCHA_T__])
+                if not __SCHA_TG__ in keys:
                     self.ensemble.T0 = self.ensemble.current_T
             
-            if "tg" in keys:
-                self.ensemble.T0 = np.float64(namelist["tg"])
+            if __SCHA_TG__ in keys:
+                self.ensemble.T0 = np.float64(namelist[__SCHA_TG__])
                 
-            if "supercell_size" in keys:
-                self.ensemble.supercell = [int(x) for x in namelist["supercell_size"]]
+            if __SCHA_SUPERCELLSIZE__ in keys:
+                self.ensemble.supercell = [int(x) for x in namelist[__SCHA_SUPERCELLSIZE__]]
                 
             # Load the data dir
-            self.population = int(namelist["population"])
-            self.ensemble.load(namelist["data_dir"], int(namelist["population"]), int(namelist["n_random"]))
+            self.population = int(namelist[__SCHA_POPULATION__])
+            self.ensemble.load(namelist[__SCHA_DATADIR__], int(namelist[__SCHA_POPULATION__]), int(namelist[__SCHA_NRANDOM__]))
         
-        if "print_stress" in keys:
-            if not "fildyn_prefix" in keys:
+        if __SCHA_PRINTSTRESS__ in keys:
+            if not __SCHA_FILDYN__ in keys:
                 raise ValueError("Error, please specify a dynamical matrix.")
             self.ensemble.has_stress = True
         
@@ -599,6 +654,13 @@ class SSCHA_Minimizer:
         This subroutine initialize the variables needed by the minimization.
         Call this before the first time you invoke the run function.
         """
+        
+        # Check the ensemble size
+        if not self.ensemble.structures:
+            s = """The ensemble has not been initialized.
+Maybe data_dir is missing from your input?"""
+            print s
+            raise IOError(s)
         
         # Symmetrize the starting dynamical matrix and apply the sum rule
         qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)

@@ -38,7 +38,7 @@
 	n_random = 100
 	n_random_eff = 50
 	population = 2
-	meaninguful_factor = 0.5
+	meaningful_factor = 0.5
 &end
 
 ! Now in this namespace we setup the mode locking and

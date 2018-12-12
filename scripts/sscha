@@ -57,9 +57,6 @@ Refer to the documentation for more details.
 
 """
 
-# Define the required arguments in the input namelist
-REQUIRED_ARGUMENTS = {"inputscha" : ["data_dir", "fildyn_prefix", "n_random"]}
-
 
 # Define a custom function to raise an error if the file does not exist
 def is_valid_file(parser, arg):
@@ -98,14 +95,8 @@ fp.close()
 
 # Check if the mandatory arguments are defined
 namelist = CC.Methods.read_namelist(line_list)
-for x_con in REQUIRED_ARGUMENTS.keys():
-    if not x_con in namelist.keys():
-        raise IOError("Error, required the control '&%s' in the input file." % x_con)
-
-    if not sscha.Relax.__RELAX_NAMESPACE__ in namelist.keys():
-        for x_req in REQUIRED_ARGUMENTS[x_con]:
-            if not x_req in namelist[x_con].keys():
-                raise IOError("Error, the namelist '%s' must contain the '%s' keyword." % (x_con, x_req))
+if not sscha.SchaMinimizer.__SCHA_NAMELIST__ in namelist.keys():
+    raise IOError("Error, %s namelist required." % sscha.SchaMinimizer.__SCHA_NAMELIST__)
 
 # Check if the relax is hypothized
 if sscha.Relax.__RELAX_NAMESPACE__ in namelist.keys():
