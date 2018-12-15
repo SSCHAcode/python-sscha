@@ -82,7 +82,10 @@ def get_custom_functions_from_namelist(namelist, dyn):
     
     def cfp(minim):
         if use_io:
-            return io_info.CFP_SaveAll
+            print "SAVING"
+            return io_info.CFP_SaveAll(minim)
+        else:
+            print "NOT SAVING"
         
     # Setup the mode projection
     locking = False

@@ -137,6 +137,7 @@ if sscha.Utilities.__UTILS_NAMESPACE__ in namelist:
     minim.run(custom_function_pre = cfs[0], 
               custom_function_gradient = cfs[1],
               custom_function_post = cfs[2])
+    print "I'm here"
 else:
     minim.run()
     
