@@ -2,6 +2,7 @@
 import os
 import numpy as np
 import time
+from __future__ import print_function
 
 """
 This is part of the program python-sscha
@@ -267,7 +268,7 @@ class Ensemble:
             self.sscha_forces[i,:,:] = force
         
         if verbose:
-            print "[LOAD ENSEMBLE]: time elapsed for the cycle over the configurations:", time.time() - t_before_for
+            print( "[LOAD ENSEMBLE]: time elapsed for the cycle over the configurations:", time.time() - t_before_for)
         
         t1 = time.time()
         # Load the energy
@@ -287,9 +288,9 @@ class Ensemble:
         self.current_q = self.q_start.copy()
         
         if verbose:
-            print "[LOAD ENSEMBLE]: time elapsed to compute the current q vectors:", t2 - t1
-            print "[LOAD ENSEMBLE]: time elapsed while loading with numpy:", total_t_for_loading
-            print "[LOAD ENSEMBLE]: time elapsed for computing sscha energy and forces:", total_t_for_sscha_ef
+            print( "[LOAD ENSEMBLE]: time elapsed to compute the current q vectors:", t2 - t1)
+            print( "[LOAD ENSEMBLE]: time elapsed while loading with numpy:", total_t_for_loading)
+            print( "[LOAD ENSEMBLE]: time elapsed for computing sscha energy and forces:", total_t_for_sscha_ef)
         
         # If all the stress tensors have been found, set the stress flag
         if count_stress == self.N:
@@ -592,19 +593,19 @@ class Ensemble:
         #new_q = self.current_q * np.sqrt(np.float64(2)) * __A_TO_BOHR__
         
         t2 = time.time()
-        print "Time elapsed to prepare the rho update:", t2 - t1, "s"
+        print( "Time elapsed to prepare the rho update:", t2 - t1, "s")
         
         #t1 = time.time()
         #self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
         #t2 = time.time()
         
         if __DEBUG_RHO__:
-            print " ==== [UPDATE RHO DEBUGGING] ==== "
-            print " INPUT INFO: "
+            print( " ==== [UPDATE RHO DEBUGGING] ==== ")
+            print( " INPUT INFO: ")
             np.savetxt("rho_%05d.dat" % self.__debug_index__, self.rho)
-            print " rho saved in ", "rho_%05d.dat" % self.__debug_index__
+            print( " rho saved in ", "rho_%05d.dat" % self.__debug_index__)
         
-        print "Time elapsed to update the stochastic weights:", t2 - t1, "s"
+        print ("Time elapsed to update the stochastic weights:", t2 - t1, "s")
         
         # Get the rho in the other way
         ups_new = new_super_dyn.GetUpsilonMatrix(self.current_T)
@@ -630,32 +631,32 @@ class Ensemble:
             #self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
         t1 = time.time()
         
-        print "Time elapsed to update the sscha energies, forces and displacements:", t1 - t2, "s"
+        print( "Time elapsed to update the sscha energies, forces and displacements:", t1 - t2, "s")
         self.current_dyn = new_dynamical_matrix.Copy()
         
         
         if __DEBUG_RHO__:
             new_dynamical_matrix.save_qe("ud_%05d" % self.__debug_index__)
-            print " new_dynmat saved in ud_%05d " % self.__debug_index__
-            print " new_T : ", newT
-            print " old_T : ", self.T0
-            print " supercell :", self.supercell
+            print( " new_dynmat saved in ud_%05d " % self.__debug_index__)
+            print( " new_T : ", newT)
+            print( " old_T : ", self.T0)
+            print( " supercell :", self.supercell)
             self.dyn_0.save_qe("sd_%05d" % self.__debug_index__)
-            print " starting dyn saved in sd_%05d" % self.__debug_index__
-            print " old_a:", " ".join(["%16.8f" %  x for x in old_a])
-            print " new_a:", " ".join(["%16.8f" %  x for x in new_a])
+            print( " starting dyn saved in sd_%05d" % self.__debug_index__)
+            print( " old_a:", " ".join(["%16.8f" %  x for x in old_a]))
+            print( " new_a:", " ".join(["%16.8f" %  x for x in new_a]))
             np.savetxt("old_q_%05d.dat" %self.__debug_index__, old_q)
-            print " old_q saved in ", "old_q_%05d.dat" %self.__debug_index__
+            print( " old_q saved in ", "old_q_%05d.dat" %self.__debug_index__)
             np.savetxt("new_q_%05d.dat" %self.__debug_index__, new_q)
-            print " new_q saved in ", "new_q_%05d.dat" %self.__debug_index__
-            print " u_disps saved in ", "u_disps_%05.dat" % self.__debug_index__
+            print( " new_q saved in ", "new_q_%05d.dat" %self.__debug_index__)
+            print( " u_disps saved in ", "u_disps_%05.dat" % self.__debug_index__)
             np.savetxt("u_disps_%05d.dat" % self.__debug_index__, self.u_disps)
             
-            print " The last rho in", "rho_last_%05d.dat" % self.__debug_index__
+            print( " The last rho in", "rho_last_%05d.dat" % self.__debug_index__)
             np.savetxt("rho_last_%05d.dat" % self.__debug_index__, self.rho)
-            print " The other rho kind saved in", "other_rho_kind_%05d.dat"  % self.__debug_index__
+            print( " The other rho kind saved in", "other_rho_kind_%05d.dat"  % self.__debug_index__)
             np.savetxt("other_rho_kind_%05d.dat"  % self.__debug_index__, rho_tmp)
-            print " The KL according to other rho kind:", np.sum(rho_tmp)**2 / np.sum(rho_tmp**2)
+            print( " The KL according to other rho kind:", np.sum(rho_tmp)**2 / np.sum(rho_tmp**2))
             self.__debug_index__ += 1
             
             
@@ -974,7 +975,7 @@ class Ensemble:
             u_disp[i, :, :] = np.reshape(self.u_disps[i,:], (nat, 3)) 
         
         t2 = time.time()
-        print " [GRADIENT] Time to prepare the gradient calculation:", t2 -t1,"s"
+        print( " [GRADIENT] Time to prepare the gradient calculation:", t2 -t1,"s")
             
 
         t1 = time.time()
@@ -989,7 +990,7 @@ class Ensemble:
         
             
         t2 = time.time()
-        print " [GRADIENT] Time to call the fortran code:", t2 - t1, "s"
+        print (" [GRADIENT] Time to call the fortran code:", t2 - t1, "s")
     
         # Perform the fourier transform
         q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
@@ -997,7 +998,7 @@ class Ensemble:
         q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
                                                        self.current_dyn.structure, supercell_dyn.structure)
         t1 = time.time()
-        print " [GRADIENT] Time to get back in fourier space:", t1 - t2, "s"
+        print (" [GRADIENT] Time to get back in fourier space:", t1 - t2, "s")
         
         
         if return_error:
@@ -1325,10 +1326,10 @@ class Ensemble:
 #    
 
         # Print the sscha forces converted
-        print "SCHA forces:"
+        print ("SCHA forces:")
         for i in xrange(self.N):
             for j in xrange(self.current_dyn.structure.N_atoms):
-                print "Conf\t%d\tAtom\t%d\t" % (i, j), self.sscha_forces[i, j, :]/ (__A_TO_BOHR__)
+                print ("Conf\t%d\tAtom\t%d\t" % (i, j), self.sscha_forces[i, j, :]/ (__A_TO_BOHR__))
                 
                 
         # Convert the forces in Ha / bohr units and in the same type as fortran
@@ -1352,7 +1353,7 @@ class Ensemble:
                 da_dcr, de_dcr = SCHAModules.anharmonic.get_da_dcr_and_de_dcr(w, pols, self.current_T,
                                                                               mass, x_i+1, y_i+1)
                 
-                print "(%d, %d): DA_DCR = " % (x_i+1, y_i+1), da_dcr
+                print ("(%d, %d): DA_DCR = " % (x_i+1, y_i+1), da_dcr)
                 da_dcr_mat[x_i, y_i, :] = da_dcr
                 da_dcr_mat[y_i, x_i, :] = da_dcr
                 
@@ -1375,10 +1376,10 @@ class Ensemble:
         # Apply symmetries
         qe_sym.SymmetrizeDynQ(ghr, self.current_dyn.q_tot[0])
         ghr /= np.sqrt(np.trace(ghr.dot(ghr)))
-        print "Generator:"
-        print ghr
+        print ("Generator:")
+        print (ghr)
 
-        print "dA/dGhr = ", np.einsum("ijk, ij", da_dcr_mat, ghr)        
+        print ("dA/dGhr = ", np.einsum("ijk, ij", da_dcr_mat, ghr) )       
         
         # Force the symmetrization
         qe_sym.ImposeSumRule(df_dfc)
@@ -1576,7 +1577,7 @@ class Ensemble:
                     energy = atms.get_total_energy() / Rydberg # eV => Ry
                     run = False
                 except:
-                    print "Rerun the job %d" % i
+                    print ("Rerun the job %d" % i)
                     count_fails += 1
                     if count_fails >= 5:
                         run = False
@@ -1597,7 +1598,7 @@ class Ensemble:
             
             # Print the status
             if rank == 0:
-                print "conf %d / %d" % (i0, N_rand / size)
+                print ("conf %d / %d" % (i0, N_rand / size))
 
             
         
