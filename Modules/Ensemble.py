@@ -1126,9 +1126,6 @@ class Ensemble:
         if not self.has_stress:
             raise ValueError("Error, the stress tensors are not present in the current ensemble.")
         
-        # Volume bohr^3
-        volume = np.linalg.det(self.current_dyn.structure.unit_cell) * __A_TO_BOHR__**3
-            
         
         # Get frequencies and polarization vectors
         super_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
@@ -1138,6 +1135,10 @@ class Ensemble:
         pols = np.real( pols[:, trans])
         
         nat = super_dyn.structure.N_atoms 
+        
+        # Volume bohr^3
+        volume = np.linalg.det(super_dyn.structure.unit_cell) * __A_TO_BOHR__**3
+            
         
         # Get the correctly shaped polarization vectors
         er = np.zeros( (nat, len(wr), 3), dtype = np.float64, order = "F")
