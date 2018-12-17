@@ -66,6 +66,7 @@ __SCHA_EQENERGY__ = "eq_energy"
 __SCHA_FILDYN__ = "fildyn_prefix"
 __SCHA_NQIRR__ = "nqirr"
 __SCHA_DATADIR__ = "data_dir"
+__SCHA_ISBIN__ = "load_bin"
 __SCHA_T__ = "t"
 __SCHA_TG__ = "tg"
 __SCHA_SUPERCELLSIZE__ = "supercell_size"
@@ -76,7 +77,7 @@ __SCHA_POPULATION__ = "population"
 __SCHA_PRINTSTRESS__ = "print_stress"
 
 
-__SCHA_ALLOWED_KEYS__ = [__SCHA_LAMBDA_A__,
+__SCHA_ALLOWED_KEYS__ = [__SCHA_LAMBDA_A__, __SCHA_ISBIN__,
                          __SCHA_LAMBDA_W__, __SCHA_MINSTRUC__,
                          __SCHA_PRECOND_WYCK__, __SCHA_PRECOND_DYN__,
                          __SCHA_ROOTREP__, __SCHA_NEGLECT_SYMMETRIES__,
@@ -407,7 +408,9 @@ class SSCHA_Minimizer:
             if not req_key in keys:
                 raise IOError("Error, the cluster configuration namelist requires the keyword: '" + req_key + "'")
                 
-
+        load_bin = False
+        if __SCHA_ISBIN__ in keys:
+            load_bin = bool(namelist[__SCHA_ISBIN__])
         
         if __SCHA_LAMBDA_A__ in keys:
             self.min_step_dyn = np.float64(namelist[__SCHA_LAMBDA_A__])
@@ -517,7 +520,11 @@ class SSCHA_Minimizer:
                 
             # Load the data dir
             self.population = int(namelist[__SCHA_POPULATION__])
-            self.ensemble.load(namelist[__SCHA_DATADIR__], int(namelist[__SCHA_POPULATION__]), int(namelist[__SCHA_NRANDOM__]))
+            if not load_bin:
+                self.ensemble.load(namelist[__SCHA_DATADIR__], int(namelist[__SCHA_POPULATION__]), int(namelist[__SCHA_NRANDOM__]))
+            else:
+                self.ensemble.load_bin(namelist[__SCHA_DATADIR__], int(namelist[__SCHA_POPULATION__]))
+
         
         if __SCHA_PRINTSTRESS__ in keys:
             if not __SCHA_FILDYN__ in keys:
