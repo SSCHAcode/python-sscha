@@ -454,6 +454,10 @@ class SSCHA_Minimizer:
             self.dyn = CC.Phonons.Phonons(namelist[__SCHA_FILDYN__], nqirr = int(namelist[__SCHA_NQIRR__]))
             self.dyn_path = namelist[__SCHA_FILDYN__]
             
+            # Symmetrize the dynmat if requested
+            if not self.neglect_symmetries:
+                self.dyn.Symmetrize()
+            
             if not __SCHA_DATADIR__ in keys:
                 self.ensemble = Ensemble.Ensemble(self.dyn, 0)
                 

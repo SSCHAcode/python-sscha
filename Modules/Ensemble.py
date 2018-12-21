@@ -592,8 +592,6 @@ class Ensemble:
         #old_q = self.q_start * np.sqrt(np.float64(2)) * __A_TO_BOHR__
         #new_q = self.current_q * np.sqrt(np.float64(2)) * __A_TO_BOHR__
         
-        t2 = time.time()
-        print( "Time elapsed to prepare the rho update:", t2 - t1, "s")
         
         #t1 = time.time()
         #self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
@@ -605,12 +603,14 @@ class Ensemble:
             np.savetxt("rho_%05d.dat" % self.__debug_index__, self.rho)
             print( " rho saved in ", "rho_%05d.dat" % self.__debug_index__)
         
-        print ("Time elapsed to update the stochastic weights:", t2 - t1, "s")
         
         # Get the rho in the other way
         ups_new = new_super_dyn.GetUpsilonMatrix(self.current_T)
         ups_old = super_dyn.GetUpsilonMatrix(self.T0)
         dups = ups_new - ups_old
+        
+        t2 = time.time()
+        print( "Time elapsed to prepare the rho update:", t2 - t1, "s")
         
         rho_tmp = np.ones( self.N, dtype = np.float64) * np.prod( old_a / new_a)
         for i in xrange(self.N):
@@ -631,7 +631,7 @@ class Ensemble:
             #self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
         t1 = time.time()
         
-        print( "Time elapsed to update the sscha energies, forces and displacements:", t1 - t2, "s")
+        print( "Time elapsed to update weights the sscha energies, forces and displacements:", t1 - t2, "s")
         self.current_dyn = new_dynamical_matrix.Copy()
         
         
