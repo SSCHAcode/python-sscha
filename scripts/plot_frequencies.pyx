@@ -6,7 +6,7 @@ import sys
 
 RY_TO_CM = 109691.40235
 
-if len(sys.argv) != 2:
+if len(sys.argv) <= 2:
     print "Specify the frequency files."
     exit(1)
 
