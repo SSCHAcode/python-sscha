@@ -97,8 +97,6 @@ subroutine get_gradient_supercell_fast( n_random, natsc, n_modes, ntyp_sc, rho, 
      precond = .true.
   end if
 
-  print *, "AJFNKJ"
-  call flush()
   ! DEBUG INPUT
   if (print_input) then
      print *, "GET_GRADIENT_SUPERCELL INPUT VALUES:"

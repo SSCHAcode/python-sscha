@@ -974,6 +974,10 @@ class Ensemble:
         for i in xrange(self.N):
             u_disp[i, :, :] = np.reshape(self.u_disps[i,:], (nat, 3)) 
         
+        
+        # TODO: This may be dangerous
+        pols = np.real(pols)
+        
         t2 = time.time()
         print( " [GRADIENT] Time to prepare the gradient calculation:", t2 -t1,"s")
             

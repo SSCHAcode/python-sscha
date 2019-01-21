@@ -26,7 +26,8 @@ setup( name = "python-sscha",
        package_dir = {"sscha": "Modules"},
        install_requires = ["numpy", "ase", "scipy", "cellconstructor", "lapack", "blas"],
        ext_modules = [SCHAModules],
-       scripts = ["scripts/sscha", "scripts/cluster_check.x", "scripts/plot_frequencies.pyx"],
+       scripts = ["scripts/sscha", "scripts/cluster_check.x", "scripts/plot_frequencies.pyx",
+                  "scripts/static-vc-relax.pyx"],
        license = "GPLv3"
        )
 

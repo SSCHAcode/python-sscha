@@ -89,6 +89,7 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
   logical precond
   logical, parameter :: print_input = .false.
 
+
   ! Setup the default value of the preconditioned variable
   if (present(preconditioned)) then
      precond = preconditioned
@@ -132,6 +133,8 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
         print "(A10, I8, A10, 1000E13.4)", "CONF", i, "FORCE", v_aux1(:)
         print "(A10, I8, A10, 1000E13.4)", "CONF", i, "DISP", v_aux2(:)
     end do
+    
+    call flush()
   end if
   
   ! Compute the <uf> matrix in the supercell
@@ -177,6 +180,7 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
   call cpu_time(t2)
   
   print *, " Time to compute <uf> in real space: ", t2 - t1
+  call flush()
 
   ! Compute the upsilon matrix in the supercell
   call cpu_time(t1)
@@ -207,7 +211,7 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
   call dgemm("N", "N", 3*natsc, 3*natsc, 3*natsc, 1.0d0, ups_mat, 3*natsc,  err_uf_mat, 3*natsc, 0.0d0, grad_err, 3*natsc)
   call cpu_time(t2)
   print *, " get_gradient_supercell : Elapsed time to perform the multiplication", t2 - t1
-
+  call flush()
   ! Symmetrize the gradient
   ! In fact the product of symmetric matrices is not symmetric!!!!
   do ical = 1, 3*natsc-1
@@ -227,6 +231,7 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
   ! Perform the inverse preconditioning if required:
   if (.not. precond) then
      print *, "Computing the inverse preconditioning..."
+     call flush()
      call multiply_lambda_tensor(n_modes, natsc, ntyp_sc, wr_sc, epols_sc, trans, &
           mass, ityp_sc, T, grad, tmp, .false.)
      ! The lambda matrix is negative defined so multiply it by -1

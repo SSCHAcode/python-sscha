@@ -657,7 +657,7 @@ class SSCHA_Minimizer:
         
         return self.ensemble.get_free_energy(return_error = return_error) / np.prod(self.ensemble.supercell)
     
-    def init(self):
+    def init(self, verbosity = False):
         """
         INITIALIZE THE MINIMIZATION
         ===========================
@@ -674,11 +674,16 @@ Maybe data_dir is missing from your input?"""
             raise IOError(s)
         
         # Symmetrize the starting dynamical matrix and apply the sum rule
+        if verbosity:
+            print "Symmetry initialization..."
         qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
         fcq = np.array(self.dyn.dynmats)
         qe_sym.SymmetrizeFCQ(fcq, self.dyn.q_stars, asr = "custom")
         for iq in range(len(self.dyn.q_tot)):
             self.dyn.dynmats[iq] = fcq[iq, :, :]
+        
+        if verbosity:
+            print "Check for the imaginary frequencies..."
         
         self.check_imaginary_frequencies()
         
@@ -699,7 +704,11 @@ Maybe data_dir is missing from your input?"""
         
         # Get the initial gradient
         #grad = self.ensemble.get_fc_from_self_consistency(True, False)
+        if verbosity:
+            print "Get the gradient for the first time..."
         grad = self.ensemble.get_preconditioned_gradient(True)
+        if verbosity:
+            print "After gradient."
         self.prev_grad = grad
         
         # For now check that if root representation is activated
@@ -732,6 +741,8 @@ Maybe data_dir is missing from your input?"""
         
         # Prepare the minimization step rescaling to its best
         if not self.precond_wyck:
+            if verbosity:
+                print "Get wickoff best step..."
             self.min_step_struc *= GetBestWykoffStep(self.dyn)
 
     

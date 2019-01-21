@@ -24,6 +24,10 @@ class UC_OPTIMIZER:
     
     alpha0 = 1
     
+    # If true the strain is resetted each step
+    # It should regolarize the minimization. 
+    # If false the minimization will not go too far from the initial cell
+    reset_strain = True
     
     def __init__(self, starting_unit_cell):
         """
@@ -101,7 +105,7 @@ class UC_OPTIMIZER:
         return x_new
 
             
-    def UpdateCell(self, unit_cell, stress_tensor, fix_volume = False):
+    def UpdateCell(self, unit_cell, stress_tensor, fix_volume = False, verbose = True):
         """
         PERFORM THE CELL UPDATE
         =======================
@@ -128,14 +132,21 @@ class UC_OPTIMIZER:
         #uc_inv = np.linalg.inv(unit_cell)
         I = np.eye(3, dtype = np.float64)
         
+        
+        # If the strain is resetted, set the initial cell as this one
+        if self.reset_strain:
+            self.uc_0 = unit_cell.copy()
+            self.uc_0_inv = np.linalg.inv(self.uc_0)
+        
         # Get the strain tensor up to know
         strain = np.transpose(self.uc_0_inv.dot(unit_cell) - I)
         
-        print "ALPHA:", self.alpha
-        print "VOLUME:", volume
-        
-        print "CURRENT STRAIN:"
-        print strain
+        if verbose:
+            print "ALPHA:", self.alpha
+            print "VOLUME:", volume
+            
+            print "CURRENT STRAIN:"
+            print strain
         
         # Get the gradient with respect to the strain
         grad_mat =  - volume * stress_tensor.dot(np.linalg.inv(I + strain.transpose()))
@@ -150,23 +161,27 @@ class UC_OPTIMIZER:
         x_old = self.mat_to_line(strain)
         grad = self.mat_to_line(grad_mat)
 
-        print "GRAD MAT:"
-        print grad_mat
+        if verbose:
+            print "GRAD MAT:"
+            print grad_mat
         
         x_new = self.perform_step(x_old, grad)
         
         strain_new  = self.line_to_mat(x_new)
         
-        print "NEW STRAIN:"
-        print strain_new
-         
+        if verbose:
+            print "NEW STRAIN:"
+            print strain_new
+             
         unit_cell[:,:] = self.uc_0.dot( I + strain_new.transpose())
         
-        print "NEW VOLUME:", np.linalg.det(unit_cell)
         if fix_volume:
             # Fix the volume
             unit_cell[:,:] *= (np.linalg.det(self.uc_0) / np.linalg.det(unit_cell))**(1/np.float64(3))
-
+        
+        if verbose:
+            print "NEW VOLUME:", np.linalg.det(unit_cell)
+            
 
 class BFGS_UC(UC_OPTIMIZER):
     def __init__(self, unit_cell, bulk_modulus = 1, update_h_step = 0.2):
