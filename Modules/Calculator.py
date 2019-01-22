@@ -29,7 +29,7 @@ __CALCULATOR_SYNONIMOUS__ = {"qe" : __CALC_QE__,
 
 __QE_ALLOWED_KEYS__ = ["ecutrho", "ecutwfc", "smearing", "degauss", 
                        "occupations", "conv_thr", "tstress", "tprnfor",
-                       "verbosity", "disk_io", "input_dft"]
+                       "verbosity", "disk_io", "input_dft", "use_all_frac"]
 
 __ALLOWED_KEYS__ = [__KOFF_HEAD__, __KPTS_HEAD__, __DISABLE_CHECK__, 
                     __CALCULATOR_TYPE__, __BINARY__]

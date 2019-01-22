@@ -79,12 +79,17 @@ __STATIC_REL_PRESS_THR__ = "press_thr"
 __STATIC_REL_TARGET_P__ = "press"
 __STATIC_REL_V_FIXED__ = "fix_volume"
 __STATIC_REL_SCF__ = "structure"
+__STATIC_REL_SYM_THR__ = "symm_thr"
+__STATIC_REL_USE_SYM__ = "use_symmetries"
+__STATIC_REL_FILE__ = "save_file"
 
 __STATIC_REL_RWK__ = [__STATIC_REL_SCF__, __STATIC_REL_PRESS_THR__, __STATIC_REL_MAX_FORCE__]
 __STATIC_REL_KEYS__ = [__STATIC_REL_MAX_KA__, __STATIC_REL_START_KA__,
                        __STATIC_REL_MAX_FORCE__, __STATIC_REL_BULK_MODULUS__,
                        __STATIC_REL_PRESS_THR__, __STATIC_REL_TARGET_P__,
-                       __STATIC_REL_V_FIXED__, __STATIC_REL_SCF__]
+                       __STATIC_REL_V_FIXED__, __STATIC_REL_SCF__,
+                       __STATIC_REL_SYM_THR__, __STATIC_REL_USE_SYM__,
+                       __STATIC_REL_FILE__]
 
 
 # Load the namespace and check for all the variables
@@ -120,6 +125,9 @@ start_ka = 1
 fix_volume = False
 static_bulk_modulus = 100
 target_p = 0
+symm_thr = np.float64(1e-5)
+use_symmetries = True
+append_file = None
 
 if __STATIC_REL_MAX_KA__ in keys:
     max_ka = int(c_info[__STATIC_REL_MAX_KA__])
@@ -133,10 +141,23 @@ if __STATIC_REL_TARGET_P__ in keys:
     target_p = c_info[__STATIC_REL_TARGET_P__]
     if fix_volume:
         raise ValueError("Error, you cannot fix the volume and choose a target pressure.")
-
+if __STATIC_REL_USE_SYM__ in keys:
+    use_symmetries = bool(c_info[__STATIC_REL_USE_SYM__])
+if __STATIC_REL_SYM_THR__ in keys:
+    if not use_symmetries:
+        raise ValueError("Error, symmetries disabled, key '%s' has no meaning." % __STATIC_REL_SYM_THR__)
+    symm_thr = np.float64(c_info[__STATIC_REL_SYM_THR__])
+if __STATIC_REL_FILE__ in keys:
+    append_file = str(c_info[__STATIC_REL_FILE__])
 
 struct = CC.Structure.Structure()
 struct.read_scf(start_from)
+
+# Get the symmetries
+qe_sym = CC.symmetries.QE_Symmetry(struct, symm_thr)
+qe_sym.SetupQPoint()
+symmetries = qe_sym.GetSymmetries()
+
 ase_struct = struct.get_ase_atoms()
 
 # Setup the cell optimizer
@@ -164,18 +185,35 @@ for i in range(start_ka, max_ka):
     print np.array_str(stress / GPa, precision=4, suppress_small=True)
     print 
     print
-    
-    if not fix_volume:
-        stress -= np.eye(3, dtype = np.float64) * target_p * GPa
 
 
     # Perform the cell optimization
     new_struct = CC.Structure.Structure()
     new_struct.generate_from_ase_atoms(ase_struct)
+    
+    # Get the info from the structure
+    energy = ase_struct.get_total_energy() / new_struct.N_atoms
+    press = np.trace(stress) / (3 * GPa)
+    tot_force = np.sqrt(np.sum(ase_struct.get_forces()**2)) / new_struct.N_atoms
+    
+    if not fix_volume:
+        stress -= np.eye(3, dtype = np.float64) * target_p * GPa
+    
+    # Apply the symmetries on the structure
+    if use_symmetries:
+        print "Imposing the simmetries on the final structure and stress."
+        new_struct.impose_symmetries(symmetries)
+        
+        # Impose the symmetries on the stress
+        qe_sym.ApplySymmetryToMatrix(stress)
+    
     cell = new_struct.unit_cell.copy()
     cell_SD.UpdateCell(cell, stress, fix_volume = fix_volume, verbose = False)
     new_struct.change_unit_cell(cell)
     ase_struct = new_struct.get_ase_atoms()
+    
+    # Get the volume per atom
+    volume = np.abs(np.linalg.det(cell)) / new_struct.N_atoms
 
     # Save as SCF the new structure
     new_struct.save_scf("relaxed-%04d.scf" % i)
@@ -191,5 +229,21 @@ for i in range(start_ka, max_ka):
 
 new_struct.save_scf("final_relaxed.scf")
 print "Final structure saved in final_relaxed.scf"
+
+
+if not append_file is None:
+    # Add the header if it does not exists
+    if not os.path.exists(append_file):
+        myfile = open(append_file, "w")
+        myfile.write("# Pressure [GPa], Volume per atom [A^3], energy per atom [eV], average quadratic force [eV/A]\n")
+        myfile.close()             
+                     
+    with open(append_file, "a") as myfile:
+        myfile.write("%16.8f %16.8f %16.8f %16.8f\n" % (press, volume, energy, tot_force))
+        myfile.close()
+
+    print "Info on the last minimization saved in '%s'" % append_file
+
+
 print "Done."
     
