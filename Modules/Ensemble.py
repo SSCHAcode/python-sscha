@@ -1,8 +1,17 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
-import os
+import sys, os
 import numpy as np
 import time
+
+# Fix the xrange python3 problem
+try:
+    xrange = xrange
+    # We have Python 2
+except:
+    xrange = range
+    # We have Python 3
+
 
 """
 This is part of the program python-sscha
@@ -38,6 +47,14 @@ try:
     __MPI__ = True
 except:
     __MPI__ = False
+    
+# Check if you can load spglib
+try:
+    import spglib
+    __SPGLIB__ = True
+except: 
+    __SPGLIB__ = False
+    
 
 # The small value considered zero
 __EPSILON__ =  1e-6
@@ -45,13 +62,15 @@ __A_TO_BOHR__ = 1.889725989
 
 try:
     from ase.units import create_units
-    units = ase.units.create_units("2006")#Rydberg, Bohr
+    units = create_units("2006")#Rydberg, Bohr
     Rydberg = units["Ry"]
     Bohr = units["Bohr"]
+    __RyToK__ =  Rydberg / units["kB"]
     
 except:
     Rydberg = 13.605698066
     Bohr = __A_TO_BOHR__
+    __RyToK__ = 157887.32400374097
 
 
 __DEBUG_RHO__ = False
@@ -530,6 +549,97 @@ class Ensemble:
         # Generate the q_start
         self.q_start = CC.Manipulate.GetQ_vectors(self.structures, super_dyn)
         self.current_q = self.q_start.copy()
+        
+        
+    def unwrap_symmetries(self):
+        """
+        UNWRAP THE ENSEMBLE
+        ===================
+        
+        This function unwraps the current ensemble by introducing the displacements
+        (and energies and forces) of the symmetric specular configurations.
+        This allows for a simple simmetrization of the odd3 correction.
+        
+        NOTE: stress tensors are not unwrapped!
+        
+        NOTE: This works only if spglib is installed
+        """
+        
+        # Get the symmetries
+        if not __SPGLIB__:
+            raise ImportError("Error, unwrap_symmetries mehtod requires spglib to be importable")
+            
+        # Get the symmetries from spglib
+        super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
+        spglib_syms = spglib.get_symmetry(super_structure.get_ase_atoms())
+        
+        # Convert them into the cellconstructor format
+        cc_syms = CC.symmetries.GetSymmetriesFromSPGLIB(spglib_syms, False)
+        
+        print("N syms:", len(cc_syms))
+        
+        n_syms = len(cc_syms)
+        nat_sc = super_structure.N_atoms
+        
+        # Get the IRT atoms
+        t1 = time.time()
+        irts = np.zeros( (n_syms, nat_sc), dtype = int)
+        for i in range(n_syms):
+            irts[i, :] = CC.symmetries.GetIRT(super_structure, cc_syms[i])
+        t2 = time.time()
+        
+        print ("Time elapsed to compute IRTS:", t2 - t1, "s")
+        
+        new_N = self.N * n_syms
+        u_disps_new = np.zeros( (new_N, 3 * nat_sc), dtype = np.float64, order = "F")
+        forces_new = np.zeros( (new_N, nat_sc, 3), dtype = np.float64, order = "F")
+        rho_new = np.zeros( (new_N), dtype = np.float64)
+        xats_new = np.zeros( (new_N, nat_sc, 3), dtype = np.float64, order = "C")
+        energies_new = np.zeros( (new_N), dtype = np.float64)
+        sscha_energies_new = np.zeros( (new_N), dtype = np.float64)
+        sscha_forces_new = np.zeros( (new_N, nat_sc, 3), dtype = np.float64, order = "F")
+        new_structures = []
+        
+        t1 = time.time()
+        for x in range(self.N):
+            for i in range(n_syms):
+                index = n_syms * x + i
+                
+                u_v = self.u_disps[x, :].reshape((nat_sc, 3))
+                u_new = CC.symmetries.ApplySymmetryToVector(cc_syms[i], u_v, super_structure.unit_cell, irts[i, :])
+                u_disps_new[index, :] = u_new.ravel()
+                xats_new[index, :, :] = super_structure.coords + u_new
+                
+                f_v = self.forces[x, :, :]
+                f_new = CC.symmetries.ApplySymmetryToVector(cc_syms[i], f_v, super_structure.unit_cell, irts[i, :])
+                forces_new[index, :, :] = f_new
+                
+                f_v = self.sscha_forces[x, :, :]                
+                f_new = CC.symmetries.ApplySymmetryToVector(cc_syms[i], f_v, super_structure.unit_cell, irts[i, :])
+                sscha_forces_new[index, :, :] = f_new
+                
+                rho_new[index] = self.rho[x]
+                energies_new[index] = self.energies[x]
+                sscha_energies_new[index] = self.sscha_energies[x]
+                
+                tmp_struct = super_structure.copy()
+                tmp_struct.coords = xats_new[index, :, :]
+                new_structures.append(tmp_struct)
+        t2 = time.time()
+        
+        print ("Time elapsed unwrapping the ensemble:", t2 - t1, "s")
+        
+        # Update the ensemble
+        self.N = new_N
+        self.u_disps = u_disps_new
+        self.xats = xats_new
+        self.rho = rho_new
+        self.structures = new_structures
+        self.energies = energies_new
+        self.forces = forces_new
+        self.sscha_energies = sscha_energies_new
+        self.sscha_forces = sscha_forces_new
+                
         
         
     def update_weights(self, new_dynamical_matrix, newT):
@@ -1455,7 +1565,277 @@ class Ensemble:
         #TODO: apply symmetries
             
         return df_dfc, err_df_dfc
+    
+    def get_v3_realspace(self):
+        """
+        This is a testing function that computes the V3 matrix in real space:
+            
+        ..math::
+            
+            \\Phi^{(3)}_{xyz} = - \sum_{pq} \\Upsilon_{xp}\\Upsilon_{yq} \\left<u_pu_q f_z\\\right>
+        """
+        
+        nat_sc = self.structures[0].N_atoms
+        Ups = self.current_dyn.GetUpsilonMatrix(self.current_T)
+        f2 = np.reshape(self.forces - self.sscha_forces, (self.N, 3 * nat_sc))
+        
+        # Get the average <uuf>
+        t1 = time.time()
+        N_eff = np.sum(self.rho)
+        uuf = np.einsum("ix,iy,iz,i", self.u_disps, self.u_disps, f2, self.rho)
+        uuf /= N_eff
+        t2 = time.time()
+        
+        print("Time elapsed to compute <uuf>:", t2-t1, "s")
+        
+        # Get the v3
+        v3 = - np.einsum("xp,yq,pqz->xyz", Ups, Ups, uuf) * __A_TO_BOHR__
+        # Symmetrize
+        #v3 = np.einsum("xyz,xzy,yxz,yzx,zxy,zyx->xyz", v3, v3, v3, v3, v3, v3) / 6
+        v3 -=  np.einsum("xp,yq,pqz->xzy", Ups, Ups, uuf) * __A_TO_BOHR__
+        v3 -=  np.einsum("xp,yq,pqz->zyx", Ups, Ups, uuf) * __A_TO_BOHR__
+        v3 -=  np.einsum("xp,yq,pqz->yxz", Ups, Ups, uuf)* __A_TO_BOHR__
+        v3 -=  np.einsum("xp,yq,pqz->zxy", Ups, Ups, uuf)* __A_TO_BOHR__
+        v3 -=  np.einsum("xp,yq,pqz->yzx", Ups, Ups, uuf)* __A_TO_BOHR__
+        v3 /= 6
+        t3 = time.time()
+        print("Time elapsed to compute v3:", t3-t1, "s")
+        return v3
 
+    def get_odd_realspace(self):
+        """
+        This is a testing function to compute the odd3 correction 
+        using the real space v3 (similar to the raffaello first implementation)
+        """
+        # Get the dynamical matrix in the supercell
+        super_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
+        w_sc, pols_sc = super_dyn.DyagDinQ(0)
+        
+        # Remove translations
+        no_trans_mask = ~CC.Methods.get_translations(pols_sc, super_dyn.structure.get_masses_array())
+        w_sc = w_sc[no_trans_mask]
+        pols_sc = pols_sc[:, no_trans_mask]
+        
+        # Get phi3
+        phi3 = self.get_v3_realspace()
+        
+        # Get Gmunu
+        Gmunu = super_dyn.GetGmunu(self.current_T)
+        
+        # Divide the polarization vectors by the mass
+        nat_sc = super_dyn.structure.N_atoms
+        epol = pols_sc.copy()
+        m = super_dyn.structure.get_masses_array()
+        for x in range(nat_sc):
+            epol[3*x : 3*x + 3, :] = pols_sc[3*x : 3*x + 3, :] / np.sqrt(m[x])
+        
+        first_part = np.einsum("xab,ij,ai,bj->xij", phi3, Gmunu, epol, epol)
+        second_part = np.einsum("ci,dj,cdy->ijy", epol, epol, phi3)
+        odd_correction = np.einsum("xij, ijy->xy", first_part, second_part)
+        
+        fakedyn = super_dyn.Copy()
+        fakedyn.dynmats[0] = odd_correction
+        fakedyn.save_qe("odd_new")
+        return super_dyn.dynmats[0] + odd_correction
+        
+
+    def get_odd_correction(self, include_v4 = False, store_v3 = True, progress = False):
+        """
+        RAFFAELLO'S BIANCO ODD CORRECTION
+        =================================
+        
+        This function returns the odd correction to the dynamical matrix. 
+        It can be used to get the free energy curvature, to study structure stability.
+        It contains also the static phonons (w -> 0). 
+        
+        .. math ::
+            
+            \\Phi^(F) = \\Phi^{(2)} + \\Phi^{(3)} \\Lambda (I - \\Phi^{(4)})^{-1} \\Lambda \\Phi^{(3)}
+        
+        where :math:`\\Phi^{(2)}` is the standard dynamical matrix, while :math:`\\Phi^{(n)}` are
+        the high order force constant matrices.
+        
+        See "Phys. Rev. B 96, 014111" for further details (consider also to cite it if
+        you use this method).
+        
+        Parameters
+        ----------
+            include_v4 : bool
+                If false (default) the :math:`\\Phi^{(4)} matrix is not computed and it is
+                considered as the null matrix. This speed up a lot the calculation,
+                and :math:`\\Phi^{(4)}` is found to give a neglectable contribution in many
+                systems.
+            store_v3 : bool
+                If true (default) the d3 matrix is stored in memory. This is much
+                cheaper from a computational point of view, but in large system can
+                require a lot of memory.
+            progress : bool
+                If true (default false), shows a progress bar while computing 
+        
+        Results
+        -------
+            new_dyn : ndarray(3xnat_sc, 3xnat_sc, dtype = float64)
+                The new dynamical matrix with the odd contribution corrected.
+        """
+        __TYPE__ = np.float64
+        
+        # For now do not implement v4
+        if include_v4:
+            raise NotImplementedError("Error, v4 has still not been implemented")
+        
+        # Get the dynamical matrix in the supercell
+        super_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
+        w_sc, pols_sc = super_dyn.DyagDinQ(0)
+        
+        # Remove translations
+        no_trans_mask = ~CC.Methods.get_translations(pols_sc, super_dyn.structure.get_masses_array())
+        w_sc = w_sc[no_trans_mask]
+        pols_sc = pols_sc[:, no_trans_mask]
+        
+        # Check if the polarization vectors have an imaginary part
+        imag_part = np.sqrt(np.sum( np.imag(pols_sc)**2))
+        if imag_part > __EPSILON__:
+            print("Imaginary part of the polarization vectors:", imag_part)
+            raise ValueError("Error the imaginary part of the polarization vector exceeded the threshold.")
+            
+        pols_sc = np.real(pols_sc)
+        
+        nat_sc = super_dyn.structure.N_atoms
+        
+        # Get the masses array of the correct shape
+        _m_ = np.zeros( (3*nat_sc), dtype = __TYPE__)
+        _m_[:] = np.tile(super_dyn.structure.get_masses_array(), (3, 1)).T.ravel()
+        
+        n_modes_sc = len(w_sc)
+        
+        # Get the forces of the correct shape
+        _f_ = (self.forces - self.sscha_forces).reshape((self.N, 3*nat_sc))
+        
+        # Get the X and Y arrays
+        X = np.zeros( (n_modes_sc, self.N), dtype = __TYPE__)
+        Y = np.zeros( (n_modes_sc, self.N), dtype = __TYPE__)
+
+        # Get the Upsilon eigenvalue
+        w_ups = 2 * w_sc        
+        n_bos = 0 * w_sc
+        dn_dw = 0 * w_sc
+        if self.current_T > __EPSILON__:
+            n_bos = 1 / (np.exp(w_sc * __RyToK__ / self.current_T) - 1)
+            w_ups /=  1 + 2*n_bos
+            dn_dw = - n_bos**2 * np.exp(w_sc * __RyToK__ / self.current_T) * __RyToK__ / self.current_T
+            
+        X[:,:] = np.einsum("ab,ca,a,b,c -> bc", pols_sc, self.u_disps, np.sqrt(_m_), w_ups, self.rho) * __A_TO_BOHR__
+        Y[:,:] = np.einsum("ab,ca,a,c -> bc", pols_sc, _f_, 1 / np.sqrt(_m_), self.rho) / __A_TO_BOHR__
+        N_eff = np.sum(self.rho)
+        
+        # Get lambda matrix
+        Lambda_G = np.zeros( (n_modes_sc, n_modes_sc), dtype = __TYPE__)
+        for mu in range(n_modes_sc):
+            w_mu = w_sc[mu]
+            n_mu = n_bos[mu]
+            
+            for nu in range(n_modes_sc):
+                w_nu = w_sc[nu]
+                n_nu = n_bos[nu]
+                if abs(w_mu - w_nu) < __EPSILON__:
+                    Lambda_G[mu, nu] = (2*n_nu + 1)/(2*w_nu) - dn_dw[nu]
+                else:
+                    Lambda_G[mu, nu] = (n_mu + n_nu + 1)/(w_mu + w_nu) - (n_mu - n_nu)/(w_mu - w_nu)
+                
+                Lambda_G[mu, nu] /= - 4*w_mu*w_nu
+                
+        print ("Consistent check on Lambda:", np.sqrt(np.sum( (Lambda_G - Lambda_G.T)**2)))
+        
+        # Compute the odd3 correction
+        odd_corr = np.zeros( (n_modes_sc, n_modes_sc), dtype = __TYPE__)
+        if store_v3:
+            d3 = np.einsum("ai,bi,ci", X, X, Y)
+            d3 += np.einsum("ai,bi,ci", X, Y, X)
+            d3 += np.einsum("ai,bi,ci", Y, X, X)
+            d3 /= - 3 * N_eff
+            #d3 /= N_eff
+
+            print (type(d3[0,0,0]))
+            print ("N_eff:", N_eff)
+
+            #odd_corr[:,:] = np.einsum("abc,bc,de,def -> af", d3, Lambda_G, Lambda_G, d3)
+            odd_corr[:,:] = np.einsum("abc,bc,bcd -> ad", d3, Lambda_G, d3)
+            
+#            for b in range(len(w_sc)):
+#                for c in range(len(w_sc)):
+#                    odd_corr[:,:] += np.outer(d3[:, b, c], d3[b, c, :]) * Lambda_G[b,c]
+        else:
+            if progress:
+                print ("D3 correction computation:")
+                
+            
+            for a in range(n_modes_sc):
+                d3_a = np.einsum("i,bi,ci", X[a,:], X, Y)
+                d3_a += np.einsum("i,bi,ci", X[a,:], Y, X)
+                d3_a += np.einsum("i,bi,ci", Y[a,:], X, X)
+                d3_a /= - 3 * N_eff
+                for b in range(a, n_modes_sc):
+                    d3_b = d3_a
+                    if a != b:
+                        d3_b = np.einsum("i,bi,ci", X[a,:], X, Y)
+                        d3_b += np.einsum("i,bi,ci", X[a,:], Y, X)
+                        d3_b += np.einsum("i,bi,ci", Y[a,:], X, X)
+                        d3_b /= - 3 * N_eff
+                    
+                    odd_corr[a,b] = np.sum(d3_a * d3_b * Lambda_G)
+                    odd_corr[b,a] = odd_corr[a,b]
+                
+                if progress:
+                    sys.stdout.write("\r%2d %%" % (a * 100 / n_modes_sc))
+                    sys.stdout.flush()
+                    
+            
+#                
+#            
+#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", X, X, Y, Lambda_G, X, X, Y)
+#            print ("1")
+#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", X, X, Y, Lambda_G, X, Y, X)
+#            print ("2")
+#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", X, X, Y, Lambda_G, Y, X, X)
+#            print ("3...")
+#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", X, Y, X, Lambda_G, X, X, Y)
+#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", X, Y, X, Lambda_G, X, Y, X)
+#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", X, Y, X, Lambda_G, Y, X, X)
+#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", Y, X, X, Lambda_G, X, X, Y)
+#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", Y, X, X, Lambda_G, X, Y, X)
+#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", Y, X, X, Lambda_G, Y, X, X)
+#                
+#                
+#            for i in range(self.N):
+#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", X[:,i], X[:,i], Y[:,i], Lambda_G, X[:,i], X[:,i], Y[:,i])
+#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", X[:,i], X[:,i], Y[:,i], Lambda_G, X[:,i], Y[:,i], X[:,i])
+#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", X[:,i], X[:,i], Y[:,i], Lambda_G, Y[:,i], X[:,i], X[:,i])
+#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", X[:,i], Y[:,i], X[:,i], Lambda_G, X[:,i], X[:,i], Y[:,i])
+#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", X[:,i], Y[:,i], X[:,i], Lambda_G, X[:,i], Y[:,i], X[:,i])
+#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", X[:,i], Y[:,i], X[:,i], Lambda_G, Y[:,i], X[:,i], X[:,i])
+#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", Y[:,i], X[:,i], X[:,i], Lambda_G, X[:,i], X[:,i], Y[:,i])
+#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", Y[:,i], X[:,i], X[:,i], Lambda_G, X[:,i], Y[:,i], X[:,i])
+#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", Y[:,i], X[:,i], X[:,i], Lambda_G, Y[:,i], X[:,i], X[:,i])
+#      
+#                if progress:
+#                    if i % 10 == 0:
+#                        sys.stdout.write("\r%2d %%" % (i * 100 / self.N))
+#                        sys.stdout.flush()
+#            
+#            odd_corr /= (3 * self.N)**2
+            if progress:
+                print ()
+            #raise NotImplementedError("Error, the store_v3 = .false. has still not been implemented")
+        
+        # Get back in the cartesian basis
+        cart_odd_corr = np.zeros((3*nat_sc, 3*nat_sc), dtype = __TYPE__)
+        cart_odd_corr[:,:] = np.einsum("ai,bj,ij -> ab", pols_sc, pols_sc, odd_corr)
+        cart_odd_corr *= np.outer(np.sqrt(_m_),  np.sqrt(_m_))
+        
+        np.save("odd_corr.npy", cart_odd_corr)
+        
+        # Return the new dynamical matrix in the supercell
+        return super_dyn.dynmats[0] + cart_odd_corr
 
     def compute_ensemble(self, calculator, compute_stress = True, stress_numerical = False,
                          cluster = None):
