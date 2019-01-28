@@ -1,0 +1,156 @@
+!
+! * * * * * * * * * * * * * * *
+! *                           *
+! *    VC - RELAX EXAMPLE     *
+! *                           *
+! * * * * * * * * * * * * * * *
+!
+!
+! This is the input to perform the sscha minimization, followed
+! by the change of the unit cell given by the stress step.
+!
+! This is not the recommended way to do it (you can do everything automatically)
+! But it can be very easy if you came from the sscha.x fortran code.
+!
+!
+! In this example we setup a new namelist: 'relax'.
+! It is used to setup the relaxation among many sscha minimizations.
+! In this example we want to setup a 'vc-relax' optimization, with only one step
+! (we do not want to regenerate forces and stresses for a new ensembe).
+! Then we need to setup the 'inputscha' as always, to load the ensemble.
+
+&relax
+	! We want a 'vc-relax' calculation
+	type = "vc-relax"
+
+	! The initial population
+	start_pop = 2
+	! We want to stop after only one step (without generating a new)
+	max_pop_id = 2
+
+	! Get the ensemble from 'inputscha'
+	! NOTE: by default the esemble is re-extracted by this method
+	generate_ensemble = .false.
+
+	! We want to perform a standard vc-relax with target pressure
+	! So we do now want to fix the volume, and we need to specify
+	! a target pressure:
+	fix_volume = .false.
+	target_pressure = 0 ! [GPa]
+
+	! We can provide a bulk modulus,
+	! in this way the algorithm will guess the best step.
+	bulk_modulus = 15 ! [GPa]
+
+	! We need to specify also here the number of configurations
+	! This is because usually this namespace is able to generate
+	! new ensembles to perform several minimizations
+	! (if a calculator/cluster namespace is provided)
+	! (for details, see the Cluster example)
+	n_configs = 1000
+
+	! If you choose to save the ensemble,
+	! you can specify a directory:
+	! ensemble_datadir = 'data'
+	! Note: the ensemble will be saved in binary data.
+&end
+
+	
+! Now we need to specify the minimization variables
+! As always
+&inputscha
+    ! The dimension of the ensemble
+    n_random = 1000
+    
+    ! The position of the ensemble (where the data are stored).
+    ! Take a look to that to see how to dispose your ensemble.
+    ! Unit of measurements must be in bohr for displacements and 
+    ! Ry/bohr for forces and Ry/bohr^3 for stress tensors.
+    ! Energy is in Ry.
+    data_dir = "../ensemble_data_test"
+    
+    ! The population id. This is an integer that distinguish different ensembles
+    ! and allows for use the same data_dir for several minimizations
+    population = 2
+    
+    ! Now we must tell the program where is the dynamical matrix that
+    ! generated the ensemble. 
+    ! This matrix should be written in the Quantum ESPRESSO file format
+    fildyn_prefix = "../ensemble_data_test/dyn"
+    
+    ! We should tell the number of irriducible q points (how many files are)
+    nqirr = 1
+    
+    ! The supercell size
+    supercell_size =  1 1 1
+    
+    ! The temperature used to generate the ensemble (in Kelvin)
+    Tg = 0 
+    
+    ! The temperature that will be used in the minimization (in Kelvin)
+    T = 0
+    
+    ! The stopping criteria. The code will end the minimization after
+    ! the gradient is lower than meaningful_factor times its stochastic error
+    meaningful_factor = 1e-4
+    
+    ! But which gradient?
+    ! We are minimizing both the structure and the dynamical matrix
+    ! Therefore we can specify to the code which gradient is used to trigger the
+    ! stopping condition.
+    ! By default, both of them should satisfy the meaningufl criteria.
+    ! Options are "all", "gc", and "gw".
+    ! "all" - both the gradient should satisfy the meaningulf (default)
+    ! "gw"  - only the wyckoff (i.e. structure) gradient.
+    ! "gc"  - only the force-constant matrix gradient.
+    gradi_op = "all" 
+    
+    ! The Kong-Liu effective sample size. 
+    ! This is a stochastic test, during the minimization the effective
+    ! size of the ensemble is reduced by the importance sampling. When this size
+    ! becomes lower than the given threshold the minimization is stopped,
+    ! and you should re-generate a new ensemble.
+    ! Usually in the begining you can chose 0.1-0.3 the original ensemble,
+    ! and raise it to 0.4 or 0.5 when you are close to convergence.
+    n_random_eff = 500
+    
+    ! This flag is used by the old code to make it seek for the pressures
+    ! in the ensemble. However it is ignored by the python code, that will print
+    ! the stress if it finds the stress tensor inside the ensemble automatically
+    ! In this case it must be used to do a vc-relax
+    print_stress = .true.
+    
+    ! The following flag set the equilibrium energy.
+    ! It should be the energy of the structure without fluctuations,
+    ! it is used to separate the electronic and the vibrational energy,
+    ! since they are usually of different order of magnitude.
+    ! It is measured in Ry
+    eq_energy = -144.40680397
+    
+    ! The following are the step size for the minimization
+    ! They are dimensionless and builded so that their best value should be 1
+    ! However, especially in the first step, this can be a very drastic jump
+    ! leading to neagive frequencies, it is wise in the beginning to decrease it.
+    ! lambda_a : step for the force constant matrix
+    ! lambda_w : step for the structure
+    lambda_a = 1
+    lambda_w = 1
+    
+    ! The root representation is a trick to increase the speed of the minimization
+    ! And to avoid the imaginary frequency error (the force-constant matrix is constrained
+    ! by a nonlinear change of variable to be positive defined).
+    ! The python new code is not able to do simultaneously precondition
+    ! and root_representation.
+    ! - "normal" : normal minimization, can lead to imaginary frequencies
+    ! - "sqrt"   : square root representation.
+    ! - "root4"  : fourth-root represnetation, the best one (and the slowest).
+    root_representation = "normal"
+
+    ! Preconditioning allows for a very fast minimization!
+    ! Note that it is much faster than the fortran code
+    ! (it is implemented in a more intelligent way)
+    preconditioning = .true.
+
+    ! The maximum number of steps after which the code is automatically stopped
+    max_ka= 20
+/

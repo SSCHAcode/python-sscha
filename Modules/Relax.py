@@ -24,6 +24,7 @@ __RELAX_NCONFIGS__ = "n_configs"
 __RELAX_MAX_POP__ = "max_pop_id"
 __RELAX_START_POP__ = "start_pop"
 __RELAX_SAVE_ENSEMBLE__ = "ensemble_datadir"
+__RELAX_GENERATE_FIRST_ENSEMBLE__ = "generate_ensemble"
 __RELAX_TARGET_PRESSURE__ = "target_pressure"
 __RELAX_FIXVOLUME__ = "fix_volume"
 __RELAX_BULK_MODULUS__ = "bulk_modulus"
@@ -37,7 +38,7 @@ __REQ_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__]
 __ALLOWED_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__, __RELAX_MAX_POP__,
                     __RELAX_START_POP__, __RELAX_SAVE_ENSEMBLE__,
                     __RELAX_FIXVOLUME__, __RELAX_TARGET_PRESSURE__,
-                    __RELAX_BULK_MODULUS__]
+                    __RELAX_BULK_MODULUS__, __RELAX_GENERATE_FIRST_ENSEMBLE__]
 
 class SSCHA:
     minim = sscha.SchaMinimizer.SSCHA_Minimizer()
@@ -46,7 +47,7 @@ class SSCHA:
     fix_volume = False
     
     def __init__(self, minimizer = None, ase_calculator=None, N_configs=1, max_pop = 20, 
-                 save_ensemble = True, cluster = None):
+                 save_ensemble = False, cluster = None):
         """
         This module initialize the relaxer. It may perform
         constant volume or pressure relaxation using fully anharmonic potentials.
@@ -64,7 +65,7 @@ class SSCHA:
             max_pop: int, optional
                 The maximum number of iteration (The code will stop)
             save_ensemble : bool, optional
-                If True (default) the ensemble is saved after each energy and forces calculation.
+                If True (default false) the ensemble is saved after each energy and forces calculation.
             cluster : Cluster.Cluster, optional
                 If different from None, the ensemble force and energy calculations
                 will be runned in the provided cluster.
@@ -125,6 +126,10 @@ class SSCHA:
         if sscha.Calculator.__CALCULATOR_HEAD__ in namelist.keys():
             self.calc = sscha.Calculator.prepare_calculator_from_namelist(namelist)
         
+        # Get if you must use a already loaded ensemble or not
+        restart_from_ens = False
+        if __RELAX_GENERATE_FIRST_ENSEMBLE__ in keys:
+            restart_from_ens = not bool(c_info[__RELAX_GENERATE_FIRST_ENSEMBLE__])
         
         # Get the number of configurations
         if __RELAX_NCONFIGS__ in keys:
@@ -184,11 +189,11 @@ class SSCHA:
             self.minim.print_info()
         
             if rtype == __TYPE_RELAX__:
-                self.relax(False, self.minim.ensemble.has_stress, self.data_dir,
+                self.relax(restart_from_ens, self.minim.ensemble.has_stress, self.data_dir,
                            self.start_pop)
             elif rtype == __TYPE_VCRELAX__:
                 self.vc_relax(self.target_pressure, self.bulk_modulus, 
-                              False, self.data_dir, self.start_pop, fix_volume=self.fix_volume)
+                              restart_from_ens, self.data_dir, self.start_pop, fix_volume=self.fix_volume)
         
     def setup_custom_functions(self, custom_function_pre = None,
                                custom_function_gradient = None,

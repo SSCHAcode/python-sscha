@@ -40,7 +40,7 @@ minim.meaningful_factor = 1
 minim.precond_dyn = True
 
 # We setup the SSCHA relaxation.
-N_CONFIGS = 400
+N_CONFIGS = 1000
 MAX_ITERATIONS = 20
 relax = sscha.Relax.SSCHA(minim, calc, N_CONFIGS, MAX_ITERATIONS)
 
@@ -53,7 +53,7 @@ relax.setup_custom_functions(custom_function_post=freq_saving.CFP_SaveFrequencie
 
 # Start the variable cell relaxation
 
-relax.vc_relax(static_bulk_modulus=100, fix_volume = True)
+relax.vc_relax(static_bulk_modulus=40, fix_volume = False)
 
 
 
