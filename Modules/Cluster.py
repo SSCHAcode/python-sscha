@@ -34,6 +34,7 @@ __CLUSTER_PWD__ = "pwd"
 __CLUSTER_ACCOUNT__ = "account"
 __CLUSTER_BINARY__ = "binary_path"
 __CLUSTER_MPICMD__ = "mpicmd"
+__CLUSTER_ATTEMPTS__ = "reconnect_attempts"
 
 
 __CLUSTER_TERMINAL__ = "shell"
@@ -84,7 +85,8 @@ __CLUSTER_KEYS__ = [__CLUSTER_NAMELIST__, __CLUSTER_TEMPLATE__, __CLUSTER_HOST__
                     __CLUSTER_UPART__, __CLUSTER_INITSCRIPT__, __CLUSTER_MAXRECALC__, __CLUSTER_BATCHSIZE__,
                     __CLUSTER_LOCALWD__, __CLUSTER_VACCOUNT__, __CLUSTER_UACCOUNT__, __CLUSTER_SSHCMD__,
                     __CLUSTER_SCPCMD__, __CLUSTER_WORKDIR__, __CLUSTER_TIMEOUT__, 
-                    __CLUSTER_JOBNUMBER__, __CLUSTER_NPARALLEL__, __CLUSTER_NPOOLS__]
+                    __CLUSTER_JOBNUMBER__, __CLUSTER_NPARALLEL__, __CLUSTER_NPOOLS__,
+                    __CLUSTER_ATTEMPTS__]
 
 
 class Cluster:
@@ -132,6 +134,7 @@ class Cluster:
     # This is the maximum number of resubmissions after the expected one
     # from the batch size. It can be use to resubmit the failed jobs.
     max_recalc = 10
+    connection_attempts = 1
     
     # This is the time string. Faster job will be the less in the queue,
     time="00:02:00" # 2minutes
@@ -210,6 +213,62 @@ class Cluster:
         self.binary = binary
         self.mpi_cmd = mpi_cmd
         
+    def ExecuteCMD(self, cmd, raise_error = True, return_output = False):
+        """
+        EXECUTE THE CMD ON THE CLUSTER
+        ==============================
+        
+        This subroutine execute the cmd in the cluster,
+        with the specified number of attempts.
+        
+        Parameters
+        ----------
+            cmd: string
+                The whole command, including the ssh/scp.
+            raise_error : bool, optional
+                If True (default) raises an error upon failure.
+            return_output : bool, optional
+                If True (default False) the output of the command is 
+                returned as second value.
+                
+        Returns
+        -------
+            success : bool
+                If True, the command has been executed with success,
+                False otherwise
+            output : string
+                Returned only if return_output is True
+        """
+        
+        success = False
+        output = ""
+        for i in range(self.connection_attempts):
+            # Subprocess opening
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell = True)
+            output, err = p.communicate()
+            output = output.strip()
+            status = p.wait()
+            if not err is None:
+                sys.stderr.write(err)
+            
+            if status != 0:
+                sys.stderr.write("Error with cmd: "+ cmd + "\n")
+                sys.stderr.write(output + "\n")
+                sys.stderr.write("EXITSTATUS: " + str(status) + "; attempt = " + str(i+1) + "\n")
+            else:
+                success = True
+                break
+            
+        if raise_error and not success:
+            raise IOError("Error while communicating with the cluster. More than %d attempts failed." % (i+1))
+            
+        
+        if return_output:
+            return success, output
+        return success
+            
+        
+        
             
     def CheckCommunication(self):
         """
@@ -221,17 +280,20 @@ class Cluster:
         """
         
         cmd = self.sshcmd + " %s 'echo ciao'" % self.hostname
-        print cmd
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
-        output, err = p.communicate()
-        output = output.strip()
-        status = p.wait()
-        if not err is None:
-            sys.stderr.write(err)
-        if status != 0:
-            sys.stderr.write("Error, cmd: " + cmd + "\n")
-            sys.stderr.write("Exit status:" + str(status))
-            return False
+        
+        status, output = self.ExecuteCMD(cmd, return_output = True)
+        
+#        print cmd
+#        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+#        output, err = p.communicate()
+#        output = output.strip()
+#        status = p.wait()
+#        if not err is None:
+#            sys.stderr.write(err)
+#        if status != 0:
+#            sys.stderr.write("Error, cmd: " + cmd + "\n")
+#            sys.stderr.write("Exit status:" + str(status))
+#            return False
     
         if output != "ciao":
             sys.stderr.write("Code exited correctly but echo did not answer properly\n")
@@ -312,18 +374,21 @@ class Cluster:
             cmd = self.sshcmd + " %s 'rm -f %s/%s%s %s/%s%s'" % (self.hostname, 
                                                                  self.workdir, lbl, in_extension,
                                                                  self.workdir, lbl, out_extension)
-            cp_res = os.system(cmd + " > /dev/null")
-            if cp_res != 0:
-                print "Error while executing:", cmd
-                print "Return code:", cp_res
-                sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
-            
+            self.ExecuteCMD(cmd, False)
+#            cp_res = os.system(cmd + " > /dev/null")
+#            if cp_res != 0:
+#                print "Error while executing:", cmd
+#                print "Return code:", cp_res
+#                sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
+#            
             # Copy the file into the cluster
             cmd = self.scpcmd + " %s/%s%s %s:%s/" % (self.local_workdir, lbl, 
                                                     in_extension, self.hostname, 
                                                     self.workdir)
-            cp_res = os.system(cmd + " > /dev/null")
-            if cp_res != 0:
+            cp_res = self.ExecuteCMD(cmd, False)
+            
+            #cp_res = os.system(cmd + " > /dev/null")
+            if not cp_res:
                 print "Error while executing:", cmd
                 print "Return code:", cp_res
                 sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
@@ -389,8 +454,9 @@ class Cluster:
         f.write(submission)
         f.close()
         cmd = self.scpcmd + " %s %s:%s" % (sub_fpath, self.hostname, self.workdir)
-        cp_res = os.system(cmd  + " > /dev/null")
-        if cp_res != 0:
+        cp_res = self.ExecuteCMD(cmd, False)
+        #cp_res = os.system(cmd  + " > /dev/null")
+        if not cp_res:
             print "Error while executing:", cmd
             print "Return code:", cp_res
             sys.stderr.write(cmd + ": exit with code " + str(cp_res))
@@ -400,12 +466,13 @@ class Cluster:
         # Run the simulation
         cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, 
                                                    self.workdir, label+ "_" + str(indices[0]))
-        cp_res = os.system(cmd + " > /dev/null")
-        if cp_res != 0:
-            print "Error while executing:", cmd
-            print "Return code:", cp_res
-            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
-            
+        cp_res = self.ExecuteCMD(cmd, False)
+#        cp_res = os.system(cmd + " > /dev/null")
+#        if cp_res != 0:
+#            print "Error while executing:", cmd
+#            print "Return code:", cp_res
+#            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
+#            
         
         # Collect the output back
         for i in submitted:
@@ -416,11 +483,12 @@ class Cluster:
             # Get the response
             cmd = self.scpcmd + " %s:%s %s/" % (self.hostname, out_filename,
                                                 self.local_workdir)
-            cp_res = os.system(cmd + " > /dev/null")
-            if cp_res != 0:
-                print "Error while executing:", cmd
-                print "Return code:", cp_res
-                sys.stderr.write(cmd + ": exit with code " + str(cp_res))
+            cp_res = self.ExecuteCMD(cmd, False)
+            #cp_res = os.system(cmd + " > /dev/null")
+            if not cp_res:
+                #print "Error while executing:", cmd
+                #print "Return code:", cp_res
+                #sys.stderr.write(cmd + ": exit with code " + str(cp_res))
                 continue
             
             # Get the results
@@ -485,44 +553,49 @@ class Cluster:
         cmd = self.sshcmd + " %s 'rm -f %s/%s%s %s/%s%s'" % (self.hostname, 
                                                              self.workdir, label, in_extension,
                                                              self.workdir, label, out_extension)
-        cp_res = os.system(cmd)
-        if cp_res != 0:
-            print "Error while executing:", cmd
-            print "Return code:", cp_res
-            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
-        
+        self.ExecuteCMD(cmd, False)
+#        cp_res = os.system(cmd)
+#        if cp_res != 0:
+#            print "Error while executing:", cmd
+#            print "Return code:", cp_res
+#            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
+#        
         # Copy the input files into the target directory
         f = file("%s/%s.sh" % (self.local_workdir, label), "w")
         f.write(submission)
         f.close()
         cmd = self.scpcmd + " %s/%s.sh %s:%s" % (self.local_workdir, label, self.hostname, self.workdir)
-        cp_res = os.system(cmd)
-        if cp_res != 0:
-            print "Error while executing:", cmd
-            print "Return code:", cp_res
-            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
-            
+        self.ExecuteCMD(cmd, False)
+#        cp_res = os.system(cmd)
+#        if cp_res != 0:
+#            print "Error while executing:", cmd
+#            print "Return code:", cp_res
+#            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
+#            
         cmd = self.scpcmd + " %s/%s%s %s:%s" % (self.local_workdir, label, in_extension, self.hostname, self.workdir)
-        cp_res = os.system(cmd)
-        if cp_res != 0:
-            print "Error while executing:", cmd
-            print "Return code:", cp_res
-            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
+        cp_res = self.ExecuteCMD(cmd, False)
+        #cp_res = os.system(cmd)
+        if not cp_res:
+            #print "Error while executing:", cmd
+            #print "Return code:", cp_res
+            #sys.stderr.write(cmd + ": exit with code " + str(cp_res))
             return
         
         # Run the simulation
         cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, self.workdir, label)
-        cp_res = os.system(cmd)
-        if cp_res != 0:
-            print "Error while executing:", cmd
-            print "Return code:", cp_res
-            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
+        self.ExecuteCMD(cmd, False)
+#        cp_res = os.system(cmd)
+#        if cp_res != 0:
+#            print "Error while executing:", cmd
+#            print "Return code:", cp_res
+#            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
             
         # Get the response
         cmd = self.scpcmd + " %s:%s/%s%s %s/" % (self.hostname, self.workdir, label, out_extension, 
                                                  self.local_workdir) 
-        cp_res = os.system(cmd)
-        if cp_res != 0:
+        cp_res = self.ExecuteCMD(cmd, False)
+        #cp_res = os.system(cmd)
+        if not cp_res:
             print "Error while executing:", cmd
             print "Return code:", cp_res
             sys.stderr.write(cmd + ": exit with code " + str(cp_res))
@@ -647,7 +720,7 @@ class Cluster:
         if __CLUSTER_SUBCMD__ in keys:
             self.submit_command = c_info[__CLUSTER_SUBCMD__]
         if __CLUSTER_SUBNAME__ in keys:
-            self.submit_command = c_info[__CLUSTER_SUBNAME__]
+            self.submit_name = c_info[__CLUSTER_SUBNAME__]
         if __CLUSTER_VNODES__ in keys:
             self.v_nodes = c_info[__CLUSTER_VNODES__]
         if __CLUSTER_NNODES__ in keys:
@@ -682,10 +755,13 @@ class Cluster:
         #    self.use_partition = c_info[__CLUSTER_UPART__]
         if __CLUSTER_UACCOUNT__ in keys:
             self.use_account = c_info[__CLUSTER_UACCOUNT__]
-        if __CLUSTER_VPART__ in keys:
+        if __CLUSTER_VACCOUNT__ in keys:
             self.v_account = c_info[__CLUSTER_VACCOUNT__]
         if __CLUSTER_NPOOLS__ in keys:
             self.n_pool = int(c_info[__CLUSTER_NPOOLS__])
+            
+        if __CLUSTER_ATTEMPTS__ in keys:
+            self.connection_attempts = int(c_info[__CLUSTER_ATTEMPTS__])
             
         if __CLUSTER_INITSCRIPT__ in keys:
             # Load the init script.
@@ -746,13 +822,16 @@ class Cluster:
         
         sshcmd = self.sshcmd + " %s 'mkdir -p %s'" % (self.hostname, 
                                                       workdir)
-        retval = os.system(sshcmd)
-        if retval != 0:
-            raise IOError("Error, while executing cmd: " + sshcmd)
         
-        if verbose:
-            print "Cluster workdir setted to:"
-            print workdir
+        self.ExecuteCMD(sshcmd)
+#        
+#        retval = os.system(sshcmd)
+#        if retval != 0:
+#            raise IOError("Error, while executing cmd: " + sshcmd)
+#        
+#        if verbose:
+#            print "Cluster workdir setted to:"
+#            print workdir
         
         self.workdir = workdir
     
@@ -783,17 +862,20 @@ class Cluster:
         # Use single ' to avoid string parsing by the local terminal
         cmd = "%s %s 'echo \"%s\"'" % (self.sshcmd, self.hostname, string)
         #print cmd
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
-        output, err = p.communicate()
-        status = p.wait()
-        output = output.strip()
-
-        if not err is None: 
-            sys.stderr.write(err)
-        if status != 0:
-            print "Command:", cmd
-            print "Error, status:", status
-            raise ValueError("Error, while connecting with the server.")
+        
+        status, output = self.ExecuteCMD(cmd, return_output = True)
+#        
+#        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+#        output, err = p.communicate()
+#        status = p.wait()
+#        output = output.strip()
+#
+#        if not err is None: 
+#            sys.stderr.write(err)
+#        if status != 0:
+#            print "Command:", cmd
+#            print "Error, status:", status
+#            raise ValueError("Error, while connecting with the server.")
         
         return output
             
