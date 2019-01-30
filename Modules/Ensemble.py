@@ -1639,7 +1639,7 @@ class Ensemble:
         return super_dyn.dynmats[0] + odd_correction
         
 
-    def get_odd_correction(self, include_v4 = False, store_v3 = True, progress = False):
+    def get_odd_correction(self, include_v4 = False, store_v3 = True, store_v4 = True, progress = False):
         """
         RAFFAELLO'S BIANCO ODD CORRECTION
         =================================
@@ -1669,6 +1669,9 @@ class Ensemble:
                 If true (default) the d3 matrix is stored in memory. This is much
                 cheaper from a computational point of view, but in large system can
                 require a lot of memory.
+            store_v4 : bool
+                If true (default) the v4 matrix is stored in memory. This is very fast, but
+                it can drain the memory.
             progress : bool
                 If true (default false), shows a progress bar while computing 
         
@@ -1678,10 +1681,6 @@ class Ensemble:
                 The new dynamical matrix with the odd contribution corrected.
         """
         __TYPE__ = np.float64
-        
-        # For now do not implement v4
-        if include_v4:
-            raise NotImplementedError("Error, v4 has still not been implemented")
         
         # Get the dynamical matrix in the supercell
         super_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
@@ -1760,6 +1759,32 @@ class Ensemble:
 
             #odd_corr[:,:] = np.einsum("abc,bc,de,def -> af", d3, Lambda_G, Lambda_G, d3)
             odd_corr[:,:] = np.einsum("abc,bc,bcd -> ad", d3, Lambda_G, d3)
+
+            if include_v4:
+                # Check if v4 must be stored
+                if store_v4:
+                    d4 = np.einsum("ai,bi,ci,di", X, X, X, Y)
+                    d4 += np.einsum("ai,bi,ci,di", X, X, Y, X)
+                    d4 += np.einsum("ai,bi,ci,di", X, Y, X, X)
+                    d4 += np.einsum("ai,bi,ci,di", Y, X, X, X)
+                    d4 /= -4 * N_eff
+
+                    # Perform the cycle for the geometric sum
+                    odd_dim = np.sum(odd_corr**2)
+                    old_odd = odd_corr.copy()
+                    new_corr = np.zeros( np.shape(old_odd), dtype = __TYPE__)
+                    running = True
+                    new_d3 = d3.copy()
+                    while running:
+                        new_d3 = np.einsum("xab,ab,abyz-> xyz", new_d3, Lambda_G, d4)
+                        new_corr[:,:] = np.einsum("xab, ab, aby->xy", new_d3, Lambda_G, d3)
+                        odd_corr += new_corr
+                        ratio = np.sum(new_corr**2) / np.sum(odd_corr**2)
+                        if np.sqrt(ratio) < __EPSILON__:
+                            running = False  
+                else:
+                    # Do not store d4
+                    raise NotImplementedError("Error, v4 not stored not implemented")
             
 #            for b in range(len(w_sc)):
 #                for c in range(len(w_sc)):
@@ -1788,6 +1813,10 @@ class Ensemble:
                 if progress:
                     sys.stdout.write("\r%2d %%" % (a * 100 / n_modes_sc))
                     sys.stdout.flush()
+
+                if include_v4:
+                    raise NotImplementedError("Error, v4 without v3 stored not yet implemented.")
+
                     
             
 #                
