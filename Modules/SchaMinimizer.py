@@ -686,6 +686,7 @@ Maybe data_dir is missing from your input?"""
             print "Check for the imaginary frequencies..."
         
         self.check_imaginary_frequencies()
+        self.update()
         
         # Clean all the minimization variables
         self.__fe__ = []
