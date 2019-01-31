@@ -1773,6 +1773,7 @@ class Ensemble:
 
                     print ("d4 = ", np.sqrt(np.sum(d4**2)))
                     print ("Lambda = ", np.sqrt(np.sum(Lambda_G**2)))
+                    print ("d4*Lambda =", np.sqrt(np.sum(np.einsum("ab, abxy", Lambda_G, d4)**2)))
 
                     # Perform the cycle for the geometric sum
                     old_odd = odd_corr.copy()
