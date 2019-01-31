@@ -1785,6 +1785,7 @@ class Ensemble:
                         if progress:
                             print("")
                             print("New_d3-d3 = ", np.sqrt(np.sum( (d3-new_d3)**2)))
+                            print("new_d3 = ", np.sqrt(np.sum(new_d3**2)))
                             print("Odd corr magnitude =", np.sqrt(np.sum(odd_corr**2)))
                             print("Ratio: %.4e | Converged after: %.4e" % (ratio, v4_conv_thr))
                             print("")
