@@ -1639,7 +1639,7 @@ class Ensemble:
         return super_dyn.dynmats[0] + odd_correction
         
 
-    def get_odd_correction(self, include_v4 = False, store_v3 = True, store_v4 = True, progress = False):
+    def get_odd_correction(self, include_v4 = False, store_v3 = True, store_v4 = True, progress = False, v4_conv_thr = 1e-2):
         """
         RAFFAELLO'S BIANCO ODD CORRECTION
         =================================
@@ -1674,6 +1674,8 @@ class Ensemble:
                 it can drain the memory.
             progress : bool
                 If true (default false), shows a progress bar while computing 
+            frequency : double
+                if different from zero (default = 0) it computes the dynamical correction
         
         Results
         -------
@@ -1780,11 +1782,54 @@ class Ensemble:
                         new_corr[:,:] = np.einsum("xab, ab, aby->xy", new_d3, Lambda_G, d3)
                         odd_corr += new_corr
                         ratio = np.sum(new_corr**2) / np.sum(odd_corr**2)
-                        if np.sqrt(ratio) < __EPSILON__:
+
+                        if progress:
+                            print("")
+                            print("Ratio: %.4e | Converged after: %.4e" % (ratio, v4_conv_thr))
+                            print("")
+
+                        if np.sqrt(ratio) < v4_conv_thr:
                             running = False  
                 else:
+                    # We can do exactly the same as before
+                    # But performing the sum over I explicitely
+                    odd_dim = np.sum(odd_corr**2)
+                    old_odd = odd_corr.copy()
+                    new_corr = np.zeros(np.shape(old_odd), dtype = __TYPE__)
+                    running = True
+                    new_d3 = d3.copy()
+
+
+                    while running:
+                        for x in xrange( n_modes_sc):
+                            aux1 = new_d3[x, :, :] * Lambda_G
+                            new_d3[x, :, :] = np.einsum("ab,ai,bi,ci,di->cd", aux1, X, X, X, Y)
+                            new_d3[x, :, :] += np.einsum("ab,ai,bi,ci,di->cd", aux1, X, X, Y, X)
+                            new_d3[x, :, :] += np.einsum("ab,ai,bi,ci,di->cd", aux1, X, Y, X, X)
+                            new_d3[x, :, :] += np.einsum("ab,ai,bi,ci,di->cd", aux1, Y, X, X, X)
+                            new_d3[x, :, :] /= -4*N_eff
+                            aux2 = new_d3[x, :, :] * Lambda_G
+                            for y in xrange(x, n_modes_sc):
+                                new_corr[x,y] = np.sum(aux2 * d3[y, :, :])
+                                new_corr[y,x] = new_corr[x,y]
+                            
+                            if progress:
+                                sys.stdout.write("\r Computing v4 correction ... %d / %d" % (x+1, n_modes_sc))
+                        
+                        # Add the correction
+                        odd_corr += new_corr
+                        ratio = np.sum(new_corr**2) / np.sum(odd_corr**2)
+                        
+                        if progress:
+                            print("")
+                            print("Ratio: %.4e | Converged after: %.4e" % (ratio, v4_conv_thr))
+                            print("")
+                        if np.sqrt(ratio) < v4_conv_thr:
+                            running = False  
+
+
                     # Do not store d4
-                    raise NotImplementedError("Error, v4 not stored not implemented")
+                    #raise NotImplementedError("Error, v4 not stored not implemented")
             
 #            for b in range(len(w_sc)):
 #                for c in range(len(w_sc)):

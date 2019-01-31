@@ -30,7 +30,7 @@ new_dyn_supercell = ens.get_odd_correction()
 t2 = time.time()
 
 #other_new_dyn = ens.get_odd_correction(store_v3 = False, progress = True)
-other_new_dyn = ens.get_odd_realspace()
+other_new_dyn = ens.get_odd_correction(include_v4 = True)
 t3 = time.time()
 
 # Copy the matrix into the Phonons class
