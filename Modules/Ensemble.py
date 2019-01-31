@@ -1771,6 +1771,8 @@ class Ensemble:
                     d4 += np.einsum("ai,bi,ci,di", Y, X, X, X)
                     d4 /= -4 * N_eff
 
+                    print ("d3 = ", np.sqrt(np.sum(d3**2)))
+                    print ("d3 * Lambda = ", np.sqrt(np.sum(np.einsum("ab,abc", Lambda_G, d3)**2)))
                     print ("d4 = ", np.sqrt(np.sum(d4**2)))
                     print ("Lambda = ", np.sqrt(np.sum(Lambda_G**2)))
                     print ("d4*Lambda =", np.sqrt(np.sum(np.einsum("ab, abxy", Lambda_G, d4)**2)))
