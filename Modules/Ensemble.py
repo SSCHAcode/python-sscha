@@ -1772,7 +1772,6 @@ class Ensemble:
                     d4 /= -4 * N_eff
 
                     # Perform the cycle for the geometric sum
-                    odd_dim = np.sum(odd_corr**2)
                     old_odd = odd_corr.copy()
                     new_corr = np.zeros( np.shape(old_odd), dtype = __TYPE__)
                     running = True
@@ -1785,6 +1784,8 @@ class Ensemble:
 
                         if progress:
                             print("")
+                            print("New_d3-d3 = ", np.sqrt(np.sum( (d3-new_d3)**2)))
+                            print("Odd corr magnitude =", np.sqrt(np.sum(odd_corr**2)))
                             print("Ratio: %.4e | Converged after: %.4e" % (ratio, v4_conv_thr))
                             print("")
 
