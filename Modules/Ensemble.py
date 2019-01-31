@@ -1771,6 +1771,9 @@ class Ensemble:
                     d4 += np.einsum("ai,bi,ci,di", Y, X, X, X)
                     d4 /= -4 * N_eff
 
+                    print ("d4 = ", np.sqrt(np.sum(d4**2)))
+                    print ("Lambda = ", np.sqrt(np.sum(Lambda_G**2)))
+
                     # Perform the cycle for the geometric sum
                     old_odd = odd_corr.copy()
                     new_corr = np.zeros( np.shape(old_odd), dtype = __TYPE__)
