@@ -406,7 +406,7 @@ class SSCHA_Minimizer:
         # Check if the required keywords are present
         for req_key in __SCHA_MANDATORY_KEYS__:
             if not req_key in keys:
-                raise IOError("Error, the cluster configuration namelist requires the keyword: '" + req_key + "'")
+                raise IOError("Error, the " + __SCHA_NAMELIST__ + " configuration namelist requires the keyword: '" + req_key + "'")
                 
         load_bin = False
         if __SCHA_ISBIN__ in keys:
