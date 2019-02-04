@@ -1785,9 +1785,19 @@ class Ensemble:
                     new_corr = np.zeros( np.shape(old_odd), dtype = __TYPE__)
                     running = True
                     new_d3 = d3.copy()
+                    step = 0.1
                     while running:
-                        new_d3 = np.einsum("xab,ab,abyz-> xyz", new_d3, Lambda_G, d4)
-                        new_corr[:,:] = np.einsum("xab, ab, aby->xy", new_d3, Lambda_G, d3)
+                        # Steepest Descent
+                        rest = new_d3 - d3 - np.einsum("xyab, ab, abz", d4, Lambda_G, new_d3)
+                        delta = 2*rest 
+                        delta -=  np.einsum("xyab, ab, abz", d4, Lambda_G, rest)
+                        delta -= np.einsum("xab, abyz,yz->xyz", rest, d4, Lambda_G)
+
+                        new_d3 -= step * delta
+
+                        # Geometric series
+                        #new_d3 = np.einsum("xab,ab,abyz-> xyz", new_d3, Lambda_G, d4)
+                        new_corr[:,:] = np.einsum("xab, ab, aby->xy", d3, Lambda_G, new_d3)
                         odd_corr += new_corr
                         ratio = np.sum(new_corr**2) / np.sum(odd_corr**2)
 
