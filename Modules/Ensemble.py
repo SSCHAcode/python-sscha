@@ -1780,6 +1780,13 @@ class Ensemble:
                     Ld4 = np.einsum("ab, abxy->abxy", Lambda_G, d4).reshape((n_modes_sc**2, n_modes_sc**2))
                     print ("Ld4 spectrum:", np.linalg.eigvals(Ld4))
 
+                    # Get the solution
+                    Inv_mat = np.linalg.inv(np.eye(n_modes_sc**2) - Ld4)
+                    d32 = d3.reshape((n_modes_sc**2, n_modes_sc))
+                    new_b32 = Inv_mat.dot(d32)
+                    new_b = new_b32.reshape((n_modes_sc, n_modes_sc, n_modes_sc))
+                    odd_corr = np.einsum("xab, ab, aby", d3, Lambda_G, new_b)
+""" 
                     # Perform the cycle for the geometric sum
                     old_odd = odd_corr.copy()
                     new_corr = np.zeros( np.shape(old_odd), dtype = __TYPE__)
@@ -1812,7 +1819,7 @@ class Ensemble:
                             print ("Rest: ", rest_mod)
 
                         if rest_mod < v4_conv_thr:
-                            running = False  
+                            running = False   """
                 else:
                     # We can do exactly the same as before
                     # But performing the sum over I explicitely
