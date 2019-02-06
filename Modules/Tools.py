@@ -28,6 +28,51 @@ import scipy, scipy.linalg
 import numpy as np
 import os
 
+
+# Here some usefull functions to solve linear systems
+def BiconjugateVector(R, Rbar, P, Pbar, Xold, ApplyMatrix, ApplyTranspose):
+    """
+    BICONJUGATE STEP
+    ================
+
+    This is the single step of the biconjugate algorithm for finding
+    the solution of a linear system.
+
+    Parameters
+    ----------
+        R, Rbar, P, Pbar : vectors
+            The parameters of the Bicojugate, they will be updated at each step.
+        Xold : vector
+            The guess of the system solution, will be updated
+        ApplyMatrix: function of vector
+            Takes in input the vector, and computes A*x 
+        ApplyTranspose: function of the vector
+            Takes in input the vector and computes A.T * x
+    """
+
+    Ap = ApplyMatrix(P)
+    Apbar = ApplyTranspose(Pbar)
+
+    # Get the alpha step
+    alpha = Rbar.dot(R) / (Pbar.dot(Ap))
+
+    # Get the rest
+    newR = R - alpha * Ap
+    newRbar = Rbar - alpha * Apbar
+
+    # Get the beta step
+    beta = newRbar.dot(newR) / Rbar.dot(R)
+    newP = newR + beta *P
+    newPbar = newRbar + beta*Pbar
+
+    # Update all
+    Xold += alpha*P
+    R[:] = newR
+    Rbar[:] = newRbar
+    P[:] = newP
+    Pbar[:] = newPbar
+
+
 # ------------------ GENERATORS ---------------------------
 # Here we work with the old sscha generators, to enable them
 # to represent any given matrix

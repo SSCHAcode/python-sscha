@@ -1785,31 +1785,33 @@ class Ensemble:
                     new_corr = np.zeros( np.shape(old_odd), dtype = __TYPE__)
                     running = True
                     new_d3 = d3.copy()
-                    step = 0.1
+
+                    # Setup the biconjugate method
+                    R = np.einsum("xyab, ab, abz", d4, Lambda_G, d3)
+                    Rbar = R.copy()
+                    P = R.copy()
+                    Pbar = R.copy()
+                    
                     while running:
-                        # Steepest Descent
-                        rest = new_d3 - d3 - np.einsum("xyab, ab, abz", d4, Lambda_G, new_d3)
-                        delta = 2*rest 
-                        delta -=  np.einsum("xyab, ab, abz", d4, Lambda_G, rest)
-                        delta -= np.einsum("xab, abyz,yz->xyz", rest, d4, Lambda_G)
+                        Ap = P - np.einsum("xyab, ab, abz", d4, Lambda_G, P)
+                        ATpbar = Pbar - np.einsum("xab, abyz, yz -> xyz", Pbar, d4, Lambda_G)
 
-                        new_d3 -= step * delta
+                        alpha = np.einsum("abc, bca", Rbar, R) / np.einsum("abc,bca", Pbar, Ap)
+                        new_d3 += alpha * P
+                        Rnew = R - alpha *Ap
+                        Rbarnew = Rbar - alpha * ATpbar
+                        beta = np.einsum("abc,bca", Rbarnew, Rnew) / np.einsum("abc,bca", Rbar, R)
+                        P = R + beta*P
+                        Pbar = Rbar + beta*Pbar
+                        R = Rnew
+                        Rbar = Rbarnew
 
-                        # Geometric series
-                        #new_d3 = np.einsum("xab,ab,abyz-> xyz", new_d3, Lambda_G, d4)
-                        new_corr[:,:] = np.einsum("xab, ab, aby->xy", d3, Lambda_G, new_d3)
-                        odd_corr += new_corr
-                        ratio = np.sum(new_corr**2) / np.sum(odd_corr**2)
-
+                        rest_mod =np.sqrt(np.einsum("abc,bca", R, R))
                         if progress:
                             print("")
-                            print("New_d3-d3 = ", np.sqrt(np.sum( (d3-new_d3)**2)))
-                            print("new_d3 = ", np.sqrt(np.sum(new_d3**2)))
-                            print("Odd corr magnitude =", np.sqrt(np.sum(odd_corr**2)))
-                            print("Ratio: %.4e | Converged after: %.4e" % (ratio, v4_conv_thr))
-                            print("")
+                            print ("Rest: ", rest_mod)
 
-                        if np.sqrt(ratio) < v4_conv_thr:
+                        if rest_mod < v4_conv_thr:
                             running = False  
                 else:
                     # We can do exactly the same as before
