@@ -1786,7 +1786,7 @@ class Ensemble:
                     new_b32 = Inv_mat.dot(d32)
                     new_b = new_b32.reshape((n_modes_sc, n_modes_sc, n_modes_sc))
                     odd_corr = np.einsum("xab, ab, aby", d3, Lambda_G, new_b)
-""" 
+                    """ 
                     # Perform the cycle for the geometric sum
                     old_odd = odd_corr.copy()
                     new_corr = np.zeros( np.shape(old_odd), dtype = __TYPE__)
