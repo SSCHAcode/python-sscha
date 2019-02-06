@@ -1794,19 +1794,19 @@ class Ensemble:
                     
                     while running:
                         Ap = P - np.einsum("xyab, ab, abz", d4, Lambda_G, P)
-                        ATpbar = Pbar - np.einsum("xab, abyz, yz -> xyz", Pbar, d4, Lambda_G)
+                        ATpbar = Pbar - np.einsum("abxy,xy, abz->xyz", d4, Lambda_G, Pbar)
 
-                        alpha = np.einsum("abc, bca", Rbar, R) / np.einsum("abc,bca", Pbar, Ap)
-                        new_d3 += alpha * P
-                        Rnew = R - alpha *Ap
-                        Rbarnew = Rbar - alpha * ATpbar
-                        beta = np.einsum("abc,bca", Rbarnew, Rnew) / np.einsum("abc,bca", Rbar, R)
-                        P = R + beta*P
-                        Pbar = Rbar + beta*Pbar
+                        alpha = np.einsum("abc, abc->c", Rbar, R) / np.einsum("abc,abc->c", Pbar, Ap)
+                        new_d3 += np.einsum("c, abc->abc", alpha, P)
+                        Rnew = R - np.einsum("c, abc->abc", alpha, Ap)
+                        Rbarnew = Rbar - np.einsum("c, abc->abc", alpha, ATpbar)
+                        beta = np.einsum("abc,abc->c", Rbarnew, Rnew) / np.einsum("abc, abc->c", Rbar, R)
+                        P = R + np.einsum("c, abc->abc", beta, P)
+                        Pbar = Rbar + np.einsum("c, abc->abc", beta, Pbar)
                         R = Rnew
                         Rbar = Rbarnew
 
-                        rest_mod =np.sqrt(np.einsum("abc,bca", R, R))
+                        rest_mod =np.sqrt(np.einsum("abc,abc", R, R))
                         if progress:
                             print("")
                             print ("Rest: ", rest_mod)
