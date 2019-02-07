@@ -459,7 +459,7 @@ class SSCHA_Minimizer:
                 self.dyn.Symmetrize()
             
             if not __SCHA_DATADIR__ in keys:
-                self.ensemble = Ensemble.Ensemble(self.dyn)
+                self.ensemble = Ensemble.Ensemble(self.dyn, 0)
                 
                 if __SCHA_T__ in keys:
                     self.ensemble.current_T = np.float64(namelist[__SCHA_T__])
