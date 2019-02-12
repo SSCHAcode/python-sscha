@@ -1680,7 +1680,7 @@ class Ensemble:
 
         superdyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
         superstruc = superdyn.structure
-        ups_mat = superdyn.GetUpsilonMatrix(self.current_T)
+        ups_mat = np.real(superdyn.GetUpsilonMatrix(self.current_T))
 
         # Get Upsilon dot u
         vs = self.u_disps.dot(ups_mat) * __A_TO_BOHR__
