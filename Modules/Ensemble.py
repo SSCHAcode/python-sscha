@@ -1639,6 +1639,99 @@ class Ensemble:
         return super_dyn.dynmats[0] + odd_correction
         
 
+    def get_v3_qspace(self, q, k):
+        r"""
+        GET THE PHONON-PHONON SCATTERING ELEMENT
+        ========================================
+
+        This subroutine computes the 3-body phonon-phonon scatternig within the sscha.
+        It evaluates the vertex where the q phonon splits in a q+k and -k phonon:
+                    
+                  /---> q + k
+           q ____/
+                 \
+                  \---> -k  
+
+        
+        This computes v3 on the fly in real space.
+        
+        .. math ::
+
+            V^3_{abc} (q, -q-k, k)
+
+        Where :math:`a`, :math:`b` and :math:`c` are the atomic indices in the unit cell.
+
+        Parameters
+        ----------
+            q : ndarray(size = 3, dtype = float)
+                The q vector for the v3 compuation V3(q, -q-k, k).
+            k : ndarray(size = 3, dtype = float)
+                The k vector for the v3 computation V3(q, -q-k, k).
+        
+        Returns
+        -------
+            v3 : ndarray( size = (3*nat, 3*nat, 3*nat), dtype = np.complex128)
+                The 3-rank tensor vertext V3(q, -q-k, k) of the phonon-phonon scattering
+        """
+
+        # Define the q vectors
+        q1 = -q -k
+        q2 = k
+
+        superdyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
+        superstruc = superdyn.structure
+        ups_mat = superdyn.GetUpsilonMatrix(self.current_T)
+
+        # Get Upsilon dot u
+        vs = self.u_disps.dot(ups_mat)
+        
+        # Get the corrispondance between unit cell and super cell
+        itau = superdyn.structure.get_itau(self.current_dyn.structure) - 1
+        nat_sc = superdyn.structure.N_atoms
+        nat = self.current_dyn.structure.N_atoms
+        struct = self.current_dyn.structure
+
+        D3 = np.zeros( (3*nat, 3*nat, 3*nat), dtype = np.complex128)
+        N_eff = np.sum(self.rho)
+        fc = np.zeros((3,3,3), dtype = np.float64)
+        for i in range(nat_sc):
+            i_uc = itau[i]
+
+            # The forces and displacement along this atom
+            v_i = vs[:, 3*i:3*i+3]
+            f_i = self.forces[:, i, :] - self.sscha_forces[:, i, :]
+            for j in range(nat_sc):
+                j_uc = itau[j]
+
+                R1 = superstruc.coords[i, :] - struct.coords[i_uc, :]
+                R1 -= superstruc.coords[j, :] - struct.coords[j_uc, :]
+                q1dotR = q1.dot(R1)
+
+                # Forces and displacement along this atom
+                v_j = vs[:, 3*j:3*j+3]
+                f_j = self.forces[:, j, :] - self.sscha_forces[:, j, :] 
+                
+
+                for k in range(nat_sc):
+                    k_uc = itau[k]
+
+                    R2 = superstruc.coords[i, :] - struct.coords[i_uc, :]
+                    R2 -= superstruc.coords[k, :] - struct.coords[k_uc, :]
+                    q2dotR = q2.dot(R2)
+                        
+                    # Forces and displacement along this atom
+                    v_k = vs[:, 3*k:3*k+3]
+                    f_k = self.forces[:, k, :] - self.sscha_forces[:, k, :] 
+
+                    fc[:,:] = np.einsum("ia,ib,ic,i", v_i, v_j, f_k, self.rho)
+                    fc += np.einsum("ia,ib,ic,i", v_i, f_j, v_k, self.rho)
+                    fc += np.einsum("ia,ib,ic,i", f_i, v_j, v_k, self.rho)
+                    fc /= 3*N_eff
+                    D3[3*i_uc: 3*i_uc+3, 3*j_uc: 3*j_uc+3, 3*k_uc : 3*k_uc+3] += fc * np.exp(-1j* q1dotR - 1j*q2dotR)
+
+                    
+        return D3
+
     def get_odd_correction(self, include_v4 = False, store_v3 = True, store_v4 = True, progress = False, v4_conv_thr = 1e-2):
         """
         RAFFAELLO'S BIANCO ODD CORRECTION
