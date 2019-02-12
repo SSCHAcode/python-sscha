@@ -1699,7 +1699,6 @@ class Ensemble:
 
             # The forces and displacement along this atom
             v_i = vs[:, 3*i:3*i+3]
-            print (type(i))
             f_i = self.forces[:, i, :] - self.sscha_forces[:, i, :]
             f_i /= __A_TO_BOHR__
             for j in range(nat_sc):
@@ -1785,9 +1784,11 @@ class Ensemble:
 
             # Get the v3 
             d3_1 = self.get_v3_qspace(k1, k)
+            print ("Sum of v3:", np.sum(d3_1))
 
             # Get the phonon-propagator
             bubble = self.current_dyn.get_phonon_propagator(w, self.current_T, k1, k, smearing)
+            print ("Sum of the bubble:", np.sum(bubble))
 
             # Get the index of k1 to extract the polarization vectors
             k1_dists = [CC.Methods.get_min_dist_into_cell(bg, k1, x) for x in q_list]
