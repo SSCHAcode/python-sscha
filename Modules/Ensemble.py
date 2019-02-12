@@ -1683,7 +1683,7 @@ class Ensemble:
         ups_mat = superdyn.GetUpsilonMatrix(self.current_T)
 
         # Get Upsilon dot u
-        vs = self.u_disps.dot(ups_mat) / 
+        vs = self.u_disps.dot(ups_mat) * __A_TO_BOHR__
         
         # Get the corrispondance between unit cell and super cell
         itau = superdyn.structure.get_itau(self.current_dyn.structure) - 1
@@ -1700,6 +1700,7 @@ class Ensemble:
             # The forces and displacement along this atom
             v_i = vs[:, 3*i:3*i+3]
             f_i = self.forces[:, i, :] - self.sscha_forces[:, i, :]
+            f_i /= __A_TO_BOHR__
             for j in range(nat_sc):
                 j_uc = itau[j]
 
@@ -1710,6 +1711,7 @@ class Ensemble:
                 # Forces and displacement along this atom
                 v_j = vs[:, 3*j:3*j+3]
                 f_j = self.forces[:, j, :] - self.sscha_forces[:, j, :] 
+                f_j /= __A_TO_BOHR__
                 
 
                 for k in range(nat_sc):
@@ -1722,6 +1724,7 @@ class Ensemble:
                     # Forces and displacement along this atom
                     v_k = vs[:, 3*k:3*k+3]
                     f_k = self.forces[:, k, :] - self.sscha_forces[:, k, :] 
+                    f_k /= __A_TO_BOHR__
 
                     fc[:,:] = np.einsum("ia,ib,ic,i", v_i, v_j, f_k, self.rho)
                     fc += np.einsum("ia,ib,ic,i", v_i, f_j, v_k, self.rho)
