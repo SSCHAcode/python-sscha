@@ -1766,7 +1766,7 @@ class Ensemble:
         # Perform the summation over the allowed q points
         q_list = self.current_dyn.q_tot
 
-        bg = CC.Methods.get_reciprocal_vectors(self.structure.unit_cell)
+        bg = CC.Methods.get_reciprocal_vectors(self.current_dyn.structure.unit_cell)
         m = self.current_dyn.structure.get_masses_array()
 
         nat = self.current_dyn.structure.N_atoms
