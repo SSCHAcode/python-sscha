@@ -1683,7 +1683,7 @@ class Ensemble:
         ups_mat = superdyn.GetUpsilonMatrix(self.current_T)
 
         # Get Upsilon dot u
-        vs = self.u_disps.dot(ups_mat)
+        vs = self.u_disps.dot(ups_mat) / 
         
         # Get the corrispondance between unit cell and super cell
         itau = superdyn.structure.get_itau(self.current_dyn.structure) - 1
@@ -1731,6 +1731,78 @@ class Ensemble:
 
                     
         return D3
+
+    def get_dynamical_bubble(self, q, w):
+        r"""
+        GET THE DYNAMICAL BUBBLE SELF ENERGY
+        ====================================
+
+        This function returns the dynamical bubble self-energy:
+
+        .. math::
+
+            \Sigma_{af}(q, w) = \sum_{q'q''}\sum_{bc,\mu\nu} D^{(3)}_{abc} \left(-\frac 1 2 \chi_{\mu\nu}(\omega, q', q'')\right) \frac{e_\nu^b e_\mu^c e_\nu^d e_\mu^e}{\sqrt{M_bM_cM_dM_e}} D^{(3)}_{def}
+
+        
+        NOTE: The integral in the q space is performed over the mesh grid given by the supercell.
+
+
+        Parameters
+        ----------
+            q : vector
+                The q vector to compute the dynamical self energy
+            w : the frequency to compute the dynamical self-energy
+
+        Results
+        -------
+            Sigma : ndarray(size = (3*nat, 3*nat), dtype = np.complex128)
+                The dynamical self energy.
+        """
+
+
+        # Perform the summation over the allowed q points
+        q_list = self.current_dyn.q_tot
+
+        bg = CC.Methods.get_reciprocal_vectors(self.structure.unit_cell)
+        m = self.current_dyn.structure.get_masses_array()
+
+        nat = self.current_dyn.structure.N_atoms
+
+        # Extend m to 3*nat
+        # This is a numpy hack: tile creates a replica matrix of m (3xN_nat)
+        # .T: makes a transposition to N_nat x 3 and ravel convert it in a 1d array
+        m = np.tile(m, (3,1)).T.ravel()
+        minvsqrt = 1 / np.sqrt(m)
+
+        # Initialize the bubble self energy
+        sigma = np.zeros((3*nat, 3*nat), dtype = np.complex128)
+        for ik, k in enumerate(q_list):
+            k1 = -q -k
+
+            # Get the v3 
+            d3_1 = self.get_v3_qspace(k1, k)
+
+            # Get the phonon-propagator
+            bubble = self.current_dyn.get_phonon_propagator(w, self.current_T, k1, k, smearing)
+
+            # Get the index of k1 to extract the polarization vectors
+            k1_dists = [CC.Methods.get_min_dist_into_cell(bg, k1, x) for x in q_list]
+            k1_i = np.argmin(k1_dists)
+
+            wk, polk = self.current_dyn.DyagDinQ(ik)
+            wk1, polk1 = self.current_dyn.DyagDinQ(k1_i)
+
+            # Get |e><e| / sqrt(m_a m_b)
+            e_mat = np.einsum("am,bn, a, b->abmn", polk1, polk, minvsqrt, minvsqrt)
+
+            # Convert the d3 in the mu basis
+            d3_mubasis = np.einsum("abc, bcmn -> amn", d3_1, e_mat)
+
+            # Compute the bubble
+            sigma -= 2 * np.einsum("amn, mn, bmn->ab", d3_mubasis, bubble, np.conj(d3_mubasis))
+
+        return sigma
+
 
     def get_odd_correction(self, include_v4 = False, store_v3 = True, store_v4 = True, progress = False, v4_conv_thr = 1e-2):
         """
