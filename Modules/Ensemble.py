@@ -1699,7 +1699,7 @@ class Ensemble:
 
             # The forces and displacement along this atom
             v_i = vs[:, 3*i:3*i+3]
-            print type(i)
+            print (type(i))
             f_i = self.forces[:, i, :] - self.sscha_forces[:, i, :]
             f_i /= __A_TO_BOHR__
             for j in range(nat_sc):
