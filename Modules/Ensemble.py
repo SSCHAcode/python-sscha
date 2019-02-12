@@ -1804,7 +1804,7 @@ class Ensemble:
             d3_mubasis = np.einsum("abc, bcmn -> amn", d3_1, e_mat)
 
             # Compute the bubble
-            sigma -= 2 * np.einsum("amn, mn, bmn->ab", d3_mubasis, bubble, np.conj(d3_mubasis))
+            sigma -= np.einsum("amn, mn, bmn->ab", d3_mubasis, bubble, np.conj(d3_mubasis)) / 2
 
         return sigma
 
