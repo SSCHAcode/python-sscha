@@ -1699,6 +1699,7 @@ class Ensemble:
 
             # The forces and displacement along this atom
             v_i = vs[:, 3*i:3*i+3]
+            print type(i)
             f_i = self.forces[:, i, :] - self.sscha_forces[:, i, :]
             f_i /= __A_TO_BOHR__
             for j in range(nat_sc):
@@ -1735,7 +1736,7 @@ class Ensemble:
                     
         return D3
 
-    def get_dynamical_bubble(self, q, w):
+    def get_dynamical_bubble(self, q, w, smearing = 1e-5):
         r"""
         GET THE DYNAMICAL BUBBLE SELF ENERGY
         ====================================
