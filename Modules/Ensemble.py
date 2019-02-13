@@ -1754,12 +1754,14 @@ class Ensemble:
         ----------
             q : vector
                 The q vector to compute the dynamical self energy
-            w : the frequency to compute the dynamical self-energy
+            w : float or array
+                The frequency(ies) to compute the dynamical self-energy
 
         Results
         -------
             Sigma : ndarray(size = (3*nat, 3*nat), dtype = np.complex128)
-                The dynamical self energy.
+                The dynamical self energy. Note it could be a list of Sigma
+                if the provided frequency is an array
         """
 
 
@@ -1777,8 +1779,17 @@ class Ensemble:
         m = np.tile(m, (3,1)).T.ravel()
         minvsqrt = 1 / np.sqrt(m)
 
+        # Check how many frequencies has been provided
+        N_w = 1
+        try:
+            N_w = len(w)
+        except:
+            pass
+
         # Initialize the bubble self energy
         sigma = np.zeros((3*nat, 3*nat), dtype = np.complex128)
+        if N_w > 1:
+            sigmas = [sigma.copy() for x in range(N_w)]
         for ik, k in enumerate(q_list):
             k1 = -q -k
 
@@ -1787,8 +1798,12 @@ class Ensemble:
             print ("Sum of v3:", np.sum(d3_1))
 
             # Get the phonon-propagator
-            bubble = self.current_dyn.get_phonon_propagator(w, self.current_T, k1, k, smearing)
-            print ("Sum of the bubble:", np.sum(bubble))
+            if N_w > 1:
+                bubbles = []
+                for i in range(N_w):
+                    bubbles.append( self.current_dyn.get_phonon_propagator(w[i], self.current_T, k1, k, smearing))
+            else:
+                bubble = self.current_dyn.get_phonon_propagator(w, self.current_T, k1, k, smearing)
 
             # Get the index of k1 to extract the polarization vectors
             k1_dists = [CC.Methods.get_min_dist_into_cell(bg, k1, x) for x in q_list]
@@ -1804,8 +1819,14 @@ class Ensemble:
             d3_mubasis = np.einsum("abc, bcmn -> amn", d3_1, e_mat)
 
             # Compute the bubble
-            sigma -= np.einsum("amn, mn, bmn->ab", d3_mubasis, bubble, np.conj(d3_mubasis)) / 2
+            if N_w > 1:
+                for i in range(N_w):
+                    sigmas[i] -= np.einsum("amn, mn, bmn->ab", d3_mubasis, bubbles[i], np.conj(d3_mubasis)) / 2
+            else:
+                sigma -= np.einsum("amn, mn, bmn->ab", d3_mubasis, bubble, np.conj(d3_mubasis)) / 2
 
+        if N_w > 1:
+            return sigmas
         return sigma
 
 
