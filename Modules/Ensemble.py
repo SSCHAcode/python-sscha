@@ -1831,7 +1831,8 @@ class Ensemble:
         return sigma
 
 
-    def get_odd_correction(self, include_v4 = False, store_v3 = True, store_v4 = True, progress = False, v4_conv_thr = 1e-2):
+    def get_odd_correction(self, include_v4 = False, store_v3 = True, 
+            store_v4 = True, progress = False, frequency = 0, smearing = 5e-5, v4_conv_thr = 1e-2):
         """
         RAFFAELLO'S BIANCO ODD CORRECTION
         =================================
@@ -1868,13 +1869,22 @@ class Ensemble:
                 If true (default false), shows a progress bar while computing 
             frequency : double
                 if different from zero (default = 0) it computes the dynamical correction
+            smearing : double
+                This is the smearing applied only in the case of dynamical correction
         
         Results
         -------
             new_dyn : ndarray(3xnat_sc, 3xnat_sc, dtype = float64)
                 The new dynamical matrix with the odd contribution corrected.
         """
+        is_dynamic = False
+        if np.abs(frequency) > __EPSILON__:
+            is_dynamic = True
+
+        
         __TYPE__ = np.float64
+        if is_dynamic:
+            __TYPE = np.complex128
         
         # Get the dynamical matrix in the supercell
         super_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
@@ -1930,11 +1940,15 @@ class Ensemble:
             for nu in range(n_modes_sc):
                 w_nu = w_sc[nu]
                 n_nu = n_bos[nu]
-                if abs(w_mu - w_nu) < __EPSILON__:
+                if abs(w_mu - w_nu) < __EPSILON__ and not is_dynamic:
                     Lambda_G[mu, nu] = (2*n_nu + 1)/(2*w_nu) - dn_dw[nu]
                 else:
-                    Lambda_G[mu, nu] = (n_mu + n_nu + 1)/(w_mu + w_nu) - (n_mu - n_nu)/(w_mu - w_nu)
-                
+                    if not is_dynamic:
+                        Lambda_G[mu, nu] = (n_mu + n_nu + 1)/(w_mu + w_nu) - (n_mu - n_nu)/(w_mu - w_nu)
+                    else:
+                        Lambda_G[mu, nu] =(w_mu + w_nu)*(n_mu + n_nu + 1)/((w_mu + w_nu)**2 - frequency**2 - 2*1j*smearing*frequency) - \
+                            (w_mu - w_nu)*(n_mu - n_nu)/((w_mu - w_nu)**2 - frequency**2 - 2*frequency*1j*smearing)
+
                 Lambda_G[mu, nu] /= - 4*w_mu*w_nu
                 
         print ("Consistent check on Lambda:", np.sqrt(np.sum( (Lambda_G - Lambda_G.T)**2)))
