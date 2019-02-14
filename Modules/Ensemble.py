@@ -1735,6 +1735,7 @@ class Ensemble:
                     
         return D3
 
+
     def get_dynamical_bubble(self, q, w, smearing = 1e-5):
         r"""
         GET THE DYNAMICAL BUBBLE SELF ENERGY
@@ -1973,10 +1974,9 @@ class Ensemble:
 
                     # Get the solution
                     Inv_mat = np.linalg.inv(np.eye(n_modes_sc**2) - Ld4)
-                    d32 = d3.reshape((n_modes_sc**2, n_modes_sc))
-                    new_b32 = Inv_mat.dot(d32)
-                    new_b = new_b32.reshape((n_modes_sc, n_modes_sc, n_modes_sc))
-                    odd_corr = np.einsum("xab, ab, aby", d3, Lambda_G, new_b)
+                    Inv_mat_4d = Inv_mat.reshape((n_modes_sc, n_modes_sc, n_modes_sc, n_modes_sc))
+                    New_Prop = np.einsum("abcd, cd->abcd", Inv_mat_4d, Lambda_G)
+                    odd_corr = np.einsum("xab, abcd, cdy", d3, New_Prop, d3)
                     """ 
                     # Perform the cycle for the geometric sum
                     old_odd = odd_corr.copy()
