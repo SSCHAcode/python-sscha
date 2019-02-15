@@ -1949,7 +1949,7 @@ class Ensemble:
         # Get the propagator at all the given frequencies
         for i_lambda in range(N_w):
             if N_w > 1:
-                frequency = frequencies[i]
+                frequency = frequencies[i_lambda]
             else:
                 frequency = frequencies
             for mu in range(n_modes_sc):
