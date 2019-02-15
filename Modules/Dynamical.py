@@ -186,17 +186,19 @@ def get_spectral_function(dyn, supercell, self_energy, w_array):
     """
     # Get the dynamical matrix in the supercell
     superdyn = dyn.GenerateSupercellDyn(supercell)
+    nat_sc = superdyn.structure.N_atoms
 
     # Convert the force constants into a dynamical matrix
     m = superdyn.structure.get_masses_array()
     m = np.tile(m, (3,1)).T.ravel()
     m_mat = np.sqrt(np.einsum("a,b", m, m)) #|m><m|
     dyn_mat = superdyn.dynmats[0] / m_mat
+    I = np.eye(nat_sc, dtype = np.complex128)
 
     A = np.zeros(len(w_array))
     for i, w in enumerate(w_array):
         sigma = self_energy[i] / m_mat
-        G_inv = w**2 - dyn_mat - sigma
+        G_inv = w**2*I - dyn_mat - sigma
 
         # Invert the green function
         G = np.linalg.inv(G_inv)
