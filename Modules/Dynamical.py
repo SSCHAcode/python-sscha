@@ -194,7 +194,7 @@ def get_spectral_function(dyn, supercell, self_energy, w_array):
     dyn_mat = superdyn.dynmats[0] / m_mat
 
     A = np.zeros(len(w_array))
-    for i, w in range(w_array):
+    for i, w in enumerate(w_array):
         sigma = self_energy[i] / m_mat
         G_inv = w**2 - dyn_mat - sigma
 

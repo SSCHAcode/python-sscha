@@ -1898,7 +1898,7 @@ class Ensemble:
         # Setup the type of the calculation
         __TYPE__ = np.float64
         if is_dynamic:
-            __TYPE = np.complex128
+            __TYPE__ = np.complex128
         
         # Get the dynamical matrix in the supercell
         super_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
