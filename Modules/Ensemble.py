@@ -1832,7 +1832,8 @@ class Ensemble:
 
 
     def get_odd_correction(self, include_v4 = False, store_v3 = True, 
-            store_v4 = True, progress = False, frequencies = 0, smearing = 5e-5, v4_conv_thr = 1e-2):
+            store_v4 = True, progress = False, frequencies = 0, smearing = 5e-5, v4_conv_thr = 1e-2,
+            return_only_correction = False):
         """
         RAFFAELLO'S BIANCO ODD CORRECTION
         =================================
@@ -1873,11 +1874,14 @@ class Ensemble:
                 In this case the returned quantity will be a list of self-energies.
             smearing : double
                 This is the smearing applied only in the case of dynamical correction
+            return_only_correction: bool, optional
+                If true it returns only the correction behond the sscha matrix.
         
         Results
         -------
             new_dyn : ndarray(3xnat_sc, 3xnat_sc, dtype = float64)
-                The new dynamical matrix with the odd contribution corrected.
+                The real dynamical matrix. Note, if return_only_correction = True, it
+                will be only the bubble (+ bubble chain) terms. 
         """
         # Check if freqiencies is an array
         # And setup if it is a static or dynamic calcuation
@@ -2183,7 +2187,10 @@ class Ensemble:
             cart_odd_corr = np.einsum("ai,bj,ij -> ab", pols_sc, pols_sc, odd_corr)
             cart_odd_corr *= np.outer(np.sqrt(_m_),  np.sqrt(_m_))
 
-            total_self_energy = cart_odd_corr + super_dyn.dynmats[0]
+
+            total_self_energy = cart_odd_corr 
+            if not return_only_correction:
+                total_self_energy += super_dyn.dynmats[0]
             if N_w >1:
                 total_self_energies.append(total_self_energy)
             
