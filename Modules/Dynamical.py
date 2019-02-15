@@ -193,7 +193,7 @@ def get_spectral_function(dyn, supercell, self_energy, w_array):
     m = np.tile(m, (3,1)).T.ravel()
     m_mat = np.sqrt(np.einsum("a,b", m, m)) #|m><m|
     dyn_mat = superdyn.dynmats[0] / m_mat
-    I = np.eye(nat_sc, dtype = np.complex128)
+    I = np.eye(3*nat_sc, dtype = np.complex128)
 
     A = np.zeros(len(w_array))
     for i, w in enumerate(w_array):
