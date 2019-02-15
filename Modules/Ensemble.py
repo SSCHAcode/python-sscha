@@ -1946,7 +1946,6 @@ class Ensemble:
         N_eff = np.sum(self.rho)
         
         # Get lambda matrix
-        Lambda_G = np.zeros( (n_modes_sc, n_modes_sc), dtype = __TYPE__)
         if N_w > 1:
             Lambdas = []
 
@@ -1956,6 +1955,8 @@ class Ensemble:
                 frequency = frequencies[i_lambda]
             else:
                 frequency = frequencies
+        
+            Lambda_G = np.zeros( (n_modes_sc, n_modes_sc), dtype = __TYPE__)
             for mu in range(n_modes_sc):
                 w_mu = w_sc[mu]
                 n_mu = n_bos[mu]
