@@ -1832,7 +1832,7 @@ class Ensemble:
 
 
     def get_odd_correction(self, include_v4 = False, store_v3 = True, 
-            store_v4 = True, progress = False, frequency = 0, smearing = 5e-5, v4_conv_thr = 1e-2):
+            store_v4 = True, progress = False, frequencies = 0, smearing = 5e-5, v4_conv_thr = 1e-2):
         """
         RAFFAELLO'S BIANCO ODD CORRECTION
         =================================
@@ -1867,8 +1867,10 @@ class Ensemble:
                 it can drain the memory.
             progress : bool
                 If true (default false), shows a progress bar while computing 
-            frequency : double
-                if different from zero (default = 0) it computes the dynamical correction
+            frequencies : double or list
+                if different from zero (default = 0) it computes the dynamical correction.
+                If it is a list it will compute the correction for each frequency in the list.
+                In this case the returned quantity will be a list of self-energies.
             smearing : double
                 This is the smearing applied only in the case of dynamical correction
         
@@ -1877,11 +1879,19 @@ class Ensemble:
             new_dyn : ndarray(3xnat_sc, 3xnat_sc, dtype = float64)
                 The new dynamical matrix with the odd contribution corrected.
         """
+        # Check if freqiencies is an array
+        # And setup if it is a static or dynamic calcuation
         is_dynamic = False
-        if np.abs(frequency) > __EPSILON__:
+        try:
+            N_w = len(frequencies)
             is_dynamic = True
-
+        except:
+            N_w = 1
+            if np.abs(frequencies) < __EPSILON__:
+                is_dynamic = False
         
+
+        # Setup the type of the calculation
         __TYPE__ = np.float64
         if is_dynamic:
             __TYPE = np.complex128
@@ -1933,28 +1943,42 @@ class Ensemble:
         
         # Get lambda matrix
         Lambda_G = np.zeros( (n_modes_sc, n_modes_sc), dtype = __TYPE__)
-        for mu in range(n_modes_sc):
-            w_mu = w_sc[mu]
-            n_mu = n_bos[mu]
-            
-            for nu in range(n_modes_sc):
-                w_nu = w_sc[nu]
-                n_nu = n_bos[nu]
-                if abs(w_mu - w_nu) < __EPSILON__ and not is_dynamic:
-                    Lambda_G[mu, nu] = (2*n_nu + 1)/(2*w_nu) - dn_dw[nu]
-                else:
-                    if not is_dynamic:
-                        Lambda_G[mu, nu] = (n_mu + n_nu + 1)/(w_mu + w_nu) - (n_mu - n_nu)/(w_mu - w_nu)
-                    else:
-                        Lambda_G[mu, nu] =(w_mu + w_nu)*(n_mu + n_nu + 1)/((w_mu + w_nu)**2 - frequency**2 - 2*1j*smearing*frequency) - \
-                            (w_mu - w_nu)*(n_mu - n_nu)/((w_mu - w_nu)**2 - frequency**2 - 2*frequency*1j*smearing)
+        if N_w > 1:
+            Lambdas = []
 
-                Lambda_G[mu, nu] /= - 4*w_mu*w_nu
+        # Get the propagator at all the given frequencies
+        for i_lambda in range(N_w):
+            if N_w > 1:
+                frequency = frequencies[i]
+            else:
+                frequency = frequencies
+            for mu in range(n_modes_sc):
+                w_mu = w_sc[mu]
+                n_mu = n_bos[mu]
                 
-        print ("Consistent check on Lambda:", np.sqrt(np.sum( (Lambda_G - Lambda_G.T)**2)))
+                for nu in range(n_modes_sc):
+                    w_nu = w_sc[nu]
+                    n_nu = n_bos[nu]
+                    if abs(w_mu - w_nu) < __EPSILON__ and not is_dynamic:
+                        Lambda_G[mu, nu] = (2*n_nu + 1)/(2*w_nu) - dn_dw[nu]
+                    else:
+                        if not is_dynamic:
+                            Lambda_G[mu, nu] = (n_mu + n_nu + 1)/(w_mu + w_nu) - (n_mu - n_nu)/(w_mu - w_nu)
+                        else:
+                            Lambda_G[mu, nu] =(w_mu + w_nu)*(n_mu + n_nu + 1)/((w_mu + w_nu)**2 - frequency**2 - 2*1j*smearing*frequency) - \
+                                (w_mu - w_nu)*(n_mu - n_nu)/((w_mu - w_nu)**2 - frequency**2 - 2*frequency*1j*smearing)
+
+                    Lambda_G[mu, nu] /= - 4*w_mu*w_nu
+            if N_w > 1:
+                Lambdas.append(Lambda_G)
+                
+        #print ("Consistent check on Lambda:", np.sqrt(np.sum( (Lambda_G - Lambda_G.T)**2)))
         
         # Compute the odd3 correction
-        odd_corr = np.zeros( (n_modes_sc, n_modes_sc), dtype = __TYPE__)
+
+        if N_w > 1:
+            odd_corrs = []
+        #odd_corr = np.zeros( (n_modes_sc, n_modes_sc), dtype = __TYPE__)
         if store_v3:
             d3 = np.einsum("ai,bi,ci", X, X, Y)
             d3 += np.einsum("ai,bi,ci", X, Y, X)
@@ -1966,7 +1990,13 @@ class Ensemble:
             print ("N_eff:", N_eff)
 
             #odd_corr[:,:] = np.einsum("abc,bc,de,def -> af", d3, Lambda_G, Lambda_G, d3)
-            odd_corr[:,:] = np.einsum("abc,bc,bcd -> ad", d3, Lambda_G, d3)
+            if not include_v4:
+                for i_freq in range(N_w):
+                    if N_w > 1:
+                        Lambda_G = Lambdas[i_freq]
+                    odd_corr = np.einsum("abc,bc,bcd -> ad", d3, Lambda_G, d3)
+                    if N_w > 1: 
+                        odd_corrs.append(odd_corr)
 
             if include_v4:
                 # Check if v4 must be stored
@@ -1983,14 +2013,21 @@ class Ensemble:
                     print ("Lambda = ", np.sqrt(np.sum(Lambda_G**2)))
                     print ("d4*Lambda =", np.sqrt(np.sum(np.einsum("ab, abxy", Lambda_G, d4)**2)))
                     # Reshape Lambda d4
-                    Ld4 = np.einsum("ab, abxy->abxy", Lambda_G, d4).reshape((n_modes_sc**2, n_modes_sc**2))
-                    print ("Ld4 spectrum:", np.linalg.eigvals(Ld4))
 
-                    # Get the solution
-                    Inv_mat = np.linalg.inv(np.eye(n_modes_sc**2) - Ld4)
-                    Inv_mat_4d = Inv_mat.reshape((n_modes_sc, n_modes_sc, n_modes_sc, n_modes_sc))
-                    New_Prop = np.einsum("abcd, cd->abcd", Inv_mat_4d, Lambda_G)
-                    odd_corr = np.einsum("xab, abcd, cdy", d3, New_Prop, d3)
+                    # Get the dynamical response
+                    for i_freq in range(N_w):
+                        if N_w > 1:
+                            Lambda_G = Lambdas[i_freq]
+                        Ld4 = np.einsum("ab, abxy->abxy", Lambda_G, d4).reshape((n_modes_sc**2, n_modes_sc**2))
+                        print ("Ld4 spectrum:", np.linalg.eigvals(Ld4))
+
+                        # Get the solution
+                        Inv_mat = np.linalg.inv(np.eye(n_modes_sc**2) - Ld4)
+                        Inv_mat_4d = Inv_mat.reshape((n_modes_sc, n_modes_sc, n_modes_sc, n_modes_sc))
+                        New_Prop = np.einsum("abcd, cd->abcd", Inv_mat_4d, Lambda_G)
+                        odd_corr = np.einsum("xab, abcd, cdy", d3, New_Prop, d3)
+                        if N_w > 1:
+                            odd_corrs.append(odd_corr)
                     """ 
                     # Perform the cycle for the geometric sum
                     old_odd = odd_corr.copy()
@@ -2026,6 +2063,7 @@ class Ensemble:
                         if rest_mod < v4_conv_thr:
                             running = False   """
                 else:
+                    raise NotImplementedError("Not yet implemented")
                     # We can do exactly the same as before
                     # But performing the sum over I explicitely
                     odd_dim = np.sum(odd_corr**2)
@@ -2137,14 +2175,25 @@ class Ensemble:
             #raise NotImplementedError("Error, the store_v3 = .false. has still not been implemented")
         
         # Get back in the cartesian basis
-        cart_odd_corr = np.zeros((3*nat_sc, 3*nat_sc), dtype = __TYPE__)
-        cart_odd_corr[:,:] = np.einsum("ai,bj,ij -> ab", pols_sc, pols_sc, odd_corr)
-        cart_odd_corr *= np.outer(np.sqrt(_m_),  np.sqrt(_m_))
-        
-        np.save("odd_corr.npy", cart_odd_corr)
+        total_self_energies = []
+        total_self_energy = np.zeros((3*nat_sc, 3*nat_sc), dtype = __TYPE__)
+        for i_freq in range(N_w):
+            if N_w > 1:
+                odd_corr = odd_corrs[i_freq]
+            cart_odd_corr = np.einsum("ai,bj,ij -> ab", pols_sc, pols_sc, odd_corr)
+            cart_odd_corr *= np.outer(np.sqrt(_m_),  np.sqrt(_m_))
+
+            total_self_energy = cart_odd_corr + super_dyn.dynmats[0]
+            if N_w >1:
+                total_self_energies.append(total_self_energy)
+            
+            np.save("odd_corr_%d.npy" % i_freq, cart_odd_corr)
         
         # Return the new dynamical matrix in the supercell
-        return super_dyn.dynmats[0] + cart_odd_corr
+        if N_w > 1:
+            return total_self_energies
+        return total_self_energy
+
 
     def compute_ensemble(self, calculator, compute_stress = True, stress_numerical = False,
                          cluster = None):
