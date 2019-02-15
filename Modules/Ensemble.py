@@ -2190,7 +2190,10 @@ class Ensemble:
 
             total_self_energy = cart_odd_corr 
             if not return_only_correction:
-                total_self_energy += super_dyn.dynmats[0]
+                if is_dynamic:
+                    total_self_energy += super_dyn.dynmats[0] + 0j
+                else:
+                    total_self_energy += super_dyn.dynmats[0]
             if N_w >1:
                 total_self_energies.append(total_self_energy)
             
