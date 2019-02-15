@@ -2191,7 +2191,7 @@ class Ensemble:
             total_self_energy = cart_odd_corr 
             if not return_only_correction:
                 if is_dynamic:
-                    total_self_energy += super_dyn.dynmats[0] + 0j
+                    total_self_energy += super_dyn.dynmats[0]
                 else:
                     total_self_energy += np.real(super_dyn.dynmats[0])
             if N_w >1:
