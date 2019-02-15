@@ -2193,7 +2193,7 @@ class Ensemble:
                 if is_dynamic:
                     total_self_energy += super_dyn.dynmats[0] + 0j
                 else:
-                    total_self_energy += super_dyn.dynmats[0]
+                    total_self_energy += np.real(super_dyn.dynmats[0])
             if N_w >1:
                 total_self_energies.append(total_self_energy)
             
