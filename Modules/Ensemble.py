@@ -1970,8 +1970,8 @@ class Ensemble:
                         if not is_dynamic:
                             Lambda_G[mu, nu] = (n_mu + n_nu + 1)/(w_mu + w_nu) - (n_mu - n_nu)/(w_mu - w_nu)
                         else:
-                            Lambda_G[mu, nu] =(w_mu + w_nu)*(n_mu + n_nu + 1)/((w_mu + w_nu)**2 - frequency**2 - 2*1j*smearing*frequency) - \
-                                (w_mu - w_nu)*(n_mu - n_nu)/((w_mu - w_nu)**2 - frequency**2 - 2*frequency*1j*smearing)
+                            Lambda_G[mu, nu] =(w_mu + w_nu)*(n_mu + n_nu + 1)/((w_mu + w_nu)**2 - (frequency + 1j*smearing)**2) - \
+                                (w_mu - w_nu)*(n_mu - n_nu)/((w_mu - w_nu)**2 - (frequency + 1j*smearing)**2)
 
                     Lambda_G[mu, nu] /= - 4*w_mu*w_nu
             if N_w > 1:
