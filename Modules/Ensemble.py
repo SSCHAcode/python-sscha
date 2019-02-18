@@ -1944,7 +1944,7 @@ class Ensemble:
             w_ups /=  1 + 2*n_bos
             dn_dw = - n_bos**2 * np.exp(w_sc * __RyToK__ / self.current_T) * __RyToK__ / self.current_T
             
-        X[:,:] = np.einsum("ab,ca,a,b,c -> bc", pols_sc, self.u_disps, np.sqrt(_m_), w_ups, self.rho) * __A_TO_BOHR__
+        X[:,:] = np.einsum("ab,ca,a,b -> bc", pols_sc, self.u_disps, np.sqrt(_m_), w_ups) * __A_TO_BOHR__
         Y[:,:] = np.einsum("ab,ca,a,c -> bc", pols_sc, _f_, 1 / np.sqrt(_m_), self.rho) / __A_TO_BOHR__
         N_eff = np.sum(self.rho)
         
@@ -1988,9 +1988,9 @@ class Ensemble:
             odd_corrs = []
         #odd_corr = np.zeros( (n_modes_sc, n_modes_sc), dtype = __TYPE__)
         if store_v3:
-            d3 = np.einsum("ai,bi,ci, i", X, X, Y, self.rho)
-            d3 += np.einsum("ai,bi,ci, i", X, Y, X, self.rho)
-            d3 += np.einsum("ai,bi,ci, i", Y, X, X, self.rho)
+            d3 = np.einsum("ai,bi,ci", X, X, Y)
+            d3 += np.einsum("ai,bi,ci", X, Y, X)
+            d3 += np.einsum("ai,bi,ci", Y, X, X)
             d3 /= - 3 * N_eff
             #d3 /= N_eff
 
@@ -2009,10 +2009,10 @@ class Ensemble:
             if include_v4:
                 # Check if v4 must be stored
                 if store_v4:
-                    d4 = np.einsum("ai,bi,ci,di, i", X, X, X, Y, self.rho)
-                    d4 += np.einsum("ai,bi,ci,di,i", X, X, Y, X, self.rho)
-                    d4 += np.einsum("ai,bi,ci,di,i", X, Y, X, X, self.rho)
-                    d4 += np.einsum("ai,bi,ci,di,i", Y, X, X, X, self.rho)
+                    d4 = np.einsum("ai,bi,ci,di", X, X, X, Y)
+                    d4 += np.einsum("ai,bi,ci,di", X, X, Y, X)
+                    d4 += np.einsum("ai,bi,ci,di", X, Y, X, X)
+                    d4 += np.einsum("ai,bi,ci,di", Y, X, X, X)
                     d4 /= -4 * N_eff
 
                     print ("d3 = ", np.sqrt(np.sum(d3**2)))
