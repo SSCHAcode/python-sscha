@@ -207,3 +207,95 @@ def get_spectral_function(dyn, supercell, self_energy, w_array):
         A[i] = np.einsum("aa", -np.imag(G))
     
     return A
+
+def GetRamanResponce(dyn, supercell, self_energies, w_array, in_pol = None, out_pol = None, repeat_times = 10):
+    """
+    GET RAMAN SIGNAL
+    ================
+
+    This subroutines uses the dynamical self-energy to extract the Raman signal.
+    We use the raman_tensor of the dyn variable to get the intensity of the scattered light.
+
+    NOTE: The code will rise a ValueException if no raman tensor is found in the dynamical matrix.
+
+    Parameters
+    ----------
+        dyn : Phonons()
+            The sscha dynamical matrix (it must contain the raman tensor).
+        supercell : list of 3 ints
+            The size of the supercell (must match the q points)
+        self_energies: list of (3xnatsc, 3xnatsc) 
+            The dynamical w dependent part of the self-energy at many w values.
+        w_array : ndarray
+            The array of frequencies (in Ry) at which the self energy is computed.
+        in_pol : 3d vector or None
+            The polarization of the incoming light. If None a random one is chosen
+        out_pol : 3d vector or None
+            The polarization of the outcoming light. If None a random one is chosen.
+        repeat_times : int
+            If the polarizations are not provided, the light is supposed unpolarized
+            and averaged on many directions. This is the number of averages to be carried
+            out on many random polarization vectors
+
+    Results
+    -------
+        raman_intensity : ndarray(shape = w_array.shape())
+            The vector containing the Raman intensity for each frequency in the
+            w_array.  
+    """
+
+    # Check if the given dynamical matrix has a Raman tensor
+    if dyn.raman_tensor is None:
+        raise ValueError("Error, the provided dyn must have a defined Raman tensor")
+
+    # Check if the polarization vectors are defined
+    repeat = False
+    if in_pol is None:
+        in_pol = np.random.normal(size=3)
+        in_pol /= np.sqrt(in_pol.dot(in_pol))
+        repeat = True
+    if out_pol is None:
+        out_pol = np.random.normal(size=3)
+        out_pol /= np.sqrt(out_pol.dot(out_pol))
+        repeat = True
+
+    if not repeat:
+        repeat_times = 1
+
+    # Get the raman vector(s)
+    v_ramans = []
+    for i in range(repeat_times):
+        v_raman = dyn.GetRamanVector(in_pol, out_pol)
+        v_ramans.append(v_raman)
+
+    # Get the dynamical matrix in the supercell
+    superdyn = dyn.GenerateSupercellDyn(supercell)
+    nat = dyn.structure.N_atoms
+
+    # Convert the force constants into a dynamical matrix
+    m = superdyn.structure.get_masses_array()
+    m = np.tile(m, (3,1)).T.ravel()
+    m_mat = np.sqrt(np.einsum("a,b", m, m)) #|m><m|
+    I = np.eye(3*nat, dtype = np.complex128)
+
+    raman_intensity = np.zeros(len(w_array), dtype = np.float64)
+    for i, w in enumerate(w_array):
+
+        # Get only the gamma point
+        q_selfenergy = CC.Phonons.GetDynQFromFCSupercell(self_energies[i], np.array(dyn.q_tot), 
+            dyn.structure, superdyn.structure)
+        
+        # Add the sscha static diagrams and transform to a dynamical matrix
+        gamma_selfenergy = q_selfenergy[0, :, :] + dyn.dynmats[0]
+        gamma_selfenergy /= m_mat 
+
+        # Compute the gamma green function
+        G_inv = w**2*I - gamma_selfenergy
+        G = np.linalg.inv(G_inv)
+
+        # trace the imaginary part of the green function through the raman vector
+        # In case of unpolarized light, average on many possible polarizations
+        for v_raman in v_ramans:
+            raman_intensity[i] += np.einsum("a, ab, b", v_raman, -np.imag(G), v_raman) / repeat_times
+    
+    return raman_intensity

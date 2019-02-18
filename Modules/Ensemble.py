@@ -1833,7 +1833,7 @@ class Ensemble:
 
     def get_odd_correction(self, include_v4 = False, store_v3 = True, 
             store_v4 = True, progress = False, frequencies = 0, smearing = 5e-5, v4_conv_thr = 1e-2,
-            return_only_correction = False):
+            return_only_correction = False, save_all = False):
         """
         RAFFAELLO'S BIANCO ODD CORRECTION
         =================================
@@ -1876,6 +1876,9 @@ class Ensemble:
                 This is the smearing applied only in the case of dynamical correction
             return_only_correction: bool, optional
                 If true it returns only the correction behond the sscha matrix.
+            save_all : bool, default false
+                If true the self-energy in the supercell is saved for each w value. 
+                It is usefull if you want to analyze the results in a new run.
         
         Results
         -------
@@ -2198,7 +2201,8 @@ class Ensemble:
             if N_w >1:
                 total_self_energies.append(total_self_energy)
             
-            np.save("odd_corr_%d.npy" % i_freq, cart_odd_corr)
+            if save_all:
+                np.save("odd_corr_%d.npy" % i_freq, cart_odd_corr)
         
         # Return the new dynamical matrix in the supercell
         if N_w > 1:
