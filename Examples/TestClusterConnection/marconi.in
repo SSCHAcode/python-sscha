@@ -22,7 +22,7 @@
 
 	! The command for the parallel mpi execution
 	! NPROC will be substituted with the right choice.
-	mpicmd = "srun --mpi=pmi2 -n NPROC"
+	mpicmd = "srun --mpi=pmi2 --exclusive -n NPROC "
 
 
 	!NOTE:

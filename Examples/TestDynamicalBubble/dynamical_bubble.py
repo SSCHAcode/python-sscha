@@ -8,6 +8,7 @@ from matplotlib.pyplot import *
 
 
 import sscha, sscha.Ensemble
+import sys
 
 SUPERCELL = (1,1,1)
 T = 0

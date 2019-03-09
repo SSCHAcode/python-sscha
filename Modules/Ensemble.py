@@ -602,7 +602,9 @@ class Ensemble:
         
         t1 = time.time()
         for x in range(self.N):
+            print ("Config %d" % x)
             for i in range(n_syms):
+
                 index = n_syms * x + i
                 
                 u_v = self.u_disps[x, :].reshape((nat_sc, 3))
@@ -1988,6 +1990,8 @@ class Ensemble:
             odd_corrs = []
         #odd_corr = np.zeros( (n_modes_sc, n_modes_sc), dtype = __TYPE__)
         if store_v3:
+            if progress:
+                print("Computing v3...")
             d3 = np.einsum("ai,bi,ci", X, X, Y)
             d3 += np.einsum("ai,bi,ci", X, Y, X)
             d3 += np.einsum("ai,bi,ci", Y, X, X)
@@ -1999,6 +2003,8 @@ class Ensemble:
 
             #odd_corr[:,:] = np.einsum("abc,bc,de,def -> af", d3, Lambda_G, Lambda_G, d3)
             if not include_v4:
+                if progress:
+                    print("Computing the bubble...")
                 for i_freq in range(N_w):
                     if N_w > 1:
                         Lambda_G = Lambdas[i_freq]
