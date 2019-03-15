@@ -487,7 +487,7 @@ class Ensemble:
         self.current_q = self.q_start.copy()
 
         
-    def generate(self, N, evenodd = True):
+    def generate(self, N, evenodd = True, project_on_modes = None):
         """
         GENERATE THE ENSEMBLE
         =====================
@@ -502,6 +502,9 @@ class Ensemble:
                 The number of random configurations to be extracted
             evenodd : bool, optional
                 If true for each configuration also the opposite is extracted
+            project_on_modes : ndarray(size=(3*nat_sc, nproj)), optional
+                If different from None the displacements are projected on the
+                given modes.
         """
         
         if evenodd and (N % 2 != 0):
@@ -512,7 +515,9 @@ class Ensemble:
         self.structures = []
         super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
         if evenodd:
-            structs = super_dyn.ExtractRandomStructures(N / 2, self.T0)
+            structs = super_dyn.ExtractRandomStructures(N / 2, self.T0, project_on_vectors = project_on_modes)
+
+
             for i, s in enumerate(structs):
                 self.structures.append(s)
                 new_s = s.copy()
@@ -520,8 +525,9 @@ class Ensemble:
                 new_s.coords = super_dyn.structure.coords - new_s.get_displacement(super_dyn.structure)
                 self.structures.append(new_s)
         else:
-            self.structures = super_dyn.ExtractRandomStructures(N, self.T0)
-        
+            self.structures = super_dyn.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
+
+            
         # Compute the sscha energy and forces
         self.sscha_energies = np.zeros( ( self.N), dtype = np.float64)
         self.sscha_forces = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "F")
