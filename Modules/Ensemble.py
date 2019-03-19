@@ -40,6 +40,7 @@ import cellconstructor.Settings
 
 
 import SCHAModules
+import sscha_HP_odd
 
 # Try to load the parallel library if any
 try:
@@ -1841,7 +1842,7 @@ class Ensemble:
 
     def get_odd_correction(self, include_v4 = False, store_v3 = True, 
             store_v4 = True, progress = False, frequencies = 0, smearing = 5e-5, v4_conv_thr = 1e-2,
-            return_only_correction = False, save_all = False):
+            return_only_correction = False, save_all = False, load_d3 = None, use_omp = True):
         """
         RAFFAELLO'S BIANCO ODD CORRECTION
         =================================
@@ -1887,6 +1888,13 @@ class Ensemble:
             save_all : bool, default false
                 If true the self-energy in the supercell is saved for each w value. 
                 It is usefull if you want to analyze the results in a new run.
+            load_d3 : ndarray((n_modes, n_modes, n_modes), dtype = np.float64)
+                The d3 matrix. If None (default) it is recomputed.
+            use_omp : bool
+                If true the OpenMP parallelization is used to perform some calculation.
+                If you enable this flag be carefull to the scaling with the number of processors.
+                It can have a negative impact. You can select the number of threads
+                by using the OMP_NUM_THREADS variable before running the python command.
         
         Results
         -------
@@ -1956,6 +1964,12 @@ class Ensemble:
         Y[:,:] = np.einsum("ab,ca,a,c -> bc", pols_sc, _f_, 1 / np.sqrt(_m_), self.rho) / __A_TO_BOHR__
         N_eff = np.sum(self.rho)
         
+        if save_all:
+            # Save the X and Y to file.
+            # This is for debugging.
+            np.save("X.npy", X)
+            np.save("Y.npy", Y)
+
         # Get lambda matrix
         if N_w > 1:
             Lambdas = []
@@ -1998,10 +2012,21 @@ class Ensemble:
         if store_v3:
             if progress:
                 print("Computing v3...")
-            d3 = np.einsum("ai,bi,ci", X, X, Y)
-            d3 += np.einsum("ai,bi,ci", X, Y, X)
-            d3 += np.einsum("ai,bi,ci", Y, X, X)
-            d3 /= - 3 * N_eff
+            d3 = np.zeros( (n_modes_sc, n_modes_sc, n_modes_sc), dtype = np.float64, order = "C")
+            if load_d3 is None:
+                if not use_omp:
+                    # Compute the d3 using python
+                    d3 = np.einsum("ai,bi,ci", X, X, Y)
+                    d3 += np.einsum("ai,bi,ci", X, Y, X)
+                    d3 += np.einsum("ai,bi,ci", Y, X, X)
+                    d3 /= - 3 * N_eff
+                else:
+                    # Lets call the C code with openMP support
+                    # to compute the d3 faster
+                    sscha_HP_odd.GetV3(X, Y, n_modes_sc, self.N, d3)
+                    d3 *= self.N / N_eff
+            else:
+                d3 = load_d3
             #d3 /= N_eff
 
             print (type(d3[0,0,0]))
