@@ -279,6 +279,7 @@ static PyObject * ApplyV4(PyObject * self, PyObject * args) {
           }
           v4 /= (4 * N_eff);
           v_out[N_modes * a + b] -= v4 * Lambda[N_modes * c + d] * v_in[N_modes * c + d];
+        }
       }
     }
   }
@@ -287,3 +288,4 @@ static PyObject * ApplyV4(PyObject * self, PyObject * args) {
   Py_INCREF(Py_None);
   return Py_None;
 }
+#endif 
