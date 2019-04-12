@@ -300,3 +300,5 @@ def GetRamanResponce(dyn, supercell, self_energies, w_array, in_pol = None, out_
             raman_intensity[i] += np.einsum("a, ab, b", v_raman, -np.imag(G), v_raman) / repeat_times
     
     return raman_intensity
+
+

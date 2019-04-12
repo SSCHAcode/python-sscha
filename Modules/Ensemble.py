@@ -764,9 +764,9 @@ class Ensemble:
             print( " starting dyn saved in sd_%05d" % self.__debug_index__)
             print( " old_a:", " ".join(["%16.8f" %  x for x in old_a]))
             print( " new_a:", " ".join(["%16.8f" %  x for x in new_a]))
-            np.savetxt("old_q_%05d.dat" %self.__debug_index__, old_q)
+            #np.savetxt("old_q_%05d.dat" %self.__debug_index__, old_q)
             print( " old_q saved in ", "old_q_%05d.dat" %self.__debug_index__)
-            np.savetxt("new_q_%05d.dat" %self.__debug_index__, new_q)
+            #np.savetxt("new_q_%05d.dat" %self.__debug_index__, new_q)
             print( " new_q saved in ", "new_q_%05d.dat" %self.__debug_index__)
             print( " u_disps saved in ", "u_disps_%05.dat" % self.__debug_index__)
             np.savetxt("u_disps_%05d.dat" % self.__debug_index__, self.u_disps)
@@ -2044,7 +2044,7 @@ class Ensemble:
                         odd_corrs.append(odd_corr)
 
             if include_v4:
-                # Check if v4 must be stored
+
                 if store_v4:
                     d4 = np.einsum("ai,bi,ci,di", X, X, X, Y)
                     d4 += np.einsum("ai,bi,ci,di", X, X, Y, X)

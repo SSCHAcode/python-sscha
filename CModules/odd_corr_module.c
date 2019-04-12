@@ -364,7 +364,7 @@ static PyObject * GetV4(PyObject * self, PyObject * args) {
   int n_equal;
   #pragma omp parallel shared(X, Y, rows, cols, v4_out, n_tot) private(a,b,c,d,v4, i)
   {
-    #pragma omp for
+    #pragma omp for collapse(4)
     for (a = 0; a < N_modes; ++a) {
       for (b = a; b < N_modes; ++b) {
         for (c = b; c < N_modes; ++c) {
