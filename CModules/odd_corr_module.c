@@ -368,7 +368,7 @@ static PyObject * GetV4(PyObject * self, PyObject * args) {
     for (a = 0; a < N_modes; ++a) {
       for (b = a; b < N_modes; ++b) {
         for (c = b; c < N_modes; ++c) {
-          for (d = c; c < N_modes; ++d) {
+          for (d = c; d < N_modes; ++d) {
             // Compute the v4
             v4 = 0;
             for (i = 1; i < N_random; i++) {

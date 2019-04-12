@@ -60,7 +60,7 @@ class Lanczos:
         """
 
         self.dyn = ensemble.current_dyn.Copy() 
-        superdyn = self.dyn.generate_supercell(ensemble.supercell)
+        superdyn = self.dyn.GenerateSupercellDyn(ensemble.supercell)
         self.uci_structure = ensemble.current_dyn.structure.copy()
         self.super_structure = superdyn.structure
 
@@ -70,8 +70,8 @@ class Lanczos:
 
         self.nat = superdyn.structure.N_atoms
 
-        self.qe_sym = CC.symmetries.QE_Symmetry(ensemble.current_dyn.structure)
-        self.qe_sym.SetupQPoint(0)
+        self.qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+        self.qe_sym.SetupQPoint()
 
         # Get the masses
         m = superdyn.structure.get_masses_array()
@@ -86,6 +86,9 @@ class Lanczos:
 
         self.n_modes = len(self.w)
 
+        # Ignore v3 or v4. You can set them for testing
+        self.ignore_v3 = False
+        self.ignore_v4 = False
 
         # Get the info about the ensemble
         self.N = ensemble.N 
@@ -217,14 +220,14 @@ class Lanczos:
         out_vect = np.zeros(np.shape(self.psi), dtype = TYPE_DP)
 
         # Get the harmonic responce function
-        out_vect[:self.n_modes] = self.psi * self.w**2
+        out_vect[:self.n_modes] = self.psi[:self.n_modes] * self.w**2
 
         # Get the harmonic responce on the propagator
         w_a = np.tile(self.w, (self.n_modes, 1))
         w_b = np.tile(self.w, (self.n_modes, 1)).T 
 
         new_out = (w_a + w_b)**2
-        out_vect[self.n_modes:] = new_out.ravel() * self.psi
+        out_vect[self.n_modes:] = new_out.ravel() * self.psi[self.n_modes:]
 
         return out_vect
 
@@ -297,13 +300,16 @@ class Lanczos:
         """
 
         # Setup the target vector to the self.psi
-        if target is None:
+        if not target is None:
             self.psi = target 
 
         # Apply the whole L step by step to self.psi
         output = self.apply_L1()
-        output += self.apply_L2()
-        output += self.apply_L3()
+
+        if not self.ignore_v3:
+            output += self.apply_L2()
+        if not self.ignore_v4:
+            output += self.apply_L3()
 
         # Now return the output
         return output
@@ -342,7 +348,7 @@ class Lanczos:
         """
 
         # Perform the lanczos operation
-        eigvals, eigvects = scipy.sparse.linalg.eigsh(self.L_linop, k = number, v0 = self.psi, maxiter= n_iter)
+        eigvals, eigvects = scipy.sparse.linalg.eigsh(self.L_linop, k = number, v0 = self.psi, ncv= n_iter)
 
         self.eigvals = eigvals
         self.eigvects = eigvects
@@ -404,7 +410,7 @@ class Lanczos:
         big_mat = p_w / (l_alpha - _w_**2 + 1j*smearing)
         spectral_function[:] = np.sum(big_mat, axis = 1)
 
-        return spectral_function
+        return - np.imag(spectral_function)
 
 
     def GetFullSelfEnergy(self):
@@ -452,7 +458,8 @@ def SlowApplyD3ToDyn(X, Y, rho, w, T, input_dyn):
     This is a testing function. It is slow, as it is a pure python implementation.
     """
 
-    new_X = X.dot(f_ups(w, T))
+    new_X = np.einsum("ab,b->ab", X, f_ups(w, T))
+
     
     n_rand, n_modes = np.shape(X)
     N_eff = np.sum(rho)
@@ -480,7 +487,7 @@ def SlowApplyD3ToVector(X, Y, rho, w, T, input_vector):
     This is a testing function. It is slow, as it is a pure python implementation.
     """
 
-    new_X = X.dot(f_ups(w, T))
+    new_X = np.einsum("ab,b->ab", X, f_ups(w, T))
     
     n_rand, n_modes = np.shape(X)
     N_eff = np.sum(rho)
@@ -510,7 +517,9 @@ def SlowApplyD4ToDyn(X, Y, rho, w, T, input_dyn):
     This is a testing function. It is slow, as it is a pure python implementation.
     """
 
-    new_X = X.dot(f_ups(w, T))
+
+    new_X = np.einsum("ab,b->ab", X, f_ups(w, T))
+
     
     n_rand, n_modes = np.shape(X)
     N_eff = np.sum(rho)
