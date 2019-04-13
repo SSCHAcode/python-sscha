@@ -108,16 +108,20 @@ class Lanczos:
         # Prepare the variable used for the working
         self.psi = np.zeros(self.n_modes + self.n_modes*self.n_modes, dtype = TYPE_DP)
 
-        # This is a variable used to store the vectors after each lanczos iteration
-        self.store_vectors = []
-
-
         # Prepare the L as a linear operator
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
 
         # Prepare the solution of the Lanczos algorithm
         self.eigvals = None
         self.eigvects = None 
+
+        # Store the basis and the coefficients of the Lanczos procedure
+        # In the custom lanczos mode
+        self.a_coeffs = [] #Coefficients on the diagonal
+        self.b_coeffs = [] # Coefficients close to the diagonal
+        self.krilov_basis = [] # The basis of the krilov subspace
+        self.arnoldi_matrix = None # If requested, the full quasi-tridiagonal matrix
+
 
     def prepare_perturbation(self, vector):
         """
@@ -313,6 +317,73 @@ class Lanczos:
 
         # Now return the output
         return output
+
+    
+    def custom_lanczos(self, iterations, save_dir = ".", correct_arnoldi = True):
+        """
+        RUN LANCZOS PROCEDURE
+        =====================
+
+        This method perform the lanczos procedure to tridiagonalize the L operator.
+        It will save the current status after each iteration, to allow the user to simply restart.
+
+        Parameters
+        ----------
+            iterations : int
+                The number of Lanczos iterations to be done. 
+                This correspond (in principle) to an exact dyagonalization if the number of iterations
+                matches the dimension of the space. In practice the result should converge pretty fast.
+            save_dir : string
+                Path to the directiory in which to store the status after each iteration.
+                This is necessary if you want to restart a calculation or look for convergence after each
+                step. Use None if you do not want to use any I/O.
+            correct_arnoldi : bool
+                If True the Gram-Schmidt procedure will be iterated for all the basis, in this way also
+                some element outside the tridiagonal form will be non zero, but this prevents the loss of
+                orthogonality, commonly faced in standard Lanczos algorithms.
+        """
+
+        # TODO: Implement the full Lanczos procedure
+        pass
+
+    def save_status(self, file):
+        """
+        Save the current data in npz compressed format, in order to reanalyze easily the result (or restart the Lanczos)
+        later.
+
+        Parameters
+        ----------
+            file : string
+                Path to where you want to save the data. It must be an npz binary format. The extension
+                will be added if it does not match the npz one
+        """
+
+
+        # Add the correct extension
+        if not ".npz" in file.lower():
+            file += ".npz"
+        
+        # Save all the data
+        np.savez_compressed(file, 
+                            T = self.T,
+                            nat = self.nat,
+                            m = self.m,
+                            w = self.w,
+                            pols = self.pols,
+                            n_modes = self.n_modes,
+                            ignore_v3 = self.ignore_v3,
+                            ignore_v4 = self.ignore_v4,
+                            N = self.N,
+                            rho = self.rho
+                            X = self.X,
+                            Y = self.Y,
+                            psi = self.psi,
+                            a_coeffs = self.a_coeffs,
+                            b_coeffs = self.b_coeffs,
+                            krilov_basis = self.krilov_basis,
+                            arnoldi_matrix = self.arnoldi_matrix)
+            
+        
 
 
     def run_full_diag(self, number, discard_dyn = True, n_iter = 100):
