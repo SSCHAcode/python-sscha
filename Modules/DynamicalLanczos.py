@@ -5,6 +5,8 @@ This module performs the Lanczos algorithm in order to compute the responce func
 of a particular perturbation.
 """
 
+import sys, os
+import time
 import numpy as np
 
 # Import the scipy Lanczos modules
@@ -18,6 +20,7 @@ import cellconstructor.symmetries
 
 # Define a generic type for the double precision.
 TYPE_DP = np.double
+__EPSILON__ = 1e-6
 
 try:
     from ase.units import create_units
@@ -120,7 +123,7 @@ class Lanczos:
         self.a_coeffs = [] #Coefficients on the diagonal
         self.b_coeffs = [] # Coefficients close to the diagonal
         self.krilov_basis = [] # The basis of the krilov subspace
-        self.arnoldi_matrix = None # If requested, the full quasi-tridiagonal matrix
+        self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
 
 
     def prepare_perturbation(self, vector):
@@ -374,7 +377,7 @@ class Lanczos:
                             ignore_v3 = self.ignore_v3,
                             ignore_v4 = self.ignore_v4,
                             N = self.N,
-                            rho = self.rho
+                            rho = self.rho,
                             X = self.X,
                             Y = self.Y,
                             psi = self.psi,
@@ -383,7 +386,189 @@ class Lanczos:
                             krilov_basis = self.krilov_basis,
                             arnoldi_matrix = self.arnoldi_matrix)
             
+    def load_status(self, file):
+        """
+        Load a previously saved status from the speficied npz file.
+        The file must be saved with save_status.
+        """
+
+        # Check if the provided file exists
+        if not os.path.exists(file):
+            print ("Error while loading %s file.\n" % file)
+            raise IOError("Error while loading %s" % file)
+
         
+        data = np.load(file) 
+
+        self.T = data["T"]
+        self.nat = data["nat"]
+        self.m = data["m"]
+        self.w = data["w"]
+        self.pols = data["pols"]
+        self.n_modes = data["n_modes"]
+        self.ignore_v3 = data["ignore_v3"]
+        self.ignore_v4 = data["ignore_v4"]
+        self.N = data["N"]
+        self.rho = data["rho"]
+        self.X = data["X"]
+        self.Y = data["Y"]
+        self.psi = data["psi"]
+        self.a_coeffs = data["a_coeffs"]
+        self.b_coeffs = data["b_coeffs"]
+        self.krilov_basis = data["krilov_basis"]
+        self.arnoldi_matrix = data["arnoldi_matrix"]
+
+        # Rebuild the Linear operator
+        self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
+
+
+    def run(self, n_iter, save_dir = ".", verbose = True):
+        """
+        RUN LANCZOS ITERATIONS
+        ======================
+
+        This method performs the Lanczos algorithm to find
+        the sequence of a and b coefficients that are the tridiagonal representation 
+        of the L matrix to be inverted.
+
+        Parameters
+        ----------
+            n_iter : int
+                The number of iterations to be performed in the Lanczos algorithm.
+            save_dir : string
+                The directory in which you want to store the results step by step,
+                in order to do a preliminar analysis or restart the calculation later.
+            verbose : bool
+                If true all the info during the minimization will be printed on output.
+        """
+
+        # Get the current step
+        i_step = len(self.a_coeffs)
+
+        if verbose:
+            header = """
+<=====================================>
+|                                     |
+|          LANCZOS ALGORITHM          |
+|                                     |
+<=====================================>
+
+Starting the algorithm. It may take a while.
+Starting from step %d
+""" % i_step
+            print(header)
+
+
+        # If this is the current step initialize the algorithm
+        if i_step == 0:
+            self.krilov_basis = []
+            first_vector = self.psi / np.sqrt(self.psi.dot(self.psi))
+            self.krilov_basis.append(first_vector)
+        else:
+            if len(self.krilov_basis) != i_step + 1:
+                print("Krilov dim: %d, number of steps perfomed: %d" % (len(self.krilov_basis), i_step))
+                print("Error, the krilov basis dimension should be 1 more than the number of steps")
+                raise ValueError("Error the starting krilov basis does not matches the matrix, Look stdout.")
+
+        self.psi = self.krilov_basis[-1]
+
+        for i in range(i_step, i_step+n_iter):
+            if verbose:
+                step_txt = """
+ ===== NEW STEP %d =====
+
+ """ % i
+                print(step_txt)
+
+            # Apply the matrix L
+            t1 = time.time()
+            self.apply_full_L()
+            t2 = time.time()
+
+            if verbose:
+                print("Time to apply the full L: %d s" % (t2 -t1))
+
+            # Get the coefficients for the Lanczos/Arnoldi matrix
+            t1 = time.time()
+            arnoldi_row = []
+            new_vect = self.psi
+            for j in range(len(self.krilov_basis)):
+                coeff = self.psi.dot(self.krilov_basis[j])
+                arnoldi_row.append(coeff)
+
+                # Gram Schmidt
+                new_vect -= coeff * self.krilov_basis[j]
+            
+            # Add the new vector to the Krilov Basis
+            norm = np.sqrt(new_vect.dot(new_vect))
+
+            # Check the normalization (If zero the algorithm converged)
+            if norm < __EPSILON__:
+                if verbose:
+                    print("Obtained a linear dependent vector.")
+                    print("The algorithm converged.")
+
+                return 
+            new_vect /= norm 
+
+            self.krilov_basis.append(new_vect)
+            self.psi = new_vect
+            t2 = time.time()
+
+            # Add the coefficients to the variables
+            self.a_coeffs.append(arnoldi_row[-1])
+            if len(arnoldi_row) > 1:
+                self.b_coeffs.append(arnoldi_row[-2])
+            self.arnoldi_matrix.append(arnoldi_row)
+
+            if verbose:
+                print("Time to perform the Gram-Schmidt and retrive the coefficients: %d s" % (t2-t1))
+                print()
+                print("a_%d = %.8e" % (i, self.a_coeffs[-1]))
+                if i > 0:
+                    print("b_%d = %.8e" % (i, self.b_coeffs[-1]))
+                print()
+            
+            # Save the step
+            if not save_dir is None:
+                self.save_status("%s/LANCZOS_STEP%d" % (save_dir, i))
+        
+                if verbose:
+                    print("Status saved into '%s/LANCZOS_STEP%d'" % (save_dir, i))
+            
+            if verbose:
+                print("Lanczos step %d ultimated." % i)
+
+
+    def build_lanczos_matrix_from_coeffs(self, use_arnoldi=False):
+        """
+        BUILD THE LANCZOS MATRIX
+        ========================
+
+        This method builds the Lanczos matrix from the coefficients. 
+        To execute this method correctly you must have already completed the Lanczos algorithm (method run)
+
+        Parameters
+        ----------
+            use_arnoldi: bool
+                If true the full matrix is computed, using all the coefficients from the
+                Arnoldi iteration.
+        """
+
+        N_size = len(self.a_coeffs)
+        matrix = np.zeros((N_size, N_size), dtype = TYPE_DP)
+        if not use_arnoldi:
+            for i in range(N_size):
+                matrix[i,i] = self.a_coeffs[i]
+                if i> 1:
+                    matrix[i-1,i] = self.b_coeffs[i]
+                    matrix[i,i-1] = self.b_coeffs[i]
+        else:
+            for i in range(N_size):
+                matrix[:i+1, i] = self.arnoldi_matrix[i]
+                matrix[i, :i+1] = self.arnoldi_matrix[i]
+        
+        return matrix
 
 
     def run_full_diag(self, number, discard_dyn = True, n_iter = 100):
