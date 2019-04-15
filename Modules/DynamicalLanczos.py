@@ -629,10 +629,9 @@ Starting from step %d
         # Dyagonalize the Lanczos matrix
         eigvals, eigvects = np.linalg.eigh(matrix)
 
-        
+        # Convert the eigenvectors from the krilov basis to the polarization basis 
         kb = np.array(self.krilov_basis)
         kb = kb[:-1,:]
-        #print (np.shape(eigvects), np.shape(kb))
         new_eigv = np.einsum("ab, ac->cb", eigvects, kb)
 
         Na, Nb = np.shape(matrix)
@@ -794,93 +793,93 @@ Starting from step %d
 
         return eigvals, eigvects
 
-    def GetSupercellSpectralFunctionFromEig(self, w_array, smearing):
-        r"""
-        GET SPECTRAL FUNCTION
-        =====================
+    # def GetSupercellSpectralFunctionFromEig(self, w_array, smearing):
+    #     r"""
+    #     GET SPECTRAL FUNCTION
+    #     =====================
 
-        Get the spectral function from the eigenvalues and eigenvectors.
-        The method run_full_diag must already be runned.
+    #     Get the spectral function from the eigenvalues and eigenvectors.
+    #     The method run_full_diag must already be runned.
 
-        This method returns the spectral function in the supercell.
-        The spectral function is computed as:
+    #     This method returns the spectral function in the supercell.
+    #     The spectral function is computed as:
 
-        .. math ::
+    #     .. math ::
 
-            G_{ab}(\omega) = \sum_{\alpha} \frac{\left<a | \lambda_\alpha\right>\left<\lambda_\alpha|b\right>}{\lambda_\alpha - \omega^2 + i\eta}
+    #         G_{ab}(\omega) = \sum_{\alpha} \frac{\left<a | \lambda_\alpha\right>\left<\lambda_\alpha|b\right>}{\lambda_\alpha - \omega^2 + i\eta}
 
-        where :math:`\lambda` are eigenvalues and vectors returned by this method, while :math:`\eta` is a
-        smearing parameter chosen by the user.
+    #     where :math:`\lambda` are eigenvalues and vectors returned by this method, while :math:`\eta` is a
+    #     smearing parameter chosen by the user.
 
-        Parameters
-        ----------
-            w_array : ndarray
-                The frequencies to which you want to compute the spectral function.
-            smearing : float
-                The smearing of the spectral function.
+    #     Parameters
+    #     ----------
+    #         w_array : ndarray
+    #             The frequencies to which you want to compute the spectral function.
+    #         smearing : float
+    #             The smearing of the spectral function.
 
-        Returns
-        -------
-            s(w) : ndarray
-                The -ImG(w), the opposite of the imaginary part of the Green function. 
-        """
+    #     Returns
+    #     -------
+    #         s(w) : ndarray
+    #             The -ImG(w), the opposite of the imaginary part of the Green function. 
+    #     """
 
-        # Exclude dynamical
-        eigvects = self.eigvects[:self.n_modes, :]
+    #     # Exclude dynamical
+    #     eigvects = self.eigvects[:self.n_modes, :]
 
-        N_w = len(w_array)
-        N_alpha = len(self.eigvals)
+    #     N_w = len(w_array)
+    #     N_alpha = len(self.eigvals)
 
-        # Transform the vectors back in cartesian coordinates
-        new_vects = np.einsum("ab, ca, c->cb", eigvects, self.pols, 1 / np.sqrt(self.m))
+    #     # Transform the vectors back in cartesian coordinates
+    #     new_vects = np.einsum("ab, ca, c->cb", eigvects, self.pols, 1 / np.sqrt(self.m))
 
-        spectral_weight = np.einsum("ab, ab -> b", new_vects, np.conj(new_vects))
-        spectral_function = np.zeros(N_w, dtype = np.complex128)
+    #     spectral_weight = np.einsum("ab, ab -> b", new_vects, np.conj(new_vects))
+    #     spectral_function = np.zeros(N_w, dtype = np.complex128)
 
-        l_alpha = np.tile(self.eigvals, (N_w, 1))
-        p_w = np.tile(spectral_weight, (N_w, 1))
-        _w_ = np.tile(w_array, (N_alpha, 1)).T 
+    #     l_alpha = np.tile(self.eigvals, (N_w, 1))
+    #     p_w = np.tile(spectral_weight, (N_w, 1))
+    #     _w_ = np.tile(w_array, (N_alpha, 1)).T 
 
-        big_mat = p_w / (l_alpha - _w_**2 + 1j*smearing)
-        spectral_function[:] = np.sum(big_mat, axis = 1)
+    #     big_mat = p_w / (l_alpha - _w_**2 + 1j*smearing)
+    #     spectral_function[:] = np.sum(big_mat, axis = 1)
 
-        return - np.imag(spectral_function)
-
-
-    def GetFullSelfEnergy(self):
-        r"""
-        GET SELF ENERGY 
-        ===============
-
-        Get the self-energy matrix from the eigenvalues and eigenvectors.
-        The method run_full_diag must already be runned.
-
-        This method returns the self energy in the supercell.
-        It is computed as
-
-        .. math ::
-
-            \Pi_{ab} = \sum_{\alpha} \lambda_\alpha\left<a | \lambda_\alpha\right>\left<\lambda_\alpha|b\right>
-
-        where :math:`\lambda` are eigenvalues and vectors returned by this method.
-        The matrix is in real (cartesian) space.
-
-        Returns
-        -------
-            s(w) : ndarray
-                The -ImG(w), the opposite of the imaginary part of the Green function. 
-        """
-
-        # Exclude dynamical
-        eigvects = self.eigvects[:self.n_modes, :]
+    #     return - np.imag(spectral_function)
 
 
-        # Transform the vectors back in cartesian coordinates
-        new_vects = np.einsum("ab, ca, c->cb", eigvects, self.pols, 1 / np.sqrt(self.m))
+    # def GetFullSelfEnergy(self):
+    #     r"""
+    #     GET SELF ENERGY 
+    #     ===============
 
-        self_energy = np.einsum("ab, cb, b", new_vects, np.conj(new_vects), self.eigvals)
+    #     Get the self-energy matrix from the eigenvalues and eigenvectors.
+    #     The method run_full_diag must already be runned.
 
-        return self_energy
+    #     This method returns the self energy in the supercell.
+    #     It is computed as
+
+    #     .. math ::
+
+    #         \Pi_{ab} = \sum_{\alpha} \lambda_\alpha\left<a | \lambda_\alpha\right>\left<\lambda_\alpha|b\right>
+
+    #     where :math:`\lambda` are eigenvalues and vectors returned by this method.
+    #     The matrix is in real (cartesian) space.
+
+    #     Returns
+    #     -------
+    #         s(w) : ndarray
+    #             The -ImG(w), the opposite of the imaginary part of the Green function. 
+    #     """
+
+    #     # Exclude dynamical
+    #     eigvects = self.eigvects[:self.n_modes, :]
+
+
+    #     # Transform the vectors back in cartesian coordinates
+    #     new_vects = np.einsum("ab, ca, c->cb", eigvects, self.pols, 1 / np.sqrt(self.m))
+
+    #     self_energy = np.einsum("ab, cb, b", new_vects, np.conj(new_vects), self.eigvals)
+
+    #     return self_energy
 
 
 
