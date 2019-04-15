@@ -32,7 +32,7 @@ SMEARING = 5 / CC.Phonons.RY_TO_CM
 
 # The number of eigenvalues to return
 N_VALS = 16
-N_ITERS = 33
+N_ITERS = 50
 
 # If the data dir does not exist, create it
 if not os.path.exists(SAVE_DIR):
@@ -49,7 +49,7 @@ ens.load(DATADIR, POPULATION, NRANDOM)
 LanczosResponce = sscha.DynamicalLanczos.Lanczos(ens)
 
 # Ignore for now v3 and v4
-LanczosResponce.ignore_v3 = True
+LanczosResponce.ignore_v3 = False
 LanczosResponce.ignore_v4 = True
 
 # Prepare the lanczos algorithm with a random vector

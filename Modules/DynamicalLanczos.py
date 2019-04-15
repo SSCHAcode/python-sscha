@@ -16,6 +16,7 @@ import cellconstructor as CC
 import cellconstructor.Phonons
 import cellconstructor.symmetries
 
+import Ensemble
 
 
 # Define a generic type for the double precision.
@@ -103,10 +104,10 @@ class Lanczos:
         f -= ensemble.sscha_forces.reshape(self.N, 3 * self.nat)
 
         self.X = np.zeros((self.N, self.n_modes), order = "C", dtype = TYPE_DP)
-        self.X[:,:] = np.einsum("a,ia, ab->ib", np.sqrt(self.m), u, self.pols)
+        self.X[:,:] = np.einsum("a,ia, ab->ib", np.sqrt(self.m), u, self.pols) * Ensemble.Bohr
 
         self.Y = np.zeros((self.N, self.n_modes), order = "C", dtype = TYPE_DP)
-        self.Y[:,:] = np.einsum("a,ia, ab->ib", 1/np.sqrt(self.m), f, self.pols)
+        self.Y[:,:] = np.einsum("a,ia, ab->ib", 1/np.sqrt(self.m), f, self.pols) / Ensemble.Bohr
 
         # Prepare the variable used for the working
         self.psi = np.zeros(self.n_modes + self.n_modes*self.n_modes, dtype = TYPE_DP)
@@ -641,7 +642,7 @@ Starting from step %d
         return -np.imag(spectral)
 
 
-    def get_green_function_continued_fraction(self, use_terminator = True, last_average = 1, smearing = 0):
+    def get_green_function_continued_fraction(self, w_array, use_terminator = True, last_average = 1, smearing = 0):
         """
         CONTINUED FRACTION GREEN FUNCTION
         =================================
@@ -653,6 +654,8 @@ Starting from step %d
 
         Parameters
         ----------
+            w_array : ndarray
+                The list of frequencies in which you want to compute the green function
             use_terminator : bool
                 If true (default) a standard terminator is used.
             last_average : int
@@ -660,8 +663,24 @@ Starting from step %d
             smearing : float
                 The smearing parameter. If none
         """
-        #TODO:
-        pass
+
+        n_iters = len(self.a_coeffs)
+
+        gf = np.zeros(np.shape(w_array), dtype = np.complex128)
+
+        # Get the terminator
+        if use_terminator:
+            a_av = np.mean(self.a_coeffs[-last_average:])
+            b_av = np.mean(self.b_coeffs[-last_average:])
+
+            gf[:] = (a_av - w_array**2 - np.sqrt( (a_av - w_array**2 + 0j)**2 - 4*b_av**2))/(2*b_av**2)
+        else:
+            gf[:] = 1/ (self.a_coeffs[-1] - w_array**2 - 1j*w_array*smearing)
+
+        for i in range(n_iters-2, -1, -1):
+            gf = 1. / (self.a_coeffs[i] - w_array**2  - 1j*w_array*smearing - self.b_coeffs / gf)
+
+        return gf
 
     def run_full_diag(self, number, discard_dyn = True, n_iter = 100):
         r"""
