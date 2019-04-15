@@ -227,8 +227,10 @@ class Lanczos:
         out_vect = np.zeros(np.shape(self.psi), dtype = TYPE_DP)
 
         # Get the harmonic responce function
-        out_vect[:self.n_modes] = self.psi[:self.n_modes] * self.w**2
+        out_vect[:self.n_modes] = (self.psi[:self.n_modes] * self.w) * self.w
 
+        #print("freqsL1: ", self.w)
+        #print("out 0:", out_vect[0])
         # Get the harmonic responce on the propagator
         w_a = np.tile(self.w, (self.n_modes, 1))
         w_b = np.tile(self.w, (self.n_modes, 1)).T 
@@ -236,6 +238,7 @@ class Lanczos:
         new_out = (w_a + w_b)**2
         out_vect[self.n_modes:] = new_out.ravel() * self.psi[self.n_modes:]
 
+        #print("out 0 (just end):", out_vect[0])
         return out_vect
 
     def apply_L2(self):
@@ -312,6 +315,7 @@ class Lanczos:
 
         # Apply the whole L step by step to self.psi
         output = self.apply_L1()
+        #print ("out just after l1 return:", output[0])
 
         if not self.ignore_v3:
             output += self.apply_L2()
@@ -319,35 +323,9 @@ class Lanczos:
             output += self.apply_L3()
 
         # Now return the output
+        #print ("out just before return:", output[0])
         return output
 
-    
-    def custom_lanczos(self, iterations, save_dir = ".", correct_arnoldi = True):
-        """
-        RUN LANCZOS PROCEDURE
-        =====================
-
-        This method perform the lanczos procedure to tridiagonalize the L operator.
-        It will save the current status after each iteration, to allow the user to simply restart.
-
-        Parameters
-        ----------
-            iterations : int
-                The number of Lanczos iterations to be done. 
-                This correspond (in principle) to an exact dyagonalization if the number of iterations
-                matches the dimension of the space. In practice the result should converge pretty fast.
-            save_dir : string
-                Path to the directiory in which to store the status after each iteration.
-                This is necessary if you want to restart a calculation or look for convergence after each
-                step. Use None if you do not want to use any I/O.
-            correct_arnoldi : bool
-                If True the Gram-Schmidt procedure will be iterated for all the basis, in this way also
-                some element outside the tridiagonal form will be non zero, but this prevents the loss of
-                orthogonality, commonly faced in standard Lanczos algorithms.
-        """
-
-        # TODO: Implement the full Lanczos procedure
-        pass
 
     def save_status(self, file):
         """
@@ -482,7 +460,7 @@ Starting from step %d
 
             # Apply the matrix L
             t1 = time.time()
-            self.apply_full_L()
+            self.psi = self.apply_full_L()
             t2 = time.time()
 
             if verbose:
@@ -491,7 +469,8 @@ Starting from step %d
             # Get the coefficients for the Lanczos/Arnoldi matrix
             t1 = time.time()
             arnoldi_row = []
-            new_vect = self.psi
+            new_vect = self.psi.copy()
+            print("New vector:", new_vect)
             for j in range(len(self.krilov_basis)):
                 coeff = self.psi.dot(self.krilov_basis[j])
                 arnoldi_row.append(coeff)
@@ -502,10 +481,14 @@ Starting from step %d
             # Add the new vector to the Krilov Basis
             norm = np.sqrt(new_vect.dot(new_vect))
 
+            print("Vector after GS:")
+            print(new_vect)
+
             # Check the normalization (If zero the algorithm converged)
             if norm < __EPSILON__:
                 if verbose:
                     print("Obtained a linear dependent vector.")
+                    
                     print("The algorithm converged.")
 
                 return 
@@ -561,8 +544,8 @@ Starting from step %d
             for i in range(N_size):
                 matrix[i,i] = self.a_coeffs[i]
                 if i> 1:
-                    matrix[i-1,i] = self.b_coeffs[i]
-                    matrix[i,i-1] = self.b_coeffs[i]
+                    matrix[i-1,i] = self.b_coeffs[i-1]
+                    matrix[i,i-1] = self.b_coeffs[i-1]
         else:
             for i in range(N_size):
                 matrix[:i+1, i] = self.arnoldi_matrix[i]
@@ -570,6 +553,115 @@ Starting from step %d
         
         return matrix
 
+
+    def get_green_function_Lenmann(self, w_array, smearing, v_a, v_b, use_arnoldi = False):
+        """
+        GET GREEN FUNCTION
+        ==================
+
+        Compute the green function using the Lemman representation.
+
+        Parameters
+        ----------
+            w_array : ndarray
+                The list of frequencies for which you want to compute the
+                dynamical green function.
+            smearing : float
+                The smearing to take a non zero imaginary part.
+            v_a : ndarray(size = 3*self.nat)
+                The perturbation operator (on atomic positions)
+            v_b : ndarray(size = 3*self.nat)
+                The probed responce operator (on atomic positions)
+            use_arnoldi: bool
+                If true the full arnoldi matrix is used to extract eigenvalues and 
+                eigenvectors. Otherwise the tridiagonal Lanczos matrix is used.
+                The first one prevents the loss of orthogonality problem.
+        """
+
+        # Get the Lanczos matrix
+        matrix = self.build_lanczos_matrix_from_coeffs(use_arnoldi)
+
+        # Convert the vectors in the polarization basis
+        new_va = np.einsum("a, a, ab->b", np.sqrt(self.m), v_a, self.pols)
+        new_vb = np.einsum("a, a, ab->b", np.sqrt(self.m), v_b, self.pols)
+
+        # Dyagonalize the Lanczos matrix
+        eigvals, eigvects = np.linalg.eigh(matrix)
+
+        Na, Nb = np.shape(matrix)
+        if Na != Nb:
+            raise ValueError("Error, the Lanczos matrix must be square, dim (%d,%d)" % (Na, Nb))
+        
+        gf = np.zeros(len(w_array), dtype = np.complex128)
+
+        for j in range(Na):
+            eig_v = eigvects[:self.n_modes, j]
+            matrix_element = eig_v.dot(new_va) * new_vb.dot(eig_v)
+            gf[:] += matrix_element / (-eigvals[j]  + w_array**2 + 2j*w_array*smearing)
+
+        return gf
+
+    def get_spectral_function_from_Lenmann(self, w_array, smearing, use_arnoldi=False):
+        """
+        GET SPECTRAL FUNCTION
+        =====================
+
+        This method computes the spectral function in the supercell
+        using the Lenmann representation.
+
+        Parameters
+        ----------
+            w_array : ndarray
+                The list of frequencies for which you want to compute the
+                dynamical green function.
+            smearing : float
+                The smearing to take a non zero imaginary part.
+            use_arnoldi: bool
+                If true the full arnoldi matrix is used to extract eigenvalues and 
+                eigenvectors. Otherwise the tridiagonal Lanczos matrix is used.
+                The first one prevents the loss of orthogonality problem.
+        """
+        # Get the Lanczos matrix
+        matrix = self.build_lanczos_matrix_from_coeffs(use_arnoldi)
+
+        # Dyagonalize the Lanczos matrix
+        eigvals, eigvects = np.linalg.eigh(matrix)
+
+        Na, Nb = np.shape(matrix)
+        if Na != Nb:
+            raise ValueError("Error, the Lanczos matrix must be square, dim (%d,%d)" % (Na, Nb))
+        
+        spectral = np.zeros(len(w_array), dtype = np.complex128)
+
+        for j in range(Na):
+            eig_v = eigvects[:self.n_modes, j]
+            matrix_element = eig_v.dot(eig_v)
+            spectral[:] += matrix_element / (-eigvals[j]  + w_array**2 +2j*w_array*smearing)
+
+        return -np.imag(spectral)
+
+
+    def get_green_function_continued_fraction(self, use_terminator = True, last_average = 1, smearing = 0):
+        """
+        CONTINUED FRACTION GREEN FUNCTION
+        =================================
+
+        In this way the continued fraction for the green function is used.
+        This should converge faster than the Lenmann representation, and
+        has the advantage of adding the possibility to add a terminator.
+        This avoids to define a smearing.
+
+        Parameters
+        ----------
+            use_terminator : bool
+                If true (default) a standard terminator is used.
+            last_average : int
+                How many a and be coefficients are averaged to evaluate the terminator?
+            smearing : float
+                The smearing parameter. If none
+        """
+        #TODO:
+        pass
 
     def run_full_diag(self, number, discard_dyn = True, n_iter = 100):
         r"""
