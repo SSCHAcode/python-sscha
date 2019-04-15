@@ -589,6 +589,13 @@ Starting from step %d
         # Dyagonalize the Lanczos matrix
         eigvals, eigvects = np.linalg.eigh(matrix)
 
+        kb = np.array(self.krilov_basis)
+        kb = kb[:-1,:]
+        #print (np.shape(eigvects), np.shape(kb))
+        # Convert in krilov space
+        new_eigv = np.einsum("ab, ac->cb", eigvects, kb)
+
+
         Na, Nb = np.shape(matrix)
         if Na != Nb:
             raise ValueError("Error, the Lanczos matrix must be square, dim (%d,%d)" % (Na, Nb))
@@ -596,13 +603,68 @@ Starting from step %d
         gf = np.zeros(len(w_array), dtype = np.complex128)
 
         for j in range(Na):
-            eig_v = eigvects[:self.n_modes, j]
+            eig_v = new_eigv[:self.n_modes, j]
             matrix_element = eig_v.dot(new_va) * new_vb.dot(eig_v)
-            gf[:] += matrix_element / (-eigvals[j]  + w_array**2 + 2j*w_array*smearing)
+            gf[:] += matrix_element / (eigvals[j]  - w_array**2 + 2j*w_array*smearing)
 
         return gf
 
-    def get_spectral_function_from_Lenmann(self, w_array, smearing, use_arnoldi=False):
+    def get_static_odd_fc(self, use_arnoldi = False):
+        """
+        GET STATIC FORCE CONSTANT
+        =========================
+
+        Get the static force constant matrix
+
+        Parameters
+        ----------
+            use_arnoldi: bool
+                If true the full arnoldi matrix is used, otherwise the Lanczos tridiagonal
+                matrix is used.
+        """
+
+        # Get the Lanczos matrix
+        matrix = self.build_lanczos_matrix_from_coeffs(use_arnoldi)
+
+        # Dyagonalize the Lanczos matrix
+        eigvals, eigvects = np.linalg.eigh(matrix)
+
+        
+        kb = np.array(self.krilov_basis)
+        kb = kb[:-1,:]
+        #print (np.shape(eigvects), np.shape(kb))
+        new_eigv = np.einsum("ab, ac->cb", eigvects, kb)
+
+        Na, Nb = np.shape(matrix)
+        if Na != Nb:
+            raise ValueError("Error, the Lanczos matrix must be square, dim (%d,%d)" % (Na, Nb))
+        
+
+        fc_matrix = np.zeros( (3*self.nat, 3*self.nat), dtype = TYPE_DP)
+
+        for i in range(3*self.nat):
+            # Define the vector
+            v = np.zeros(3*self.nat, dtype = TYPE_DP)
+            v[i] = 1
+
+            # Convert the vectors in the polarization basis
+            new_v = np.einsum("a, a, ab->b", np.sqrt(self.m), v, self.pols)
+            # Convert in the krilov space 
+            v_kb = np.einsum("ab, b", kb[:, :self.n_modes], new_v)
+            # Apply the L matrix
+            w_kb = matrix.dot(v_kb)
+            # Convert back in the polarization space
+            new_w = np.einsum("ab, a", kb[:, :self.n_modes], w_kb)
+            # Convert back in real space
+            w = np.einsum("a, b, ab ->a", 1/np.sqrt(self.m), new_w, self.pols)
+
+            fc_matrix[i, :] = w
+            
+        return fc_matrix
+
+
+
+    def get_spectral_function_from_Lenmann(self, w_array, smearing, use_arnoldi=True):
         """
         GET SPECTRAL FUNCTION
         =====================
@@ -634,10 +696,15 @@ Starting from step %d
         
         spectral = np.zeros(len(w_array), dtype = np.complex128)
 
+        kb = np.array(self.krilov_basis)
+        kb = kb[:-1,:]
+        #print (np.shape(eigvects), np.shape(kb))
+        new_eigv = np.einsum("ab, ac->cb", eigvects, kb)
+
         for j in range(Na):
-            eig_v = eigvects[:self.n_modes, j]
+            eig_v = new_eigv[:self.n_modes, j]
             matrix_element = eig_v.dot(eig_v)
-            spectral[:] += matrix_element / (-eigvals[j]  + w_array**2 +2j*w_array*smearing)
+            spectral[:] += matrix_element / (eigvals[j]  - w_array**2 +2j*w_array*smearing)
 
         return -np.imag(spectral)
 

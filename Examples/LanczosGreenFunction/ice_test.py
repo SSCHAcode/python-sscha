@@ -25,7 +25,7 @@ SAVE_DIR = "data"
 
 # The frequencies/smearing for the dynamical responce
 W_START = 0
-W_END = 4000 / CC.Phonons.RY_TO_CM
+W_END = 10000 / CC.Phonons.RY_TO_CM
 NW = 5000
 SMEARING = 5 / CC.Phonons.RY_TO_CM
 
