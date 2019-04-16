@@ -30,6 +30,26 @@ PyMODINIT_FUNC initsscha_HP_odd(void) {
  * Here the functions of the module.
  */
 
+/*
+ * APPLY D3 TO DYN (OpenMP version)
+ * ===============
+ * 
+ *  Apply the D3 to a vector that represents a dynamical matrix
+ * This function returns an output vector.
+ * 
+ * This function is accelerated using OpenMP
+ * 
+ * Parameters
+ * ----------
+ *  X : double vector (size = (n_modes, n_random))
+ *  Y : double vector (size = (n_modes, n_random))
+ *  n_modes : int
+ *  n_random : int
+ *  rho : double vector (size = nrandom)
+ *  TODO:
+ */
+
+
 
 /*
  * GET V3
@@ -364,7 +384,7 @@ static PyObject * GetV4(PyObject * self, PyObject * args) {
   int n_equal;
   #pragma omp parallel shared(X, Y, rows, cols, v4_out, n_tot) private(a,b,c,d,v4, i)
   {
-    #pragma omp for collapse(4)
+    #pragma omp for
     for (a = 0; a < N_modes; ++a) {
       for (b = a; b < N_modes; ++b) {
         for (c = b; c < N_modes; ++c) {
