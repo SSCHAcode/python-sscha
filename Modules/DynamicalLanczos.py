@@ -629,7 +629,6 @@ Starting from step %d
         # Dyagonalize the Lanczos matrix
         eigvals, eigvects = np.linalg.eigh(matrix)
 
-<<<<<<< HEAD
         Nk = len(self.krilov_basis)
 
         kb = np.array(self.krilov_basis)
@@ -639,13 +638,7 @@ Starting from step %d
             kb = kb[:-1,:]
 
         #print (np.shape(eigvects), np.shape(kb))
-        #new_eigv = np.einsum("ab, ac->cb", eigvects, kb)
-=======
-        # Convert the eigenvectors from the krilov basis to the polarization basis 
-        kb = np.array(self.krilov_basis)
-        kb = kb[:-1,:]
         new_eigv = np.einsum("ab, ac->cb", eigvects, kb)
->>>>>>> 638df61a8dcf7db643dcf61a65af95a031beff10
 
         Na, Nb = np.shape(matrix)
         if Na != Nb:
@@ -662,16 +655,23 @@ Starting from step %d
             # Convert the vectors in the polarization basis
             new_v = np.einsum("a, a, ab->b", np.sqrt(self.m), v, self.pols)
             # Convert in the krilov space 
-            v_kb = np.einsum("ab, b", kb[:, :self.n_modes], new_v)
+            mat_coeff = np.einsum("a, ab", new_v, new_eigv[:self.n_modes, :])
+            new_w = np.einsum("a, ba, a", mat_coeff, new_eigv[:self.n_modes,:], eigvals)
+
+            #v_kb = np.einsum("ab, b", kb[:, :self.n_modes], new_v)
             # Apply the L matrix
-            w_kb = matrix.dot(v_kb)
+            #w_kb = matrix.dot(v_kb)
             # Convert back in the polarization space
-            new_w = np.einsum("ab, a", kb[:, :self.n_modes], w_kb)
+            #new_w = np.einsum("ab, a", kb[:, :self.n_modes], w_kb)
             # Convert back in real space
             w = np.einsum("a, b, ab ->a", 1/np.sqrt(self.m), new_w, self.pols)
 
             fc_matrix[i, :] = w
             
+
+        # This is the dynamical matrix now we can multiply by the masses
+        fc_matrix *= np.sqrt(np.outer(self.m, self.m))
+
         return fc_matrix
 
 

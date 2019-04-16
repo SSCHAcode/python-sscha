@@ -24,7 +24,7 @@ NRANDOM = 1000
 SAVE_DIR = "data"
 
 # The frequencies/smearing for the dynamical responce
-W_START = 0
+W_START = 0 #-5000/ CC.Phonons.RY_TO_CM
 W_END = 10000 / CC.Phonons.RY_TO_CM
 NW = 5000
 SMEARING = 5 / CC.Phonons.RY_TO_CM
@@ -32,7 +32,7 @@ SMEARING = 5 / CC.Phonons.RY_TO_CM
 
 # The number of eigenvalues to return
 N_VALS = 16
-N_ITERS = 50
+N_ITERS = 200
 
 # If the data dir does not exist, create it
 if not os.path.exists(SAVE_DIR):
@@ -40,10 +40,15 @@ if not os.path.exists(SAVE_DIR):
 
 # Load the original dynamical matrix
 dyn = CC.Phonons.Phonons("%s/dyn" % DATADIR)
+w_sscha, p = dyn.DyagDinQ(0)
+w_sscha *= CC.Phonons.RY_TO_CM
 
 # Load the original ensemble
 ens = sscha.Ensemble.Ensemble(dyn, T, SUPERCELL)
 ens.load(DATADIR, POPULATION, NRANDOM)
+
+# Unwrap symmetries
+ens.unwrap_symmetries()
 
 # Compute the Lanczos matrix
 LanczosResponce = sscha.DynamicalLanczos.Lanczos(ens)
@@ -66,12 +71,17 @@ print ()
 print("Preparation compleated.")
 print("Running the Lanczos algorithm...")
 
-t1 = time.time()
-#LanczosResponce.run_full_diag(N_VALS, n_iter = N_ITERS)
-LanczosResponce.run(N_ITERS, SAVE_DIR)
-t2 = time.time()
+step_file = "%s/LANCZOS_STEP%d.npz" % (SAVE_DIR, N_ITERS-1)
+if os.path.exists(step_file):
+    LanczosResponce.load_status(step_file)
+    print("Status loaded from file %s." % step_file)
+else:
+    t1 = time.time()
+    #LanczosResponce.run_full_diag(N_VALS, n_iter = N_ITERS)
+    LanczosResponce.run(N_ITERS, SAVE_DIR)
+    t2 = time.time()
 
-print("Lanczos ended. Time elapsed = %.4f s" % (t2-t1))
+    print("Lanczos ended. Time elapsed = %.4f s" % (t2-t1))
 
 print ()
 print (LanczosResponce.psi)
@@ -95,6 +105,23 @@ print(LanczosResponce.psi)
 # Now get the spectral function
 w_array = np.linspace(W_START, W_END, NW)
 spectral_function =LanczosResponce.get_spectral_function_from_Lenmann(w_array, SMEARING, True)
+static_odd = LanczosResponce.get_static_odd_fc(True)
+
+
+new_dyn = dyn.Copy()
+new_dyn.dynmats[0] = static_odd
+new_dyn.Symmetrize()
+new_dyn.save_qe("odd_lanczos")
+
+w_odd, p = new_dyn.DyagDinQ(0)
+w_odd *= CC.Phonons.RY_TO_CM
+
+# Get the odd with standard technique
+odd_mat = ens.get_odd_correction()
+new_dyn.dynmats[0] = odd_mat
+new_dyn.Symmetrize()
+new_dyn.save_qe("odd_standard")
+
 # LanczosResponce.GetSupercellSpectralFunctionFromEig(w_array, SMEARING)
 
 print("Saving the spectral function to 'spectral_function.dat'")
@@ -105,5 +132,14 @@ plt.plot(w_array * CC.Phonons.RY_TO_CM, spectral_function)
 plt.title("Spectral function")
 plt.xlabel("Frequency [cm-1]")
 plt.ylabel("Spectral function")
+
+# Show the static and sscha phonons
+for i in range(len(w_sscha)):
+    w_s = w_sscha[i]
+    w_o = w_odd[i]
+
+    plt.vlines(w_s, 0, np.max(spectral_function)*1.1, linestyle = "dotted", color ="k")
+    plt.vlines(w_o, 0, np.max(spectral_function)*1.1, linestyle = "dashed", color ="r")
+
 plt.tight_layout()
 plt.show()
