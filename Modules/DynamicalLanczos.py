@@ -629,11 +629,16 @@ Starting from step %d
         # Dyagonalize the Lanczos matrix
         eigvals, eigvects = np.linalg.eigh(matrix)
 
-        
+        Nk = len(self.krilov_basis)
+
         kb = np.array(self.krilov_basis)
-        kb = kb[:-1,:]
+        
+        # Lanczos did not converged, discard the last vector
+        if Nk > len(eigvals):
+            kb = kb[:-1,:]
+
         #print (np.shape(eigvects), np.shape(kb))
-        new_eigv = np.einsum("ab, ac->cb", eigvects, kb)
+        #new_eigv = np.einsum("ab, ac->cb", eigvects, kb)
 
         Na, Nb = np.shape(matrix)
         if Na != Nb:
