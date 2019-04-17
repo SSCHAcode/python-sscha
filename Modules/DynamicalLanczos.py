@@ -49,7 +49,7 @@ def f_ups(w, T):
 
 
 class Lanczos:
-    def __init__(self, ensemble):
+    def __init__(self, ensemble = None):
         """
         INITIALIZE THE LANCZOS
         ======================
@@ -62,6 +62,33 @@ class Lanczos:
             ensemble : Ensemble.Ensemble()
                 The ensemble upon which you want to compute the DynamicalResponce
         """
+
+        # Perform a bare initialization if the ensemble is not provided
+        if ensemble is None:
+            self.T = 0
+            self.nat = 0
+            self.m = []
+            self.w = []
+            self.pols = []
+            self.n_modes = 0
+            self.ignore_v3 = False
+            self.ignore_v4 = False
+            self.N = 0
+            self.rho = []
+            self.N_eff = 0
+            self.X = []
+            self.Y = []
+            self.psi = []
+            self.eigvals = None
+            self.eigvects = None
+            # In the custom lanczos mode
+            self.a_coeffs = [] #Coefficients on the diagonal
+            self.b_coeffs = [] # Coefficients close to the diagonal
+            self.krilov_basis = [] # The basis of the krilov subspace
+            self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
+
+            return
+
 
         self.dyn = ensemble.current_dyn.Copy() 
         superdyn = self.dyn.GenerateSupercellDyn(ensemble.supercell)
@@ -544,7 +571,7 @@ Starting from step %d
         if not use_arnoldi:
             for i in range(N_size):
                 matrix[i,i] = self.a_coeffs[i]
-                if i> 1:
+                if i>= 1:
                     matrix[i-1,i] = self.b_coeffs[i-1]
                     matrix[i,i-1] = self.b_coeffs[i-1]
         else:
@@ -583,8 +610,8 @@ Starting from step %d
         matrix = self.build_lanczos_matrix_from_coeffs(use_arnoldi)
 
         # Convert the vectors in the polarization basis
-        new_va = np.einsum("a, a, ab->b", np.sqrt(self.m), v_a, self.pols)
-        new_vb = np.einsum("a, a, ab->b", np.sqrt(self.m), v_b, self.pols)
+        new_va = np.einsum("a, a, ab->b", 1/np.sqrt(self.m), v_a, self.pols)
+        new_vb = np.einsum("a, a, ab->b", 1/np.sqrt(self.m), v_b, self.pols)
 
         # Dyagonalize the Lanczos matrix
         eigvals, eigvects = np.linalg.eigh(matrix)
@@ -647,26 +674,32 @@ Starting from step %d
 
         fc_matrix = np.zeros( (3*self.nat, 3*self.nat), dtype = TYPE_DP)
 
-        for i in range(3*self.nat):
-            # Define the vector
-            v = np.zeros(3*self.nat, dtype = TYPE_DP)
-            v[i] = 1
+        # Get the dynamical matrix in the polarization basis
+        D = np.einsum("ai, bi, i->ab", new_eigv[:self.n_modes,:], new_eigv[:self.n_modes, :], eigvals)
 
-            # Convert the vectors in the polarization basis
-            new_v = np.einsum("a, a, ab->b", np.sqrt(self.m), v, self.pols)
-            # Convert in the krilov space 
-            mat_coeff = np.einsum("a, ab", new_v, new_eigv[:self.n_modes, :])
-            new_w = np.einsum("a, ba, a", mat_coeff, new_eigv[:self.n_modes,:], eigvals)
+        # Convert it in the standard basis
+        fc_matrix = np.einsum("ab, ia, jb->ij", D, self.pols, self.pols)
 
-            #v_kb = np.einsum("ab, b", kb[:, :self.n_modes], new_v)
-            # Apply the L matrix
-            #w_kb = matrix.dot(v_kb)
-            # Convert back in the polarization space
-            #new_w = np.einsum("ab, a", kb[:, :self.n_modes], w_kb)
-            # Convert back in real space
-            w = np.einsum("a, b, ab ->a", 1/np.sqrt(self.m), new_w, self.pols)
+        # for i in range(3*self.nat):
+        #     # Define the vector
+        #     v = np.zeros(3*self.nat, dtype = TYPE_DP)
+        #     v[i] = 1
 
-            fc_matrix[i, :] = w
+        #     # Convert the vectors in the polarization basis
+        #     new_v = np.einsum("a, a, ab->b", np.sqrt(self.m), v, self.pols)
+        #     # Convert in the krilov space 
+        #     mat_coeff = np.einsum("a, ab", new_v, new_eigv[:self.n_modes, :])
+        #     new_w = np.einsum("a, ba, a", mat_coeff, new_eigv[:self.n_modes,:], eigvals)
+
+        #     #v_kb = np.einsum("ab, b", kb[:, :self.n_modes], new_v)
+        #     # Apply the L matrix
+        #     #w_kb = matrix.dot(v_kb)
+        #     # Convert back in the polarization space
+        #     #new_w = np.einsum("ab, a", kb[:, :self.n_modes], w_kb)
+        #     # Convert back in real space
+        #     w = np.einsum("a, b, ab ->a", 1/np.sqrt(self.m), new_w, self.pols)
+
+        #     fc_matrix[i, :] = w
             
 
         # This is the dynamical matrix now we can multiply by the masses
@@ -754,10 +787,10 @@ Starting from step %d
 
             gf[:] = (a_av - w_array**2 - np.sqrt( (a_av - w_array**2 + 0j)**2 - 4*b_av**2))/(2*b_av**2)
         else:
-            gf[:] = 1/ (self.a_coeffs[-1] - w_array**2 - 1j*w_array*smearing)
+            gf[:] = 1/ (self.a_coeffs[-1] - w_array**2 + 2j*w_array*smearing)
 
         for i in range(n_iters-2, -1, -1):
-            gf = 1. / (self.a_coeffs[i] - w_array**2  - 1j*w_array*smearing - self.b_coeffs / gf)
+            gf = 1. / (self.a_coeffs[i] - w_array**2  + 2j*w_array*smearing - self.b_coeffs[i] * self.b_coeffs[i] * gf)
 
         return gf
 
