@@ -56,7 +56,7 @@ for i, dat in enumerate(sorted_data):
     freqs[i, :] = w 
 
     dynamical_lenmann[i, :] = dat.get_spectral_function_from_Lenmann(w_array, SMEARING, False)
-    dynamical[i, :] = -np.imag( dat.get_green_function_continued_fraction(w_array, use_terminator = True, smearing = 0))
+    dynamical[i, :] = -np.imag( dat.get_green_function_continued_fraction(w_array, use_terminator = False, smearing = SMEARING))
     
     if i % 10 == 0:
         sys.stderr.write("\rProgress %% %d" % (i * 100 / len(sorted_data)))

@@ -785,7 +785,7 @@ Starting from step %d
             a_av = np.mean(self.a_coeffs[-last_average:])
             b_av = np.mean(self.b_coeffs[-last_average:])
 
-            gf[:] = (a_av - w_array**2 - np.sqrt( (a_av - w_array**2 + 0j)**2 - 4*b_av**2))/(2*b_av**2)
+            gf[:] = (a_av - w_array**2 - np.sqrt( (a_av - w_array**2)**2 - 4*b_av**2 + 0j))/(2*b_av**2)
         else:
             gf[:] = 1/ (self.a_coeffs[-1] - w_array**2 + 2j*w_array*smearing)
 
