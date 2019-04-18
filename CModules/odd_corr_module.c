@@ -2,6 +2,7 @@
 #include <numpy/arrayobject.h>
 #include <stdio.h>
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include "LanczosFunctions.h"
 
 #ifdef _MPI
 #include <mpi.h>
@@ -11,11 +12,15 @@
 
 static PyObject *GetV3 (PyObject * self, PyObject * args);
 static PyObject *GetV4 (PyObject * self, PyObject * args);
+static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args);
+static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args);
 
 
 static PyMethodDef odd_engine[] = {
     {"GetV3", GetV3, METH_VARARGS, "Compute the v3 matrix using the replica method"},
     {"GetV4", GetV4, METH_VARARGS, "Compute the sparse v4 using the replica method"},
+    {"ApplyV3ToDyn", ApplyV3ToDyn, METH_VARARGS, "Apply the v3 to a given dynamical matrix"},
+    {"ApplyV3ToVector", ApplyV3ToDyn, METH_VARARGS, "Apply the v3 to a given vector"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -31,7 +36,7 @@ PyMODINIT_FUNC initsscha_HP_odd(void) {
  */
 
 /*
- * APPLY D3 TO DYN (OpenMP version)
+ * APPLY D3 TO DYN (VECTOR)
  * ===============
  * 
  *  Apply the D3 to a vector that represents a dynamical matrix
@@ -43,11 +48,130 @@ PyMODINIT_FUNC initsscha_HP_odd(void) {
  * ----------
  *  X : double vector (size = (n_modes, n_random))
  *  Y : double vector (size = (n_modes, n_random))
- *  n_modes : int
- *  n_random : int
  *  rho : double vector (size = nrandom)
- *  TODO:
+ *  w : double vector (size = n_modes)
+ *  T : double 
+ *  input_dyn : double vector (size = n_modes^2)  
+ *  output_vector : double vector (size = n_modes)
+ *  mode : int 
+ *    If mode = 1 : OpenMP version
+ *    If mode = 2 : MPI version (Not yet implemented)
  */
+static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
+  PyObject * npy_X, npy_Y, npy_rho, npy_omega, npy_input, npy_output;
+  double * X, *Y, *w, *input, *output;
+  int N_configs, N_modes, mode;
+  double T;
+
+  // Parse the python arguments
+  if (!PyArg_ParseTuple(args, "OOOOdOOi", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode))
+    return NULL;
+
+  // Get the dimension of the arrays
+  N_modes = PyArray_DIM(npy_X, 0);
+  N_configs = PyArray_DIM(npy_X, 1);
+
+  // Check the dimensions of all the variables
+  if (N_configs != PyArray_DIM(npy_rho,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "N_configs from X is %d, while len(rho) = %d\n", N_configs, PyArray_DIM(npy_rho, 0));
+    exit(EXIT_FAILURE);
+  }
+  if (N_modes != PyArray_DIM(npy_w,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "N_modes from X is %d, while len(w) = %d\n", N_modes, PyArray_DIM(npy_w, 0));
+    exit(EXIT_FAILURE);
+  }
+  if (N_modes != PyArray_DIM(npy_output,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "The output vector should have a length of %d instead of %d\n", N_modes, PyArray_DIM(npy_output, 0));
+    exit(EXIT_FAILURE);
+  }
+  if (N_modes*N_modes != PyArray_DIM(npy_input,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "The output vector should have a length of %d instead of %d\n", N_modes*N_modes, PyArray_DIM(npy_input, 0));
+    exit(EXIT_FAILURE);
+  }
+
+  // Retrive the pointer to the data from the python object
+  X = (double*) PyArray_DATA(npy_X);
+  Y = (double*) PyArray_DATA(npy_Y);
+  rho = (double*) PyArray_DATA(npy_rho);
+  w = (double*) PyArray_DATA(npy_w);
+  input = (double*) PyArray_DATA(npy_input);
+  output = (double*) PyArray_DATA(npy_output);
+
+
+  // Check the mode
+  if (mode == 1) {
+    OMP_ApplyD3ToVector(X, Y, rho, w, T, N_modes, N_configs, input, output);
+  } else {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "mode %d not implemented.\n", mode);
+    exit(EXIT_FAILURE);
+  }
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
+static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args) {
+  PyObject * npy_X, npy_Y, npy_rho, npy_omega, npy_input, npy_output;
+  double * X, *Y, *w, *input, *output;
+  int N_configs, N_modes, mode;
+  double T;
+
+  // Parse the python arguments
+  if (!PyArg_ParseTuple(args, "OOOOdOOi", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode))
+    return NULL;
+
+  // Get the dimension of the arrays
+  N_modes = PyArray_DIM(npy_X, 0);
+  N_configs = PyArray_DIM(npy_X, 1);
+
+  // Check the dimensions of all the variables
+  if (N_configs != PyArray_DIM(npy_rho,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "N_configs from X is %d, while len(rho) = %d\n", N_configs, PyArray_DIM(npy_rho, 0));
+    exit(EXIT_FAILURE);
+  }
+  if (N_modes != PyArray_DIM(npy_w,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "N_modes from X is %d, while len(w) = %d\n", N_modes, PyArray_DIM(npy_w, 0));
+    exit(EXIT_FAILURE);
+  }
+  if (N_modes*N_modes != PyArray_DIM(npy_output,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "The output vector should have a length of %d instead of %d\n", N_modes*N_modes, PyArray_DIM(npy_output, 0));
+    exit(EXIT_FAILURE);
+  }
+  if (N_modes != PyArray_DIM(npy_input,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "The output vector should have a length of %d instead of %d\n", N_modes, PyArray_DIM(npy_input, 0));
+    exit(EXIT_FAILURE);
+  }
+
+  // Retrive the pointer to the data from the python object
+  X = (double*) PyArray_DATA(npy_X);
+  Y = (double*) PyArray_DATA(npy_Y);
+  rho = (double*) PyArray_DATA(npy_rho);
+  w = (double*) PyArray_DATA(npy_w);
+  input = (double*) PyArray_DATA(npy_input);
+  output = (double*) PyArray_DATA(npy_output);
+
+
+  // Check the mode
+  if (mode == 1) {
+    OMP_ApplyD3ToVector(X, Y, rho, w, T, N_modes, N_configs, input, output);
+  } else {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "mode %d not implemented.\n", mode);
+    exit(EXIT_FAILURE);
+  }
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
 
 
 
