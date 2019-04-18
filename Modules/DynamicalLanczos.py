@@ -180,6 +180,8 @@ class Lanczos:
         This function returns a standard vector and the dynamical matrix in cartesian coordinates
         
         This can be used to symmetrize the vector.
+
+        The vector is returned in [Bohr] and the force constant matrix is returned in [Ry/bohr^2]
         """
 
 
@@ -192,17 +194,17 @@ class Lanczos:
         dyn *= ( 2*(w_a + w_b) * np.sqrt(w_a*w_b*(w_a + w_b)))
 
         # Get back the real vectors
-        real_v = np.einsum("a, b, ab->a", 1/np.sqrt(self.m), vector, self.pols)
+        real_v = np.einsum("a, b, ab->a", np.sqrt(self.m), vector, self.pols)
         real_dyn = np.einsum("ab, ca, db-> cd", dyn, self.pols, self.pols)
-        real_dyn *= np.outer(np.sqrt(self.m), np.sqrt(self.m))
+        #real_dyn *= np.outer(np.sqrt(self.m), np.sqrt(self.m))
 
         return real_v, real_dyn 
     
     def set_psi_from_vector_dyn(self, vector, dyn):
         """
-        Set the psi vector from a given vector and a force constant matrix.
+        Set the psi vector from a given vector of positions [bohr] and a force constant matrix [Ry/bohr^2].
         Used to reset the psi after the symmetrization.
-        """
+       """
 
         new_v = np.einsum("a, a, ab->b",  np.sqrt(self.m), vector, self.pols)
         
@@ -320,7 +322,7 @@ class Lanczos:
         return output
 
 
-    def apply_full_L(self, target=None):
+    def apply_full_L(self, target=None, symmetrize = True):
         """
         APPLY THE L 
         ===========
@@ -335,12 +337,18 @@ class Lanczos:
             target : ndarray ( size = shape(self.psi)), optional
                 The garget vector to which you want to apply the
                 full L matrix
+            symmetrize : bool
+                If true before and after the application the vector will be symmetrized.
         """
 
         # Setup the target vector to the self.psi
         if not target is None:
             self.psi = target 
 
+        if symmetrize:
+            self.symmetrize_psi()
+
+            
         # Apply the whole L step by step to self.psi
         output = self.apply_L1()
         #print ("out just after l1 return:", output[0])
@@ -352,7 +360,11 @@ class Lanczos:
 
         # Now return the output
         #print ("out just before return:", output[0])
-        return output
+        self.psi = output
+        if symmetrize:
+            self.symmetrize_psi()
+        
+        return self.psi
 
 
     def save_status(self, file):

@@ -21,7 +21,7 @@ POPULATION = 2
 NRANDOM = 1000
 
 # Where to store the progress?
-SAVE_DIR = "data_odd3"
+SAVE_DIR = "data_odd3_full_sym"
 
 # The frequencies/smearing for the dynamical responce
 W_START = 0 #-5000/ CC.Phonons.RY_TO_CM
@@ -32,7 +32,7 @@ SMEARING = 5 / CC.Phonons.RY_TO_CM
 
 # The number of eigenvalues to return
 N_VALS = 16
-N_ITERS = 200
+N_ITERS = 20
 
 # If the data dir does not exist, create it
 if not os.path.exists(SAVE_DIR):
@@ -48,13 +48,13 @@ ens = sscha.Ensemble.Ensemble(dyn, T, SUPERCELL)
 ens.load(DATADIR, POPULATION, NRANDOM)
 
 # Unwrap symmetries
-ens.unwrap_symmetries()
+#ens.unwrap_symmetries()
 
 # Compute the Lanczos matrix
 LanczosResponce = sscha.DynamicalLanczos.Lanczos(ens)
 
 # Ignore for now v3 and v4
-LanczosResponce.ignore_v3 = True
+LanczosResponce.ignore_v3 = False
 LanczosResponce.ignore_v4 = True
 
 # Prepare the lanczos algorithm with a random vector
@@ -63,6 +63,7 @@ random_vector = np.random.uniform(size = 3*nat)
 random_vector /= np.sqrt(random_vector.dot(random_vector))
 
 LanczosResponce.prepare_perturbation(random_vector)
+np.savetxt("psi0.dat", LanczosResponce.psi)
 
 print ()
 print (LanczosResponce.psi)
