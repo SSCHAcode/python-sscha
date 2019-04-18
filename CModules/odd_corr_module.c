@@ -58,9 +58,16 @@ PyMODINIT_FUNC initsscha_HP_odd(void) {
  *    If mode = 2 : MPI version (Not yet implemented)
  */
 static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
-  PyObject * npy_X, npy_Y, npy_rho, npy_omega, npy_input, npy_output;
-  double * X, *Y, *w, *input, *output;
-  int N_configs, N_modes, mode;
+  PyObject * npy_X, *npy_Y, *npy_rho, *npy_omega, *npy_input, *npy_output;
+  double * X; 
+  double *Y;
+  double *w;
+  double *input;
+  double *output;
+  double * rho;
+  int N_configs;
+  int N_modes;
+  int mode;
   double T;
 
   // Parse the python arguments
@@ -77,9 +84,9 @@ static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
     fprintf(stderr, "N_configs from X is %d, while len(rho) = %d\n", N_configs, PyArray_DIM(npy_rho, 0));
     exit(EXIT_FAILURE);
   }
-  if (N_modes != PyArray_DIM(npy_w,0)) {
+  if (N_modes != PyArray_DIM(npy_omega,0)) {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
-    fprintf(stderr, "N_modes from X is %d, while len(w) = %d\n", N_modes, PyArray_DIM(npy_w, 0));
+    fprintf(stderr, "N_modes from X is %d, while len(w) = %d\n", N_modes, PyArray_DIM(npy_omega, 0));
     exit(EXIT_FAILURE);
   }
   if (N_modes != PyArray_DIM(npy_output,0)) {
@@ -97,7 +104,7 @@ static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
   X = (double*) PyArray_DATA(npy_X);
   Y = (double*) PyArray_DATA(npy_Y);
   rho = (double*) PyArray_DATA(npy_rho);
-  w = (double*) PyArray_DATA(npy_w);
+  w = (double*) PyArray_DATA(npy_omega);
   input = (double*) PyArray_DATA(npy_input);
   output = (double*) PyArray_DATA(npy_output);
 
@@ -116,8 +123,8 @@ static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
 }
 
 static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args) {
-  PyObject * npy_X, npy_Y, npy_rho, npy_omega, npy_input, npy_output;
-  double * X, *Y, *w, *input, *output;
+  PyObject * npy_X, *npy_Y, *npy_rho, *npy_omega, *npy_input, *npy_output;
+  double * X, *Y, *w, *input, *output, *rho;
   int N_configs, N_modes, mode;
   double T;
 
@@ -135,9 +142,9 @@ static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args) {
     fprintf(stderr, "N_configs from X is %d, while len(rho) = %d\n", N_configs, PyArray_DIM(npy_rho, 0));
     exit(EXIT_FAILURE);
   }
-  if (N_modes != PyArray_DIM(npy_w,0)) {
+  if (N_modes != PyArray_DIM(npy_omega,0)) {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
-    fprintf(stderr, "N_modes from X is %d, while len(w) = %d\n", N_modes, PyArray_DIM(npy_w, 0));
+    fprintf(stderr, "N_modes from X is %d, while len(w) = %d\n", N_modes, PyArray_DIM(npy_omega, 0));
     exit(EXIT_FAILURE);
   }
   if (N_modes*N_modes != PyArray_DIM(npy_output,0)) {
@@ -155,7 +162,7 @@ static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args) {
   X = (double*) PyArray_DATA(npy_X);
   Y = (double*) PyArray_DATA(npy_Y);
   rho = (double*) PyArray_DATA(npy_rho);
-  w = (double*) PyArray_DATA(npy_w);
+  w = (double*) PyArray_DATA(npy_omega);
   input = (double*) PyArray_DATA(npy_input);
   output = (double*) PyArray_DATA(npy_output);
 

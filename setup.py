@@ -41,7 +41,7 @@ SCHAModules = Extension(name = "SCHAModules",
 
 # Setup the HP performance module
 odd_HP = Extension(name = "sscha_HP_odd",
-                   sources= ["CModules/odd_corr_module.c"],
+                   sources= ["CModules/odd_corr_module.c", "CModules/LanczosFunctions.c"],
                    include_dirs=[numpy.get_include()],
                    extra_compile_args= extra_flags_c + mpi_compile_args,
                    extra_link_args = mpi_link_args + extra_link_args_c

@@ -11,6 +11,7 @@ double f_ups(double w, double T) {
 }
 
 
+
 void OMP_ApplyD3ToVector(const double * X, const double * Y, const double * rho, const double * w, double T, int N_modes, int N_configs, const double * input_vector, double * output_dyn) {
 
     // Compute the N_eff
@@ -60,7 +61,7 @@ void OMP_ApplyD3ToVector(const double * X, const double * Y, const double * rho,
 
 
 
-void OMP_ApplyD3ToVector(const double * X, const double * Y, const double * rho, const double * w, 
+void OMP_ApplyD3ToDyn(const double * X, const double * Y, const double * rho, const double * w, 
     double T, int N_modes, int N_configs, const double * input_dyn, double * output_vector){
 
     // Compute the N_eff
