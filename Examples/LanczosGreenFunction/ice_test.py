@@ -22,6 +22,7 @@ NRANDOM = 1000
 
 # Where to store the progress?
 SAVE_DIR = "data_odd3_full_sym"
+#SAVE_DIR = "data"
 
 # The frequencies/smearing for the dynamical responce
 W_START = 0 #-5000/ CC.Phonons.RY_TO_CM
@@ -32,7 +33,7 @@ SMEARING = 5 / CC.Phonons.RY_TO_CM
 
 # The number of eigenvalues to return
 N_VALS = 16
-N_ITERS = 20
+N_ITERS = 50
 
 # If the data dir does not exist, create it
 if not os.path.exists(SAVE_DIR):
@@ -48,7 +49,7 @@ ens = sscha.Ensemble.Ensemble(dyn, T, SUPERCELL)
 ens.load(DATADIR, POPULATION, NRANDOM)
 
 # Unwrap symmetries
-#ens.unwrap_symmetries()
+ens.unwrap_symmetries()
 
 # Compute the Lanczos matrix
 LanczosResponce = sscha.DynamicalLanczos.Lanczos(ens)
@@ -57,10 +58,17 @@ LanczosResponce = sscha.DynamicalLanczos.Lanczos(ens)
 LanczosResponce.ignore_v3 = False
 LanczosResponce.ignore_v4 = True
 
+
+# Get first the lowest eigenvalues
+LanczosResponce.set_max_frequency(3000/CC.Phonons.RY_TO_CM)
+
+
 # Prepare the lanczos algorithm with a random vector
 nat = dyn.structure.N_atoms
 random_vector = np.random.uniform(size = 3*nat)
 random_vector /= np.sqrt(random_vector.dot(random_vector))
+
+
 
 LanczosResponce.prepare_perturbation(random_vector)
 np.savetxt("psi0.dat", LanczosResponce.psi)
@@ -83,16 +91,6 @@ else:
     t2 = time.time()
 
     print("Lanczos ended. Time elapsed = %.4f s" % (t2-t1))
-
-print ()
-print (LanczosResponce.psi)
-print ()
-
-LanczosResponce.psi *= 0
-LanczosResponce.psi[0] = 1
-
-LanczosResponce.apply_full_L()
-print(LanczosResponce.psi)
 
 # print()
 # print("Eigenvalues found:", LanczosResponce.eigvals)
@@ -117,11 +115,11 @@ new_dyn.save_qe("odd_lanczos")
 w_odd, p = new_dyn.DyagDinQ(0)
 w_odd *= CC.Phonons.RY_TO_CM
 
-# Get the odd with standard technique
-odd_mat = ens.get_odd_correction()
-new_dyn.dynmats[0] = odd_mat
-new_dyn.Symmetrize()
-new_dyn.save_qe("odd_standard")
+# # Get the odd with standard technique
+# odd_mat = ens.get_odd_correction()
+# new_dyn.dynmats[0] = odd_mat
+# new_dyn.Symmetrize()
+# new_dyn.save_qe("odd_standard")
 
 # LanczosResponce.GetSupercellSpectralFunctionFromEig(w_array, SMEARING)
 

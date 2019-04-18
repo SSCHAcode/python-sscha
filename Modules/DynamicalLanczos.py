@@ -86,6 +86,9 @@ class Lanczos:
             self.b_coeffs = [] # Coefficients close to the diagonal
             self.krilov_basis = [] # The basis of the krilov subspace
             self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
+            self.reverse_L = False
+            self.shift_value = 0
+            self.symmetrize = False
 
             return
 
@@ -153,6 +156,12 @@ class Lanczos:
         self.krilov_basis = [] # The basis of the krilov subspace
         self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
 
+        # These are some options that can be used to properly reverse and shift the L operator to
+        # fasten the convergence of low energy modes
+        self.reverse_L = False
+        self.shift_value = 0
+        self.symmetrize = False
+
 
     def prepare_perturbation(self, vector):
         """
@@ -175,6 +184,9 @@ class Lanczos:
         new_v = np.einsum("a, a, ab->b", np.sqrt(self.m), vector, self.pols)
         self.psi[:self.n_modes] = new_v
 
+        if self.symmetrize:
+            self.symmetrize_psi()
+
     def get_vector_dyn_from_psi(self):
         """
         This function returns a standard vector and the dynamical matrix in cartesian coordinates
@@ -194,9 +206,9 @@ class Lanczos:
         dyn *= ( 2*(w_a + w_b) * np.sqrt(w_a*w_b*(w_a + w_b)))
 
         # Get back the real vectors
-        real_v = np.einsum("a, b, ab->a", np.sqrt(self.m), vector, self.pols)
+        real_v = np.einsum("b, ab->a",  vector, self.pols)  /np.sqrt(self.m)
         real_dyn = np.einsum("ab, ca, db-> cd", dyn, self.pols, self.pols)
-        #real_dyn *= np.outer(np.sqrt(self.m), np.sqrt(self.m))
+        real_dyn *= np.outer(np.sqrt(self.m), np.sqrt(self.m))
 
         return real_v, real_dyn 
     
@@ -206,9 +218,10 @@ class Lanczos:
         Used to reset the psi after the symmetrization.
        """
 
-        new_v = np.einsum("a, a, ab->b",  np.sqrt(self.m), vector, self.pols)
+        new_v = np.einsum("a, ab->b",  np.sqrt(self.m) * vector, self.pols)
         
         new_dyn = dyn / np.outer(np.sqrt(self.m), np.sqrt(self.m))
+        new_dyn = np.einsum("ab, ai, bj-> ij", new_dyn, self.pols, self.pols) 
         
         w_a = np.tile(self.w, (self.n_modes, 1))
         w_b = np.tile(self.w, (self.n_modes, 1)).T 
@@ -226,6 +239,9 @@ class Lanczos:
         # First of all, get the vector and the dyn
         vector, dyn = self.get_vector_dyn_from_psi()
 
+        print ("Vector before symmetries:")
+        print (vector)
+
         # Symmetrize the vector
         self.qe_sym.SetupQPoint()
         new_v = np.zeros( (self.nat, 3), dtype = np.float64, order = "F")
@@ -233,6 +249,9 @@ class Lanczos:
         self.qe_sym.SymmetrizeVector(new_v)
         vector = new_v.ravel()
 
+        print ("Vector after symmetries:")
+        print (vector)
+               
         # Symmetrize the dynamical matrix
         dyn_q = CC.Phonons.GetDynQFromFCSupercell(dyn, np.array(self.dyn.q_tot), self.uci_structure, self.super_structure)
         self.qe_sym.SymmetrizeFCQ(dyn_q, self.dyn.q_stars, asr = "custom")
@@ -241,6 +260,36 @@ class Lanczos:
         # Push everithing back into the psi
         self.set_psi_from_vector_dyn(vector, dyn)
 
+    def set_max_frequency(self, freq):
+        """
+        SETUP THE REVERSE LANCZOS
+        =========================
+
+        This function prepares the Lanczos algorithm in order to find the lowest eigenvalues
+        You should provide the maximum frequencies of the standard spectrum.
+        Then the Lanczos is initialized in order to solve the problem
+
+        (Ia - L) x = b
+
+        where a is sqrt(2*freq) so that should match the maximum energy. 
+        Since Lanczos is very good in converging the biggest (in magnitude) eigenvectors, this
+        procedure should accelerate the convergence of the low energy spectrum.
+
+        NOTE: This method should be executed BEFORE the Lanczos run.
+
+        Parameters
+        ----------
+            freq : float
+               The frequencies (in Ry) of the maximum eigenvalue.
+        """
+
+        self.shift_value = 4*freq*freq
+        self.reverse_L = True
+
+        print("Shift value:", self.shift_value)
+
+        
+        
     def apply_L1(self):
         """
         APPLY THE L1
@@ -322,7 +371,7 @@ class Lanczos:
         return output
 
 
-    def apply_full_L(self, target=None, symmetrize = True):
+    def apply_full_L(self, target=None):
         """
         APPLY THE L 
         ===========
@@ -345,9 +394,12 @@ class Lanczos:
         if not target is None:
             self.psi = target 
 
-        if symmetrize:
+        if self.symmetrize:
             self.symmetrize_psi()
 
+        print("Psi before:")
+        print(self.psi[:self.n_modes])
+            
             
         # Apply the whole L step by step to self.psi
         output = self.apply_L1()
@@ -358,10 +410,19 @@ class Lanczos:
         if not self.ignore_v4:
             output += self.apply_L3()
 
+        # Apply the shift reverse
+        print ("Output before:")
+        print (output[:self.n_modes])
+        if self.reverse_L:
+            output *= -1
+        output += self.shift_value * self.psi
+        print ("Output after:")
+        print (output[:self.n_modes])
+
         # Now return the output
         #print ("out just before return:", output[0])
         self.psi = output
-        if symmetrize:
+        if self.symmetrize:
             self.symmetrize_psi()
         
         return self.psi
@@ -402,7 +463,9 @@ class Lanczos:
                             a_coeffs = self.a_coeffs,
                             b_coeffs = self.b_coeffs,
                             krilov_basis = self.krilov_basis,
-                            arnoldi_matrix = self.arnoldi_matrix)
+                            arnoldi_matrix = self.arnoldi_matrix,
+                            reverse = self.reverse_L,
+                            shift = self.shift_value)
             
     def load_status(self, file):
         """
@@ -435,6 +498,10 @@ class Lanczos:
         self.b_coeffs = data["b_coeffs"]
         self.krilov_basis = data["krilov_basis"]
         self.arnoldi_matrix = data["arnoldi_matrix"]
+
+        if "reverse" in data.keys():
+            self.reverse_L = data["reverse"]
+            self.shift_value = data["shift"]
 
         # Rebuild the Linear operator
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
@@ -563,7 +630,7 @@ Starting from step %d
                 print("Lanczos step %d ultimated." % i)
 
 
-    def build_lanczos_matrix_from_coeffs(self, use_arnoldi=False):
+    def build_lanczos_matrix_from_coeffs(self, use_arnoldi=True):
         """
         BUILD THE LANCZOS MATRIX
         ========================
@@ -590,7 +657,14 @@ Starting from step %d
             for i in range(N_size):
                 matrix[:i+1, i] = self.arnoldi_matrix[i]
                 matrix[i, :i+1] = self.arnoldi_matrix[i]
-        
+
+
+        sign = 1
+        if self.reverse_L:
+            sign = -1
+
+        matrix =  sign*matrix - sign* np.eye(N_size) * self.shift_value
+                    
         return matrix
 
 
@@ -801,8 +875,13 @@ Starting from step %d
         else:
             gf[:] = 1/ (self.a_coeffs[-1] - w_array**2 + 2j*w_array*smearing)
 
+        sign =1
+        if self.reverse_L:
+            sign = -1
         for i in range(n_iters-2, -1, -1):
-            gf = 1. / (self.a_coeffs[i] - w_array**2  + 2j*w_array*smearing - self.b_coeffs[i] * self.b_coeffs[i] * gf)
+            a = self.a_coeffs[i] * sign - sign* self.shift_value
+            b = self.b_coeffs[i] * sign
+            gf = 1. / (a - w_array**2  + 2j*w_array*smearing - b**2 * gf)
 
         return gf
 
