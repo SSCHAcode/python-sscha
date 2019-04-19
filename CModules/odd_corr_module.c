@@ -14,6 +14,7 @@ static PyObject *GetV3 (PyObject * self, PyObject * args);
 static PyObject *GetV4 (PyObject * self, PyObject * args);
 static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args);
 static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args);
+static PyObject *ApplyV4ToDyn(PyObject * self, PyObject * args);
 
 
 static PyMethodDef odd_engine[] = {
@@ -21,6 +22,7 @@ static PyMethodDef odd_engine[] = {
     {"GetV4", GetV4, METH_VARARGS, "Compute the sparse v4 using the replica method"},
     {"ApplyV3ToDyn", ApplyV3ToDyn, METH_VARARGS, "Apply the v3 to a given dynamical matrix"},
     {"ApplyV3ToVector", ApplyV3ToVector, METH_VARARGS, "Apply the v3 to a given vector"},
+    {"ApplyV4ToDyn", ApplyV4ToDyn, METH_VARARGS, "Apply the v3 to a given dynamical matrix"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -189,6 +191,104 @@ static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args) {
     //printf("I'm here\n");
     fflush(stdout);
     OMP_ApplyD3ToVector(X, Y, rho, w, T, N_modes, N_configs, input, output);
+  } else {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "mode %d not implemented.\n", mode);
+    exit(EXIT_FAILURE);
+  }
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
+
+
+/*
+ * APPLY D4 TO DYN 
+ * ===============
+ * 
+ *  Apply the D4 to a vector that represents a dynamical matrix
+ * This function returns an output vector.
+ * 
+ * This function is accelerated using OpenMP
+ * 
+ * Parameters
+ * ----------
+ *  X : double vector (size = (n_modes, n_random))
+ *  Y : double vector (size = (n_modes, n_random))
+ *  rho : double vector (size = nrandom)
+ *  w : double vector (size = n_modes)
+ *  T : double 
+ *  input_dyn : double vector (size = n_modes^2)  
+ *  output_vector : double vector (size = n_modes)
+ *  mode : int 
+ *    If mode = 1 : OpenMP version
+ *    If mode = 2 : MPI version (Not yet implemented)
+ */
+static PyObject *ApplyV4ToDyn(PyObject * self, PyObject * args) {
+  PyArrayObject * npy_X, *npy_Y, *npy_rho, *npy_omega, *npy_input, *npy_output;
+  double * X; 
+  double *Y;
+  double *w;
+  double *input;
+  double *output;
+  double * rho;
+  int N_configs;
+  int N_modes;
+  int mode;
+  double T;
+
+  int index_mode = 0, index_config = 1;
+
+  // Parse the python arguments
+  if (!PyArg_ParseTuple(args, "OOOOdOOi", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode))
+    return NULL;
+  
+  // Check the array memory setting
+  if (npy_X->flags & NPY_ARRAY_F_CONTIGUOUS) {
+    index_mode = 1;
+    index_config = 0;
+  }
+  
+
+  // Get the dimension of the arrays
+  N_modes = PyArray_DIM(npy_X, index_mode);
+  N_configs = PyArray_DIM(npy_X, index_config);
+
+  // Check the dimensions of all the variables
+  if (N_configs != PyArray_DIM(npy_rho,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "N_configs from X is %d, while len(rho) = %d\n", N_configs, PyArray_DIM(npy_rho, 0));
+    exit(EXIT_FAILURE);
+  }
+  if (N_modes != PyArray_DIM(npy_omega,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "N_modes from X is %d, while len(w) = %d\n", N_modes, PyArray_DIM(npy_omega, 0));
+    exit(EXIT_FAILURE);
+  }
+  if (N_modes*N_modes != PyArray_DIM(npy_output,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "The output vector should have a length of %d instead of %d\n", N_modes*N_modes, PyArray_DIM(npy_output, 0));
+    exit(EXIT_FAILURE);
+  }
+  if (N_modes*N_modes != PyArray_DIM(npy_input,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "The output vector should have a length of %d instead of %d\n", N_modes*N_modes, PyArray_DIM(npy_input, 0));
+    exit(EXIT_FAILURE);
+  }
+
+  // Retrive the pointer to the data from the python object
+  X = (double*) PyArray_DATA(npy_X);
+  Y = (double*) PyArray_DATA(npy_Y);
+  rho = (double*) PyArray_DATA(npy_rho);
+  w = (double*) PyArray_DATA(npy_omega);
+  input = (double*) PyArray_DATA(npy_input);
+  output = (double*) PyArray_DATA(npy_output);
+
+
+  // Check the mode
+  if (mode == 1) {
+    OMP_ApplyD4ToDyn(X, Y, rho, w, T, N_modes, N_configs, input, output);
   } else {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
     fprintf(stderr, "mode %d not implemented.\n", mode);

@@ -387,8 +387,16 @@ class Lanczos:
 
         dyn = self.psi[self.n_modes:] * np.sqrt((w_a + w_b) / (w_a * w_b)) / 2
 
-        out_dyn = SlowApplyD4ToDyn(self.X, self.Y, self.rho, self.w, self.T, dyn)
 
+        # Here the time consuming part [The most of all]!!!
+        if self.mode == 0:
+            # A very slow implementation
+            # Use it just for debugging
+            out_dyn = SlowApplyD4ToDyn(self.X, self.Y, self.rho, self.w, self.T, dyn)
+        elif self.mode >= 1:
+            # The fast C implementation
+            out_dyn = FastApplyD4ToDyn(self.X, self.Y, self.rho, self.w, self.T, dyn)            
+            
         out_dyn *= np.sqrt((w_a + w_b) / (w_a * w_b)) / 2
 
         output = np.zeros(np.shape(self.psi), dtype = TYPE_DP)
@@ -1228,3 +1236,48 @@ def SlowApplyD4ToDyn(X, Y, rho, w, T, input_dyn):
                     v_out[a*n_modes + b] += - np.sum(in_av) * input_dyn[n_modes*c + d] / (4*N_eff)
     
     return v_out
+
+
+def FastApplyD4ToDyn(X, Y, rho, w, T, input_dyn, mode = 1):
+    """
+    Apply the D3 to vector
+    ======================
+
+    This is a wrapper to the fast C function.
+
+    Remember to use the correct dtype value:
+    if mode == GPU:
+       dtype = np.float32
+    if mode == CPU:
+       dtype = np.float64
+
+    For details on the mode, look at the parameters list
+
+    Parameters
+    ----------
+       X : ndarray(size = (n_modes, n_configs), dtype = np.double / np.float32)
+           The X array (displacement in mode basis). Note that the dtype should match the mode
+       Y : ndarray(size = (n_modes, n_configs))
+           The Y array (forces in mode basis).
+       rho : ndarray(size = n_configs)
+           The weights of the configurations
+       w : ndarray(size = n_modes)
+           The list of frequencies
+       T : float
+           The temperature
+       input_dyn : ndarray (size = n_modes*n_modes)
+           The input dynamical matrix
+       mode : int
+           The mode for the execution:
+              1) CPU : OpenMP parallelization
+
+    Results
+    -------
+       output_dyn : ndarray (size = n_modes*n_modes)
+           The result of the calculation
+    """
+    n_modes = len(w)
+    output_dyn = np.zeros(n_modes*n_modes, dtype = TYPE_DP)
+    #print( "Apply to vector, nmodes:", n_modes, "shape:", np.shape(output_dyn))
+    sscha_HP_odd.ApplyV4ToDyn(X, Y, rho, w, T, input_dyn, output_dyn, mode)
+    return output_dyn
