@@ -20,7 +20,7 @@ static PyMethodDef odd_engine[] = {
     {"GetV3", GetV3, METH_VARARGS, "Compute the v3 matrix using the replica method"},
     {"GetV4", GetV4, METH_VARARGS, "Compute the sparse v4 using the replica method"},
     {"ApplyV3ToDyn", ApplyV3ToDyn, METH_VARARGS, "Apply the v3 to a given dynamical matrix"},
-    {"ApplyV3ToVector", ApplyV3ToDyn, METH_VARARGS, "Apply the v3 to a given vector"},
+    {"ApplyV3ToVector", ApplyV3ToVector, METH_VARARGS, "Apply the v3 to a given vector"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -58,7 +58,7 @@ PyMODINIT_FUNC initsscha_HP_odd(void) {
  *    If mode = 2 : MPI version (Not yet implemented)
  */
 static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
-  PyObject * npy_X, *npy_Y, *npy_rho, *npy_omega, *npy_input, *npy_output;
+  PyArrayObject * npy_X, *npy_Y, *npy_rho, *npy_omega, *npy_input, *npy_output;
   double * X; 
   double *Y;
   double *w;
@@ -70,13 +70,22 @@ static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
   int mode;
   double T;
 
+  int index_mode = 0, index_config = 1;
+
   // Parse the python arguments
   if (!PyArg_ParseTuple(args, "OOOOdOOi", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode))
     return NULL;
+  
+  // Check the array memory setting
+  if (npy_X->flags & NPY_ARRAY_F_CONTIGUOUS) {
+    index_mode = 1;
+    index_config = 0;
+  }
+  
 
   // Get the dimension of the arrays
-  N_modes = PyArray_DIM(npy_X, 0);
-  N_configs = PyArray_DIM(npy_X, 1);
+  N_modes = PyArray_DIM(npy_X, index_mode);
+  N_configs = PyArray_DIM(npy_X, index_config);
 
   // Check the dimensions of all the variables
   if (N_configs != PyArray_DIM(npy_rho,0)) {
@@ -111,7 +120,7 @@ static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
 
   // Check the mode
   if (mode == 1) {
-    OMP_ApplyD3ToVector(X, Y, rho, w, T, N_modes, N_configs, input, output);
+    OMP_ApplyD3ToDyn(X, Y, rho, w, T, N_modes, N_configs, input, output);
   } else {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
     fprintf(stderr, "mode %d not implemented.\n", mode);
@@ -123,18 +132,26 @@ static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
 }
 
 static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args) {
-  PyObject * npy_X, *npy_Y, *npy_rho, *npy_omega, *npy_input, *npy_output;
+  PyArrayObject * npy_X, *npy_Y, *npy_rho, *npy_omega, *npy_input, *npy_output;
   double * X, *Y, *w, *input, *output, *rho;
   int N_configs, N_modes, mode;
   double T;
+
+  int index_mode = 0, index_config = 1;
 
   // Parse the python arguments
   if (!PyArg_ParseTuple(args, "OOOOdOOi", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode))
     return NULL;
 
+  // Check the array memory setting
+  if (npy_X->flags & NPY_ARRAY_F_CONTIGUOUS) {
+    index_mode = 1;
+    index_config = 0;
+  }
+  
   // Get the dimension of the arrays
-  N_modes = PyArray_DIM(npy_X, 0);
-  N_configs = PyArray_DIM(npy_X, 1);
+  N_modes = PyArray_DIM(npy_X, index_mode);
+  N_configs = PyArray_DIM(npy_X, index_config);
 
   // Check the dimensions of all the variables
   if (N_configs != PyArray_DIM(npy_rho,0)) {
@@ -169,6 +186,8 @@ static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args) {
 
   // Check the mode
   if (mode == 1) {
+    //printf("I'm here\n");
+    fflush(stdout);
     OMP_ApplyD3ToVector(X, Y, rho, w, T, N_modes, N_configs, input, output);
   } else {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);

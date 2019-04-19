@@ -17,7 +17,7 @@ import cellconstructor.Phonons
 import cellconstructor.symmetries
 
 import Ensemble
-
+import sscha_HP_odd
 
 # Define a generic type for the double precision.
 TYPE_DP = np.double
@@ -49,7 +49,7 @@ def f_ups(w, T):
 
 
 class Lanczos:
-    def __init__(self, ensemble = None):
+    def __init__(self, ensemble = None, mode = 1):
         """
         INITIALIZE THE LANCZOS
         ======================
@@ -61,7 +61,21 @@ class Lanczos:
         ----------
             ensemble : Ensemble.Ensemble()
                 The ensemble upon which you want to compute the DynamicalResponce
+            mode : int
+                The mode of the speedup.
+                   0) Slow python implementation 
+                      Use this just for testing
+                   1) Fast C parallel (OpenMP)
+
         """
+
+        self.mode = mode
+
+        # Define the order
+        order = "C"
+        if self.mode == 1:
+            order = "F"
+        
 
         # Perform a bare initialization if the ensemble is not provided
         if ensemble is None:
@@ -133,10 +147,10 @@ class Lanczos:
         f = ensemble.forces.reshape(self.N, 3 * self.nat).copy()
         f -= ensemble.sscha_forces.reshape(self.N, 3 * self.nat)
 
-        self.X = np.zeros((self.N, self.n_modes), order = "C", dtype = TYPE_DP)
+        self.X = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
         self.X[:,:] = np.einsum("a,ia, ab->ib", np.sqrt(self.m), u, self.pols) * Ensemble.Bohr
 
-        self.Y = np.zeros((self.N, self.n_modes), order = "C", dtype = TYPE_DP)
+        self.Y = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
         self.Y[:,:] = np.einsum("a,ia, ab->ib", 1/np.sqrt(self.m), f, self.pols) / Ensemble.Bohr
 
         # Prepare the variable used for the working
@@ -161,6 +175,8 @@ class Lanczos:
         self.reverse_L = False
         self.shift_value = 0
         self.symmetrize = False
+
+
 
 
     def prepare_perturbation(self, vector):
@@ -337,8 +353,18 @@ class Lanczos:
         dyn = self.psi[self.n_modes:]
         new_dyn = -dyn * np.sqrt( (w_a + w_b)/(w_a*w_b)) / 2
 
-        out_v = SlowApplyD3ToDyn(self.X, self.Y, self.rho, self.w, self.T, new_dyn)
-        out_d = SlowApplyD3ToVector(self.X, self.Y, self.rho, self.w, self.T, vector)
+        # Here the time consuming part
+        if self.mode == 0:
+            # DEBUGGING PYTHON VERSION (SLOW)
+            out_v = SlowApplyD3ToDyn(self.X, self.Y, self.rho, self.w, self.T, new_dyn)
+            out_d = SlowApplyD3ToVector(self.X, self.Y, self.rho, self.w, self.T, vector)
+        elif self.mode >= 1:
+            out_v = FastApplyD3ToDyn(self.X, self.Y, self.rho, self.w, self.T, new_dyn, self.mode)
+            out_d = FastApplyD3ToVector(self.X, self.Y, self.rho, self.w, self.T, vector, self.mode)
+        else:
+            print("Error, mode %d not recognized." % self.mode)
+            raise ValueError("Mode not recognized %d" % self.mode)
+            
         out_d *= -np.sqrt( (w_a + w_b)/(w_a*w_b)) / 2
 
         out_vect = np.zeros(np.shape(self.psi), dtype = TYPE_DP)
@@ -1049,6 +1075,97 @@ def SlowApplyD3ToDyn(X, Y, rho, w, T, input_dyn):
     
     return v_out
 
+def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn, mode = 1):
+    """
+    Apply the D3 to dyn
+    ======================
+
+    This is a wrapper to the fast C function.
+
+    Remember to use the correct dtype value:
+    if mode == GPU:
+       dtype = np.float32
+    if mode == CPU:
+       dtype = np.float64
+
+    For details on the mode, look at the parameters list
+
+    Parameters
+    ----------
+       X : ndarray(size = (n_modes, n_configs), dtype = np.double / np.float32)
+           The X array (displacement in mode basis). Note that the dtype should match the mode
+       Y : ndarray(size = (n_modes, n_configs))
+           The Y array (forces in mode basis).
+       rho : ndarray(size = n_configs)
+           The weights of the configurations
+       w : ndarray(size = n_modes)
+           The list of frequencies
+       T : float
+           The temperature
+       input_dyn : ndarray (size = n_modes*n_modes)
+           The vector of the input dynamical matrix
+       mode : int
+           The mode for the execution:
+              1) CPU : OpenMP parallelization
+
+    Results
+    -------
+       output_vector : ndarray (size = n_modes)
+           The result of the calculation
+    """
+
+    n_modes = len(w)
+
+    output_vector = np.zeros(n_modes, dtype = TYPE_DP)
+    #print( "Apply to dyn, nmodes:", n_modes, "shape:", np.shape(output_vector))
+    sscha_HP_odd.ApplyV3ToDyn(X, Y, rho, w, T, input_dyn, output_vector, mode)
+    return output_vector
+
+def FastApplyD3ToVector(X, Y, rho, w, T, input_vector, mode = 1):
+    """
+    Apply the D3 to vector
+    ======================
+
+    This is a wrapper to the fast C function.
+
+    Remember to use the correct dtype value:
+    if mode == GPU:
+       dtype = np.float32
+    if mode == CPU:
+       dtype = np.float64
+
+    For details on the mode, look at the parameters list
+
+    Parameters
+    ----------
+       X : ndarray(size = (n_modes, n_configs), dtype = np.double / np.float32)
+           The X array (displacement in mode basis). Note that the dtype should match the mode
+       Y : ndarray(size = (n_modes, n_configs))
+           The Y array (forces in mode basis).
+       rho : ndarray(size = n_configs)
+           The weights of the configurations
+       w : ndarray(size = n_modes)
+           The list of frequencies
+       T : float
+           The temperature
+       input_vector : ndarray (size = n_modes)
+           The input dynamical matrix
+       mode : int
+           The mode for the execution:
+              1) CPU : OpenMP parallelization
+
+    Results
+    -------
+       output_dyn : ndarray (size = n_modes*n_modes)
+           The result of the calculation
+    """
+    n_modes = len(w)
+    output_dyn = np.zeros(n_modes*n_modes, dtype = TYPE_DP)
+    #print( "Apply to vector, nmodes:", n_modes, "shape:", np.shape(output_dyn))
+    sscha_HP_odd.ApplyV3ToVector(X, Y, rho, w, T, input_vector, output_dyn, mode)
+    return output_dyn
+
+    
 
 def SlowApplyD3ToVector(X, Y, rho, w, T, input_vector):
     """

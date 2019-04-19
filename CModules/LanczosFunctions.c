@@ -1,5 +1,6 @@
 #include "LanczosFunctions.h"
 
+#define DEB 0
 
 // The eigenvalues of the Covariance matrix
 double f_ups(double w, double T) {
@@ -22,6 +23,10 @@ void OMP_ApplyD3ToVector(const double * X, const double * Y, const double * rho,
     for (i = 0; i < N_configs; ++i)
         N_eff += rho[i];
 
+    if (DEB) {
+      printf("File %s, Line %d: N_eff = %.4f\n", __FILE__, __LINE__, N_eff);
+      fflush(stdout);
+    }
     
     // Prepare the new modified X
     double * new_X = malloc(sizeof(double) * N_configs* N_modes);
@@ -30,6 +35,12 @@ void OMP_ApplyD3ToVector(const double * X, const double * Y, const double * rho,
     for (i = 0; i < N_configs*N_modes; ++i) {
         new_X[i] = X[i] * f_ups(w[i / N_configs], T);
     }
+
+    if (DEB) {
+      printf("File %s, Line %d: Got the new X\n", __FILE__, __LINE__, N_eff);
+      fflush(stdout);
+    }
+    
 
     // Initialize the output
     for (i = 0; i < N_modes*N_modes; ++i)
@@ -50,8 +61,13 @@ void OMP_ApplyD3ToVector(const double * X, const double * Y, const double * rho,
                     tmp += tmp1 * rho[i];
                 }
 
+
                 output_dyn[a * N_modes + b] += -tmp * input_vector[c] / (3 * N_eff);
-            }
+		if (DEB && c == N_modes -1) {
+		  printf("a = %d, b = %d: output = %.8e\n", a, b, output_dyn[a * N_modes + b]);
+		}
+	    }
+	   
         }
     }
 
@@ -101,6 +117,11 @@ void OMP_ApplyD3ToDyn(const double * X, const double * Y, const double * rho, co
                 }
 
                 output_vector[a] += -tmp * input_dyn[N_modes * b + c] / (3 * N_eff);
+
+		if (DEB && b == N_modes - 1 && c == N_modes - 1) {
+		  printf("a = %d,  output = %.8e\n", a, output_vector[a]);
+		}
+	
             }
         }
     }

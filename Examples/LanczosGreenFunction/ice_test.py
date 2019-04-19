@@ -21,8 +21,8 @@ POPULATION = 2
 NRANDOM = 1000
 
 # Where to store the progress?
-#SAVE_DIR = "data_odd3_full_sym"
-SAVE_DIR = "data_odd4_full_sym"
+SAVE_DIR = "data_odd3_full_sym_cfast"
+#SAVE_DIR = "data_odd4_full_sym"
 #SAVE_DIR = "data"
 
 # The frequencies/smearing for the dynamical responce
@@ -57,7 +57,7 @@ LanczosResponce = sscha.DynamicalLanczos.Lanczos(ens)
 
 # Ignore for now v3 and v4
 LanczosResponce.ignore_v3 = False
-LanczosResponce.ignore_v4 = False
+LanczosResponce.ignore_v4 = True
 
 
 # Get first the lowest eigenvalues
