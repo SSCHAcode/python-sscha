@@ -541,6 +541,77 @@ class Lanczos:
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
 
 
+    def run_conjugate_gradient(self, eigval = 0, n_iters = 100, thr = 1e-5, verbose = True):
+        r"""
+        RUN THE CONJUGATE GRADIENT
+        ==========================
+
+        The conjugate gradient is a very fast algorithm 
+        that allows to compute the (in principle) exact green function. 
+
+        Given the initial vector in the psi direction, it will edit it to obtain:
+        
+        .. math ::
+
+            \left|x\right> = \left(\mathcal{L} - I\lambda\right)^{-1} \left| {\psi} \right> 
+
+        At the end of the algorithm, the self.psi variable will contain the :math:`\left|x\right>`
+        vector.
+
+        Parameters
+        ----------
+            eigval : float
+                The value of the :math:`\lambda` for the inversion problem.
+            n_iters : int
+                The number of iterations
+            thr : float
+                The threshold between two iteration after which the algorithm is considered 
+                to be converged.
+            verbose : bool
+                If true print the status of the iteration.
+                
+        """
+
+        x = self.psi.copy()
+        A_x = self.apply_full_L()
+
+        r = x - A_x
+        p = r.copy()
+
+        mod_r = np.sqrt(r.dot(r))
+
+        if verbose:
+            print("   CJ step %d : residual = %.4e | threshold = %.4e" % (0,mod_r, thr))
+
+        if mod_r < thr:
+            return x
+
+        for i in range(n_iters):
+            self.psi = p
+            A_p = self.apply_full_L()
+            alpha = r.dat(r) / p.dot(A_p)
+            x += alpha * p 
+
+            # Update
+            r_new = r - alpha * A_p 
+            beta = r_new.dot(r_new) / r.dot(r)
+
+            r = r_new
+            p = r + beta * p 
+
+
+            # Check the new iteration
+            mod_r = np.sqrt(r.dot(r))
+            if verbose:
+                print("   CJ step %d : residual = %.4e | threshold = %.4e" % (i+1,mod_r, thr))
+
+            if mod_r < thr:
+                return x
+
+        print("WARNING: CJ ended before the convergence was achieved.") 
+        return x
+
+
     def run(self, n_iter, save_dir = ".", verbose = True):
         """
         RUN LANCZOS ITERATIONS
@@ -918,6 +989,7 @@ Starting from step %d
             gf = 1. / (a - w_array**2  + 2j*w_array*smearing - b**2 * gf)
 
         return gf
+
 
     def run_full_diag(self, number, discard_dyn = True, n_iter = 100):
         r"""

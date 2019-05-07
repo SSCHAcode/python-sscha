@@ -651,7 +651,7 @@ class Ensemble:
                 
         
         
-    def update_weights(self, new_dynamical_matrix, newT):
+    def update_weights(self, new_dynamical_matrix, newT, update_q = False):
         """
         IMPORTANCE SAMPLING
         ===================
@@ -667,6 +667,10 @@ class Ensemble:
                 The new dynamical matrix on which you want to compute the averages.
             new_T : float
                 The new temperature.
+            update_q : bool
+                If false the q_vectors are not updated. This is required for some
+                methods and application, but not for standard minimization.
+                Since it is the most time consuming part, it can be safely avoided. 
         """
         
         self.current_T = newT
@@ -698,14 +702,16 @@ class Ensemble:
         Nat_sc = super_structure.N_atoms
         
         # Get the new displacements in the supercell
+        t3 = time.time()
         for i in xrange(self.N):
             self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
             
             # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
             self.sscha_energies[i], self.sscha_forces[i, :,:] = new_super_dyn.get_energy_forces(self.structures[i], real_space_fc = new_super_dyn.dynmats[0], displacement = self.u_disps[i, :])
-            
-        
-        self.current_q = CC.Manipulate.GetQ_vectors(self.structures, new_super_dyn, self.u_disps) 
+        t4 = time.time()
+
+        if update_q:
+            self.current_q = CC.Manipulate.GetQ_vectors(self.structures, new_super_dyn, self.u_disps) 
         
         # Convert the q vectors in the Hartree units
         #old_q = self.q_start * np.sqrt(np.float64(2)) * __A_TO_BOHR__
@@ -730,6 +736,8 @@ class Ensemble:
         
         t2 = time.time()
         print( "Time elapsed to prepare the rho update:", t2 - t1, "s")
+        print ( "(of which to update sscha energies and forces: %.4f s)" % (t4-t3))
+        print ( "(of which computing the Upsilon matrix: %.4f s)" % (t2 - t4))
         
         rho_tmp = np.ones( self.N, dtype = np.float64) * np.prod( old_a / new_a)
         for i in xrange(self.N):
@@ -1361,219 +1369,219 @@ class Ensemble:
         return stress
         
     
-    def get_free_energy_gradient_respect_to_dyn(self):
-        """
-        FREE ENERGY GRADIENT
-        ====================
+#     def get_free_energy_gradient_respect_to_dyn(self):
+#         """
+#         FREE ENERGY GRADIENT
+#         ====================
         
-        Get the free energy gradient respect to the dynamical matrix.
-        The result is in [Ry/bohr^3] as the dynamical matrix are stored
-        in [Ry/bohr^2].
+#         Get the free energy gradient respect to the dynamical matrix.
+#         The result is in [Ry/bohr^3] as the dynamical matrix are stored
+#         in [Ry/bohr^2].
         
-        NOTE: Not working
+#         NOTE: Not working
         
-        .. math::
+#         .. math::
             
-            \\nabla_\\Phi \\mathcal F = -\\sum_{a\\mu} \\left<\\gamma_\\mu^a q_\\mu\\right>
+#             \\nabla_\\Phi \\mathcal F = -\\sum_{a\\mu} \\left<\\gamma_\\mu^a q_\\mu\\right>
             
-            \\gamma_\\mu^a = \\frac{e_\\mu^a \\nabla_\\Phi \\ln a_\\mu + \\nabla_\\Phi e_\mu^a}{\\sqrt M_a}(f_a - f^{\\Phi}_a)
+#             \\gamma_\\mu^a = \\frac{e_\\mu^a \\nabla_\\Phi \\ln a_\\mu + \\nabla_\\Phi e_\mu^a}{\\sqrt M_a}(f_a - f^{\\Phi}_a)
             
-            q_\\mu = \\sum_b \\sqrt M_b e_\\mu^b (R_b - \\mathcal R_b)
+#             q_\\mu = \\sum_b \\sqrt M_b e_\\mu^b (R_b - \\mathcal R_b)
             
-            \\nabla_\\Phi \\ln a_\\mu = \\frac{1}{2\\omega_\\mu a_\\mu} \\frac{\\partial a_\\mu}{\\partial\\omega_\\mu} \\frac{e_\\mu^a e_\\mu^b}{\\sqrt {M_aM_b}}
+#             \\nabla_\\Phi \\ln a_\\mu = \\frac{1}{2\\omega_\\mu a_\\mu} \\frac{\\partial a_\\mu}{\\partial\\omega_\\mu} \\frac{e_\\mu^a e_\\mu^b}{\\sqrt {M_aM_b}}
             
-            \\nabla_\\Phi e_\mu^c  =\\sum_{\\nu \\neq \\mu} \\frac{e_\\nu^a e_\\mu^b}{\\sqrt {M_aM_b} (\\omega_\\mu^2 - \\omega_\\nu^2)} e_\\nu^c
+#             \\nabla_\\Phi e_\mu^c  =\\sum_{\\nu \\neq \\mu} \\frac{e_\\nu^a e_\\mu^b}{\\sqrt {M_aM_b} (\\omega_\\mu^2 - \\omega_\\nu^2)} e_\\nu^c
     
     
-        NOTE: it works only at gamma.
+#         NOTE: it works only at gamma.
     
     
-        Return
-        ------
-            A 3Nx3N matrix. The gradient of the free energy (To be symmetrized)
+#         Return
+#         ------
+#             A 3Nx3N matrix. The gradient of the free energy (To be symmetrized)
             
-        """
-        #K_to_Ry=6.336857346553283e-06
+#         """
+#         #K_to_Ry=6.336857346553283e-06
         
-        #T = self.current_T
-        # TODO: TO BE TESTED
-        
-        
-#        # Get the mass vector
-#        _m_ = np.zeros(self.dyn_0.structure.N_atoms * 3)
-#        for i in range(self.current_dyn.structure.N_atoms):
-#            _m_[ 3*i : 3*i + 3] = self.current_dyn.structure.masses[ self.current_dyn.structure.atoms[i]]
-#        
-#        _m_sqrtinv = 1 / np.sqrt(_m_)
-        
-        # Get the frequency and polarization vector of the dynamical matrix
-        w, pols = self.current_dyn.DyagDinQ(0)
+#         #T = self.current_T
+#         # TODO: TO BE TESTED
         
         
-        # Discard translations and convert in Ha units
-        not_trans = ~CC.Methods.get_translations(pols, self.current_dyn.structure.get_masses_array())
-        w = np.array(w[not_trans] / 2, dtype = np.float64)
-        pols = np.real(pols[:, not_trans])
+# #        # Get the mass vector
+# #        _m_ = np.zeros(self.dyn_0.structure.N_atoms * 3)
+# #        for i in range(self.current_dyn.structure.N_atoms):
+# #            _m_[ 3*i : 3*i + 3] = self.current_dyn.structure.masses[ self.current_dyn.structure.atoms[i]]
+# #        
+# #        _m_sqrtinv = 1 / np.sqrt(_m_)
         
-        #n_modes = len(w)
-        
-        # Convert the q vector into Ha units
-        q_new = np.array(self.current_q, dtype = np.float64) * np.sqrt(2) * __A_TO_BOHR__
-        
-        # Get the ityp variable 
-        #ityp = self.current_dyn.structure.get_atomic_types()
-        
-        # Get the mass and convert in Ha units
-        mass = np.array(self.current_dyn.structure.get_masses_array() * 2,
-                        dtype = np.float64)
-        
-        nat = len(mass)
-        
-        # Prepare the symmetrization
-        qe_sym = CC.symmetries.QE_Symmetry(self.current_dyn.structure)
-        qe_sym.SetupQPoint(self.current_dyn.q_tot[0])
+#         # Get the frequency and polarization vector of the dynamical matrix
+#         w, pols = self.current_dyn.DyagDinQ(0)
         
         
-#        # Get the a_mu and its derivatives
-#        a_mu = np.zeros(n_modes, dtype = np.float64)
-#        da_dw = np.zeros(n_modes, dtype = np.float64)
+#         # Discard translations and convert in Ha units
+#         not_trans = ~CC.Methods.get_translations(pols, self.current_dyn.structure.get_masses_array())
+#         w = np.array(w[not_trans] / 2, dtype = np.float64)
+#         pols = np.real(pols[:, not_trans])
         
-        # Use the fortran subroutines
-#        if T == 0:
-#            a_mu = 1 / np.sqrt(2* w) 
-#            da_dw = -1 /  np.sqrt(8 * w**3)
-#        else:            
-#            beta = 1 / (K_to_Ry*T)
-#            a_mu = 1 / np.sqrt( np.tanh(beta*w / 2) *2* w) 
-#            da_dw = - (w*beta + np.sinh(w*beta)) / (2 * np.sqrt(2) * w**2 * (np.cosh(beta*w) - 1) * np.sqrt(np.cosh(beta*w / 2) / (np.sinh(beta*w/2) * w)))
-#            
-#    
+#         #n_modes = len(w)
+        
+#         # Convert the q vector into Ha units
+#         q_new = np.array(self.current_q, dtype = np.float64) * np.sqrt(2) * __A_TO_BOHR__
+        
+#         # Get the ityp variable 
+#         #ityp = self.current_dyn.structure.get_atomic_types()
+        
+#         # Get the mass and convert in Ha units
+#         mass = np.array(self.current_dyn.structure.get_masses_array() * 2,
+#                         dtype = np.float64)
+        
+#         nat = len(mass)
+        
+#         # Prepare the symmetrization
+#         qe_sym = CC.symmetries.QE_Symmetry(self.current_dyn.structure)
+#         qe_sym.SetupQPoint(self.current_dyn.q_tot[0])
+        
+        
+# #        # Get the a_mu and its derivatives
+# #        a_mu = np.zeros(n_modes, dtype = np.float64)
+# #        da_dw = np.zeros(n_modes, dtype = np.float64)
+        
+#         # Use the fortran subroutines
+# #        if T == 0:
+# #            a_mu = 1 / np.sqrt(2* w) 
+# #            da_dw = -1 /  np.sqrt(8 * w**3)
+# #        else:            
+# #            beta = 1 / (K_to_Ry*T)
+# #            a_mu = 1 / np.sqrt( np.tanh(beta*w / 2) *2* w) 
+# #            da_dw = - (w*beta + np.sinh(w*beta)) / (2 * np.sqrt(2) * w**2 * (np.cosh(beta*w) - 1) * np.sqrt(np.cosh(beta*w / 2) / (np.sinh(beta*w/2) * w)))
+# #            
+# #    
 
-        # Print the sscha forces converted
-        print ("SCHA forces:")
-        for i in xrange(self.N):
-            for j in xrange(self.current_dyn.structure.N_atoms):
-                print ("Conf\t%d\tAtom\t%d\t" % (i, j), self.sscha_forces[i, j, :]/ (__A_TO_BOHR__))
+#         # Print the sscha forces converted
+#         print ("SCHA forces:")
+#         for i in xrange(self.N):
+#             for j in xrange(self.current_dyn.structure.N_atoms):
+#                 print ("Conf\t%d\tAtom\t%d\t" % (i, j), self.sscha_forces[i, j, :]/ (__A_TO_BOHR__))
                 
                 
-        # Convert the forces in Ha / bohr units and in the same type as fortran
-        e_forces = np.array( self.forces - self.sscha_forces, dtype = np.float64, order = "F") / (2 * __A_TO_BOHR__)
+#         # Convert the forces in Ha / bohr units and in the same type as fortran
+#         e_forces = np.array( self.forces - self.sscha_forces, dtype = np.float64, order = "F") / (2 * __A_TO_BOHR__)
         
-        # Get df_da
-        df_da = SCHAModules.anharmonic.get_df_da_nonav(w, w, self.current_T, pols,
-                                                       e_forces,
-                                                       q_new, mass, "stat_schappp")
-        #print np.shape(e_forces)
-        # Now get the rest of the derivative
+#         # Get df_da
+#         df_da = SCHAModules.anharmonic.get_df_da_nonav(w, w, self.current_T, pols,
+#                                                        e_forces,
+#                                                        q_new, mass, "stat_schappp")
+#         #print np.shape(e_forces)
+#         # Now get the rest of the derivative
         
-        df_dfc = np.zeros( np.shape(self.current_dyn.dynmats[0]), dtype = np.float64)
-        err_df_dfc = np.zeros( np.shape(self.current_dyn.dynmats[0]), dtype = np.float64)
+#         df_dfc = np.zeros( np.shape(self.current_dyn.dynmats[0]), dtype = np.float64)
+#         err_df_dfc = np.zeros( np.shape(self.current_dyn.dynmats[0]), dtype = np.float64)
         
-        # Just to do something good
-        da_dcr_mat = np.zeros( (nat * 3, nat * 3, len(w)), dtype = np.float64)
+#         # Just to do something good
+#         da_dcr_mat = np.zeros( (nat * 3, nat * 3, len(w)), dtype = np.float64)
         
-        for x_i in xrange(self.current_dyn.structure.N_atoms * 3):
-            for y_i in xrange(x_i, self.current_dyn.structure.N_atoms * 3):
-                da_dcr, de_dcr = SCHAModules.anharmonic.get_da_dcr_and_de_dcr(w, pols, self.current_T,
-                                                                              mass, x_i+1, y_i+1)
+#         for x_i in xrange(self.current_dyn.structure.N_atoms * 3):
+#             for y_i in xrange(x_i, self.current_dyn.structure.N_atoms * 3):
+#                 da_dcr, de_dcr = SCHAModules.anharmonic.get_da_dcr_and_de_dcr(w, pols, self.current_T,
+#                                                                               mass, x_i+1, y_i+1)
                 
-                print ("(%d, %d): DA_DCR = " % (x_i+1, y_i+1), da_dcr)
-                da_dcr_mat[x_i, y_i, :] = da_dcr
-                da_dcr_mat[y_i, x_i, :] = da_dcr
+#                 print ("(%d, %d): DA_DCR = " % (x_i+1, y_i+1), da_dcr)
+#                 da_dcr_mat[x_i, y_i, :] = da_dcr
+#                 da_dcr_mat[y_i, x_i, :] = da_dcr
                 
 
-                df_dc, delta_df_dc = SCHAModules.anharmonic.get_df_dcoeff_av_new(df_da, da_dcr, e_forces,
-                                                                                 q_new, mass, de_dcr, 
-                                                                                 self.rho, 1, "err_yesrho")
-                # Fill the matrix
-                df_dfc[x_i, y_i] = df_dc
-                df_dfc[y_i, x_i] = df_dc
+#                 df_dc, delta_df_dc = SCHAModules.anharmonic.get_df_dcoeff_av_new(df_da, da_dcr, e_forces,
+#                                                                                  q_new, mass, de_dcr, 
+#                                                                                  self.rho, 1, "err_yesrho")
+#                 # Fill the matrix
+#                 df_dfc[x_i, y_i] = df_dc
+#                 df_dfc[y_i, x_i] = df_dc
                 
-                err_df_dfc[x_i, y_i] = delta_df_dc
-                err_df_dfc[y_i, x_i] = delta_df_dc
+#                 err_df_dfc[x_i, y_i] = delta_df_dc
+#                 err_df_dfc[y_i, x_i] = delta_df_dc
         
-        # Get the generator
-        ghr = np.zeros( (3*nat, 3*nat), dtype = np.float64, order = "F")
-        ghr[0,0] = 1
-        # Apply the sum rule
-        qe_sym.ImposeSumRule(ghr)
-        # Apply symmetries
-        qe_sym.SymmetrizeDynQ(ghr, self.current_dyn.q_tot[0])
-        ghr /= np.sqrt(np.trace(ghr.dot(ghr)))
-        print ("Generator:")
-        print (ghr)
+#         # Get the generator
+#         ghr = np.zeros( (3*nat, 3*nat), dtype = np.float64, order = "F")
+#         ghr[0,0] = 1
+#         # Apply the sum rule
+#         qe_sym.ImposeSumRule(ghr)
+#         # Apply symmetries
+#         qe_sym.SymmetrizeDynQ(ghr, self.current_dyn.q_tot[0])
+#         ghr /= np.sqrt(np.trace(ghr.dot(ghr)))
+#         print ("Generator:")
+#         print (ghr)
 
-        print ("dA/dGhr = ", np.einsum("ijk, ij", da_dcr_mat, ghr) )       
+#         print ("dA/dGhr = ", np.einsum("ijk, ij", da_dcr_mat, ghr) )       
         
-        # Force the symmetrization
-        qe_sym.ImposeSumRule(df_dfc)
-        qe_sym.ImposeSumRule(err_df_dfc)
-        qe_sym.SymmetrizeDynQ(df_dfc, self.current_dyn.q_tot[0])
-        qe_sym.SymmetrizeDynQ(err_df_dfc, self.current_dyn.q_tot[0])
+#         # Force the symmetrization
+#         qe_sym.ImposeSumRule(df_dfc)
+#         qe_sym.ImposeSumRule(err_df_dfc)
+#         qe_sym.SymmetrizeDynQ(df_dfc, self.current_dyn.q_tot[0])
+#         qe_sym.SymmetrizeDynQ(err_df_dfc, self.current_dyn.q_tot[0])
         
-        # Convert from [Ha/bohr] in [Ry/bohr]
-        df_dfc *= 2
-        err_df_dfc *=  2
+#         # Convert from [Ha/bohr] in [Ry/bohr]
+#         df_dfc *= 2
+#         err_df_dfc *=  2
         
 
-#        # Prepare the w as a matrix
-#        _w_ = np.tile(w, (n_modes, 1))
-#        # 1 / (w_mu^2 - w_nu^2)
-#        one_over_omegamunu = 1 / (_w_**2 - _w_.transpose()**2)
-#        #one_over_omegamunu *= 1 - np.eye(n_modes) # Remove the therms for mu equal to nu
-#        one_over_omegamunu[ (_w_ - _w_.transpose()) < __EPSILON__] = 0
-#        
-#        #print "freqs:", w
-#        #print "w", _w_
-#        #print "one_over_omega:", one_over_omegamunu
-#                                        
-#        # Get the derivative of the lna_mu respect to the dynamical matrix
-#        # Inner product
-#        d_lna_d_dyn = np.einsum("i, ai, bi, ci, a, b, c->abic", da_dw/(2 * w * a_mu), pols, pols, pols, _m_sqrtinv, _m_sqrtinv, _m_sqrtinv)
-#        
-#        # Get the derivative respect to the polarization vector
-#        d_pol_d_dyn = np.einsum("ai,bj,ci,ji,a,b,c->abjc", pols, pols, pols, one_over_omegamunu, _m_sqrtinv, _m_sqrtinv, _m_sqrtinv)
-#        
-#        #print "d_lna:", d_lna_d_dyn
-#        #print "d_pol:", d_pol_d_dyn
-#        
-#        pre_sum = d_lna_d_dyn + d_pol_d_dyn
-#        
-#        # Get the q vector
-#        d_F_d_dyn = np.zeros(np.shape(self.current_dyn.dynmats[0]))
-#        for i in range(self.N):
-#            # Get the displacements of the structure
-#            u_disp = self.structures[i].get_displacement(self.current_dyn.structure).reshape(3 * self.current_dyn.structure.N_atoms)
-#            
-#            # Get the forces on the configuration
-#            delta_f = (self.forces[i,:,:] - self.sscha_forces[i,:,:]).reshape(3 * self.current_dyn.structure.N_atoms)
-#            
-#            # Get the q vector
-#            q = np.einsum("i, ij, i", np.sqrt(_m_), pols, u_disp)
-#            
-#            # Get gamma matrix
-#            gamma = np.einsum("abcd, d", pre_sum, delta_f)
-#            
-#            #print "%d) delta_f = " % (i+1), delta_f
-#            #print "%d) q = " % (i+1), q
-#            #print "%d) gamma = " % (i+1), gamma
-#            
-#            # Contract the gamma matrix and multiply it for the weight
-#            partial_gradient = - np.einsum("abc, c", gamma, q)
-#            d_F_d_dyn += partial_gradient * self.rho[i]
-#            
-#            #print "conf %d | weight %.4e | partial gradient:" % (i, self.rho[i]), partial_gradient
-#            
-#            
-#        # Normalization
-#        d_F_d_dyn /= np.sum(self.rho)
-        #print "Grad:"
-        #for i in range(np.shape(d_F_d_dyn)[0]):
-        #    print " ".join(["%7.2e" % x for x in list(d_F_d_dyn[i,:])])
+# #        # Prepare the w as a matrix
+# #        _w_ = np.tile(w, (n_modes, 1))
+# #        # 1 / (w_mu^2 - w_nu^2)
+# #        one_over_omegamunu = 1 / (_w_**2 - _w_.transpose()**2)
+# #        #one_over_omegamunu *= 1 - np.eye(n_modes) # Remove the therms for mu equal to nu
+# #        one_over_omegamunu[ (_w_ - _w_.transpose()) < __EPSILON__] = 0
+# #        
+# #        #print "freqs:", w
+# #        #print "w", _w_
+# #        #print "one_over_omega:", one_over_omegamunu
+# #                                        
+# #        # Get the derivative of the lna_mu respect to the dynamical matrix
+# #        # Inner product
+# #        d_lna_d_dyn = np.einsum("i, ai, bi, ci, a, b, c->abic", da_dw/(2 * w * a_mu), pols, pols, pols, _m_sqrtinv, _m_sqrtinv, _m_sqrtinv)
+# #        
+# #        # Get the derivative respect to the polarization vector
+# #        d_pol_d_dyn = np.einsum("ai,bj,ci,ji,a,b,c->abjc", pols, pols, pols, one_over_omegamunu, _m_sqrtinv, _m_sqrtinv, _m_sqrtinv)
+# #        
+# #        #print "d_lna:", d_lna_d_dyn
+# #        #print "d_pol:", d_pol_d_dyn
+# #        
+# #        pre_sum = d_lna_d_dyn + d_pol_d_dyn
+# #        
+# #        # Get the q vector
+# #        d_F_d_dyn = np.zeros(np.shape(self.current_dyn.dynmats[0]))
+# #        for i in range(self.N):
+# #            # Get the displacements of the structure
+# #            u_disp = self.structures[i].get_displacement(self.current_dyn.structure).reshape(3 * self.current_dyn.structure.N_atoms)
+# #            
+# #            # Get the forces on the configuration
+# #            delta_f = (self.forces[i,:,:] - self.sscha_forces[i,:,:]).reshape(3 * self.current_dyn.structure.N_atoms)
+# #            
+# #            # Get the q vector
+# #            q = np.einsum("i, ij, i", np.sqrt(_m_), pols, u_disp)
+# #            
+# #            # Get gamma matrix
+# #            gamma = np.einsum("abcd, d", pre_sum, delta_f)
+# #            
+# #            #print "%d) delta_f = " % (i+1), delta_f
+# #            #print "%d) q = " % (i+1), q
+# #            #print "%d) gamma = " % (i+1), gamma
+# #            
+# #            # Contract the gamma matrix and multiply it for the weight
+# #            partial_gradient = - np.einsum("abc, c", gamma, q)
+# #            d_F_d_dyn += partial_gradient * self.rho[i]
+# #            
+# #            #print "conf %d | weight %.4e | partial gradient:" % (i, self.rho[i]), partial_gradient
+# #            
+# #            
+# #        # Normalization
+# #        d_F_d_dyn /= np.sum(self.rho)
+#         #print "Grad:"
+#         #for i in range(np.shape(d_F_d_dyn)[0]):
+#         #    print " ".join(["%7.2e" % x for x in list(d_F_d_dyn[i,:])])
         
-        #TODO: apply symmetries
+#         #TODO: apply symmetries
             
-        return df_dfc, err_df_dfc
+#         return df_dfc, err_df_dfc
     
     def get_v3_realspace(self):
         """
