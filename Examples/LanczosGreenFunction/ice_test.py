@@ -21,9 +21,9 @@ POPULATION = 2
 NRANDOM = 1000
 
 # Where to store the progress?
-SAVE_DIR = "data_odd4_full_sym_cfast2"
+#SAVE_DIR = "data_odd4_full_sym_cfast2"
 #SAVE_DIR = "data_odd4_full_sym"
-#SAVE_DIR = "data"
+SAVE_DIR = "data"
 
 # The frequencies/smearing for the dynamical responce
 W_START = 0 #-5000/ CC.Phonons.RY_TO_CM
@@ -34,7 +34,7 @@ SMEARING = 5 / CC.Phonons.RY_TO_CM
 
 # The number of eigenvalues to return
 N_VALS = 16
-N_ITERS = 50
+N_ITERS = 30
 
 # If the data dir does not exist, create it
 if not os.path.exists(SAVE_DIR):
@@ -57,7 +57,7 @@ LanczosResponce = sscha.DynamicalLanczos.Lanczos(ens)
 
 # Ignore for now v3 and v4
 LanczosResponce.ignore_v3 = False
-LanczosResponce.ignore_v4 = False
+LanczosResponce.ignore_v4 = True
 
 
 # Get first the lowest eigenvalues
@@ -105,7 +105,8 @@ else:
 # Now get the spectral function
 w_array = np.linspace(W_START, W_END, NW)
 spectral_function =LanczosResponce.get_spectral_function_from_Lenmann(w_array, SMEARING, True)
-static_odd = LanczosResponce.get_static_odd_fc(True)
+#static_odd = LanczosResponce.get_static_odd_fc(True)
+static_odd = LanczosResponce.get_statical_responce_from_scratch(n_iters = 100, thr = 1e-4)
 
 
 new_dyn = dyn.Copy()

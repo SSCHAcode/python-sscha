@@ -75,35 +75,34 @@ class Lanczos:
         order = "C"
         if self.mode == 1:
             order = "F"
-        
+    
+        self.T = 0
+        self.nat = 0
+        self.m = []
+        self.w = []
+        self.pols = []
+        self.n_modes = 0
+        self.ignore_v3 = False
+        self.ignore_v4 = False
+        self.N = 0
+        self.rho = []
+        self.N_eff = 0
+        self.X = []
+        self.Y = []
+        self.psi = []
+        self.eigvals = None
+        self.eigvects = None
+        # In the custom lanczos mode
+        self.a_coeffs = [] #Coefficients on the diagonal
+        self.b_coeffs = [] # Coefficients close to the diagonal
+        self.krilov_basis = [] # The basis of the krilov subspace
+        self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
+        self.reverse_L = False
+        self.shift_value = 0
+        self.symmetrize = False
 
         # Perform a bare initialization if the ensemble is not provided
         if ensemble is None:
-            self.T = 0
-            self.nat = 0
-            self.m = []
-            self.w = []
-            self.pols = []
-            self.n_modes = 0
-            self.ignore_v3 = False
-            self.ignore_v4 = False
-            self.N = 0
-            self.rho = []
-            self.N_eff = 0
-            self.X = []
-            self.Y = []
-            self.psi = []
-            self.eigvals = None
-            self.eigvects = None
-            # In the custom lanczos mode
-            self.a_coeffs = [] #Coefficients on the diagonal
-            self.b_coeffs = [] # Coefficients close to the diagonal
-            self.krilov_basis = [] # The basis of the krilov subspace
-            self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
-            self.reverse_L = False
-            self.shift_value = 0
-            self.symmetrize = False
-
             return
 
 
@@ -431,8 +430,8 @@ class Lanczos:
         if self.symmetrize:
             self.symmetrize_psi()
 
-        print("Psi before:")
-        print(self.psi[:self.n_modes])
+        #print("Psi before:")
+        #print(self.psi[:self.n_modes])
             
             
         # Apply the whole L step by step to self.psi
@@ -445,13 +444,13 @@ class Lanczos:
             output += self.apply_L3()
 
         # Apply the shift reverse
-        print ("Output before:")
-        print (output[:self.n_modes])
+        #print ("Output before:")
+        #print (output[:self.n_modes])
         if self.reverse_L:
             output *= -1
         output += self.shift_value * self.psi
-        print ("Output after:")
-        print (output[:self.n_modes])
+        #print ("Output after:")
+        #print (output[:self.n_modes])
 
         # Now return the output
         #print ("out just before return:", output[0])
@@ -541,7 +540,7 @@ class Lanczos:
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
 
 
-    def run_conjugate_gradient(self, eigval = 0, n_iters = 100, thr = 1e-5, verbose = True):
+    def run_conjugate_gradient(self, eigval = 0, n_iters = 100, thr = 1e-5, verbose = True, guess_x = None):
         r"""
         RUN THE CONJUGATE GRADIENT
         ==========================
@@ -572,7 +571,10 @@ class Lanczos:
                 
         """
 
-        x = self.psi.copy()
+        if guess_x is None:
+            x = self.psi.copy()
+        else:
+            x = guess_x.copy()
         A_x = self.apply_full_L()
 
         r = x - A_x
@@ -589,7 +591,7 @@ class Lanczos:
         for i in range(n_iters):
             self.psi = p
             A_p = self.apply_full_L()
-            alpha = r.dat(r) / p.dot(A_p)
+            alpha = r.dot(r) / p.dot(A_p)
             x += alpha * p 
 
             # Update
@@ -610,6 +612,97 @@ class Lanczos:
 
         print("WARNING: CJ ended before the convergence was achieved.") 
         return x
+
+    def get_statical_responce_from_scratch(self, n_iters = 100, thr = 1e-5, verbose = True, sub_block = None, sub_space = None):
+        """
+        GET STATIC RESPONCE
+        ===================
+
+        This algorithm performs the CJ minimization to obtain the static self-energy.
+
+        Parameters
+        ----------
+            n_iters : int
+                The number of maximum iteration for a single CJ step.
+            thr : float
+                The threshold for the convergence of the CJ algorithm.
+            verbose : bool
+                If true (default) prints the info during the minimization
+            sub_block : list
+                A list of indices that identifies the modes id that that you want to select.
+                The algorithm is performed only in the reduced space of (N_modes x N_modes)
+                given by the length of this list. 
+                In this way you will neglect mode interaction, but you can save a lot of time.
+                Leave as None if you want the whole space.
+            sub_space : ndarray(size = (N_dim, 3*n_at))
+                Compute the self-energy only in the subspace given. Leave it as none
+                if you do not want to use this option
+
+        Results
+        -------
+            fc_matrix : ndarray (size=(3*nat, 3*nat))
+                The static self-energy.
+        """
+
+        n_dim_space = self.n_modes
+
+
+        PLinvP = np.zeros((n_dim_space, n_dim_space), dtype = TYPE_DP, order = "C")
+
+        if (not sub_block is None) and (not sub_space is None):
+            raise ValueError("Error, you cannot specify both sub_block and sub_space.")
+
+        if not sub_block is None:
+            n_dim_space = len(sub_block)
+        elif not sub_space is None:
+            n_dim_space = len(sub_space)
+            
+        # initialize the algorithm
+        for i in range(n_dim_space):
+            # Setup the vector
+            self.psi = np.zeros((self.n_modes + 1)*self.n_modes, dtype = TYPE_DP)
+            guess = self.psi.copy()
+
+            # Create the subbasis
+            if not sub_block is None:
+                self.psi[sub_block[i]] = 1
+                guess[sub_block[i]] = self.w[sub_block[i]] ** 2
+            elif not sub_space is None:
+                self.psi[:self.n_modes] = sub_block[i].dot(self.pols)
+                guess = None
+            else:
+                self.psi[i] = 1
+                guess[i] = self.w[i] ** 2
+
+            if verbose:
+                print("")
+                print("==== NEW STATIC COMPUTATION ====")
+                print("Iteration: %d out of %d" % (i+1, n_dim_space))
+
+
+            new_v = self.run_conjugate_gradient(n_iters = n_iters, thr = thr, verbose = verbose, guess_x = guess)
+            
+            if not sub_space is None:
+                v_out = self.pols.dot(new_v[:self.n_modes])
+                PLinvP[i, :] = np.array(sub_space).dot(v_out)
+            else:
+                PLinvP[i, :] = new_v[:self.n_modes]
+
+        
+
+        # Invert the P L^-1 P 
+        D = np.linalg.inv(PLinvP)
+        # Transform to a force constant matrix in cartesian coordinates
+
+        if not sub_space is None:
+            fc_matrix = np.einsum("ab, ai, bj->ij", D, np.array(sub_space), np.array(sub_space))
+        else:
+            fc_matrix = np.einsum("ab, ia, jb->ij", D, self.pols, self.pols)
+        fc_matrix *= np.sqrt(np.outer(self.m, self.m))
+
+        return fc_matrix
+
+
 
 
     def run(self, n_iter, save_dir = ".", verbose = True):
