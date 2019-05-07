@@ -583,7 +583,7 @@ class Lanczos:
         mod_r = np.sqrt(r.dot(r))
 
         if verbose:
-            print("   CJ step %d : residual = %.4e | threshold = %.4e" % (0,mod_r, thr))
+            print("   CG step %d : residual = %.4e | threshold = %.4e" % (0,mod_r, thr))
 
         if mod_r < thr:
             return x
@@ -605,12 +605,12 @@ class Lanczos:
             # Check the new iteration
             mod_r = np.sqrt(r.dot(r))
             if verbose:
-                print("   CJ step %d : residual = %.4e | threshold = %.4e" % (i+1,mod_r, thr))
+                print("   CG step %d : residual = %.4e | threshold = %.4e" % (i+1,mod_r, thr))
 
             if mod_r < thr:
                 return x
 
-        print("WARNING: CJ ended before the convergence was achieved.") 
+        print("WARNING: CG ended before the convergence was achieved.") 
         return x
 
     def get_statical_responce_from_scratch(self, n_iters = 100, thr = 1e-5, verbose = True, sub_block = None, sub_space = None):
@@ -618,14 +618,14 @@ class Lanczos:
         GET STATIC RESPONCE
         ===================
 
-        This algorithm performs the CJ minimization to obtain the static self-energy.
+        This algorithm performs the CG minimization to obtain the static self-energy.
 
         Parameters
         ----------
             n_iters : int
-                The number of maximum iteration for a single CJ step.
+                The number of maximum iteration for a single CG step.
             thr : float
-                The threshold for the convergence of the CJ algorithm.
+                The threshold for the convergence of the CG algorithm.
             verbose : bool
                 If true (default) prints the info during the minimization
             sub_block : list
