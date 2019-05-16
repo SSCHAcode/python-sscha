@@ -344,6 +344,9 @@ class Lanczos:
         It involves the phi3 matrix.
         """
 
+        if self.ignore_v3:
+            return np.zeros(np.shape(self.psi), dtype = TYPE_DP)
+
 
         w_a = np.tile(self.w, (self.n_modes, 1)).ravel()
         w_b = np.tile(self.w, (self.n_modes, 1)).T.ravel()
@@ -384,7 +387,17 @@ class Lanczos:
         w_a = np.tile(self.w, (self.n_modes, 1)).ravel()
         w_b = np.tile(self.w, (self.n_modes, 1)).T.ravel()
 
+        simple_output = np.zeros(np.shape(self.psi), dtype = TYPE_DP)
+
+        simple_output[self.n_modes:] = self.psi[self.n_modes:] * (w_a + w_b)**2
+
+        if self.ignore_v4:
+            return simple_output
+
+        # Apply the D4
+        
         dyn = self.psi[self.n_modes:] * np.sqrt((w_a + w_b) / (w_a * w_b)) / 2
+        
 
 
         # Here the time consuming part [The most of all]!!!
@@ -400,6 +413,8 @@ class Lanczos:
 
         output = np.zeros(np.shape(self.psi), dtype = TYPE_DP)
         output[self.n_modes:] = out_dyn
+
+        output += simple_output
 
         return output
 
@@ -436,12 +451,8 @@ class Lanczos:
             
         # Apply the whole L step by step to self.psi
         output = self.apply_L1()
-        #print ("out just after l1 return:", output[0])
-
-        if not self.ignore_v3:
-            output += self.apply_L2()
-        if not self.ignore_v4:
-            output += self.apply_L3()
+        output += self.apply_L2()
+        output += self.apply_L3()
 
         # Apply the shift reverse
         #print ("Output before:")

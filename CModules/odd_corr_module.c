@@ -434,27 +434,20 @@ static PyObject * GetV3(PyObject * self, PyObject * args) {
   // Check the parallelization and assign the size and the rank
 
   int a, b, c;
+#pragma omp parallel for collapse(3) shared(X, Y, v3) private(a,b,c)
   for (a = 0; a < N_modes; ++a) {
     for (b = 0; b < N_modes; ++b) {
       for (c = 0; c < N_modes; ++c) {
         // Compute the averages
-        tmp2 = 0;
-        #pragma omp parallel 
-        {
-          double tmp1 = 0;
-          #pragma omp for
-          for (i = 1; i < N_random; i++) {
-            tmp1 += 
-              X[N_random*a + i] * X[N_random*b + i] * Y[N_random*c + i] +
-              X[N_random*a + i] * Y[N_random*b + i] * X[N_random*c + i] +
-              Y[N_random*a + i] * X[N_random*b + i] * X[N_random*c + i];
-          }
+	double tmp1 = 0;
+	for (i = 1; i < N_random; i++) {
+	  tmp1 += 
+	    X[N_random*a + i] * X[N_random*b + i] * Y[N_random*c + i] +
+	    X[N_random*a + i] * Y[N_random*b + i] * X[N_random*c + i] +
+	    Y[N_random*a + i] * X[N_random*b + i] * X[N_random*c + i];
+	}
 
-          // Perform the reduction
-          #pragma omp critical 
-            tmp2 += tmp1;
-        }
-        v3[a * N_modes*N_modes + b * N_modes + c] = - tmp2 / (3*N_random); 
+        v3[a * N_modes*N_modes + b * N_modes + c] = - tmp1 / (3*N_random); 
          
       }
     }
