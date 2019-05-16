@@ -4,7 +4,7 @@
 
 // The eigenvalues of the Covariance matrix
 double f_ups(double w, double T) {
-    double n_w;
+    double n_w = 0;
     if (T > 0) {
         n_w = 1 / ( exp(w * RY_TO_K / T) - 1);
     }

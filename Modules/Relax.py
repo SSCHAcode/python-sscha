@@ -41,7 +41,6 @@ __ALLOWED_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__, __RELAX_MAX_POP__,
                     __RELAX_BULK_MODULUS__, __RELAX_GENERATE_FIRST_ENSEMBLE__]
 
 class SSCHA:
-    minim = sscha.SchaMinimizer.SSCHA_Minimizer()
     bulk_modulus = 100
     target_pressure = 0
     fix_volume = False
@@ -71,8 +70,12 @@ class SSCHA:
                 will be runned in the provided cluster.
         """
         
-        if minimizer is not None:
-            self.minim = minimizer
+        new_minim = minimizer
+        if minimizer is None:
+            new_minim = sscha.SchaMinimizer.SSCHA_Minimizer()
+        
+        self.minim = new_minim
+
         self.calc = ase_calculator
         self.N_configs = N_configs
         self.max_pop = max_pop
@@ -89,6 +92,29 @@ class SSCHA:
         self.__cfpre__ = None
         self.__cfpost__ = None
         self.__cfg__ = None
+
+    def setup_from_dynamical_matrix(self, dynmat, T = 0):
+        """
+        SETUP THE RELAXER FOR THE RUN
+        =============================
+
+        With this function it is possible to setup the ensemble
+        and the minimizer directly from the dynamical matrix, without
+        the need of a different approach.
+
+        Parameters
+        ----------
+            dynmat : Phonons()
+                The dynamical matrix
+            T : float
+                The temperature
+        """
+
+        self.minim.dyn = dynmat.Copy()
+
+        # Prepare the ensemble
+        self.minim.ensemble = sscha.Ensemble.Ensemble(dynmat, T, dynmat.GetSupercell())
+
         
     def setup_from_namelist(self, namelist):
         """
