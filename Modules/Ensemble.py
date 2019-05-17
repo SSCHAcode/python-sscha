@@ -70,7 +70,7 @@ try:
     
 except:
     Rydberg = 13.605698066
-    Bohr = __A_TO_BOHR__
+    Bohr = 1/__A_TO_BOHR__
     __RyToK__ = 157887.32400374097
 
 

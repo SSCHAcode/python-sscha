@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import division
 
 """
 This module performs the Lanczos algorithm in order to compute the responce function
@@ -147,10 +148,10 @@ class Lanczos:
         f -= ensemble.sscha_forces.reshape(self.N, 3 * self.nat)
 
         self.X = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
-        self.X[:,:] = np.einsum("a,ia, ab->ib", np.sqrt(self.m), u, self.pols) * Ensemble.Bohr
+        self.X[:,:] = np.einsum("a,ia, ab->ib", np.sqrt(self.m), u, self.pols) / Ensemble.Bohr
 
         self.Y = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
-        self.Y[:,:] = np.einsum("a,ia, ab->ib", 1/np.sqrt(self.m), f, self.pols) / Ensemble.Bohr
+        self.Y[:,:] = np.einsum("a,ia, ab->ib", 1/np.sqrt(self.m), f, self.pols) * Ensemble.Bohr
 
         # Prepare the variable used for the working
         self.psi = np.zeros(self.n_modes + self.n_modes*self.n_modes, dtype = TYPE_DP)
@@ -389,7 +390,7 @@ class Lanczos:
 
         simple_output = np.zeros(np.shape(self.psi), dtype = TYPE_DP)
 
-        simple_output[self.n_modes:] = self.psi[self.n_modes:] * (w_a + w_b)**2
+        #simple_output[self.n_modes:] = self.psi[self.n_modes:] * (w_a + w_b)**2
 
         if self.ignore_v4:
             return simple_output
@@ -1094,6 +1095,90 @@ Starting from step %d
 
         return gf
 
+    
+    def get_full_L_operator(self, verbose = False):
+        """
+        GET THE FULL L OPERATOR
+        =======================
+        
+        Use this method to test everithing. I returns the full L operator as a matrix.
+        It is very memory consuming, but it should be fast and practical for small systems.
+        
+
+        Results
+        -------
+           L_op : ndarray(size = (nmodes * (nmodes + 1)), dtype = TYPE_DP)
+              The full L operator.
+        """
+
+
+        L_operator = np.zeros( shape = (self.n_modes + self.n_modes * self.n_modes, self.n_modes + self.n_modes * self.n_modes), dtype = TYPE_DP)
+
+        # Fill the first part with the standard dynamical matrix
+        L_operator[:self.n_modes, :self.n_modes] = np.diag(self.w**2)
+
+        
+        w_a = np.tile(self.w, (self.n_modes,1)).ravel()
+        w_b = np.tile(self.w, (self.n_modes,1)).T.ravel()
+        chi_beta = -.5 * np.sqrt((w_a + w_b)/(w_a*w_b))
+
+
+        B_mat = (w_a + w_b)**2
+        L_operator[self.n_modes:, self.n_modes:] = np.diag(B_mat)
+        
+
+        # Compute the d3 operator
+        new_X = np.einsum("ia,a->ai", self.X, f_ups(self.w, self.T))
+        new_Y = np.einsum("ia,i->ai", self.Y, self.rho)
+        N_eff = np.sum(self.rho)
+
+        if not self.ignore_v3:
+            if verbose:
+                print("Computing d3...")
+            d3 =  np.einsum("ai,bi,ci", new_X, new_X, new_Y)
+            d3 += np.einsum("ai,bi,ci", new_X, new_Y, new_X)
+            d3 += np.einsum("ai,bi,ci", new_Y, new_X, new_X)
+            d3 /= - 3 * N_eff
+
+            # Reshape the d3
+            d3_reshaped = d3.reshape((self.n_modes, self.n_modes * self.n_modes))
+
+            new_mat = np.einsum("ab,b->ab", d3_reshaped, chi_beta)
+
+            L_operator[:self.n_modes, self.n_modes:] = new_mat
+            L_operator[self.n_modes:, :self.n_modes] = new_mat.T
+        if not self.ignore_v4:
+
+            if verbose:
+                print("Computing d4...")
+            d4 =  np.einsum("ai,bi,ci,di", new_X, new_X, new_X, new_Y)
+            d4 += np.einsum("ai,bi,ci,di", new_X, new_X, new_Y, new_X)
+            d4 += np.einsum("ai,bi,ci,di", new_X, new_Y, new_X, new_X)
+            d4 += np.einsum("ai,bi,ci,di", new_Y, new_X, new_X, new_X)
+            d4 /= - 4 * N_eff
+
+            # Reshape the d3
+            d4_reshaped = d3.reshape((self.n_modes*self.n_modes, self.n_modes * self.n_modes))
+
+            new_mat = np.einsum("ab,a,b->ab", d4_reshaped, chi_beta, chi_beta)
+
+            L_operator[self.n_modes:, self.n_modes:] += new_mat
+
+        if verbose:
+            print("L superoperator computed.")
+        
+        self.L_linop = L_operator
+        return L_operator
+            
+
+
+            
+
+            
+
+        
+    
+    
 
     def run_full_diag(self, number, discard_dyn = True, n_iter = 100):
         r"""
@@ -1457,3 +1542,6 @@ def FastApplyD4ToDyn(X, Y, rho, w, T, input_dyn, mode = 1):
     #print( "Apply to vector, nmodes:", n_modes, "shape:", np.shape(output_dyn))
     sscha_HP_odd.ApplyV4ToDyn(X, Y, rho, w, T, input_dyn, output_dyn, mode)
     return output_dyn
+
+
+
