@@ -5,7 +5,7 @@
 #include <math.h>
 
 #define RY_TO_K 157887.32400374097
-
+#define __EPSILON__ 1e-6
 /*
  * Apply the D3 matrix to a vector (OpenMP)
  * ===============================
@@ -32,9 +32,18 @@
  *          The input vector
  *      output_dyn : array (size = N_modes * N_modes)
  *          The result of the operation d3 * input_vector
+ *      sym_matrix : array (size = (N_sym * N_modes * N_modes)
+ *          The symmetry matrix in the mode basis.
+ *      N_sym : int
+ *          The number of symmetries
+ *      N_degeneracy : array (size = N_modes)
+ *          The degree of degeneracy of the mode
+ *      degenerate_space : array of array [N_modes, N_degeneracy[i]]
+ *          The mode indices that compose the degenerate subspace in which the first mode label belong to.
  */
 void OMP_ApplyD3ToVector(const double * X, const double * Y, const double * rho, const double * w, 
-    double T, int N_modes, int N_configs, const double * input_vector, double * output_dyn);
+			 double T, int N_modes, int N_configs, const double * input_vector, double * output_dyn,
+			 double * sym_matrix, int N_sym, int * N_degeneracy, int ** degenerate_space);
 
 
 /*
@@ -61,9 +70,18 @@ void OMP_ApplyD3ToVector(const double * X, const double * Y, const double * rho,
  *          The input dyn
  *      output_vector : array (size = N_modes)
  *          The result of the operation d3 * input_dyn
+ *      sym_matrix : array (size = (N_sym * N_modes * N_modes)
+ *          The symmetry matrix in the mode basis.
+ *      N_sym : int
+ *          The number of symmetries
+ *      N_degeneracy : array (size = N_modes)
+ *          The degree of degeneracy of the mode
+ *      degenerate_space : array of array [N_modes, N_degeneracy[i]]
+ *          The mode indices that compose the degenerate subspace in which the first mode label belong to.
  */
 void OMP_ApplyD3ToVector(const double * X, const double * Y, const double * rho, const double * w, 
-    double T, int N_modes, int N_configs, const double * input_dyn, double * output_vector);
+			 double T, int N_modes, int N_configs, const double * input_dyn, double * output_vector,
+			 double * sym_matrix, int N_sym, int * N_degeneracy, int ** degenerate_space);
 
 
 

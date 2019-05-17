@@ -122,7 +122,7 @@ static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
 
   // Check the mode
   if (mode == 1) {
-    OMP_ApplyD3ToDyn(X, Y, rho, w, T, N_modes, N_configs, input, output);
+    OMP_ApplyD3ToDyn(X, Y, rho, w, T, N_modes, N_configs, input, output, NULL, 0, NULL, NULL);
   } else {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
     fprintf(stderr, "mode %d not implemented.\n", mode);
@@ -190,7 +190,7 @@ static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args) {
   if (mode == 1) {
     //printf("I'm here\n");
     fflush(stdout);
-    OMP_ApplyD3ToVector(X, Y, rho, w, T, N_modes, N_configs, input, output);
+    OMP_ApplyD3ToVector(X, Y, rho, w, T, N_modes, N_configs, input, output, NULL, 0, NULL, NULL);
   } else {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
     fprintf(stderr, "mode %d not implemented.\n", mode);
