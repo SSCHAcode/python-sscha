@@ -22,7 +22,8 @@ import sscha_HP_odd
 
 # Define a generic type for the double precision.
 TYPE_DP = np.double
-__EPSILON__ = 1e-6
+__EPSILON__ = 1e-8
+N_REP_ORTH = 2
 
 try:
     from ase.units import create_units
@@ -35,6 +36,14 @@ except:
     Rydberg = 13.605698066
     Bohr = 1.889725989
     __RyToK__ = 157887.32400374097
+
+
+__SPGLIB__ = True
+try:
+    import spglib
+except:
+    __SPGLIB__ = False
+    
 
 def f_ups(w, T):
     """
@@ -101,6 +110,10 @@ class Lanczos:
         self.reverse_L = False
         self.shift_value = 0
         self.symmetrize = False
+        self.symmetries = None
+        self.degenerate_space = None
+        self.N_degeneracy = None
+        self.initialized = False
 
         # Perform a bare initialization if the ensemble is not provided
         if ensemble is None:
@@ -178,6 +191,63 @@ class Lanczos:
 
 
 
+    def prepare_symmetrization(self):
+        """
+        PREPARE THE SYMMETRIZATION
+        ==========================
+
+        This function analyzes the character of the symmetry operations for each polarization vectors.
+        This will allow the method do know how many modes are degenerate
+        """
+
+        self.initialized = True
+
+        # Generate the dynamical matrix in the supercell
+        super_dyn = self.dyn.GenerateSupercellDyn(self.dyn.GetSupercell())
+        w, pols = super_dyn.DyagDinQ(0)
+
+        # Get the symmetries of the super structure
+        if not __SPGLIB__:
+            raise ImportError("Error, spglib module required to perform symmetrization in a supercell")
+        
+        super_symmetries = CC.symmetries.GetSymmetriesFromSPGLIB(spglib.get_symmetry(super_dyn.structure.get_ase_atoms()), False)
+
+        # Get the symmetry matrix in the polarization space
+        # Translations are needed, as this method needs a complete basis.
+        pol_symmetries = CC.symmetries.GetSymmetriesOnModes(super_symmetries, super_dyn.structure, pols)
+
+        Ns, dumb, dump = np.shape(pol_symmetries)
+        
+        # Now we can pull out the translations
+        trans_mask = CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())
+        self.symmetries = np.zeros( (Ns, self.n_modes, self.n_modes), dtype = TYPE_DP)
+        ptmp = pol_symmetries[:, :,  ~trans_mask] 
+        self.symmetries[:,:,:] = ptmp[:, ~trans_mask, :]
+
+        # Get the degeneracy
+        w = w[~trans_mask]
+        N_deg = np.ones(len(w), dtype = np.intc)
+        start_deg = -1
+        deg_space = [ [x] for x in range(self.n_modes)]
+        for i in range(1, len(w)):
+            if np.abs(w[i-1] - w[i]) < __EPSILON__ :
+                N_deg[i] = N_deg[i-1] + 1
+
+                if start_deg == -1:
+                    start_deg = i - 1
+
+                for j in range(start_deg, i):
+                    N_deg[j] = N_deg[i]
+                    deg_space[j].append(i)
+                    deg_space[i].append(j)
+            else:
+                start_deg = -1
+
+
+        self.N_degeneracy = N_deg
+        self.degenerate_space = deg_space
+
+        
 
     def prepare_perturbation(self, vector):
         """
@@ -348,6 +418,9 @@ class Lanczos:
         if self.ignore_v3:
             return np.zeros(np.shape(self.psi), dtype = TYPE_DP)
 
+        if not self.initialized:
+            self.prepare_symmetrization()
+
 
         w_a = np.tile(self.w, (self.n_modes, 1)).ravel()
         w_b = np.tile(self.w, (self.n_modes, 1)).T.ravel()
@@ -362,8 +435,10 @@ class Lanczos:
             out_v = SlowApplyD3ToDyn(self.X, self.Y, self.rho, self.w, self.T, new_dyn)
             out_d = SlowApplyD3ToVector(self.X, self.Y, self.rho, self.w, self.T, vector)
         elif self.mode >= 1:
-            out_v = FastApplyD3ToDyn(self.X, self.Y, self.rho, self.w, self.T, new_dyn, self.mode)
-            out_d = FastApplyD3ToVector(self.X, self.Y, self.rho, self.w, self.T, vector, self.mode)
+            out_v = FastApplyD3ToDyn(self.X, self.Y, self.rho, self.w, self.T, new_dyn, self.symmetries,
+                                     self.N_degeneracy, self.degenerate_space, self.mode)
+            out_d = FastApplyD3ToVector(self.X, self.Y, self.rho, self.w, self.T, vector, self.symmetries,
+                                        self.N_degeneracy, self.degenerate_space, self.mode)
         else:
             print("Error, mode %d not recognized." % self.mode)
             raise ValueError("Mode not recognized %d" % self.mode)
@@ -510,7 +585,11 @@ class Lanczos:
                             krilov_basis = self.krilov_basis,
                             arnoldi_matrix = self.arnoldi_matrix,
                             reverse = self.reverse_L,
-                            shift = self.shift_value)
+                            shift = self.shift_value,
+                            symmetries = self.symmetries,
+                            N_degeneracy = self.N_degeneracy,
+                            initialized = self.initialized,
+                            degenerate_space = self.degenerate_space)
             
     def load_status(self, file):
         """
@@ -547,6 +626,12 @@ class Lanczos:
         if "reverse" in data.keys():
             self.reverse_L = data["reverse"]
             self.shift_value = data["shift"]
+
+        if "symmetries" in data.keys():
+            self.symmetries = data["symmetries"]
+            self.N_degeneracy = data["N_degeneracy"]
+            self.initialized = data["initialized"]
+            self.degenerate_space = data["degenerate_space"]
 
         # Rebuild the Linear operator
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
@@ -737,6 +822,10 @@ class Lanczos:
                 If true all the info during the minimization will be printed on output.
         """
 
+        # Check if the symmetries has been initialized
+        if not self.initialized:
+            self.prepare_symmetrization()
+
         # Get the current step
         i_step = len(self.a_coeffs)
 
@@ -787,29 +876,32 @@ Starting from step %d
             t1 = time.time()
             arnoldi_row = []
             new_vect = self.psi.copy()
-            print("New vector:", new_vect)
-            for j in range(len(self.krilov_basis)):
-                coeff = self.psi.dot(self.krilov_basis[j])
-                arnoldi_row.append(coeff)
 
-                # Gram Schmidt
-                new_vect -= coeff * self.krilov_basis[j]
+
+            # Lets repeat twice the orthogonalization
+            for k_orth in range(N_REP_ORTH):
+                for j in range(len(self.krilov_basis)):
+                    coeff = new_vect.dot(self.krilov_basis[j])
+                    if k_orth == 0:
+                        arnoldi_row.append(self.psi.dot(self.krilov_basis[j]))
+
+                    # Gram Schmidt
+                    new_vect -= coeff * self.krilov_basis[j]
             
-            # Add the new vector to the Krilov Basis
-            norm = np.sqrt(new_vect.dot(new_vect))
+                # Add the new vector to the Krilov Basis
+                norm = np.sqrt(new_vect.dot(new_vect))
 
-            print("Vector after GS:")
-            print(new_vect)
-
-            # Check the normalization (If zero the algorithm converged)
-            if norm < __EPSILON__:
                 if verbose:
-                    print("Obtained a linear dependent vector.")
-                    
-                    print("The algorithm converged.")
+                    print("Vector norm after GS number {}: {:16.8e}".format(k_orth, norm))
 
-                return 
-            new_vect /= norm 
+                # Check the normalization (If zero the algorithm converged)
+                if norm < __EPSILON__:
+                    if verbose:
+                        print("Obtained a linear dependent vector.")
+                        print("The algorithm converged.")
+                    return
+                
+                new_vect /= norm 
 
             self.krilov_basis.append(new_vect)
             self.psi = new_vect
@@ -1096,7 +1188,7 @@ Starting from step %d
         return gf
 
     
-    def get_full_L_operator(self, verbose = False):
+    def get_full_L_operator(self, verbose = False, only_pert=False):
         """
         GET THE FULL L OPERATOR
         =======================
@@ -1115,7 +1207,8 @@ Starting from step %d
         L_operator = np.zeros( shape = (self.n_modes + self.n_modes * self.n_modes, self.n_modes + self.n_modes * self.n_modes), dtype = TYPE_DP)
 
         # Fill the first part with the standard dynamical matrix
-        L_operator[:self.n_modes, :self.n_modes] = np.diag(self.w**2)
+        if not only_pert:
+            L_operator[:self.n_modes, :self.n_modes] = np.diag(self.w**2)
 
         
         w_a = np.tile(self.w, (self.n_modes,1)).ravel()
@@ -1124,7 +1217,8 @@ Starting from step %d
 
 
         B_mat = (w_a + w_b)**2
-        L_operator[self.n_modes:, self.n_modes:] = np.diag(B_mat)
+        if not only_pert:
+            L_operator[self.n_modes:, self.n_modes:] = np.diag(B_mat)
         
 
         # Compute the d3 operator
@@ -1344,7 +1438,7 @@ def SlowApplyD3ToDyn(X, Y, rho, w, T, input_dyn):
     
     return v_out
 
-def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn, mode = 1):
+def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn,  symmetries, n_degeneracies, degenerate_space, mode = 1):
     """
     Apply the D3 to dyn
     ======================
@@ -1376,6 +1470,13 @@ def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn, mode = 1):
        mode : int
            The mode for the execution:
               1) CPU : OpenMP parallelization
+       symmetries : ndarray( size =(n_sym, n_modes, n_modes), dtype = np.double)
+           The symmetries in the polarization basis.
+       n_degeneracies : ndarray( size = n_modes, dtype = np.intc)
+           The number of degenerate eigenvalues for each mode
+       degenerate_space : list of lists
+           The list of modes in the eigen subspace in which that mode belongs to.
+
 
     Results
     -------
@@ -1387,10 +1488,28 @@ def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn, mode = 1):
 
     output_vector = np.zeros(n_modes, dtype = TYPE_DP)
     #print( "Apply to dyn, nmodes:", n_modes, "shape:", np.shape(output_vector))
-    sscha_HP_odd.ApplyV3ToDyn(X, Y, rho, w, T, input_dyn, output_vector, mode)
+    
+    deg_space_new = np.zeros(np.sum(n_degeneracies), dtype = np.intc)
+    i = 0
+    i_mode = 0
+    j_mode = 0
+    #print("len1 = ", len(deg_space_new), "len2 = ", len(n_degeneracies))
+    while i_mode < len(deg_space_new):
+        #print("i= ", i_mode, "Ndeg:", n_degeneracies[i_mode], "j = ", j_mode, "len = ", len(degenerate_space[i_mode]))
+        #print("new_i = ", i, "tot = ", np.sum(n_degeneracies))
+        deg_space_new[i] = degenerate_space[i_mode][j_mode]
+        j_mode += 1
+        i+=1
+
+        if j_mode == n_degeneracies[i_mode]:
+            i_mode += 1
+            j_mode = 0
+    
+
+    sscha_HP_odd.ApplyV3ToDyn(X, Y, rho, w, T, input_dyn, output_vector, mode, symmetries, n_degeneracies, deg_space_new)
     return output_vector
 
-def FastApplyD3ToVector(X, Y, rho, w, T, input_vector, mode = 1):
+def FastApplyD3ToVector(X, Y, rho, w, T, input_vector, symmetries, n_degeneracies, degenerate_space, mode = 1):
     """
     Apply the D3 to vector
     ======================
@@ -1422,6 +1541,12 @@ def FastApplyD3ToVector(X, Y, rho, w, T, input_vector, mode = 1):
        mode : int
            The mode for the execution:
               1) CPU : OpenMP parallelization
+       symmetries : ndarray( size =(n_sym, n_modes, n_modes), dtype = np.double)
+           The symmetries in the polarization basis.
+       n_degeneracies : ndarray( size = n_modes, dtype = np.intc)
+           The number of degenerate eigenvalues for each mode
+       degenerate_space : list of lists
+           The list of modes in the eigen subspace in which that mode belongs to.
 
     Results
     -------
@@ -1431,7 +1556,20 @@ def FastApplyD3ToVector(X, Y, rho, w, T, input_vector, mode = 1):
     n_modes = len(w)
     output_dyn = np.zeros(n_modes*n_modes, dtype = TYPE_DP)
     #print( "Apply to vector, nmodes:", n_modes, "shape:", np.shape(output_dyn))
-    sscha_HP_odd.ApplyV3ToVector(X, Y, rho, w, T, input_vector, output_dyn, mode)
+
+    deg_space_new = np.zeros(np.sum(n_degeneracies), dtype = np.intc)
+    i = 0
+    i_mode = 0
+    j_mode = 0
+    while i_mode < len(deg_space_new):
+        deg_space_new[i] = degenerate_space[i_mode][j_mode]
+        j_mode += 1
+        i += 1
+        if j_mode == n_degeneracies[i_mode]:
+            i_mode += 1
+            j_mode = 0
+    
+    sscha_HP_odd.ApplyV3ToVector(X, Y, rho, w, T, input_vector, output_dyn, mode, symmetries, n_degeneracies, deg_space_new)
     return output_dyn
 
     

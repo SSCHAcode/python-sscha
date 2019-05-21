@@ -60,12 +60,15 @@ PyMODINIT_FUNC initsscha_HP_odd(void) {
  *    If mode = 2 : MPI version (Not yet implemented)
  */
 static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
-  PyArrayObject * npy_X, *npy_Y, *npy_rho, *npy_omega, *npy_input, *npy_output;
+  PyArrayObject * npy_X, *npy_Y, *npy_rho, *npy_omega, *npy_input, *npy_output, *npy_symmetries, *npy_n_deg, *npy_deg_space;
   double * X; 
   double *Y;
   double *w;
   double *input;
   double *output;
+  double * symmetries;
+  int * n_deg;
+  int ** good_deg_space;
   double * rho;
   int N_configs;
   int N_modes;
@@ -75,7 +78,8 @@ static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
   int index_mode = 0, index_config = 1;
 
   // Parse the python arguments
-  if (!PyArg_ParseTuple(args, "OOOOdOOi", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode))
+  if (!PyArg_ParseTuple(args, "OOOOdOOiOOO", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode,
+			&npy_symmetries, &npy_n_deg, &npy_deg_space))
     return NULL;
   
   // Check the array memory setting
@@ -119,10 +123,28 @@ static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
   input = (double*) PyArray_DATA(npy_input);
   output = (double*) PyArray_DATA(npy_output);
 
+  // Read the symmetries
+  symmetries = (double*)PyArray_DATA(npy_symmetries);
+  n_deg = (int*)PyArray_DATA(npy_n_deg);
+
+  // Build the degeneracy space
+  good_deg_space = (int **) malloc(sizeof(int*) * N_modes);
+  int i, j;
+  int counter= 0;
+  int N_symmetries;
+  for (i = 0; i < N_modes;++i) {
+    good_deg_space[i] = (int*) malloc(sizeof(int) * n_deg[i]);
+    for (j = 0; j < n_deg[i]; ++j) {
+      good_deg_space[i][j] = ((int*) PyArray_DATA(npy_deg_space))[counter++];
+    }
+  }
+
+  N_symmetries = PyArray_DIM(npy_symmetries, 0);
+
 
   // Check the mode
   if (mode == 1) {
-    OMP_ApplyD3ToDyn(X, Y, rho, w, T, N_modes, N_configs, input, output, NULL, 0, NULL, NULL);
+    OMP_ApplyD3ToDyn(X, Y, rho, w, T, N_modes, N_configs, input, output, symmetries, N_symmetries, n_deg, good_deg_space);
   } else {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
     fprintf(stderr, "mode %d not implemented.\n", mode);
@@ -134,15 +156,20 @@ static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
 }
 
 static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args) {
-  PyArrayObject * npy_X, *npy_Y, *npy_rho, *npy_omega, *npy_input, *npy_output;
+  PyArrayObject * npy_X, *npy_Y, *npy_rho, *npy_omega, *npy_input, *npy_output, *npy_symmetries, *npy_n_deg, *npy_deg_space;
   double * X, *Y, *w, *input, *output, *rho;
+  double * symmetries;
+  int * n_deg;
+  double * deg_space;
+  int ** good_deg_space;
   int N_configs, N_modes, mode;
   double T;
 
   int index_mode = 0, index_config = 1;
 
   // Parse the python arguments
-  if (!PyArg_ParseTuple(args, "OOOOdOOi", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode))
+  if (!PyArg_ParseTuple(args, "OOOOdOOiOOO", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode,
+			&npy_symmetries, &npy_n_deg, &npy_deg_space))
     return NULL;
 
   // Check the array memory setting
@@ -185,12 +212,30 @@ static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args) {
   input = (double*) PyArray_DATA(npy_input);
   output = (double*) PyArray_DATA(npy_output);
 
+  
+  // Read the symmetries
+  symmetries = (double*)PyArray_DATA(npy_symmetries);
+  n_deg = (int*)PyArray_DATA(npy_n_deg);
 
+  // Build the degeneracy space
+  good_deg_space = (int**) malloc(sizeof(int*) * N_modes);
+  int i, j;
+  int counter= 0;
+  int N_symmetries;
+  for (i = 0; i < N_modes;++i) {
+    good_deg_space[i] = (int*) malloc(sizeof(int) * n_deg[i]);
+    for (j = 0; j < n_deg[i]; ++j) {
+      good_deg_space[i][j] = ((int*) PyArray_DATA(npy_deg_space))[counter++];
+    }
+  }
+
+  N_symmetries = PyArray_DIM(npy_symmetries, 0);
+  
   // Check the mode
   if (mode == 1) {
     //printf("I'm here\n");
     fflush(stdout);
-    OMP_ApplyD3ToVector(X, Y, rho, w, T, N_modes, N_configs, input, output, NULL, 0, NULL, NULL);
+    OMP_ApplyD3ToVector(X, Y, rho, w, T, N_modes, N_configs, input, output, symmetries, N_symmetries, n_deg, good_deg_space);
   } else {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
     fprintf(stderr, "mode %d not implemented.\n", mode);
