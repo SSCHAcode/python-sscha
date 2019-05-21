@@ -1637,7 +1637,7 @@ def SlowApplyD4ToDyn(X, Y, rho, w, T, input_dyn):
     return v_out
 
 
-def FastApplyD4ToDyn(X, Y, rho, w, T, input_dyn, mode = 1):
+def FastApplyD4ToDyn(X, Y, rho, w, T, input_dyn, symmetries, n_degeneracies, degenerate_space, mode = 1):
     """
     Apply the D3 to vector
     ======================
@@ -1666,6 +1666,12 @@ def FastApplyD4ToDyn(X, Y, rho, w, T, input_dyn, mode = 1):
            The temperature
        input_dyn : ndarray (size = n_modes*n_modes)
            The input dynamical matrix
+       symmetries : ndarray( size =(n_sym, n_modes, n_modes), dtype = np.double)
+           The symmetries in the polarization basis.
+       n_degeneracies : ndarray( size = n_modes, dtype = np.intc)
+           The number of degenerate eigenvalues for each mode
+       degenerate_space : list of lists
+           The list of modes in the eigen subspace in which that mode belongs to.
        mode : int
            The mode for the execution:
               1) CPU : OpenMP parallelization
@@ -1677,8 +1683,23 @@ def FastApplyD4ToDyn(X, Y, rho, w, T, input_dyn, mode = 1):
     """
     n_modes = len(w)
     output_dyn = np.zeros(n_modes*n_modes, dtype = TYPE_DP)
+
+
+    deg_space_new = np.zeros(np.sum(n_degeneracies), dtype = np.intc)
+    i = 0
+    i_mode = 0
+    j_mode = 0
+    while i_mode < len(deg_space_new):
+        deg_space_new[i] = degenerate_space[i_mode][j_mode]
+        j_mode += 1
+        i += 1
+        if j_mode == n_degeneracies[i_mode]:
+            i_mode += 1
+            j_mode = 0
+
+    
     #print( "Apply to vector, nmodes:", n_modes, "shape:", np.shape(output_dyn))
-    sscha_HP_odd.ApplyV4ToDyn(X, Y, rho, w, T, input_dyn, output_dyn, mode)
+    sscha_HP_odd.ApplyV4ToDyn(X, Y, rho, w, T, input_dyn, output_dyn, mode, symmetries, n_degeneracies, deg_space_new)
     return output_dyn
 
 
