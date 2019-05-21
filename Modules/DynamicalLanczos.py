@@ -483,7 +483,8 @@ class Lanczos:
             out_dyn = SlowApplyD4ToDyn(self.X, self.Y, self.rho, self.w, self.T, dyn)
         elif self.mode >= 1:
             # The fast C implementation
-            out_dyn = FastApplyD4ToDyn(self.X, self.Y, self.rho, self.w, self.T, dyn)            
+            out_dyn = FastApplyD4ToDyn(self.X, self.Y, self.rho, self.w, self.T, dyn,
+                                       self.symmetries, self.N_degeneracy, self.degenerate_space, self.mode)       
             
         out_dyn *= np.sqrt((w_a + w_b) / (w_a * w_b)) / 2
 
@@ -1251,8 +1252,8 @@ Starting from step %d
             d4 += np.einsum("ai,bi,ci,di", new_Y, new_X, new_X, new_X)
             d4 /= - 4 * N_eff
 
-            # Reshape the d3
-            d4_reshaped = d3.reshape((self.n_modes*self.n_modes, self.n_modes * self.n_modes))
+            # Reshape the d4
+            d4_reshaped = d4.reshape((self.n_modes*self.n_modes, self.n_modes * self.n_modes))
 
             new_mat = np.einsum("ab,a,b->ab", d4_reshaped, chi_beta, chi_beta)
 
