@@ -959,6 +959,76 @@ class Ensemble:
             return free_energy, error
         return free_energy
 
+
+    def get_free_energy_interpolating(self, target_supercell, support_dyn_coarse = None, support_dyn_fine = None, error_on_imaginary_frequency = True, return_error = False):
+        """
+        GET THE FREE ENERGY IN A BIGGER CELL
+        ====================================
+
+        This is a trick to interpolate the free energy in the
+        infinite volume limit.
+
+        Parameters
+        ----------
+            target_supercell : list (N, N, N)
+               A list of three indices, where N is the dimension
+               of the target supercell on which you want to interpolate.
+            support_dyn[coarse/fine] : Phonons() Optional
+               The harmonic dynamical matrix in the current/target_supercell
+               This is optional, it can be used to achieve a better
+               interpolation. If provided only the difference between
+               the harmonic dyn and the current dyn is interpolated.
+            error_on_imaginary_frequency : bool
+               If Fase (default True) it will ignore imaginary frequencies
+               arising from the interpolation. Otherwise an exception will
+               be raised.
+            return_error : bool
+               As the normal get_free_energy, if this flag is True, the stochastic error is returned.
+
+        Returns
+        -------
+            free_energy : float
+               The free energy in the unit_cell volume [in Ry]. Note.
+               This free energy is rescaled on the unit cell volume, 
+               it is a different behaviour with respect to get_free_energy.
+            error_on free energy : float
+               The stochastic error, it is returned only if requested.
+        """
+
+        # Check if the support harmonic dyn is of the correct size.
+        if not support_dyn_coarse is None:
+            assert support_dyn_coarse.GetSupercell() == self.current_dyn.GetSupercell()
+            assert support_dyn_fine.GetSupercell() == target_supercell
+
+        
+        # Interpolate the dynamical matrix
+        new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
+                                                target_supercell,
+                                                support_dyn_coarse,
+                                                support_dyn_fine)
+
+        # TODO: Allow double interpolation in case of support dyn
+        
+        # Get the new harmonic free energy
+        harm_fe = new_dyn.GetHarmonicFreeEnergy(self.current_T,
+                                                not error_on_imaginary_frequency)
+        harm_fe /= np.prod(target_supercell)
+
+        # Get the average energy
+        av_energy, av_error = self.get_average_energy(subtract_sscha = True, return_error = True)
+
+        av_energy /= np.prod(self.current_dyn.GetSupercell())
+        av_error /=  np.prod(self.current_dyn.GetSupercell())
+
+        total_free_energy = harm_fe + av_energy
+
+        if return_error:
+            return total_free_energy, av_error
+        return total_free_energy
+                                                
+            
+    
+
     def get_fc_from_self_consistency(self, subtract_sscha = False, return_error = False):
         """
         SELF CONSISTENT SCHA EQUATION
