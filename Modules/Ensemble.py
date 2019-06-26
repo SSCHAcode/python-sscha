@@ -703,8 +703,11 @@ class Ensemble:
         
         # Get the new displacements in the supercell
         t3 = time.time()
+        old_disps = np.zeros(np.shape(self.u_disps), dtype = np.double)
         for i in xrange(self.N):
             self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
+            
+            old_disps[i,:] = (self.xats[i, :, :] - super_dyn.structure.coords).reshape( 3*Nat_sc )
             
             # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
             self.sscha_energies[i], self.sscha_forces[i, :,:] = new_super_dyn.get_energy_forces(self.structures[i], real_space_fc = new_super_dyn.dynmats[0], displacement = self.u_disps[i, :])
@@ -729,20 +732,23 @@ class Ensemble:
             print( " rho saved in ", "rho_%05d.dat" % self.__debug_index__)
         
         
-        # Get the rho in the other way
+        # Get the covariance matrices of the ensemble
         ups_new = new_super_dyn.GetUpsilonMatrix(self.current_T)
         ups_old = super_dyn.GetUpsilonMatrix(self.T0)
-        dups = ups_new - ups_old
+
+        # Get the normalization ratio
+        norm = np.sqrt(np.linalg.det(ups_new) / np.linalg.det(ups_old)) 
         
         t2 = time.time()
         print( "Time elapsed to prepare the rho update:", t2 - t1, "s")
         print ( "(of which to update sscha energies and forces: %.4f s)" % (t4-t3))
         print ( "(of which computing the Upsilon matrix: %.4f s)" % (t2 - t4))
         
-        rho_tmp = np.ones( self.N, dtype = np.float64) * np.prod( old_a / new_a)
+        rho_tmp = np.ones( self.N, dtype = np.float64) * norm #* np.prod( old_a / new_a)
         for i in xrange(self.N):
-            v = dups.dot(self.u_disps[i, :]) * __A_TO_BOHR__
-            rho_tmp[i] *= np.exp(-0.5 *__A_TO_BOHR__ * self.u_disps[i, :].dot(v) )
+            v_new = self.u_disps[i, :].dot(ups_new.dot(self.u_disps[i, :])) * __A_TO_BOHR__**2
+            v_old = old_disps[i, :].dot(ups_old.dot(old_disps[i, :])) * __A_TO_BOHR__**2
+            rho_tmp[i] *= np.exp(-0.5 * (v_new - v_old) )
         # Lets try to use this one
         self.rho = rho_tmp
         
@@ -757,8 +763,8 @@ class Ensemble:
             #self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
             #self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
         t1 = time.time()
-        
-        print( "Time elapsed to update weights the sscha energies, forces and displacements:", t1 - t2, "s")
+        print( "Time elapsed to update weights the sscha energies, forces and displacements:", t1 - t3, "s")
+        print( "(of which to update the weights):", t1 - t2, "s")
         self.current_dyn = new_dynamical_matrix.Copy()
         
         
@@ -1916,6 +1922,53 @@ class Ensemble:
         if N_w > 1:
             return sigmas
         return sigma
+
+
+    def get_free_energy_hessian(self):
+        """
+        GET THE FREE ENERGY HESSIAN
+        ===========================
+
+        This subroutines computes the free energy
+        hessian using the fortran subroutines, as describe in the
+        Bianco paper ...
+
+        """
+
+        # Get the dynamical matrix in the supercell
+        dyn_supercell = self.current_dyn.GenerateSupercellDyn(self.supercell)
+        w, pols = dyn_supercell.DyagDinQ(0)
+        a = SCHAModules.thermodynamic.w_to_a(w, self.current_T)
+        
+
+        n_modes = len(w)
+        nat_sc = np.shape(pols)[0] / 3
+
+        # Get the polarization vectors in the correct format
+        new_pol = np.zeros( (nat_sc, n_modes, 3), dtype = np.double)
+        for i in range(nat_sc):
+            for j in range(n_modes):
+                new_pol[i, j, :] = pols[3*i : 3*(i+1), j]
+        
+
+        # Get the translational modes
+        trans = CC.Mehtods.get_translations(dyn_supercell.structure, dyn_supercell.structure.get_masses_array())
+
+
+        # Get the atomic types
+        ityp = dyn_supercell.structure.get_ityp() + 1 #Py to Fortran indexing
+        amass = np.array(self.masses.values(), dtype = np.double)
+
+        # Get the forces and conver in the correct units
+        f = (self.forces - self.sscha_forces) * Bohr 
+        u = self.u_disps.reshape((self.N, self.Nat_sc, 3), order = "C") / Bohr
+
+        log_err = "err_yesrho"
+
+        d3 = SCHAModule.get_v3(a, new_pol, trans, amass, ityp,
+                                f, u, self.rho, log_err)
+
+
 
 
     def get_odd_correction(self, include_v4 = False, store_v3 = True, 
