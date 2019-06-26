@@ -733,8 +733,8 @@ class Ensemble:
         
         
         # Get the covariance matrices of the ensemble
-        ups_new = new_super_dyn.GetUpsilonMatrix(self.current_T)
-        ups_old = super_dyn.GetUpsilonMatrix(self.T0)
+        ups_new = np.real(new_super_dyn.GetUpsilonMatrix(self.current_T))
+        ups_old = np.real(super_dyn.GetUpsilonMatrix(self.T0))
 
         # Get the normalization ratio
         norm = np.sqrt(np.linalg.det(ups_new) / np.linalg.det(ups_old)) 
@@ -745,12 +745,16 @@ class Ensemble:
         print ( "(of which computing the Upsilon matrix: %.4f s)" % (t2 - t4))
         
         rho_tmp = np.ones( self.N, dtype = np.float64) * norm #* np.prod( old_a / new_a)
+        if __DEBUG_RHO__:
+            print("Norm factor:", norm)
         for i in xrange(self.N):
             v_new = self.u_disps[i, :].dot(ups_new.dot(self.u_disps[i, :])) * __A_TO_BOHR__**2
             v_old = old_disps[i, :].dot(ups_old.dot(old_disps[i, :])) * __A_TO_BOHR__**2
             rho_tmp[i] *= np.exp(-0.5 * (v_new - v_old) )
         # Lets try to use this one
         self.rho = rho_tmp
+
+        print("\n".join(["%8d) %16.8f" % (i+1, r) for i, r in enumerate(self.rho)]))
         
         #np.savetxt("upsilon_%05d.dat" % self.__debug_index__, ups_new)
         #np.savetxt("d_upsilon_%05d.dat" % self.__debug_index__, dups)
