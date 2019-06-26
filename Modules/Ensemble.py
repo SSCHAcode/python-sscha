@@ -737,14 +737,15 @@ class Ensemble:
         ups_old = np.real(super_dyn.GetUpsilonMatrix(self.T0))
 
         # Get the normalization ratio
-        norm = np.sqrt(np.linalg.det(ups_new) / np.linalg.det(ups_old)) 
-        
+        #norm = np.sqrt(np.abs(np.linalg.det(ups_new) / np.linalg.det(ups_old))) 
+        norm = np.prod( old_a / new_a)
+
         t2 = time.time()
         print( "Time elapsed to prepare the rho update:", t2 - t1, "s")
         print ( "(of which to update sscha energies and forces: %.4f s)" % (t4-t3))
         print ( "(of which computing the Upsilon matrix: %.4f s)" % (t2 - t4))
         
-        rho_tmp = np.ones( self.N, dtype = np.float64) * norm #* np.prod( old_a / new_a)
+        rho_tmp = np.ones( self.N, dtype = np.float64) * norm 
         if __DEBUG_RHO__:
             print("Norm factor:", norm)
         for i in xrange(self.N):
