@@ -82,6 +82,10 @@ It is used to Load and Save info about the ensemble.
 """
 
 
+UNITS_DEFAULT = "default"
+UNITS_HARTREE = "hartree"
+SUPPORTED_UNITS = [UNITS_DEFAULT, UNITS_HARTREE]
+
 
 class Ensemble:
     __debug_index__ = 0
@@ -112,6 +116,7 @@ class Ensemble:
         self.forces = []
         self.stresses = []
         self.xats = []
+        self.units = UNITS_DEFAULT
         
         self.sscha_energies = []
         self.sscha_forces = []
@@ -143,6 +148,98 @@ class Ensemble:
         
         # A flag that memorize if the ensemble has also the stresses
         self.has_stress = False
+
+    def convert_units(new_units):
+        """
+        CONVERT ALL THE VARIABLE IN A COHERENT UNIT OF MEASUREMENTS
+        ===========================================================
+
+        This function is used to jump between several unit of measurement.
+        You should always call this function before processing data assuming
+        a particular kind of units.
+
+        Supported units are:
+           - "default" : 
+               This is the default units. Here the forces are Ry/A displacements and structure are in A
+               Dynamical matrix is in Ry/bohr^2. Mass is in Ry units
+           - "hartree" :
+               Here, everything is stored in Ha units.
+
+        Parameters
+        ----------
+           - new_units : string
+               The target units
+        """
+
+        # Check if the input is ok
+        assert new_units in SUPPORTED_UNITS, "Error, {} unit is unknown. Try one of {}".format(new_units, SUPPORTED_UNITS)
+
+        # If we already are in the correct units, ignore it
+        if new_units == self.units:
+            return
+        
+        if new_units == UNITS_HARTREE:
+            if self.units == UNITS_DEFAULT:
+                # Convert the dynamical matrix
+                for iq, q in enumerate(self.dyn0.q_tot):
+                    self.dyn0.dynmats[iq] /= 2
+                    self.current_dyn.dynmats[iq] /= 2
+
+                for k in self.dyn0.masses.keys():
+                    self.dyn0.masses[k] *= 2
+                    self.current_dyn.masses[k] *= 2
+
+                    
+                # Convert the cell shape and the coordinates
+                self.dyn0.structure.coords *= __A_TO_BOHR__
+                self.dyn0.structure.unit_cell *= __A_TO_BOHR__
+                self.current_dyn.structure.coords *= __A_TO_BOHR__
+                self.current_dyn.structure.unit_cell *= __A_TO_BOHR__
+
+                self.forces /= 2 * __A_TO_BOHR__ #Ry/A -> Ha/bohr
+                self.sscha_forces /= 2 * __A_TO_BOHR__
+                self.xats *= __A_TO_BOHR__
+                self.sscha_energies /= 2 # Ry -> Ha
+                self.energies /= 2
+
+                self.stresses /= 2
+            else:
+                raise NotImplementedError("Error, I do not know how to convert between {} and {}.".format(self.units, new_units))    
+                
+        elif new_units == UNITS_DEFAULT:
+            if self.units == UNITS_HARTREE:
+                # Convert the dynamical matrix
+                for iq, q in enumerate(self.dyn0.q_tot):
+                    self.dyn0.dynmats[iq] *= 2
+                    self.current_dyn.dynmats[iq] *= 2
+
+                for k in self.dyn0.masses.keys():
+                    self.dyn0.masses[k] /= 2
+                    self.current_dyn.masses[k] /= 2
+
+                    
+                # Convert the cell shape and the coordinates
+                self.dyn0.structure.coords /= __A_TO_BOHR__
+                self.dyn0.structure.unit_cell /= __A_TO_BOHR__
+                self.current_dyn.structure.coords /= __A_TO_BOHR__
+                self.current_dyn.structure.unit_cell /= __A_TO_BOHR__
+
+                self.forces *= 2 * __A_TO_BOHR__ # Ha/bohr -> Ry/A
+                self.sscha_forces *= 2 * __A_TO_BOHR__
+                self.xats /= __A_TO_BOHR__
+                self.sscha_energies *= 2 # Ha -> Ry
+                self.energies *= 2
+
+                self.stresses *= 2
+
+            else:
+                raise NotImplementedError("Error, I do not know how to convert between {} and {}.".format(self.units, new_units))
+        else:
+            raise NotImplementedError("Error, I do not know anything about this conversion")
+                    
+
+        # Update the units flag
+        self.units = new_units
 
         
     def load(self, data_dir, population, N, verbose = False):

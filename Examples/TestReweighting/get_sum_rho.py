@@ -34,5 +34,5 @@ new_disp = ens.u_disps.copy()
 
 
 print( "The sum over rho:", np.sum(ens.rho) / ens.N)
-print( "The tested value is:", EXPECTED_VALUE)
+print( "The tested value is:", TESTED_VALUE)
 
