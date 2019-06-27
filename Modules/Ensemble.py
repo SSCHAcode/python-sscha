@@ -149,7 +149,7 @@ class Ensemble:
         # A flag that memorize if the ensemble has also the stresses
         self.has_stress = False
 
-    def convert_units(new_units):
+    def convert_units(self, new_units):
         """
         CONVERT ALL THE VARIABLE IN A COHERENT UNIT OF MEASUREMENTS
         ===========================================================
@@ -181,18 +181,18 @@ class Ensemble:
         if new_units == UNITS_HARTREE:
             if self.units == UNITS_DEFAULT:
                 # Convert the dynamical matrix
-                for iq, q in enumerate(self.dyn0.q_tot):
-                    self.dyn0.dynmats[iq] /= 2
+                for iq, q in enumerate(self.dyn_0.q_tot):
+                    self.dyn_0.dynmats[iq] /= 2
                     self.current_dyn.dynmats[iq] /= 2
 
-                for k in self.dyn0.masses.keys():
-                    self.dyn0.masses[k] *= 2
-                    self.current_dyn.masses[k] *= 2
+                for k in self.dyn_0.structure.masses.keys():
+                    self.dyn_0.structure.masses[k] *= 2
+                    self.current_dyn.structure.masses[k] *= 2
 
                     
                 # Convert the cell shape and the coordinates
-                self.dyn0.structure.coords *= __A_TO_BOHR__
-                self.dyn0.structure.unit_cell *= __A_TO_BOHR__
+                self.dyn_0.structure.coords *= __A_TO_BOHR__
+                self.dyn_0.structure.unit_cell *= __A_TO_BOHR__
                 self.current_dyn.structure.coords *= __A_TO_BOHR__
                 self.current_dyn.structure.unit_cell *= __A_TO_BOHR__
 
@@ -209,18 +209,18 @@ class Ensemble:
         elif new_units == UNITS_DEFAULT:
             if self.units == UNITS_HARTREE:
                 # Convert the dynamical matrix
-                for iq, q in enumerate(self.dyn0.q_tot):
-                    self.dyn0.dynmats[iq] *= 2
+                for iq, q in enumerate(self.dyn_0.q_tot):
+                    self.dyn_0.dynmats[iq] *= 2
                     self.current_dyn.dynmats[iq] *= 2
 
-                for k in self.dyn0.masses.keys():
-                    self.dyn0.masses[k] /= 2
-                    self.current_dyn.masses[k] /= 2
+                for k in self.dyn_0.structure.masses.keys():
+                    self.dyn_0.structure.masses[k] /= 2
+                    self.current_dyn.structure.masses[k] /= 2
 
                     
                 # Convert the cell shape and the coordinates
-                self.dyn0.structure.coords /= __A_TO_BOHR__
-                self.dyn0.structure.unit_cell /= __A_TO_BOHR__
+                self.dyn_0.structure.coords /= __A_TO_BOHR__
+                self.dyn_0.structure.unit_cell /= __A_TO_BOHR__
                 self.current_dyn.structure.coords /= __A_TO_BOHR__
                 self.current_dyn.structure.unit_cell /= __A_TO_BOHR__
 
@@ -2026,7 +2026,7 @@ class Ensemble:
         return sigma
 
 
-    def get_free_energy_hessian(self):
+    def get_free_energy_hessian(self, include_v4 = False):
         """
         GET THE FREE ENERGY HESSIAN
         ===========================
@@ -2035,7 +2035,22 @@ class Ensemble:
         hessian using the fortran subroutines, as describe in the
         Bianco paper ...
 
+        The calculation is performed in the supercell
+
+        Parameters
+        ----------
+            include_v4 : bool
+                If True we include the fourth order force constant matrix.
+                This requires a lot of memory
+
+        Returns
+        -------
+            phi_sc : Phonons()
+                The dynamical matrix of the free energy hessian in (Ry/bohr^2)
         """
+        # Convert anything into the Ha units
+        # This is needed for the Fortran subroutines
+        #self.convert_units(UNITS_HARTREE)
 
         # Get the dynamical matrix in the supercell
         dyn_supercell = self.current_dyn.GenerateSupercellDyn(self.supercell)
@@ -2054,21 +2069,49 @@ class Ensemble:
         
 
         # Get the translational modes
-        trans = CC.Mehtods.get_translations(dyn_supercell.structure, dyn_supercell.structure.get_masses_array())
+        trans = CC.Methods.get_translations(pols, dyn_supercell.structure.get_masses_array())
 
 
         # Get the atomic types
         ityp = dyn_supercell.structure.get_ityp() + 1 #Py to Fortran indexing
-        amass = np.array(self.masses.values(), dtype = np.double)
+        amass = np.array(self.current_dyn.structure.masses.values(), dtype = np.double)
 
         # Get the forces and conver in the correct units
         f = (self.forces - self.sscha_forces) * Bohr 
-        u = self.u_disps.reshape((self.N, self.Nat_sc, 3), order = "C") / Bohr
+        u = self.u_disps.reshape((self.N, nat_sc, 3), order = "C") / Bohr
 
         log_err = "err_yesrho"
 
-        d3 = SCHAModule.get_v3(a, new_pol, trans, amass, ityp,
+        # Lets call the Fortran subroutine to compute the v3
+        print ("Going into d3")
+        d3 = SCHAModules.get_v3(a, new_pol, trans, amass, ityp,
                                 f, u, self.rho, log_err)
+        print("Outside d3")
+
+        # TODO: symmetrize the d3
+
+        # Get the odd correction (In Ha/bohr^2)
+        print ("Inside odd straight")
+        phi_sc_odd = SCHAModules.get_odd_straight(a, w, new_pol, trans, amass, ityp, 
+                                                  self.current_T, d3)
+        print ("Outside odd straight")
+
+        # Convert back the ensemble in Default units
+        #self.convert_units(UNITS_DEFAULT)
+        #phi_sc_odd *= 2 # Ha/bohr^2 -> Ry/bohr^2
+
+        # Lets fourier transform
+        dynq_odd = CC.Phonons.GetDynQFromFCSupercell(phi_sc_odd, np.array(self.current_dyn.q_tot), 
+                                                     self.current_dyn.structure, dyn_supercell.structure)
+        
+        # Generate the Phonon structure by including the odd correction
+        dyn_hessian = self.current_dyn.Copy()
+        for iq in range(len(self.current_dyn.q_tot)):
+            dyn_hessian.dynmats[iq] += dynq_odd[iq, :, :] 
+        
+        return dyn_hessian
+
+
 
 
 

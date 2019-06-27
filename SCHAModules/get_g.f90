@@ -1,20 +1,28 @@
 
-subroutine get_g (a, wr, transmode, T, g)
+subroutine get_g (a, wr, transmode, T, g, n_mode)
 
     use thermodynamic
     implicit none
   
 
-    double precision, dimension(:), intent(in) :: a, wr
-    logical, dimension(:), intent(in) :: transmode
+    double precision, dimension(n_mode), intent(in) :: a, wr
+    logical, dimension(n_mode), intent(in) :: transmode
     double precision, intent(in) :: T
-    double precision, dimension(:,:), intent(out) :: g                 
+    double precision, dimension(n_mode,n_mode), intent(out) :: g                 
   
     integer :: mu, nu
     integer :: n_mode
     double precision, allocatable, dimension(:) :: da
-  
-    n_mode = size(a(:))
+
+    logical, parameter :: debug = .true.
+
+
+    if (debug) then
+      print *, "=== DEBUG GET_G ==="
+      print *, "N_MODE:", n_mode
+      call flush() 
+    end if
+
     allocate(da(n_mode))
 
     call w_to_da(wr, T, da, n_mode)

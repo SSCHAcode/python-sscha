@@ -36,17 +36,27 @@ subroutine get_v3 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v3, &
     integer :: ka, ja
     integer :: x, y, z, w, thread_num
   
+    logical, parameter :: debug = .true.
     real :: t1, t2
   
     ! Get integers
   
-    nat_sc = size(er(:,1,1))
-    n_mode = 3*nat_sc
+    !nat_sc = size(er(:,1,1))
+    !n_mode = 3*nat_sc
     n_mode2 = n_mode*n_mode
-    n_random = size(u(:,1,1))
+    !n_random = size(u(:,1,1))
   
     ! Allocate stuff
+    if (debug) then
+      print *, "=== V3 DEBUG ==="
+      print *, "N_MODE:", n_mode
+      print *, "N_RANDOM:", n_random
+      print *, "NAT_SC:", nat_sc 
+      call flush()
+    end if
   
+    
+
     allocate(e(n_mode,n_mode))
     allocate(eprod(n_mode,n_mode))
     allocate(ur(n_random,n_mode))

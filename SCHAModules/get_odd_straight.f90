@@ -28,16 +28,24 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
   integer :: i, j, x, y, z, w
 
   real :: t1, t2
+  logical, parameter :: debug = .true.
 
   ! Get integers
 
-  nat_sc = size(er(:,1,1))
-  n_mode = 3*nat_sc
+  !nat_sc = size(er(:,1,1))
+  !n_mode = 3*nat_sc
 
   ns = n_mode
   nl = n_mode*n_mode
 
   ! Allocate stuff
+  if (debug) then
+    print *, "=== DEBUG ODD STRAIGHT ==="
+    print *, "N_MODE:", n_mode
+    print *, "NTYP:", ntyp 
+    print *, "NAT_SC:", nat_sc
+    call flush()
+  end if
 
   allocate(l(n_mode,n_mode))
   allocate(g(n_mode,n_mode))
@@ -52,6 +60,14 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
   allocate(maux(n_mode,n_mode))
   allocate(veclong(nl))
 
+  ! Allocate stuff
+  if (debug) then
+    print *, "=== DEBUG ODD STRAIGHT ==="
+    print *, "AFTER ALLOCATION"
+    call flush()
+  end if
+
+
   ! Define the polarization vectors as a 3n x 3n matrix (n = nat_sc).
   ! The square root of the mass is also included in the new matrix
   ! and also the normal length 
@@ -60,7 +76,14 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
 
   ! Calculate  the matrix g that will enter in the final equation
 
-  call get_g (a, wr, transmode, T, g)
+  call get_g (a, wr, transmode, T, g, n_mode)
+
+  ! Allocate stuff
+  if (debug) then
+    print *, "=== DEBUG ODD STRAIGHT ==="
+    print *, "AFTER G"
+    call flush()
+  end if
  
   ! Write third order force constants as rank 2
 
