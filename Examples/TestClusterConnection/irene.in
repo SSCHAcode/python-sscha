@@ -47,7 +47,7 @@
 	! This means 10 jobs per works
 	job_numbers = 10
 	! Runned togheter 2 by 2 (sharing the same nodes)
-	n_together = 2
+	n_together = 1
 	timeout=6 ! Max number of second per single job
 &end
 

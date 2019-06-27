@@ -292,6 +292,7 @@ def GetRamanResponce(dyn, supercell, self_energies, w_array, in_pol = None, out_
         # Compute the gamma green function
         G_inv = w**2*I - gamma_selfenergy
         G = np.linalg.inv(G_inv)
+        G /= m_mat
 
         # trace the imaginary part of the green function through the raman vector
         # In case of unpolarized light, average on many possible polarizations
@@ -299,3 +300,5 @@ def GetRamanResponce(dyn, supercell, self_energies, w_array, in_pol = None, out_
             raman_intensity[i] += np.einsum("a, ab, b", v_raman, -np.imag(G), v_raman) / repeat_times
     
     return raman_intensity
+
+

@@ -20,7 +20,10 @@ import cellconstructor as CC
 import cellconstructor.Methods
 
 # SETUP THE CODATA 2006, To match the QE definition of Rydberg
-units = ase.units.create_units("2006")
+try:
+    units = ase.units.create_units("2006")
+except:
+    units = {"Ry": 13.605698066, "Bohr": 1/1.889725989}
 
 """
 This is an untility script that is able to manage the submission into

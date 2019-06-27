@@ -19,18 +19,18 @@ w,p = dyn.DyagDinQ(0)
 
 # Load the ensemble
 ens = sscha.Ensemble.Ensemble(dyn, 0)
-ens.load("../ensemble_data_test", 2, 1000)
+ens.load("../ensemble_data_test", 2, 10000)
 
 # Unwrap the ensemble
 ens.unwrap_symmetries()
 
 # Compute the odd correction
 t1 = time.time()
-new_dyn_supercell = ens.get_odd_correction()
+new_dyn_supercell = ens.get_odd_correction(use_omp = False)
 t2 = time.time()
 
 #other_new_dyn = ens.get_odd_correction(store_v3 = False, progress = True)
-other_new_dyn = ens.get_odd_correction(include_v4 = True, progress = True, v4_conv_thr = 1e-8)
+other_new_dyn = ens.get_odd_correction(use_omp = True)
 t3 = time.time()
 
 # Copy the matrix into the Phonons class
@@ -45,15 +45,15 @@ dyn2.Symmetrize()
 # Save the dynamical matrix with the odd3 corrections
 dyn.save_qe("dyn_plus_odd_new")
 
-odd = dyn.Copy()
-odd.dynmats[0] = np.load("odd_corr.npy")
-odd.save_qe("odd_new_nosym")
-odd.Symmetrize()
-odd.save_qe("odd_new_sym")
+# odd = dyn.Copy()
+# odd.dynmats[0] = np.load("odd_corr.npy")
+# odd.save_qe("odd_new_nosym")
+# odd.Symmetrize()
+# odd.save_qe("odd_new_sym") 
 
 
-print "Elapsed time to compute odd3:", t2 - t1, "s"
-print "Elapsed time to compute odd3 without storing it:", t3- t2, "s"
+print "Elapsed time to compute odd3 with einsum:", t2 - t1, "s"
+print "Elapsed time to compute odd3 with openmp:", t3- t2, "s"
 print "Difference between the result of storing and not storing it:"
 print np.sqrt(np.sum( (new_dyn_supercell - other_new_dyn)**2))
 print ""

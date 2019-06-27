@@ -9,7 +9,11 @@ from matplotlib.pyplot import *
 
 
 import sscha, sscha.Ensemble
+
 import sscha.Dynamical
+
+import sys
+
 
 SUPERCELL = (1,1,1)
 T = 0

@@ -139,10 +139,11 @@ class SSCHA_Minimizer:
         self.min_step_dyn = lambda_a
         self.min_step_struc = 1
         
+        dyn = None
         if ensemble is not None:
-            self.dyn = self.ensemble.current_dyn.Copy()
-        else:
-            self.dyn = None
+            dyn = self.ensemble.current_dyn.Copy()
+
+        self.dyn = dyn
         self.dyn_path = ""
         self.population = 0
         
