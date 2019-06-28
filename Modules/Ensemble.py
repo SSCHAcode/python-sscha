@@ -201,6 +201,7 @@ class Ensemble:
                 self.xats *= __A_TO_BOHR__
                 self.sscha_energies /= 2 # Ry -> Ha
                 self.energies /= 2
+                self.u_disps *= __A_TO_BOHR__
 
                 self.stresses /= 2
             else:
@@ -229,6 +230,7 @@ class Ensemble:
                 self.xats /= __A_TO_BOHR__
                 self.sscha_energies *= 2 # Ha -> Ry
                 self.energies *= 2
+                self.u_disps /= __A_TO_BOHR__
 
                 self.stresses *= 2
 
@@ -2050,7 +2052,7 @@ class Ensemble:
         """
         # Convert anything into the Ha units
         # This is needed for the Fortran subroutines
-        #self.convert_units(UNITS_HARTREE)
+        self.convert_units(UNITS_HARTREE)
 
         # Get the dynamical matrix in the supercell
         dyn_supercell = self.current_dyn.GenerateSupercellDyn(self.supercell)
@@ -2077,8 +2079,8 @@ class Ensemble:
         amass = np.array(self.current_dyn.structure.masses.values(), dtype = np.double)
 
         # Get the forces and conver in the correct units
-        f = (self.forces - self.sscha_forces) * Bohr 
-        u = self.u_disps.reshape((self.N, nat_sc, 3), order = "C") / Bohr
+        f = (self.forces - self.sscha_forces) #* Bohr 
+        u = self.u_disps.reshape((self.N, nat_sc, 3), order = "C")# / Bohr
 
         log_err = "err_yesrho"
 
@@ -2100,8 +2102,8 @@ class Ensemble:
         
 
         # Convert back the ensemble in Default units
-        #self.convert_units(UNITS_DEFAULT)
-        #phi_sc_odd *= 2 # Ha/bohr^2 -> Ry/bohr^2
+        self.convert_units(UNITS_DEFAULT)
+        phi_sc_odd *= 2 # Ha/bohr^2 -> Ry/bohr^2
 
         # Lets fourier transform
         dynq_odd = CC.Phonons.GetDynQFromFCSupercell(phi_sc_odd, np.array(self.current_dyn.q_tot), 

@@ -22,7 +22,7 @@ ens = sscha.Ensemble.Ensemble(dyn, 0)
 ens.load("../ensemble_data_test", 2, 10)
 
 # Unwrap the ensemble
-ens.unwrap_symmetries()
+#ens.unwrap_symmetries()
 
 # Compute the odd correction
 t1 = time.time()
@@ -33,7 +33,7 @@ t2 = time.time()
 other_new_dyn = ens.get_odd_correction(use_omp = True)
 t3 = time.time()
 
-fortran_last_dyn = ens.get_free_energy_hessian()
+fortran_last_dyn = ens.get_fortran_odd_correction()
 t4 = time.time()
 
 # Copy the matrix into the Phonons class
@@ -44,7 +44,7 @@ dyn2.dynmats[0] = other_new_dyn
 # Perform the symmetrization
 dyn.Symmetrize()
 dyn2.Symmetrize()
-fortran_last_dyn.Symmetrize()
+#fortran_last_dyn.Symmetrize()
 
 # Save the dynamical matrix with the odd3 corrections
 dyn.save_qe("dyn_plus_odd_new")
