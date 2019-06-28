@@ -2087,6 +2087,7 @@ class Ensemble:
         d3 = SCHAModules.get_v3(a, new_pol, trans, amass, ityp,
                                 f, u, self.rho, log_err)
         print("Outside d3")
+        np.save("d3.npy", d3)
 
         # TODO: symmetrize the d3
 
