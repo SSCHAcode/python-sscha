@@ -2,22 +2,31 @@
 ! This subroutine calculates the matrix containing polarization vectors
 ! masses and the lengths
 
-subroutine get_emat (er, a, amass, ityp_sc, v3_log, transmode, e)
+subroutine get_emat (er, a, amass, ityp_sc, v3_log, transmode, e, n_mode, nat_sc, ntyp)
 
     implicit none
     
-      double precision, dimension(:,:,:), intent(in) :: er
-      double precision, dimension(:), intent(in) :: a
-      double precision, dimension(:), intent(in) :: amass
-      integer, dimension(:), intent(in) :: ityp_sc
+      double precision, dimension(nat_sc,n_mode,3), intent(in) :: er
+      double precision, dimension(n_mode), intent(in) :: a
+      double precision, dimension(ntyp), intent(in) :: amass
+      integer, dimension(nat_sc), intent(in) :: ityp_sc
       logical, intent(in) :: v3_log
-      logical, dimension(:), intent(in) :: transmode
-      double precision, dimension(:,:), intent(out) :: e
+      logical, dimension(n_mode), intent(in) :: transmode
+      double precision, dimension(n_mode,3*nat_sc), intent(out) :: e
     
-      integer :: mu, ka, i, nat_sc, n_mode, alpha
+      integer :: mu, ka, i, nat_sc, n_mode, alpha, ntyp
+
+      logical, parameter :: debug = .true.
     
-      nat_sc = size(er(:,1,1))
-      n_mode = size(a)
+      !nat_sc = size(er(:,1,1))
+      !n_mode = size(a)
+
+      if (debug) then
+        print *, "=== DEBUG GET_EMAT ==="
+        print *, "NAT_SC:", nat_sc 
+        print *, "N_MODE:", n_mode 
+        call flush()
+      endif
     
       do mu = 1, n_mode
         ka = 0

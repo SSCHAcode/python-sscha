@@ -52,6 +52,12 @@ subroutine get_v3 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v3, &
       print *, "N_MODE:", n_mode
       print *, "N_RANDOM:", n_random
       print *, "NAT_SC:", nat_sc 
+
+      print *, ""
+      print *, "A displacemets:", a(:)
+      print *, "Translations:", transmode(:)
+      print *, "Weights:", rho(:)
+      print *, "AMASS:", amass(:)
       call flush()
     end if
   
@@ -66,7 +72,7 @@ subroutine get_v3 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v3, &
   
     ! Calculate e polarization vectors with lengths and masses
   
-    call get_emat (er, a, amass, ityp_sc, .false., transmode, e) 
+    call get_emat (er, a, amass, ityp_sc, .false., transmode, e, n_mode, nat_sc, ntyp) 
   
     ! Get displacements in a rank two tensor
   
@@ -100,8 +106,8 @@ subroutine get_v3 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v3, &
   
     !thread_num = omp_get_max_threads ( )
   
-    !$omp parallel SHARED ( v3, eprod, ur, f2, rho, n_mode, log_err ) PRIVATE ( x, y, z, fun, av, av_err )
-    !$omp do
+    !!!!$omp parallel SHARED ( v3, eprod, ur, f2, rho, n_mode, log_err ) PRIVATE ( x, y, z, fun, av, av_err )
+    !!!!$omp do
     do x = 1, n_mode
       do y = 1, n_mode
         do z = 1, n_mode 

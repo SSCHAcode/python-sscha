@@ -2026,13 +2026,13 @@ class Ensemble:
         return sigma
 
 
-    def get_free_energy_hessian(self, include_v4 = False):
+    def get_fortran_odd_correction(self, include_v4 = False):
         """
-        GET THE FREE ENERGY HESSIAN
-        ===========================
+        GET THE FREE ENERGY ODD CORRECTION
+        ==================================
 
-        This subroutines computes the free energy
-        hessian using the fortran subroutines, as describe in the
+        This subroutines computes the odd correction
+        to the free energy hessian using the fortran subroutines, as describe in the
         Bianco paper ...
 
         The calculation is performed in the supercell
@@ -2096,6 +2096,8 @@ class Ensemble:
                                                   self.current_T, d3)
         print ("Outside odd straight")
 
+        
+
         # Convert back the ensemble in Default units
         #self.convert_units(UNITS_DEFAULT)
         #phi_sc_odd *= 2 # Ha/bohr^2 -> Ry/bohr^2
@@ -2107,7 +2109,7 @@ class Ensemble:
         # Generate the Phonon structure by including the odd correction
         dyn_hessian = self.current_dyn.Copy()
         for iq in range(len(self.current_dyn.q_tot)):
-            dyn_hessian.dynmats[iq] += dynq_odd[iq, :, :] 
+            dyn_hessian.dynmats[iq] = dynq_odd[iq, :, :] 
         
         return dyn_hessian
 

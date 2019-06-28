@@ -72,7 +72,7 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
   ! The square root of the mass is also included in the new matrix
   ! and also the normal length 
 
-  call get_emat ( er, a, amass, ityp_sc, .true., transmode, l)
+  call get_emat ( er, a, amass, ityp_sc, .true., transmode, l, n_mode, nat_sc, ntyp)
 
   ! Calculate  the matrix g that will enter in the final equation
 

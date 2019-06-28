@@ -19,7 +19,7 @@ w,p = dyn.DyagDinQ(0)
 
 # Load the ensemble
 ens = sscha.Ensemble.Ensemble(dyn, 0)
-ens.load("../ensemble_data_test", 2, 1000)
+ens.load("../ensemble_data_test", 2, 10)
 
 # Unwrap the ensemble
 ens.unwrap_symmetries()
