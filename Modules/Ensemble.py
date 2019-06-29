@@ -2127,7 +2127,10 @@ class Ensemble:
         # Generate the Phonon structure by including the odd correction
         dyn_hessian = self.current_dyn.Copy()
         for iq in range(len(self.current_dyn.q_tot)):
-            dyn_hessian.dynmats[iq] = dynq_odd[iq, :, :] 
+            if get_full_hessian:
+                dyn_hessian.dynmats[iq] += dynq_odd[iq, :, :] 
+            else:
+                dyn_hessian.dynmats[iq] = dynq_odd[iq, :, :] 
 
         
         return dyn_hessian

@@ -33,7 +33,7 @@ t2 = time.time()
 other_new_dyn = ens.get_odd_correction(use_omp = True)
 t3 = time.time()
 
-fortran_last_dyn = ens.get_fortran_odd_correction()
+fortran_last_dyn = ens.get_free_energy_hessian()
 t4 = time.time()
 
 # Copy the matrix into the Phonons class
