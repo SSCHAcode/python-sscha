@@ -184,6 +184,8 @@ class Ensemble:
                 for iq, q in enumerate(self.dyn_0.q_tot):
                     self.dyn_0.dynmats[iq] /= 2
                     self.current_dyn.dynmats[iq] /= 2
+                    self.dyn_0.q_tot[iq] /= __A_TO_BOHR__ 
+                    self.current_dyn.q_tot[iq] /= __A_TO_BOHR__
 
                 for k in self.dyn_0.structure.masses.keys():
                     self.dyn_0.structure.masses[k] *= 2
@@ -213,6 +215,8 @@ class Ensemble:
                 for iq, q in enumerate(self.dyn_0.q_tot):
                     self.dyn_0.dynmats[iq] *= 2
                     self.current_dyn.dynmats[iq] *= 2
+                    self.dyn_0.q_tot[iq] *= __A_TO_BOHR__ 
+                    self.current_dyn.q_tot[iq] *= __A_TO_BOHR__
 
                 for k in self.dyn_0.structure.masses.keys():
                     self.dyn_0.structure.masses[k] /= 2
@@ -2028,7 +2032,7 @@ class Ensemble:
         return sigma
 
 
-    def get_fortran_odd_correction(self, include_v4 = False):
+    def get_free_energy_hessian(self, include_v4 = False, get_full_hessian = True, verbose = False):
         """
         GET THE FREE ENERGY ODD CORRECTION
         ==================================
@@ -2044,6 +2048,12 @@ class Ensemble:
             include_v4 : bool
                 If True we include the fourth order force constant matrix.
                 This requires a lot of memory
+            get_full_hessian : bool
+                If True the full hessian matrix is returned, if false, only the correction to
+                the SSCHA dynamical matrix is returned.
+            verbose : bool
+                If True a lot things are written in output.
+                This is usefull for debugging purpouses.
 
         Returns
         -------
@@ -2079,40 +2089,46 @@ class Ensemble:
         amass = np.array(self.current_dyn.structure.masses.values(), dtype = np.double)
 
         # Get the forces and conver in the correct units
-        f = (self.forces - self.sscha_forces) #* Bohr 
-        u = self.u_disps.reshape((self.N, nat_sc, 3), order = "C")# / Bohr
+        f = (self.forces - self.sscha_forces)# * Bohr 
+        u = self.u_disps.reshape((self.N, nat_sc, 3), order = "C") #/ Bohr
 
         log_err = "err_yesrho"
 
         # Lets call the Fortran subroutine to compute the v3
-        print ("Going into d3")
+        if verbose:
+            print ("Going into d3")
         d3 = SCHAModules.get_v3(a, new_pol, trans, amass, ityp,
                                 f, u, self.rho, log_err)
-        print("Outside d3")
-        np.save("d3.npy", d3)
+        if verbose:
+            print("Outside d3")
+            print("Saving the third order force constants as d3.npy")
+            np.save("d3.npy", d3)
 
         # TODO: symmetrize the d3
 
         # Get the odd correction (In Ha/bohr^2)
-        print ("Inside odd straight")
+        if verbose:
+            print ("Inside odd straight")
         phi_sc_odd = SCHAModules.get_odd_straight(a, w, new_pol, trans, amass, ityp, 
                                                   self.current_T, d3)
-        print ("Outside odd straight")
-
-        
-
-        # Convert back the ensemble in Default units
-        self.convert_units(UNITS_DEFAULT)
-        phi_sc_odd *= 2 # Ha/bohr^2 -> Ry/bohr^2
+        if verbose:
+            print ("Outside odd straight.")
+            print ("Saving the odd correction (Ha) as phi_odd.npy")
+            np.save("phi_odd.npy", phi_sc_odd)
 
         # Lets fourier transform
         dynq_odd = CC.Phonons.GetDynQFromFCSupercell(phi_sc_odd, np.array(self.current_dyn.q_tot), 
                                                      self.current_dyn.structure, dyn_supercell.structure)
         
+        # Convert back the ensemble in Default units
+        self.convert_units(UNITS_DEFAULT)
+        dynq_odd *= 2 # Ha/bohr^2 -> Ry/bohr^2
+
         # Generate the Phonon structure by including the odd correction
         dyn_hessian = self.current_dyn.Copy()
         for iq in range(len(self.current_dyn.q_tot)):
             dyn_hessian.dynmats[iq] = dynq_odd[iq, :, :] 
+
         
         return dyn_hessian
 
