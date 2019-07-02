@@ -858,7 +858,7 @@ class Ensemble:
         # Lets try to use this one
         self.rho = rho_tmp
 
-        print("\n".join(["%8d) %16.8f" % (i+1, r) for i, r in enumerate(self.rho)]))
+        #print("\n".join(["%8d) %16.8f" % (i+1, r) for i, r in enumerate(self.rho)]))
         
         #np.savetxt("upsilon_%05d.dat" % self.__debug_index__, ups_new)
         #np.savetxt("d_upsilon_%05d.dat" % self.__debug_index__, dups)
