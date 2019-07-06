@@ -2032,7 +2032,8 @@ class Ensemble:
         return sigma
 
 
-    def get_free_energy_hessian(self, include_v4 = False, get_full_hessian = True, verbose = False):
+    def get_free_energy_hessian(self, include_v4 = False, get_full_hessian = True, verbose = False, \
+        use_symmetries = True):
         """
         GET THE FREE ENERGY ODD CORRECTION
         ==================================
@@ -2054,12 +2055,22 @@ class Ensemble:
             verbose : bool
                 If True a lot things are written in output.
                 This is usefull for debugging purpouses.
+            use_symmetries : bool
+                If true, the d3 and d4 are symmetrized in real space.
+                It requires that spglib is installed to detect symmetries in the supercell correctly.
 
         Returns
         -------
             phi_sc : Phonons()
                 The dynamical matrix of the free energy hessian in (Ry/bohr^2)
         """
+        # For now the v4 is not implemented
+        if include_v4:
+            ERROR_MSG = """
+    Error, the v4 computation has not yet been implemented.
+    """
+            raise NotImplementedError(ERROR_MSG)
+
         # Convert anything into the Ha units
         # This is needed for the Fortran subroutines
         self.convert_units(UNITS_HARTREE)
@@ -2101,10 +2112,19 @@ class Ensemble:
                                 f, u, self.rho, log_err)
         if verbose:
             print("Outside d3")
+        
+
+        # Symmetrize the d3
+        if use_symmetries:
+            if verbose:
+                print("Symmetrizing the d3")
+            qe_sym = CC.symmetries.QE_Symmetry(dyn_supercell.structure)
+            qe_sym.SetupFromSPGLIB()
+            qe_sym.ApplySymmetryToTensor3(d3)
+
+        if verbose:
             print("Saving the third order force constants as d3.npy")
             np.save("d3.npy", d3)
-
-        # TODO: symmetrize the d3
 
         # Get the odd correction (In Ha/bohr^2)
         if verbose:
