@@ -205,7 +205,8 @@ class Ensemble:
                 self.energies /= 2
                 self.u_disps *= __A_TO_BOHR__
 
-                self.stresses /= 2
+                if self.has_stress:
+                    self.stresses /= 2
             else:
                 raise NotImplementedError("Error, I do not know how to convert between {} and {}.".format(self.units, new_units))    
                 
@@ -236,7 +237,8 @@ class Ensemble:
                 self.energies *= 2
                 self.u_disps /= __A_TO_BOHR__
 
-                self.stresses *= 2
+                if self.has_stress:
+                    self.stresses *= 2
 
             else:
                 raise NotImplementedError("Error, I do not know how to convert between {} and {}.".format(self.units, new_units))
