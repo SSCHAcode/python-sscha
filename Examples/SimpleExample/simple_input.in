@@ -129,6 +129,17 @@
     ! by setting the step to 0 (lambda_a or lambda_w)
     minim_struc = .true.
 
+    ! We can choose to use spglib for symmetrization (the default one is Quantum ESPRESSO)
+    ! It is more effective in detecting symmetries
+    ! But it will force the symmetrization to be done in the supercell
+    ! This is slower if the supercell is big.
+    use_spglib = .true.
+
+    ! We can also chose if we want disable the symmetrization
+    ! The Acoustic sum rule will still be used. Usefull if we want to
+    ! Relax a structure.
+    neglect_symmetries = .false.
+
     ! The old code uses line minimization (activated after warm_up_steps)
     ! The new python code will complain
     !warm_up_steps = 10000    

@@ -75,6 +75,7 @@ __SCHA_STRESSOFFSET__ = "stress_offset"
 __SCHA_GRADIOP__ = "gradi_op"
 __SCHA_POPULATION__ = "population"
 __SCHA_PRINTSTRESS__ = "print_stress"
+__SCHA_USESPGLIB__ = "use_spglib"
 
 
 __SCHA_ALLOWED_KEYS__ = [__SCHA_LAMBDA_A__, __SCHA_ISBIN__,
@@ -88,7 +89,7 @@ __SCHA_ALLOWED_KEYS__ = [__SCHA_LAMBDA_A__, __SCHA_ISBIN__,
                          __SCHA_TG__, __SCHA_SUPERCELLSIZE__,
                          __SCHA_MAXSTEPS__, __SCHA_STRESSOFFSET__,
                          __SCHA_GRADIOP__, __SCHA_POPULATION__,
-                         __SCHA_PRINTSTRESS__]
+                         __SCHA_PRINTSTRESS__, __SCHA_USESPGLIB__]
 __SCHA_MANDATORY_KEYS__ = [__SCHA_FILDYN__, __SCHA_NQIRR__, __SCHA_NQIRR__,
                            __SCHA_T__]
 
@@ -173,6 +174,10 @@ class SSCHA_Minimizer:
         
         # If true the symmetries are neglected
         self.neglect_symmetries = False
+
+        # If true use spglib to impose symmetries
+        # NOTE: It is slower, but it enables using supercells
+        self.use_spglib = False
         
         
         # Setup the statistical threshold
@@ -201,6 +206,8 @@ class SSCHA_Minimizer:
         self.__gw__ = []
         self.__gw_err__ = []
         self.__KL__ = []
+
+        
         
         
     def minimization_step(self, custom_function_gradient = None):
@@ -219,6 +226,9 @@ class SSCHA_Minimizer:
         
         # Setup the symmetries
         qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+        
+        if self.use_spglib:
+            qe_sym.SetupFromSPGLIB()
         
         #qe_sym.SetupQPoint(verbose = False)
         
@@ -240,12 +250,44 @@ class SSCHA_Minimizer:
 #        qe_sym.SymmetrizeDynQ(err, np.array([0,0,0]))
         t1 = time.time()
         if not self.neglect_symmetries:
-            qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
-            qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "custom")
+            # Check if the symmetries must be applied in the supercell
+            if self.use_spglib:
+                # Check if we have a supercell
+                supercell = self.dyn.GetSupercell()
+                n_cell = np.prod(supercell)
+                if n_cell == 1:
+                    # Only gamma, apply the symmetries
+                    qe_sym.ApplySymmetriesToV2(dyn_grad[0, :, :])
+
+                    #qe_sym.ApplySymmetriesToV2(err)
+                    #CC.symmetries.CustomASR(err)
+                else:
+                    # We have a supercell, we must generate the dynamical matrix in the supercell
+                    super_structure = self.dyn.structure.generate_supercell(supercell)
+                    fc_supercell = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot), \
+                        self.dyn.structure, super_structure)
+
+                    # Lets generate a new symmetries for the supercell
+                    qe_sym_supcell = CC.symmetries.QE_Symmetry(super_structure)
+                    qe_sym_supcell.SetupFromSPGLIB()
+
+                    # Apply the symmetries to the fc_supercell matrix
+                    qe_sym_supcell.ApplySymmetriesToV2(fc_supercell)
+
+                    # Convert back to Q space
+                    dyn_grad = CC.Phonons.GetDynQFromFCSupercell(fc_supercell, np.array(self.dyn.q_tot), \
+                        self.dyn.structure, super_structure)
+                
+                # Apply the sum rule at gamma
+                CC.symmetries.CustomASR(dyn_grad[0,:,:])
+            else:
+                qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
+                #qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "custom")
+            
+            # Just divide the error by the square root the number of symmetries
+            err /= np.sqrt(qe_sym.QE_nsym * np.prod(self.ensemble.supercell))
         else:
-            for i in range(len(self.dyn.q_tot)):
-                qe_sym.ImposeSumRule(dyn_grad[i, :,:], asr = "custom")
-                qe_sym.ImposeSumRule(err[i, :, :], asr = "custom")
+            CC.symmetries.CustomASR(dyn_grad[0, :,:])
         t2 = time.time()
         print "Time elapsed to symmetrize the gradient:", t2 - t1, "s"
         
@@ -277,9 +319,6 @@ class SSCHA_Minimizer:
             
         
             
-        
-        
-        
         # If the structure must be minimized perform the step
         if self.minim_struct:
             t1 = time.time()
@@ -301,9 +340,11 @@ class SSCHA_Minimizer:
             
             # Apply the symmetries to the forces
             if not self.neglect_symmetries:
-                qe_sym.SetupQPoint()
+                if not self.use_spglib:
+                    qe_sym.SetupQPoint()
                 qe_sym.SymmetrizeVector(struct_grad)
-                qe_sym.SymmetrizeVector(struct_grad_err)
+                #qe_sym.SymmetrizeVector(struct_grad_err)
+                struct_grad_err /= np.sqrt(qe_sym.QE_nsym)
 
             # Perform the gradient restriction
             if custom_function_gradient is not None:
@@ -434,6 +475,28 @@ class SSCHA_Minimizer:
         
         if __SCHA_NEGLECT_SYMMETRIES__ in keys:
             self.neglect_symmetries = namelist[__SCHA_NEGLECT_SYMMETRIES__]
+        
+        if __SCHA_USESPGLIB__ in keys:
+            self.use_spglib = namelist[__SCHA_USESPGLIB__]
+            if self.neglect_symmetries and self.use_spglib:
+                ERROR_MSG="""
+    Error, {} = True and {} = True.
+           Incompatible choice!
+                """.format(__SCHA_NEGLECT_SYMMETRIES__, __SCHA_USESPGLIB__)
+                raise ValueError(ERROR_MSG)
+            
+            # Check if spglib can actually be loaded
+            if self.use_spglib:
+                try:
+                    import spglib
+                except:
+                    ERROR_MSG="""
+    Error, {} = True, but I cannot load spglib module!
+            Please, install spglib, or set {} to False.
+                    """.format(__SCHA_USESPGLIB__, __SCHA_USESPGLIB__)
+                    raise ImportError(ERROR_MSG)
+            
+
             
         if __SCHA_NRANDOM_EFF__ in keys:
             if not __SCHA_NRANDOM__ in keys:
