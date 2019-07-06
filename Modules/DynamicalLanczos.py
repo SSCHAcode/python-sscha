@@ -203,23 +203,23 @@ class Lanczos:
         self.initialized = True
 
         # Generate the dynamical matrix in the supercell
-        super_dyn = self.dyn.GenerateSupercellDyn(self.dyn.GetSupercell())
-        w, pols = super_dyn.DyagDinQ(0)
+        super_structure = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
+        w, pols = self.dyn.DiagonalizeSupercell()
 
         # Get the symmetries of the super structure
         if not __SPGLIB__:
             raise ImportError("Error, spglib module required to perform symmetrization in a supercell")
         
-        super_symmetries = CC.symmetries.GetSymmetriesFromSPGLIB(spglib.get_symmetry(super_dyn.structure.get_ase_atoms()), False)
+        super_symmetries = CC.symmetries.GetSymmetriesFromSPGLIB(spglib.get_symmetry(super_structure.get_ase_atoms()), False)
 
         # Get the symmetry matrix in the polarization space
         # Translations are needed, as this method needs a complete basis.
-        pol_symmetries = CC.symmetries.GetSymmetriesOnModes(super_symmetries, super_dyn.structure, pols)
+        pol_symmetries = CC.symmetries.GetSymmetriesOnModes(super_symmetries, super_structure, pols)
 
         Ns, dumb, dump = np.shape(pol_symmetries)
         
         # Now we can pull out the translations
-        trans_mask = CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())
+        trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
         self.symmetries = np.zeros( (Ns, self.n_modes, self.n_modes), dtype = TYPE_DP)
         ptmp = pol_symmetries[:, :,  ~trans_mask] 
         self.symmetries[:,:,:] = ptmp[:, ~trans_mask, :]
@@ -249,8 +249,8 @@ class Lanczos:
 
         
 
-    def prepare_perturbation(self, vector):
-        """
+    def prepare_perturbation(self, vector, masses_on_multiply = False):
+        r"""
         This function prepares the calculation for the Green function
 
         <v| G|v>
@@ -258,16 +258,35 @@ class Lanczos:
         Where |v> is the vector passed as input. If you want to compute the
         raman, for istance, it can be the vector of the Raman intensities.
 
+        The vector can be obtained contracting it with the polarization vectors.
+        The contraction can be on the numerator or on the denumerator, depending on the
+        observable.
+
+        .. math ::
+
+            v_\mu = \sum_a v_a e_\mu^a \cdot \sqrt{m_a}
+
+            v_\mu = \sum_a v_a \frac{e_\mu^a}{  \sqrt{m_a}}
+
         Parameters
         ----------
             vector: ndarray( size = (3*natoms))
                 The vector of the perturbation for the computation of the green function
+            masses_on_multiply: bool, optional
+                If true, the vector is contracted with the polarization vectors multiplied
+                by the square root of masses, 
+                otherwise it is contracted with the polarization vector divided
+                by the square root of masses.
         """
 
         self.psi = np.zeros(self.n_modes + self.n_modes*self.n_modes, dtype = TYPE_DP)
 
         # Convert the vector in the polarization space
-        new_v = np.einsum("a, a, ab->b", np.sqrt(self.m), vector, self.pols)
+        if masses_on_multiply:
+            m_on = np.sqrt(self.m)
+        else:
+            m_on = 1 / np.sqrt(self.m)
+        new_v = np.einsum("a, a, ab->b", m_on, vector, self.pols)
         self.psi[:self.n_modes] = new_v
 
         if self.symmetrize:
