@@ -2067,11 +2067,11 @@ class Ensemble:
                 The dynamical matrix of the free energy hessian in (Ry/bohr^2)
         """
         # For now the v4 is not implemented
-        if include_v4:
-            ERROR_MSG = """
-    Error, the v4 computation has not yet been implemented.
-    """
-            raise NotImplementedError(ERROR_MSG)
+        #     if include_v4:
+        #         ERROR_MSG = """
+        # Error, the v4 computation has not yet been implemented.
+        # """
+        #         raise NotImplementedError(ERROR_MSG)
 
         # Convert anything into the Ha units
         # This is needed for the Fortran subroutines
@@ -2128,15 +2128,34 @@ class Ensemble:
             print("Saving the third order force constants as d3.npy")
             np.save("d3.npy", d3)
 
-        # Get the odd correction (In Ha/bohr^2)
-        if verbose:
-            print ("Inside odd straight")
-        phi_sc_odd = SCHAModules.get_odd_straight(a, w, new_pol, trans, amass, ityp, 
-                                                  self.current_T, d3)
-        if verbose:
-            print ("Outside odd straight.")
-            print ("Saving the odd correction (Ha) as phi_odd.npy")
-            np.save("phi_odd.npy", phi_sc_odd)
+        # Check if the v4 must be included
+        if include_v4:
+            print("Computing the v4, this requires some time...")
+            t1 = time.time()
+            d4 = SCHAModules.get_v4(a, new_pol, trans, amass, ityp, \
+                f, u, self.rho, log_err)
+            t2 = time.time()
+            print("Time elapsed to compute the v4: {} s".format(t2-t1))
+
+            # Symmetrize the v4 
+            if use_symmetries:
+                qe_sym = CC.symmetries.QE_Symmetry(dyn_supercell.structure)
+                qe_sym.SetupFromSPGLIB()
+                qe_sym.ApplySymmetryToTensor4(d4)
+            
+            if verbose: print("Inside odd straight")
+            phi_sc_odd = SCHAModules.get_odd_straight_with_v4(a, w, new_pol, trans, \
+                amass, ityp, self.current_T, d3, d4)
+        else:
+            # Only v3
+            # Get the odd correction (In Ha/bohr^2)
+            if verbose: print ("Inside odd straight")
+            phi_sc_odd = SCHAModules.get_odd_straight(a, w, new_pol, trans, amass, ityp, 
+                                                    self.current_T, d3)
+            # if verbose:
+            #     print ("Outside odd straight.")
+            #     print ("Saving the odd correction (Ha) as phi_odd.npy")
+            #     np.save("phi_odd.npy", phi_sc_odd)
 
         # Lets fourier transform
         dynq_odd = CC.Phonons.GetDynQFromFCSupercell(phi_sc_odd, np.array(self.current_dyn.q_tot), 
