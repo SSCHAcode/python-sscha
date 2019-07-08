@@ -48,16 +48,10 @@ subroutine get_v4 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v4, &
 
 
     if (debug) then
-        print *, "=== V3 DEBUG ==="
+        print *, "=== V4 DEBUG ==="
         print *, "N_MODE:", n_mode
         print *, "N_RANDOM:", n_random
         print *, "NAT_SC:", nat_sc 
-  
-        print *, ""
-        print *, "A displacemets:", a(:)
-        print *, "Translations:", transmode(:)
-        print *, "Weights:", rho(:)
-        print *, "AMASS:", amass(:)
         call flush()
     end if
     
@@ -75,6 +69,11 @@ subroutine get_v4 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v4, &
     call get_emat (er, a, amass, ityp_sc, .false., transmode, e) 
   
     ! Get displacements in a rank two tensor
+
+    if (debug) then
+        print *, "AFTER EMAT"
+        call flush()
+    endif  
   
     ka = 0
   
@@ -100,6 +99,11 @@ subroutine get_v4 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v4, &
     ! Calculate the third order coefficients
   
     !thread_num = omp_get_max_threads ( )
+
+    if (debug) then
+        print *, "BEFORE SUPERLOOP"
+        call flush()
+    endif  
   
     !$omp parallel SHARED ( v4, ur, f2, rho, n_mode, log_err ) PRIVATE ( x, y, z, w, fun, av, av_err )
     !$omp do COLLAPSE(4)
@@ -117,6 +121,10 @@ subroutine get_v4 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v4, &
     !$omp end do
     !$omp end parallel
   
+    if (debug) then
+        print *, "AFTER SUPERLOOP"
+        call flush()
+    endif  
     deallocate(e,ur,u2,f2,fun)
   
   end subroutine get_v4
