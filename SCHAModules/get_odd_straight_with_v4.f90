@@ -77,7 +77,7 @@ subroutine get_odd_straight_with_v4 ( a, wr, er, transmode, amass, ityp_sc, T, v
 
   ! Get lambda matrix 
 
-  call get_cmat ( a, wr, er, transmode, amass, ityp_sc, T, .true., lamat ) 
+  call get_cmat ( a, wr, er, transmode, amass, ityp_sc, T, .true., lamat,n_mode, nat_sc, ntyp ) 
 
   ! Write third and fourth order force constants as rank 2
 

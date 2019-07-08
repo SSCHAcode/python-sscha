@@ -65,8 +65,13 @@ subroutine get_v4 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v4, &
     allocate(fun(n_random))
   
     ! Calculate e polarization vectors with lengths and masses
+
+    if (debug) then
+        print *, "BEFORE EMAT"
+        call flush()
+    endif  
   
-    call get_emat (er, a, amass, ityp_sc, .false., transmode, e) 
+    call get_emat (er, a, amass, ityp_sc, .false., transmode, e, n_mode, nat_sc, ntyp) 
   
     ! Get displacements in a rank two tensor
 

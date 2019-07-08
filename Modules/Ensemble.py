@@ -325,7 +325,7 @@ class Ensemble:
         # Superstructure
         dyn_supercell = self.dyn_0.GenerateSupercellDyn(self.supercell)
         super_structure = dyn_supercell.structure
-        super_fc = dyn_supercell.dynmats[0]
+        super_fc = np.real(dyn_supercell.dynmats[0])
 
         self.structures = []
         
