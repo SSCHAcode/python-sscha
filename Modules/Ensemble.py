@@ -2149,7 +2149,13 @@ class Ensemble:
         else:
             # Only v3
             # Get the odd correction (In Ha/bohr^2)
-            if verbose: print ("Inside odd straight")
+            if verbose: 
+                print ("Inside odd straight")
+                print (" A = ", a)
+                print (" W = ", w)
+                print (" AMASS = ", amass)
+                print (" ITYP = ", ityp)
+                print (" T = ", self.current_T)
             phi_sc_odd = SCHAModules.get_odd_straight(a, w, new_pol, trans, amass, ityp, 
                                                     self.current_T, d3)
             # if verbose:

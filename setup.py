@@ -1,6 +1,11 @@
 from numpy.distutils.core import setup, Extension
 
 
+
+LIBRARIES = ["lapack", "blas"]
+EXTRA_F90_FLAGS =  ["-cpp", "-fopenmp"]
+EXTRA_LINK_ARGS = ["-fopenmp"]
+
 # Compile the fortran SCHA modules
 SCHAModules = Extension(name = "SCHAModules", 
                         sources = ["SCHAModules/module_stochastic.f90",
@@ -19,8 +24,9 @@ SCHAModules = Extension(name = "SCHAModules",
                                    "SCHAModules/get_cmat.f90",
                                    "SCHAModules/get_v4.f90",
                                    "SCHAModules/get_odd_straight_with_v4.f90"],
-                        libraries = ["lapack", "blas"],
-                        extra_f90_compile_args = ["-cpp"])
+                        libraries = LIBRARIES,
+                        extra_f90_compile_args = EXTRA_F90_FLAGS,
+                        extra_link_args= EXTRA_LINK_ARGS)
 
 
 # Prepare the compilation of the Python Conde

@@ -106,8 +106,8 @@ subroutine get_v3 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v3, &
   
     !thread_num = omp_get_max_threads ( )
   
-    !!!!$omp parallel SHARED ( v3, eprod, ur, f2, rho, n_mode, log_err ) PRIVATE ( x, y, z, fun, av, av_err )
-    !!!!$omp do
+    !$omp parallel SHARED ( v3, eprod, ur, f2, rho, n_mode, log_err ) PRIVATE ( x, y, z, fun, av, av_err )
+    !$omp do
     do x = 1, n_mode
       do y = 1, n_mode
         do z = 1, n_mode 
