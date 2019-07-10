@@ -2158,10 +2158,13 @@ class Ensemble:
                 print (" T = ", self.current_T)
             phi_sc_odd = SCHAModules.get_odd_straight(a, w, new_pol, trans, amass, ityp, 
                                                     self.current_T, d3)
-            # if verbose:
-            #     print ("Outside odd straight.")
-            #     print ("Saving the odd correction (Ha) as phi_odd.npy")
-            #     np.save("phi_odd.npy", phi_sc_odd)
+                                        
+            if verbose:
+                print ("Outside odd straight.")
+                print ("Saving the odd correction (Ha) as phi_odd.npy")
+                np.save("phi_odd.npy", phi_sc_odd)
+        
+
 
         # Lets fourier transform
         dynq_odd = CC.Phonons.GetDynQFromFCSupercell(phi_sc_odd, np.array(self.current_dyn.q_tot), 
