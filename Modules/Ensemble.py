@@ -2163,12 +2163,17 @@ class Ensemble:
                 print ("Outside odd straight.")
                 print ("Saving the odd correction (Ha) as phi_odd.npy")
                 np.save("phi_odd.npy", phi_sc_odd)
+
+                # Try to save this matrix
+                dyn_supercell.dynmats[0] = phi_sc_odd 
+                dyn_supercell.save_qe("SupercellOddDynHa")
         
 
 
         # Lets fourier transform
         dynq_odd = CC.Phonons.GetDynQFromFCSupercell(phi_sc_odd, np.array(self.current_dyn.q_tot), 
                                                      self.current_dyn.structure, dyn_supercell.structure)
+        
         
         # Convert back the ensemble in Default units
         self.convert_units(UNITS_DEFAULT)
