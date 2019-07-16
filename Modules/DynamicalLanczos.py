@@ -114,6 +114,7 @@ class Lanczos:
         self.degenerate_space = None
         self.N_degeneracy = None
         self.initialized = False
+        self.perturbation_modulus = 1
 
         # Perform a bare initialization if the ensemble is not provided
         if ensemble is None:
@@ -247,7 +248,42 @@ class Lanczos:
         self.N_degeneracy = N_deg
         self.degenerate_space = deg_space
 
+    def prepare_ir(self, effective_charges = None, pol_vec = np.array([1,0,0])):
+        """
+        PREPARE LANCZOS FOR IR COMPUTATION
+        ==================================
+
+        In this subroutine we prepare the lanczos algorithm for the computation of the
+        IR signal.
+
+        Parameters
+        ----------
+            effective_charges : ndarray(size = (n_atoms, 3, 3), dtype = np.double)
+                The effective charges. Indices are: Number of atoms in the unit cell,
+                electric field component, atomic coordinate. If None, the effective charges
+                contained in the dynamical matrix will be considered.
+            pol_vec : ndarray(size = 3)
+                The polarization vector of the light.
+        """
+
+        ec = self.dyn.effective_charges
+        if not effective_charges is None:
+            ec = effective_charges
         
+        # Check the effective charges
+        assert not ec is None, "Error, no effective charge found. Cannot initialize IR responce"
+
+        ec_size = np.shape(ec)
+        MSG = """
+        Error, effective charges of the wrong shape: {}
+        """.format(ec_size)
+        assert len(ec_size) == 3, MSG
+        assert ec_size[0] * ec_size[2] == self.n_modes + 3
+        assert ec_size[1] == ec_size[2] == 3
+
+        z_eff = np.einsum("abc, b", ec, pol_vec)
+        self.prepare_perturbation(z_eff.ravel(), masses_exp = -1)
+
 
     def prepare_perturbation(self, vector, masses_exp = 1):
         r"""
@@ -285,6 +321,8 @@ class Lanczos:
         m_on = np.sqrt(self.m) ** masses_exp
         new_v = np.einsum("a, a, ab->b", m_on, vector, self.pols)
         self.psi[:self.n_modes] = new_v
+
+        self.perturbation_modulus = new_v.dot(new_v)
 
         if self.symmetrize:
             self.symmetrize_psi()
@@ -606,7 +644,8 @@ class Lanczos:
                             symmetries = self.symmetries,
                             N_degeneracy = self.N_degeneracy,
                             initialized = self.initialized,
-                            degenerate_space = self.degenerate_space)
+                            degenerate_space = self.degenerate_space,
+                            perturbation_modulus = self.perturbation_modulus)
             
     def load_status(self, file):
         """
@@ -649,6 +688,9 @@ class Lanczos:
             self.N_degeneracy = data["N_degeneracy"]
             self.initialized = data["initialized"]
             self.degenerate_space = data["degenerate_space"]
+        
+        if "perturbation_modulus" in data.keys():
+            self.perturbation_modulus = data["perturbation_modulus"]
 
         # Rebuild the Linear operator
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
@@ -1202,7 +1244,7 @@ Starting from step %d
             b = self.b_coeffs[i] * sign
             gf = 1. / (a - w_array**2  + 2j*w_array*smearing - b**2 * gf)
 
-        return gf
+        return gf * self.perturbation_modulus
 
     
     def get_full_L_operator(self, verbose = False, only_pert=False):
