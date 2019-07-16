@@ -115,6 +115,7 @@ class Lanczos:
         self.N_degeneracy = None
         self.initialized = False
         self.perturbation_modulus = 1
+        self.q_vectors = None # The q vectors of each mode
 
         # Perform a bare initialization if the ensemble is not provided
         if ensemble is None:
@@ -129,6 +130,7 @@ class Lanczos:
         self.T = ensemble.current_T
 
         ws, pols = self.dyn.DiagonalizeSupercell()
+
 
         self.nat = superdyn.structure.N_atoms
 
@@ -147,6 +149,17 @@ class Lanczos:
         self.pols = pols[:, ~trans_mask]
 
         self.n_modes = len(self.w)
+
+
+        # Prepare the list of q point starting from the polarization vectors
+        q_list = CC.symmetries.GetQForEachMode(self.pols, self.uci_structure, self.super_structure, self.dyn.GetSupercell())
+        # Store the q vectors in crystal space
+        bg = self.uci_structure.get_reciprocal_vectors() / 2* np.pi
+        self.q_vectors = np.zeros((self.n_modes, 3), dtype = np.double, order = "C")
+        for iq, q in enumerate(q_list):
+            self.q_vectors[iq, :] = CC.Methods.covariant_coordinate(bg, q)
+        
+
 
         # Ignore v3 or v4. You can set them for testing
         self.ignore_v3 = False
@@ -645,7 +658,8 @@ class Lanczos:
                             N_degeneracy = self.N_degeneracy,
                             initialized = self.initialized,
                             degenerate_space = self.degenerate_space,
-                            perturbation_modulus = self.perturbation_modulus)
+                            perturbation_modulus = self.perturbation_modulus,
+                            q_vectors = self.q_vectors)
             
     def load_status(self, file):
         """
@@ -691,6 +705,7 @@ class Lanczos:
         
         if "perturbation_modulus" in data.keys():
             self.perturbation_modulus = data["perturbation_modulus"]
+            self.q_vectors = data["q_vectors"]
 
         # Rebuild the Linear operator
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
