@@ -127,7 +127,7 @@ class Lanczos:
 
         self.T = ensemble.current_T
 
-        ws, pols = superdyn.DyagDinQ(0)
+        ws, pols = self.dyn.DiagonalizeSupercell()
 
         self.nat = superdyn.structure.N_atoms
 
@@ -249,7 +249,7 @@ class Lanczos:
 
         
 
-    def prepare_perturbation(self, vector, masses_on_multiply = False):
+    def prepare_perturbation(self, vector, masses_exp = 1):
         r"""
         This function prepares the calculation for the Green function
 
@@ -272,20 +272,17 @@ class Lanczos:
         ----------
             vector: ndarray( size = (3*natoms))
                 The vector of the perturbation for the computation of the green function
-            masses_on_multiply: bool, optional
-                If true, the vector is contracted with the polarization vectors multiplied
-                by the square root of masses, 
-                otherwise it is contracted with the polarization vector divided
-                by the square root of masses.
+            masses_exp : float
+                The vector is multiplied by the square root of the masses raised to masses_exp.
+                If you want to multiply each component by the square root of the masses use 1,
+                if you want to divide by the quare root use -1, use 0 if you do not want to use the
+                masses.
         """
 
         self.psi = np.zeros(self.n_modes + self.n_modes*self.n_modes, dtype = TYPE_DP)
 
         # Convert the vector in the polarization space
-        if masses_on_multiply:
-            m_on = np.sqrt(self.m)
-        else:
-            m_on = 1 / np.sqrt(self.m)
+        m_on = np.sqrt(self.m) ** masses_exp
         new_v = np.einsum("a, a, ab->b", m_on, vector, self.pols)
         self.psi[:self.n_modes] = new_v
 
