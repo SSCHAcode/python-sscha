@@ -975,6 +975,7 @@ Starting from step %d
 
 
             # Lets repeat twice the orthogonalization
+            converged = False
             for k_orth in range(N_REP_ORTH):
                 for j in range(len(self.krilov_basis)):
                     coeff = new_vect.dot(self.krilov_basis[j])
@@ -992,15 +993,17 @@ Starting from step %d
 
                 # Check the normalization (If zero the algorithm converged)
                 if norm < __EPSILON__:
+                    converged = True
                     if verbose:
                         print("Obtained a linear dependent vector.")
                         print("The algorithm converged.")
-                    return
+                    break
                 
                 new_vect /= norm 
 
-            self.krilov_basis.append(new_vect)
-            self.psi = new_vect
+            if not converged:
+                self.krilov_basis.append(new_vect)
+                self.psi = new_vect
             t2 = time.time()
 
             # Add the coefficients to the variables
@@ -1026,6 +1029,10 @@ Starting from step %d
             
             if verbose:
                 print("Lanczos step %d ultimated." % i)
+            
+            
+            if converged:
+                return
 
 
     def build_lanczos_matrix_from_coeffs(self, use_arnoldi=True):
