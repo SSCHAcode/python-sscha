@@ -1030,7 +1030,7 @@ Starting from step %d
             if verbose:
                 print("Lanczos step %d ultimated." % i)
             
-            
+
             if converged:
                 return
 
@@ -2033,7 +2033,7 @@ def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mod
         for i in range(n_modes):
             for j in range(i+1, n_modes):
                 # Get the number of steps
-                n_steps = np.arange(N_steps-1)[b_ns[i, i, :] == 0]
+                n_steps = np.arange(N_steps-1)[b_ns[i, j, :] == 0]
                 if len(n_steps) == 0:
                     n_steps = N_steps
                 else:
@@ -2046,7 +2046,7 @@ def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mod
                 lanc.b_coeffs = b_ns[i, j, :n_steps-1]
                 lanc.perturbation_modulus = 2
 
-                print("Computing ({},{}) ... n_steps = {}".format(i, j, n_steps))
+                print("Computing ({},{}) ..., n_steps = {}".format(i, j, n_steps))
 
                 # get the green function from continued fraction
                 gf = lanc.get_green_function_continued_fraction(np.array([0]), use_terminator = use_terminator, \
