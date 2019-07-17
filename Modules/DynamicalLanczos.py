@@ -1273,8 +1273,12 @@ Starting from step %d
                 self.save_status("full_lanczos_diagonal_{}".format(i))
             
             # Fill the a_n and b_n
-            a_ns[i, i, :] = self.a_coeffs
-            b_ns[i, i, :] = self.b_coeffs
+            a_tmp = np.zeros(N_steps, dtype = np.double)
+            a_tmp[len(self.a_coeffs)] = self.a_coeffs
+            b_tmp = np.zeros(N_steps-1, dtype = np.double)
+            b_tmp[len(self.b_coeffs)] = self.b_coeffs
+            a_ns[i, i, :] = a_tmp
+            b_ns[i, i, :] = b_tmp
     
         # If we must compute the mode mixing
         if mode_mixing:
