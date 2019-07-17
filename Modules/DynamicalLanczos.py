@@ -1236,7 +1236,7 @@ Starting from step %d
 
         # Load all the data
         a_ns = np.zeros( (self.n_modes, self.n_modes, N_steps), dtype = np.double)
-        b_ns = np.zeros( (self.n_modes, self.n_modes, N_steps), dtype = np.double)
+        b_ns = np.zeros( (self.n_modes, self.n_modes, N_steps-1), dtype = np.double)
 
         # Incompatible with shift for now
         self.shift_value = 0
@@ -2010,11 +2010,13 @@ def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mod
     if mode_mixing:
         for i in range(n_modes):
             for j in range(i+1, n_modes):
+                # Get the number of steps
+                n_steps = np.arange(N_steps)[b_ns[i, j, :] == 0][0] + 1
 
-                # Create the Lanczos class
+                # Create the Lanczos class)
                 lanc = Lanczos(None)
-                lanc.a_coeffs = a_ns[i, j, :]
-                lanc.b_coeffs = b_ns[i, j, :]
+                lanc.a_coeffs = a_ns[i, j, :n_steps]
+                lanc.b_coeffs = b_ns[i, j, :n_steps]
                 lanc.perturbation_modulus = 2
 
                 # get the green function from continued fraction
