@@ -152,7 +152,7 @@ class Lanczos:
 
 
         # Prepare the list of q point starting from the polarization vectors
-        q_list = CC.symmetries.GetQForEachMode(self.pols, self.uci_structure, self.super_structure, self.dyn.GetSupercell())
+        #q_list = CC.symmetries.GetQForEachMode(self.pols, self.uci_structure, self.super_structure, self.dyn.GetSupercell())
         # Store the q vectors in crystal space
         bg = self.uci_structure.get_reciprocal_vectors() / 2* np.pi
         self.q_vectors = np.zeros((self.n_modes, 3), dtype = np.double, order = "C")
