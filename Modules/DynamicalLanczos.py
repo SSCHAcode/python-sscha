@@ -1317,10 +1317,14 @@ Starting from step %d
                         self.save_status("full_lanczos_off_diagonal_{}_{}".format(i, j))
                     
                     # Fill the a_n and b_n
-                    a_ns[i, j, :] = self.a_coeffs
-                    b_ns[i, j, :] = self.b_coeffs
-                    a_ns[j, i, :] = self.a_coeffs
-                    b_ns[j, i, :] = self.b_coeffs
+                    a_tmp = np.zeros(N_steps, dtype = np.double)
+                    a_tmp[:len(self.a_coeffs)] = self.a_coeffs
+                    b_tmp = np.zeros(N_steps-1, dtype = np.double)
+                    b_tmp[:len(self.b_coeffs)] = self.b_coeffs
+                    a_ns[i, j, :] = a_tmp
+                    b_ns[i, j, :] = b_tmp
+                    a_ns[j, i, :] = a_tmp
+                    b_ns[j, i, :] = b_tmp
 
 
         if verbose:
