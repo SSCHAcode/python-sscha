@@ -1952,7 +1952,7 @@ def FastApplyD4ToDyn(X, Y, rho, w, T, input_dyn, symmetries, n_degeneracies, deg
 
 
 # Here some functions to analyze the data that comes out by a Lanczos
-def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mode_mixing = False,\
+def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mode_mixing = True,\
     use_terminator = True, last_average = 5, smearing = 0):
     """
     GET THE FREE ENERGY CURVATURE FROM MANY LANCZOS
