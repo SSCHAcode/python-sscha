@@ -2052,7 +2052,9 @@ def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mod
                 mat_pol[j,i] = (np.real(gf) - mat_pol[i,i] - mat_pol[j,j]) / 2
 
     # The green function is the inverse of the free energy curvature
+    np.savetxt("gf_mat.dat", mat_pol)
     fc_pols = np.linalg.inv(mat_pol)
+    np.savetxt("fc_pols.dat", fc_pols)
 
     # Get back into real space
     epols_m = np.einsum("ab, a->ab", pols_sc, np.sqrt(masses)) 
