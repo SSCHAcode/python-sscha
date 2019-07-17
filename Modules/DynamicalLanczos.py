@@ -203,6 +203,28 @@ class Lanczos:
         self.shift_value = 0
         self.symmetrize = False
 
+    def reset(self):
+        """
+        RESET THE LANCZOS
+        =================
+
+        This function reset the Lanczos algorithm, allowing for a new responce function calculation
+        with the same ensemble and the same settings.
+        """
+
+
+        # Prepare the solution of the Lanczos algorithm
+        self.eigvals = None
+        self.eigvects = None 
+
+        # Store the basis and the coefficients of the Lanczos procedure
+        # In the custom lanczos mode
+        self.a_coeffs = [] #Coefficients on the diagonal
+        self.b_coeffs = [] # Coefficients close to the diagonal
+        self.krilov_basis = [] # The basis of the krilov subspace
+        self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
+
+
 
 
     def prepare_symmetrization(self):
@@ -263,11 +285,11 @@ class Lanczos:
 
     def prepare_ir(self, effective_charges = None, pol_vec = np.array([1,0,0])):
         """
-        PREPARE LANCZOS FOR IR COMPUTATION
-        ==================================
+        PREPARE LANCZOS FOR INFRARED SPECTRUM COMPUTATION
+        =================================================
 
         In this subroutine we prepare the lanczos algorithm for the computation of the
-        IR signal.
+         signal.
 
         Parameters
         ----------
@@ -1170,6 +1192,147 @@ Starting from step %d
         return fc_matrix
 
 
+    def get_all_green_functions(self, N_steps = 100, mode_mixing = True, save_step_dir = None, verbose = True):
+        """
+        GET ALL THE GREEN FUNCTIONS
+        ===========================
+
+        This will compute a set of lanczos coefficients for each element of the odd matrix.
+        a_n and b_n.
+        We will run lanczos for all the elements and all the crosses.
+        In this way we have the whole evolution with frequency of the matrix.
+
+        NOTE: This can be a very intensive computation.
+
+        Parameters
+        ----------
+            N_steps : int
+                The number of Lanczos iteration for each green function
+            mode_mixing : bool
+                If True also non diagonal elements are computed, otherwise the 
+                SSCHA eigenvector are supposed to be conserved, and only diagonal
+                green functions are considered.
+                If False the computation is much less expensive (a factor nat_sc),
+                but it is approximated.
+            save_step_dir : string
+                If not None, the path to the directory in which you want to save 
+                each step. So even if stopped the calculation can restart.
+            verbose : bool
+                If true print all the progress to standard output
+
+        Results
+        -------
+            a_ns : ndarray( (n_modes, n_modes, N_steps))
+                The a coefficients for each element in the mode x mode space
+            b_ns : ndarray( (n_modes, n_modes, N_steps-1))
+                The b_n coefficients for each mode in the space.
+        """
+
+        # Check if the save directory exists
+        # Otherwise we create it
+        if not save_step_dir is None:
+            if not os.path.exists(save_step_dir):
+                os.makedirs(save_step_dir)
+
+        # Load all the data
+        a_ns = np.zeros( (self.n_modes, self.n_modes, N_steps), dtype = np.double)
+        b_ns = np.zeros( (self.n_modes, self.n_modes, N_steps), dtype = np.double)
+
+        # Incompatible with shift for now
+        self.shift_value = 0
+
+        # Compute the diagonal parts
+        for i in range(self.n_modes):
+            if verbose:
+                print("\n")
+                print("  ==========================  ")
+                print("  |                        |  ")
+                print("  |   DIAGONAL ELEMENTS    |  ")
+                print("  |       STEP {:5d}       |  ".format(i))
+                print("  |                        |  ")
+                print("  ==========================  ")
+                print()
+            
+            # Setup the Lanczos
+            self.reset()
+
+            # Prepare the perturbation
+            self.psi[:] = 0
+            self.psi[i] = 1
+
+            # Run the Lanczos perturbation
+            self.run(N_steps, save_dir = save_step_dir, verbose = verbose)
+
+            if verbose:
+                print()
+                print("   ---- > LANCZOS RUN COMPLEATED < ----   ")
+                print()
+
+            # Save the status
+            if save_step_dir:
+                self.save_status("full_lanczos_diagonal_{}".format(i))
+            
+            # Fill the a_n and b_n
+            a_ns[i, i, :] = self.a_coeffs
+            b_ns[i, i, :] = self.b_coeffs
+    
+        # If we must compute the mode mixing
+        if mode_mixing:
+            for i in range(self.n_modes):
+                for j in range(i+1, self.n_modes):
+                    # TODO: Neglect (i,j) forbidden by symmetries
+
+                    if verbose:
+                        print("\n")
+                        print("  ============================  ")
+                        print("  |                          |  ")
+                        print("  |   NON DIAGONAL ELEMENT   |  ")
+                        print("  |    STEP ({:5d},{:5d})    |  ".format(i, j))
+                        print("  |                          |  ")
+                        print("  ============================  ")
+                        print()
+                    
+                    # Setup the Lanczos
+                    self.reset()
+
+                    # Prepare the perturbation
+                    self.psi[:] = 0
+                    self.psi[i] = 1
+                    self.psi[j] = 1
+
+                    # Run the Lanczos perturbation
+                    self.run(N_steps, save_dir = save_step_dir, verbose = verbose)
+
+                    if verbose:
+                        print()
+                        print("   ---- > LANCZOS RUN COMPLEATED < ----   ")
+                        print()
+
+                    # Save the status
+                    if save_step_dir:
+                        self.save_status("full_lanczos_off_diagonal_{}_{}".format(i, j))
+                    
+                    # Fill the a_n and b_n
+                    a_ns[i, j, :] = self.a_coeffs
+                    b_ns[i, j, :] = self.b_coeffs
+                    a_ns[j, i, :] = self.a_coeffs
+                    b_ns[j, i, :] = self.b_coeffs
+
+
+        if verbose:
+            print()
+            print()
+            print("     =================     ")
+            print("     |               |     ")
+            print("     |     DONE      |     ")
+            print("     |               |     ")
+            print("     =================     ")
+            print()
+            print()
+            
+        return a_ns, b_ns
+
+
 
     def get_spectral_function_from_Lenmann(self, w_array, smearing, use_arnoldi=True):
         """
@@ -1778,3 +1941,93 @@ def FastApplyD4ToDyn(X, Y, rho, w, T, input_dyn, symmetries, n_degeneracies, deg
 
 
 
+
+
+# Here some functions to analyze the data that comes out by a Lanczos
+def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mode_mixing = False,\
+    use_terminator = True, last_average = 5, smearing = 0):
+    """
+    GET THE FREE ENERGY CURVATURE FROM MANY LANCZOS
+    ===============================================
+
+    This function computes the free energy curvature from the result
+    of a full Lanczos computation between all possible perturbations.
+
+    Parameters
+    ----------
+        a_ns : ndarray(size = (n_modes, n_modes, N_steps))
+            The a_n coefficients for each Lanczos perturbation
+        b_ns : ndarray(size = (n_modes, n_modes, N_steps-1))
+            The b_n coefficients for each Lanczos perturbation
+        pols_sc : ndarray(size = (3*nat_sc, n_modes))
+            The polarization vectors in the supercell
+        masses : ndarray(size = (3*nat_sc))
+            The mass associated to each component of pols_sc
+        use_terminator : bool
+            If true the infinite volume interpolation is performed trought the
+            terminator trick
+        last_average : int
+            Used in combination with the terminator, average the last 'last_average'
+            coefficients and replicate them.
+        smearing : float
+            The smearing for the green function calculation. 
+            Usually not needed for this kind of calculation.
+
+    Results
+    -------
+        odd_fc : ndarray( (3*nat_sc, 3*nat_sc))
+            The free energy curvature in the supercell
+
+    """
+
+    n_modes = np.shape(pols_sc)[1]
+    nat_sc = int(np.shape(pols_sc)[0] / 3)
+    N_steps = np.shape(a_ns)[2]
+
+    assert N_steps == np.shape(b_ns)[2], "Error, an and bn has an incompatible size:\n a_n = {}, b_n = {}".format(np.shape(a_ns), np.shape(b_ns))
+    
+    
+    mat_pol = np.zeros( (n_modes, n_modes), dtype = np.double)
+    for i in range(n_modes):
+        
+        # Create the Lanczos class
+        lanc = Lanczos(None)
+        lanc.a_coeffs = a_ns[i, i, :]
+        lanc.b_coeffs = b_ns[i, i, :]
+        lanc.perturbation_modulus = 1
+
+        # get the green function from continued fraction
+        gf = lanc.get_green_function_continued_fraction(np.array([0]), use_terminator = use_terminator, \
+            smearing = smearing, last_average = last_average)[0]
+        
+        mat_pol[i,i] = np.real(gf)
+
+    # If there is the mode-mixing compute also the off-diagonal terms
+    if mode_mixing:
+        for i in range(n_modes):
+            for j in range(i+1, n_modes):
+
+                # Create the Lanczos class
+                lanc = Lanczos(None)
+                lanc.a_coeffs = a_ns[i, j, :]
+                lanc.b_coeffs = b_ns[i, j, :]
+                lanc.perturbation_modulus = 2
+
+                # get the green function from continued fraction
+                gf = lanc.get_green_function_continued_fraction(np.array([0]), use_terminator = use_terminator, \
+                    smearing = smearing, last_average = last_average)[0]
+                
+                # Lanczos can compute only diagonal green functions
+                # Therefore we need to trick it to get the off-diagonal elements
+                # <1|L|2> = 1/2*( <1+2|L|1+2> - <1|L|1>  - <2|L|2>)
+                mat_pol[i,j] = (np.real(gf) - mat_pol[i,i] - mat_pol[j,j]) / 2
+                mat_pol[j,i] = (np.real(gf) - mat_pol[i,i] - mat_pol[j,j]) / 2
+
+    # The green function is the inverse of the free energy curvature
+    fc_pols = np.linalg.inv(mat_pol)
+
+    # Get back into real space
+    epols_m = np.einsum("ab, a->ab", pols_sc, np.sqrt(masses)) 
+    fc_odd = np.einsum("ab, ca, da ->cd", fc_pols, epols_m, epols_m)
+
+    return fc_odd
