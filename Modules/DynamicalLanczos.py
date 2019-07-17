@@ -2020,8 +2020,10 @@ def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mod
                 # Create the Lanczos class)
                 lanc = Lanczos(None)
                 lanc.a_coeffs = a_ns[i, j, :n_steps]
-                lanc.b_coeffs = b_ns[i, j, :n_steps]
+                lanc.b_coeffs = b_ns[i, j, :n_steps-1]
                 lanc.perturbation_modulus = 2
+
+                print("Computing ({},{}) ... n_steps = {}".format(i, j, n_steps))
 
                 # get the green function from continued fraction
                 gf = lanc.get_green_function_continued_fraction(np.array([0]), use_terminator = use_terminator, \
