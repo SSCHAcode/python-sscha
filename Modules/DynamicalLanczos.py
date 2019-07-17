@@ -1999,7 +1999,11 @@ def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mod
     for i in range(n_modes):
 
         # Get the number of steps
-        n_steps = np.arange(N_steps)[b_ns[i, i, :] == 0][0] + 1
+        n_steps = np.arange(N_steps-1)[b_ns[i, i, :] == 0]
+        if len(n_steps) == 0:
+            n_steps = N_steps
+        else:
+            n_steps = n_steps[0] + 1
 
         
         # Create the Lanczos class
@@ -2022,7 +2026,12 @@ def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mod
         for i in range(n_modes):
             for j in range(i+1, n_modes):
                 # Get the number of steps
-                n_steps = np.arange(N_steps)[b_ns[i, j, :] == 0][0] + 1
+                n_steps = np.arange(N_steps-1)[b_ns[i, i, :] == 0]
+                if len(n_steps) == 0:
+                    n_steps = N_steps
+                else:
+                    n_steps = n_steps[0] + 1
+
 
                 # Create the Lanczos class)
                 lanc = Lanczos(None)
