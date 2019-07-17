@@ -1992,7 +1992,7 @@ def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mod
     nat_sc = int(np.shape(pols_sc)[0] / 3)
     N_steps = np.shape(a_ns)[2]
 
-    assert N_steps == np.shape(b_ns)[2], "Error, an and bn has an incompatible size:\n a_n = {}, b_n = {}".format(np.shape(a_ns), np.shape(b_ns))
+    assert N_steps -1 == np.shape(b_ns)[2], "Error, an and bn has an incompatible size:\n a_n = {}, b_n = {}".format(np.shape(a_ns), np.shape(b_ns))
     
     
     mat_pol = np.zeros( (n_modes, n_modes), dtype = np.double)
