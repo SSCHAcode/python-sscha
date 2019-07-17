@@ -2013,7 +2013,7 @@ def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mod
         lanc.perturbation_modulus = 1
 
 
-        print("Computing ({},{}) ... n_steps = {}".format(i, j, n_steps))
+        print("Computing ({},{}) ... n_steps = {}".format(i, i, n_steps))
 
         # get the green function from continued fraction
         gf = lanc.get_green_function_continued_fraction(np.array([0]), use_terminator = use_terminator, \
