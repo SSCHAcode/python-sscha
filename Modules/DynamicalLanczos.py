@@ -1997,12 +1997,19 @@ def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mod
     
     mat_pol = np.zeros( (n_modes, n_modes), dtype = np.double)
     for i in range(n_modes):
+
+        # Get the number of steps
+        n_steps = np.arange(N_steps)[b_ns[i, i, :] == 0][0] + 1
+
         
         # Create the Lanczos class
         lanc = Lanczos(None)
-        lanc.a_coeffs = a_ns[i, i, :]
-        lanc.b_coeffs = b_ns[i, i, :]
+        lanc.a_coeffs = a_ns[i, i, :n_steps]
+        lanc.b_coeffs = b_ns[i, i, :n_steps - 1]
         lanc.perturbation_modulus = 1
+
+
+        print("Computing ({},{}) ... n_steps = {}".format(i, j, n_steps))
 
         # get the green function from continued fraction
         gf = lanc.get_green_function_continued_fraction(np.array([0]), use_terminator = use_terminator, \
