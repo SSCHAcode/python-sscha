@@ -156,8 +156,8 @@ class Lanczos:
         # Store the q vectors in crystal space
         bg = self.uci_structure.get_reciprocal_vectors() / 2* np.pi
         self.q_vectors = np.zeros((self.n_modes, 3), dtype = np.double, order = "C")
-        for iq, q in enumerate(q_list):
-            self.q_vectors[iq, :] = CC.Methods.covariant_coordinate(bg, q)
+        #for iq, q in enumerate(q_list):
+        #    self.q_vectors[iq, :] = CC.Methods.covariant_coordinate(bg, q)
         
 
 
