@@ -250,7 +250,7 @@ class Ensemble:
         self.units = new_units
 
         
-    def load(self, data_dir, population, N, verbose = False):
+    def load(self, data_dir, population, N, verbose = False, load_displacements = True):
         """
         LOAD THE ENSEMBLE
         =================
@@ -263,6 +263,7 @@ class Ensemble:
         data_dir / energies_supercell_populationX.dat 
         data_dir / forces_populationX_Y.dat
         data_dir / pressures_populationX_Y.dat
+        data_dir / u_populationX_Y.dat
         
         X = population
         Y = the configuration id (starting from 1 to N included, fortran convention)
@@ -292,6 +293,9 @@ class Ensemble:
             verbose : bool, optional
                 If true (default false) prints the real timing of the different part
                 during the loading.
+            load_displacement: bool
+                If true the structures are loaded from the u_populationX_Y.dat files,
+                otherwise they are loaded from the scf_populationX_Y.dat files.
         """
         A_TO_BOHR = 1.889725989
         
@@ -335,7 +339,7 @@ class Ensemble:
         for i in xrange(self.N):
             # Load the structure
             structure = CC.Structure.Structure()
-            if os.path.exists("%s/scf_population%d_%d.dat" % (data_dir, population, i+1)):
+            if os.path.exists("%s/scf_population%d_%d.dat" % (data_dir, population, i+1)) and not load_displacements:
                 t1 = time.time()
                 structure.read_scf("%s/scf_population%d_%d.dat" % (data_dir, population, i+1), alat = self.dyn_0.alat)
                 t2 = time.time()
@@ -343,6 +347,10 @@ class Ensemble:
                 
                 structure.has_unit_cell = True
                 structure.unit_cell = super_structure.unit_cell
+
+                # Get the displacement [ANGSTROM]
+                self.u_disps[i,:] = structure.get_displacement(super_structure).reshape( 3 * Nat_sc)
+
             else:
                 structure = super_structure.copy()
                 t1 = time.time()
@@ -351,12 +359,11 @@ class Ensemble:
                 total_t_for_loading += t2 - t1
                 
                 structure.coords += disp
+                self.u_disps[i, :] = disp.ravel()
                 
             self.xats[i, :, :] = structure.coords
             self.structures.append(structure)
             
-            # Get the displacement [ANGSTROM]
-            self.u_disps[i,:] = structure.get_displacement(super_structure).reshape( 3 * Nat_sc)
             
             # Load forces (Forces are in Ry/bohr, convert them in Ry /A)
             t1 = time.time()
