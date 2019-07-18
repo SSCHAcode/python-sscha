@@ -1817,13 +1817,15 @@ def FastApplyD3ToVector(X, Y, rho, w, T, input_vector, symmetries, n_degeneracie
     """
     n_modes = len(w)
     output_dyn = np.zeros(n_modes*n_modes, dtype = TYPE_DP)
-    #print( "Apply to vector, nmodes:", n_modes, "shape:", np.shape(output_dyn))
+    print( "Apply to vector, nmodes:", n_modes, "shape:", np.shape(output_dyn))
 
     deg_space_new = np.zeros(np.sum(n_degeneracies), dtype = np.intc)
     i = 0
     i_mode = 0
     j_mode = 0
+    print("Mapping degeneracies:", np.sum(n_degeneracies))
     while i_mode < len(deg_space_new):
+        print("cross_modes: ({}, {}) | deg_i = {}".format(i_mode, j_mode, n_degeneracies[i_mode]))
         deg_space_new[i] = degenerate_space[i_mode][j_mode]
         j_mode += 1
         i += 1
