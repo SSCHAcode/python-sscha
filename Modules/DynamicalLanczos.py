@@ -1342,7 +1342,7 @@ Starting from step %d
         minutes = int(total_time / 60)
         hours = int(minutes / 60)
         minutes -= hours * 60
-        seconds = total_time - hours*3600 - minutes * 60
+        seconds = int(total_time - hours*3600 - minutes * 60)
 
         if verbose:
             print()
