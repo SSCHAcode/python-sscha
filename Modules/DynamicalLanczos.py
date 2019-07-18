@@ -1755,9 +1755,9 @@ def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn,  symmetries, n_degeneracies, de
     i = 0
     i_mode = 0
     j_mode = 0
-    print("len1 = ", len(deg_space_new), "len2 = ", len(n_degeneracies))
+    print("len1 = ", len(deg_space_new), "len2 = ", n_modes)
     print("Mapping degeneracies:", np.sum(n_degeneracies))
-    while i_mode < len(deg_space_new):
+    while i_mode < n_modes:
         #print("i= ", i_mode, "Ndeg:", n_degeneracies[i_mode], "j = ", j_mode, "len = ", len(degenerate_space[i_mode]))
         #print("new_i = ", i, "tot = ", np.sum(n_degeneracies))
         print("cross_modes: ({}, {}) | deg_imu = {} | i = {}".format(i_mode, j_mode, n_degeneracies[i_mode], i))
@@ -1827,7 +1827,7 @@ def FastApplyD3ToVector(X, Y, rho, w, T, input_vector, symmetries, n_degeneracie
     i_mode = 0
     j_mode = 0
     print("Mapping degeneracies:", np.sum(n_degeneracies))
-    while i_mode < len(deg_space_new):
+    while i_mode < n_modes:
         print("cross_modes: ({}, {}) | deg_i = {}".format(i_mode, j_mode, n_degeneracies[i_mode]))
         deg_space_new[i] = degenerate_space[i_mode][j_mode]
         j_mode += 1
