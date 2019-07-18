@@ -1235,6 +1235,9 @@ Starting from step %d
                 The b_n coefficients for each mode in the space.
         """
 
+        # Time the function
+        t_start = time.time()
+
         # Check if the save directory exists
         # Otherwise we create it
         if not save_step_dir is None:
@@ -1333,15 +1336,22 @@ Starting from step %d
                     a_ns[j, i, :] = a_tmp
                     b_ns[j, i, :] = b_tmp
 
+        t_end = time.time()
+
+        total_time = t_end - t_start
+        minutes = int(total_time / 60)
+        hours = int(minutes / 60)
+        minutes -= hours * 60
+        seconds = total_time - hours*3600 - minutes * 60
 
         if verbose:
             print()
             print()
-            print("     =================     ")
-            print("     |               |     ")
-            print("     |     DONE      |     ")
-            print("     |               |     ")
-            print("     =================     ")
+            print("     ======================     ")
+            print("     |                    |     ")
+            print("     |        DONE        |      ")
+            print("     |   In {:3d}:{:02d}:{:02d}s  |     ".format(hours, minutes, seconds))
+            print("     ======================     ")
             print()
             print()
             
