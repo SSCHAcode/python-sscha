@@ -2139,7 +2139,7 @@ def symmetrize_d3_muspace(d3, symmetries):
             The d3 tensor symmetrized
     """
 
-    new_d3 = d3.copy()
+    new_d3 = np.zeros(np.shape(d3), dtype = np.double)
 
     N_sym, nmode, dumb = np.shape(symmetries)
 
@@ -2149,6 +2149,7 @@ def symmetrize_d3_muspace(d3, symmetries):
         ap = np.einsum("abc, lc ->abl", d3, symmat)
         ap = np.einsum("abc, lb ->alc", ap, symmat)
         ap = np.einsum("abc, la ->lbc", ap, symmat)
+        #ap = np.einsum("abc, aa, bb, cc->abc", d3, symmat, symmat, symmat)
 
         new_d3 += ap 
     
