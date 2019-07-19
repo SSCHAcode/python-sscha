@@ -2063,7 +2063,7 @@ class Ensemble:
 
         Returns
         -------
-            phi_sc : Phonons()
+            phi_hessian : Phonons()
                 The dynamical matrix of the free energy hessian in (Ry/bohr^2)
         """
         # For now the v4 is not implemented
