@@ -962,7 +962,8 @@ Starting from step %d
 
             # Apply the matrix L
             t1 = time.time()
-            self.psi = self.apply_full_L()
+            #self.psi = self.apply_full_L()
+            self.psi = self.L_linop.dot(self.psi)
             t2 = time.time()
 
             if verbose:
@@ -1496,6 +1497,10 @@ Starting from step %d
             d3 += np.einsum("ai,bi,ci", new_Y, new_X, new_X)
             d3 /= - 3 * N_eff
 
+            if verbose:
+                np.save("d3_modes_nosym.npy", d3)
+            
+
             # Reshape the d3
             d3_reshaped = d3.reshape((self.n_modes, self.n_modes * self.n_modes))
 
@@ -1512,6 +1517,9 @@ Starting from step %d
             d4 += np.einsum("ai,bi,ci,di", new_X, new_Y, new_X, new_X)
             d4 += np.einsum("ai,bi,ci,di", new_Y, new_X, new_X, new_X)
             d4 /= - 4 * N_eff
+
+            if verbose:
+                np.save("d4_modes_nosym.npy", d4)
 
             # Reshape the d4
             d4_reshaped = d4.reshape((self.n_modes*self.n_modes, self.n_modes * self.n_modes))
