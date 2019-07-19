@@ -82,6 +82,11 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
   if (debug) then
     print *, "=== DEBUG ODD STRAIGHT ==="
     print *, "AFTER G"
+    print *, "G [nmode, nmode]:"
+    do x = 1, n_mode
+      print *, G(:, x)
+    enddo
+    print *, ""
     call flush()
   end if
  
