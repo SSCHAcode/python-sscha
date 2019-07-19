@@ -28,7 +28,7 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
   integer :: i, j, x, y, z, w
 
   real :: t1, t2
-  logical, parameter :: debug = .true.
+  logical, parameter :: debug = .false.
 
   ! Get integers
 
