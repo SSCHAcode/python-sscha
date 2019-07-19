@@ -1515,11 +1515,15 @@ Starting from step %d
             d3 += np.einsum("abc->cba", d3_noperm)
             d3 /= 6
 
+            if verbose:
+                np.save("d3_modes_nosym.npy", d3)
+
             # Perform the standard symmetrization
             d3 = symmetrize_d3_muspace(d3, self.symmetries)
 
             if verbose:
-                np.save("d3_modes_nosym.npy", d3)
+                np.save("d3_modes_sym.npy", d3)
+                np.save("symmetries_modes.npy", self.symmetries)
             
 
             # Reshape the d3
