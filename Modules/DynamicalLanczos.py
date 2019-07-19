@@ -1515,7 +1515,8 @@ Starting from step %d
             d3 += np.einsum("abc->cba", d3_noperm)
             d3 /= 6
 
-            # TODO, symmetrization
+            # Perform the standard symmetrization
+            d3 = symmetrize_d3_muspace(d3, self.symmetries)
 
             if verbose:
                 np.save("d3_modes_nosym.npy", d3)
@@ -2111,3 +2112,41 @@ def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mod
     fc_odd = np.einsum("ab, ca, da ->cd", fc_pols, epols_m, epols_m)
 
     return fc_odd
+
+
+def symmetrize_d3_muspace(d3, symmetries):
+    """
+    SYMMETRIZE D3 IN MODE SPACE
+    ===========================
+
+    This function symmetrizes the d3 in the mu space.
+    It is quite fast.
+
+    Parameters
+    ----------
+        d3 : ndarray(n_modes, n_modes, n_modes)
+            The d3 tensor to be symmetrized
+        symmetries : ndarray(N_sym, n_modes, n_modes)
+            The full symmetry matrix
+
+    Results
+    -------
+        new_d3 : ndarray(n_modes, n_modes, n_modes)
+            The d3 tensor symmetrized
+    """
+
+    new_d3 = d3.copy()
+
+    N_sym, nmode, dumb = np.shape(symmetries)
+
+    for i in range(N_sym):
+        symmat = symmetries[i, :, :]
+
+        ap = np.einsum("abc, lc ->abl", d3, symmat)
+        ap = np.einsum("abc, lb ->alc", ap, symmat)
+        ap = np.einsum("abc, la ->lbc", ap, symmat)
+
+        new_d3 += ap 
+    
+    new_d3 /= N_sym
+    return new_d3
