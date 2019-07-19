@@ -2153,6 +2153,7 @@ class Ensemble:
                 print ("Inside odd straight")
                 print (" A = ", a)
                 print (" W = ", w)
+                print (" TRANS = ", trans)
                 print (" AMASS = ", amass)
                 print (" ITYP = ", ityp)
                 print (" T = ", self.current_T)
