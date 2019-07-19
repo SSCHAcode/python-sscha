@@ -33,10 +33,10 @@ subroutine get_emat (er, a, amass, ityp_sc, v3_log, transmode, e, n_mode, nat_sc
         do i = 1, nat_sc
           do alpha = 1, 3
             ka = ka + 1
-            if (v3_log) then
-              e(mu,ka) = er(i,mu,alpha) * a(mu) / sqrt(amass(ityp_sc(i)))
-            else if (.not. v3_log .and. transmode(mu)) then
+            if (transmode(mu)) then
               e(mu,ka) = 0.0d0
+            else if (v3_log) then
+              e(mu,ka) = er(i,mu,alpha) * a(mu) / sqrt(amass(ityp_sc(i)))
             else
               e(mu,ka) = er(i,mu,alpha) * sqrt(amass(ityp_sc(i))) / a(mu)
             end if

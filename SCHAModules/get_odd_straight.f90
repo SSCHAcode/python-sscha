@@ -82,6 +82,16 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
   if (debug) then
     print *, "=== DEBUG ODD STRAIGHT ==="
     print *, "AFTER G"
+    print *, "G [nmode, nmode]:"
+    do x = 1, n_mode
+      print *, G(:, x)
+    enddo
+    print *, ""
+    print *, "L [nmode, nmode]:"
+    do x = 1, n_mode
+      print *, l(:, x)
+    enddo
+    print *, ""
     call flush()
   end if
  
@@ -163,6 +173,26 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
   ! Write the odd correction with four indexes
 
   !call twotofour_real (phi_aux,phi_sc_odd)
+
+  if (debug) then
+    print *, "=== AFTER ODD STRAIGHT ==="
+    print *, "V1:"
+    do x = 1, n_mode
+      print *, v1(x, :)
+    enddo
+
+    print *, ""
+    print *, "V2:"
+    do x = 1, n_mode
+      print *, v2(x, :)
+    enddo 
+    print *, ""
+
+    print *, "ODD CORRECTION:"
+    do x = 1, n_mode
+      print *, phi_sc_odd(:, x)
+    enddo
+  endif
 
   ! Deallocate stuff
 
