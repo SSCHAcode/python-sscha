@@ -1814,7 +1814,7 @@ class Ensemble:
         N_eff = np.sum(self.rho)
         f_mode = np.einsum("ia, i->ia", f_mode, self.rho)
         d3_noperm = np.einsum("ia,ib,ic->abc", v_mode, v_mode, f_mode)
-        d3_noperm /= N_eff
+        d3_noperm /= -N_eff # there is a minus
 
         # Apply the permuatations
         d3 = d3_noperm.copy()
