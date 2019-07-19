@@ -1786,6 +1786,8 @@ class Ensemble:
         # Be shure to have the correct units
         self.convert_units(UNITS_DEFAULT)
 
+        supersturct = self.current_dyn.structure.generate_supercell(self.supercell)
+
         # Convert from A to Bohr the space 
         u_disps = self.u_disps * __A_TO_BOHR__
         n_rand, n_modes = np.shape(u_disps)
@@ -1798,10 +1800,10 @@ class Ensemble:
         w, pols = self.current_dyn.DiagonalizeSupercell()
 
         # Discard translations
-        trans = CC.Methods.get_translations(pols, self.structures[0].get_masses_array())
+        trans = CC.Methods.get_translations(pols, supersturct.get_masses_array())
         pols = pols[:, ~trans]
 
-        m = np.tile(self.structures[0].get_masses_array(), (3,1)).T.ravel()
+        m = np.tile(supersturct.get_masses_array(), (3,1)).T.ravel()
 
         pol_vec = np.einsum("ab, a->ab", pols, 1 / np.sqrt(m))
 
