@@ -170,15 +170,24 @@ class Lanczos:
         self.rho = ensemble.rho.copy() 
         self.N_eff = np.sum(self.rho)
 
-        u = ensemble.u_disps
+        u = ensemble.u_disps / Ensemble.Bohr
         f = ensemble.forces.reshape(self.N, 3 * self.nat).copy()
         f -= ensemble.sscha_forces.reshape(self.N, 3 * self.nat)
+        f *= Ensemble.Bohr
 
         self.X = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
-        self.X[:,:] = np.einsum("a,ia, ab->ib", np.sqrt(self.m), u, self.pols) / Ensemble.Bohr
+        #self.X[:,:] = np.einsum("a,ia, ab->ib", np.sqrt(self.m), u, self.pols) / Ensemble.Bohr
 
         self.Y = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
-        self.Y[:,:] = np.einsum("a,ia, ab->ib", 1/np.sqrt(self.m), f, self.pols) * Ensemble.Bohr
+        #self.Y[:,:] = np.einsum("a,ia, ab->ib", 1/np.sqrt(self.m), f, self.pols) * Ensemble.Bohr
+
+        ups_mat = self.dyn.GetUpsilonMatrix(self.T)
+        v_vec = u.dot(ups_mat)
+
+        # Convert in the polarization basis
+        pol_mat = np.einsum("ab, a->ab", self.pols, 1 / np.sqrt(self.m))
+        self.X[:,:] = v_vec.dot(pol_mat)
+        self.Y[:,:] = f.dot(pol_mat)
 
         # Prepare the variable used for the working
         self.psi = np.zeros(self.n_modes + self.n_modes*self.n_modes, dtype = TYPE_DP)
@@ -1485,17 +1494,28 @@ Starting from step %d
         
 
         # Compute the d3 operator
-        new_X = np.einsum("ia,a->ai", self.X, f_ups(self.w, self.T))
-        new_Y = np.einsum("ia,i->ai", self.Y, self.rho)
+        #new_X = np.einsum("ia,a->ai", self.X, f_ups(self.w, self.T))
+        N_eff = np.sum(self.rho)
+        Y_weighted = np.einsum("ia, i->ia", self.Y, self.rho)
+        #new_Y = np.einsum("ia,i->ai", self.Y, self.rho)
         N_eff = np.sum(self.rho)
 
         if not self.ignore_v3:
             if verbose:
                 print("Computing d3...")
-            d3 =  np.einsum("ai,bi,ci", new_X, new_X, new_Y)
-            d3 += np.einsum("ai,bi,ci", new_X, new_Y, new_X)
-            d3 += np.einsum("ai,bi,ci", new_Y, new_X, new_X)
-            d3 /= - 3 * N_eff
+            d3_noperm = np.einsum("ia,ib,ic->abc", self.X, self.X, Y_weighted)
+            d3_noperm /= -N_eff 
+
+            # Apply the permuatations
+            d3 = d3_noperm.copy()
+            d3 += np.einsum("abc->acb", d3_noperm)
+            d3 += np.einsum("abc->bac", d3_noperm)
+            d3 += np.einsum("abc->bca", d3_noperm)
+            d3 += np.einsum("abc->cab", d3_noperm)
+            d3 += np.einsum("abc->cba", d3_noperm)
+            d3 /= 6
+
+            # TODO, symmetrization
 
             if verbose:
                 np.save("d3_modes_nosym.npy", d3)
