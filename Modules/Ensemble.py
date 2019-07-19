@@ -1768,7 +1768,65 @@ class Ensemble:
 #         #TODO: apply symmetries
             
 #         return df_dfc, err_df_dfc
-    
+
+    def get_d3_muspace(self):
+        r"""
+        GET V3 IN MODE SPACE
+        ====================
+
+        This subroutine gets the d3 directly in the space of the modes.
+
+        ..math::
+
+            D^{(3)}_{abc} = \sum_{xyz} \frac{\Phi^{(3)}_{xyz} e_a^x e_b^y e_c^z}{\sqrt{m_x m_y m_z}}
+
+
+        """
+
+        # Be shure to have the correct units
+        self.convert_units(UNITS_DEFAULT)
+
+        # Convert from A to Bohr the space 
+        u_disps = self.u_disps * __A_TO_BOHR__
+        n_rand, n_modes = np.shape(u_disps)
+        forces = (self.forces - self.sscha_forces).reshape(self.N, n_modes)  / __A_TO_BOHR__ 
+
+        Ups = self.current_dyn.GetUpsilonMatrix(self.current_T)
+        v_disp = u_disps.dot(Ups)
+
+        # pass in the polarization space
+        w, pols = self.current_dyn.DiagonalizeSupercell()
+
+        # Discard translations
+        trans = CC.Methods.get_translations(pols, self.structures[0].get_masses_array())
+        pols = pols[:, ~trans]
+
+        m = np.tile(self.structures[0].get_masses_array(), (3,1)).T.ravel()
+
+        pol_vec = np.einsum("ab, a->ab", pols, 1 / np.sqrt(m))
+
+        v_mode = v_disp.dot(pol_vec)
+        f_mode = forces.dot(pol_vec)
+
+        # Now compute the d3 as <vvf>
+        N_eff = np.sum(self.rho)
+        f_mode = np.einsum("ia, i->ia", f_mode, self.rho)
+        d3_noperm = np.einsum("ia,ib,ic->abc", v_mode, v_mode, f_mode)
+        d3_noperm /= N_eff
+
+        # Apply the permuatations
+        d3 = d3_noperm.copy()
+        d3 += np.einsum("abc->acb", d3_noperm)
+        d3 += np.einsum("abc->bac", d3_noperm)
+        d3 += np.einsum("abc->bca", d3_noperm)
+        d3 += np.einsum("abc->cab", d3_noperm)
+        d3 += np.einsum("abc->cba", d3_noperm)
+        d3 /= 6
+
+        # TODO: symmetrize
+
+        return d3
+
     def get_v3_realspace(self):
         """
         This is a testing function that computes the V3 matrix in real space:
