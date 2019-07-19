@@ -169,6 +169,14 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
 
   !call twotofour_real (phi_aux,phi_sc_odd)
 
+  if (debug) then
+    print *, "=== AFTER ODD STRAIGHT ==="
+    print *, "ODD CORRECTION:"
+    do x = 1, n_mode
+      print *, phi_sc_odd(:, x)
+    enddo
+  endif
+
   ! Deallocate stuff
 
   deallocate(l,g,v1,v2,v32)
