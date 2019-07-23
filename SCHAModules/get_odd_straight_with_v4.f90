@@ -79,8 +79,8 @@ subroutine get_odd_straight_with_v4 ( a, wr, er, transmode, amass, ityp_sc, T, v
 
   call get_cmat ( a, wr, er, transmode, amass, ityp_sc, T, .true., lamat,n_mode, nat_sc, ntyp )
   
-  print *, "AFTER CMAT"
-  call flush()
+  !print *, "AFTER CMAT"
+  !call flush()
 
   ! Write third and fourth order force constants as rank 2
 
@@ -110,8 +110,8 @@ subroutine get_odd_straight_with_v4 ( a, wr, er, transmode, amass, ityp_sc, T, v
 
   ! Calculate ** iden - v4 lamat ** matrix
 
-  print *, "BEFORE I - V4Lambda"
-  call flush()
+  !print *, "BEFORE I - V4Lambda"
+  !call flush()
 
   maux = iden
 
@@ -119,8 +119,8 @@ subroutine get_odd_straight_with_v4 ( a, wr, er, transmode, amass, ityp_sc, T, v
 
   ! Invert ** iden - lamat v4 **
 
-  print *, "BEFORE (I - V4Lambda)^-1"
-  call flush()
+  !print *, "BEFORE (I - V4Lambda)^-1"
+  !call flush()
   
 
   call dgetrf ( nl, nl, maux, nl, ipiv, info )                                                                                                                                                      
@@ -128,24 +128,24 @@ subroutine get_odd_straight_with_v4 ( a, wr, er, transmode, amass, ityp_sc, T, v
 
   ! Take product between lamat and the inverted matrix
 
-  print *, "BEFORE Lambda(I - V4Lambda)^-1"
-  call flush()
+  !print *, "BEFORE Lambda(I - V4Lambda)^-1"
+  !call flush()
   call dgemm('N','N',nl,nl,nl,1.0d0,lamat,nl,maux,nl,0.0d0,v42,nl)
 
   ! Calculate final matrix products and assign the correction matrix
 
   ! Calculate cf = ( 1 - lamat*v4)^-1 lamat *  v3
 
-  print *, "BEFORE Lambda(I - V4Lambda)^-1 V3"
-  call flush()
+  !print *, "BEFORE Lambda(I - V4Lambda)^-1 V3"
+  !call flush()
   call dgemm('N','T',nl,ns,nl,1.0d0,v42,nl,&
              v32,ns,0.0d0,cf,nl)
 
   ! Now get:
   ! v3 * ( 1 - lamat*v4)^-1 lamat *  v3
 
-  print *, "BEFORE V3 Lambda(I - V4Lambda)^-1 V3"
-  call flush()
+  !print *, "BEFORE V3 Lambda(I - V4Lambda)^-1 V3"
+  !call flush()
   call dgemm('N','N',ns,ns,nl,1.0d0,v32,ns,&
              cf,nl,0.0d0,phi_sc_odd,ns)
 
