@@ -41,11 +41,18 @@ subroutine get_cmat ( a, wr, er, transmode, amass, ityp_sc, T, v3_log, cmat, &
     n_mode2 = n_mode*n_mode
   
     ! Allocate stuff
+
+    print *, "CMAT: ALLOCATION"
+    call flush()
+  
   
     allocate(e(n_mode,n_mode))
     allocate (mat_w(n_mode,n_mode))
     allocate (mat_e(n_mode*n_mode,n_mode*n_mode))
     allocate (mat_et(n_mode*n_mode,n_mode*n_mode))
+
+    print *, "CMAT: BEFORE EMAT"
+    call flush()
   
     ! Define the polarization vectors as a 3n x 3n matrix (n = nat_sc).
     ! The square root of the mass is also included in the new matrix.
