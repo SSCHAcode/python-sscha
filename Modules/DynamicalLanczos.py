@@ -1485,7 +1485,7 @@ Starting from step %d
         
         w_a = np.tile(self.w, (self.n_modes,1)).ravel()
         w_b = np.tile(self.w, (self.n_modes,1)).T.ravel()
-        chi_beta = -.5 * np.sqrt((w_a + w_b)/(w_a*w_b))
+        chi_beta = -.5 * np.sqrt(w_a + w_b)/(np.sqrt(w_a)*np.sqrt(w_b))
 
 
         B_mat = (w_a + w_b)**2
