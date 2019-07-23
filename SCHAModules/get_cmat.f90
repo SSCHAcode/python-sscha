@@ -57,7 +57,7 @@ subroutine get_cmat ( a, wr, er, transmode, amass, ityp_sc, T, v3_log, cmat, &
     ! Define the polarization vectors as a 3n x 3n matrix (n = nat_sc).
     ! The square root of the mass is also included in the new matrix.
   
-    call get_emat ( er, a, amass, ityp_sc, v3_log, transmode, e)
+    call get_emat ( er, a, amass, ityp_sc, v3_log, transmode, e, n_mode, nat_sc, ntyp)
 
     print *, "CMAT: after get emat"
     call flush()
