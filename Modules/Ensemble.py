@@ -2127,13 +2127,14 @@ class Ensemble:
         if use_symmetries:
             if verbose:
                 print("Symmetrizing the d3")
+                np.save("d3_realspace_nosym.npy", d3)
             qe_sym = CC.symmetries.QE_Symmetry(dyn_supercell.structure)
             qe_sym.SetupFromSPGLIB()
             qe_sym.ApplySymmetryToTensor3(d3)
 
         if verbose:
             print("Saving the third order force constants as d3.npy")
-            np.save("d3.npy", d3)
+            np.save("d3_realspace_sym.npy", d3)
 
         # Check if the v4 must be included
         if include_v4:
