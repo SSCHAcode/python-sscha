@@ -64,7 +64,7 @@ subroutine get_cmat ( a, wr, er, transmode, amass, ityp_sc, T, v3_log, cmat, &
   
     ! Calculate the matrix based on the frequencies and lengths
   
-    call get_g (a, wr, transmode, T, mat_w)
+    call get_g (a, wr, transmode, T, mat_w, n_mode)
 
     print *, "CMAT: after get g"
     call flush()
