@@ -51,10 +51,16 @@ subroutine get_cmat ( a, wr, er, transmode, amass, ityp_sc, T, v3_log, cmat, &
     ! The square root of the mass is also included in the new matrix.
   
     call get_emat ( er, a, amass, ityp_sc, v3_log, transmode, e)
+
+    print *, "CMAT: after get emat"
+    call flush()
   
     ! Calculate the matrix based on the frequencies and lengths
   
     call get_g (a, wr, transmode, T, mat_w)
+
+    print *, "CMAT: after get g"
+    call flush()
   
     ! We get the e and et matrices
   
