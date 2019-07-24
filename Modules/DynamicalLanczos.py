@@ -1989,13 +1989,16 @@ def FastApplyD4ToDyn(X, Y, rho, w, T, input_dyn, symmetries, n_degeneracies, deg
     i = 0
     i_mode = 0
     j_mode = 0
-    while i_mode < len(deg_space_new):
+    #print("Mapping degeneracies:", np.sum(n_degeneracies))
+    while i_mode < n_modes:
+        #print("cross_modes: ({}, {}) | deg_i = {}".format(i_mode, j_mode, n_degeneracies[i_mode]))
         deg_space_new[i] = degenerate_space[i_mode][j_mode]
         j_mode += 1
         i += 1
         if j_mode == n_degeneracies[i_mode]:
             i_mode += 1
             j_mode = 0
+
 
     
     #print( "Apply to vector, nmodes:", n_modes, "shape:", np.shape(output_dyn))
