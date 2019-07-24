@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import cellconstructor as CC 
+import cellconstructor.Methods
 
 import difflib
 __ASE_CALC__ = False
