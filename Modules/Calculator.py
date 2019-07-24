@@ -46,14 +46,19 @@ def prepare_calculator_from_namelist(namelist):
     
     Parameters
     ----------
-        namelist : dict
+        namelist : dict or string
             The parsed namelist.
+            If a string is passed, it will be parsed
     
     Returns
     -------
         ase_calc :
             The ASE calculator.
     """
+
+    # Parse the namelist if needed
+    if isinstance(namelist, str):
+        namelist = CC.Methods.read_namelist(namelist)
     
     # Check if the namelist has the correct keys
     if not __CALCULATOR_HEAD__ in namelist.keys():

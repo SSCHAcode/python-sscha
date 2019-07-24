@@ -625,6 +625,9 @@ class Cluster:
             namelist: 
                 The parsed namelist dictionary.
         """
+        # Parse the namelist if needed
+        if isinstance(namelist, str):
+            namelist = CC.Methods.read_namelist(namelist)
         
         # Check if the cluster namelist is present
         if not __CLUSTER_NAMELIST__ in namelist.keys():
