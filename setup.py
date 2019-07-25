@@ -82,6 +82,10 @@ if not parallel:
         print("Note: clean the build directory if you whish to recompile the code.")
         print("=======================")
         print()
+else:
+        print()
+        print(" PARALLEL ENVIRONMENT DETECTED CORRECTLY ")
+        print()
 
 def readme():
     with open("README.md") as f:
