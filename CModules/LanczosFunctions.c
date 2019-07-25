@@ -1,7 +1,7 @@
 #include "LanczosFunctions.h"
 
 
-#define DEB 1
+#define DEB 0
 
 // The eigenvalues of the Covariance matrix
 double f_ups(double w, double T) {
