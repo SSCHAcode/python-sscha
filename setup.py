@@ -17,15 +17,7 @@ if os.environ.has_key("MPICC"):
         print ()
         print("Parallel compiler setted to:", mpicc)
         print()
-else:
-        print()
-        print("======= WARNING =======")
-        print("No MPI compiler found, please specify MPICC environmental variable")
-        print("For example, try to run: ")
-        print(" >>> MPICC=mpicc " + " ".join(sys.argv))
-        print("Note: clean the build directory if you whish to recompile the code.")
-        print("=======================")
-        print()
+
 
 # Setup the parallel environemnt
 if parallel:
@@ -80,6 +72,16 @@ setup( name = "python-sscha",
                   "scripts/plot_lanczos_convergence.py"],
        license = "GPLv3"
        )
+
+if not parallel:
+        print()
+        print("======= WARNING =======")
+        print("No MPI compiler found, please specify MPICC environmental variable")
+        print("For example, try to run: ")
+        print(" >>> MPICC=mpicc python " + " ".join(sys.argv))
+        print("Note: clean the build directory if you whish to recompile the code.")
+        print("=======================")
+        print()
 
 def readme():
     with open("README.md") as f:
