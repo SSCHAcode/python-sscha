@@ -87,12 +87,12 @@ subroutine get_v3 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v3, &
     end do  
   
     ! Calculate product between two e matrices
-  
+    ! eprod is the Upsilon matrix (see Raffaello's paper)
     call dgemm('T','N',n_mode,n_mode,n_mode,1.0d0,e,n_mode,&
                e,n_mode,0.0d0,eprod,n_mode)
   
     ! Rotate displacementes
-  
+    ! Here ur are Upsilon * u2
     do x = 1, n_mode
       ur(:,x) = 0.0d0
       do mu = 1, n_mode
@@ -111,6 +111,8 @@ subroutine get_v3 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v3, &
     do x = 1, n_mode
       do y = 1, n_mode
         do z = 1, n_mode 
+          ! Here <eprod *f2> is eprod <f2> that correspond to subtract the average of the forces
+          ! This term is important if the minimization is not performed on the average positions 
   !        fun(:) = - f2(:,x) * ur(:,y) * ur(:,z)
           fun(:) = ( eprod(y,z) - ur(:,y) * ur(:,z) ) * f2(:,x)
           call average_error_weight(fun,rho,log_err,av,av_err)
