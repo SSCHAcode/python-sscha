@@ -53,7 +53,8 @@ def pprint(*argv):
 
     This will print on stdout only once in parallel execution of the code
     """
+    print("pypar:", __PYPAR__)
+    print("mpi4py:", __MPI4PY__)
     if am_i_the_master():
-        print("Hey!")
         print(*argv)
 
