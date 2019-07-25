@@ -336,7 +336,10 @@ class Lanczos:
         assert ec_size[1] == ec_size[2] == 3
 
         z_eff = np.einsum("abc, b", ec, pol_vec)
-        self.prepare_perturbation(z_eff.ravel(), masses_exp = -1)
+
+        # Get the gamma effective charge
+        new_zeff = np.tile(z_eff.ravel(), np.prod(self.dyn.GetSupercell()))
+        self.prepare_perturbation(new_zeff, masses_exp = -1)
 
 
     def prepare_perturbation(self, vector, masses_exp = 1):
