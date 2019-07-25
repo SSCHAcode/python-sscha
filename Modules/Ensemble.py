@@ -986,7 +986,7 @@ class Ensemble:
 
         Parameters
         ----------
-            - get_errors : bool
+            - get_error : bool
                 If true the error is also returned (as get_free_energy).
             - in_unit_cell : bool, optional
                 If True (default True) the mean force is averaged on all the atoms in the supercell,
