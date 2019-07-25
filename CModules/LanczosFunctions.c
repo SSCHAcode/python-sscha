@@ -1,7 +1,7 @@
 #include "LanczosFunctions.h"
 
 
-#define DEB 0
+#define DEB 1
 
 // The eigenvalues of the Covariance matrix
 double f_ups(double w, double T) {
@@ -352,11 +352,19 @@ void MPI_ApplyD3ToVector(const double * X, const double * Y, const double * rho,
 		stop = start + count;
 	}
 
+	if (DEB) printf("Division: %d in %d ranks, with %d remainer\n",
+		count*size, size, remainer);
+
 	int mpi_index;
 	for (mpi_index = start; mpi_index < stop; ++mpi_index) {
 		c = mpi_index % N_modes;
 		b = (mpi_index - c) % N_modes;
 		a = (mpi_index - c - b*N_modes) % N_modes;
+
+		if (DEB) {
+			printf("RANK %d, index = %d (%d, %d). a = %d, b = %d, c = %d\n",
+				rank, mpi_index, start, stop, a, b, c);
+		}
 
 		// Check if this element is zero by symmetry
 		int stop= 0;
