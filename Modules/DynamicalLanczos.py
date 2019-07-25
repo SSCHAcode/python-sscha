@@ -138,6 +138,7 @@ class Lanczos:
 
 
         self.nat = superdyn.structure.N_atoms
+        n_cell = np.prod(self.dyn.GetSupercell())
 
         self.qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
         self.qe_sym.SetupQPoint()
@@ -179,8 +180,9 @@ class Lanczos:
         f = ensemble.forces.reshape(self.N, 3 * self.nat).copy()
         f -= ensemble.sscha_forces.reshape(self.N, 3 * self.nat)
         # Subtract also the average force to clean more the stochastic noise
-        f -= np.tile(ensemble.get_average_forces(get_error = False, in_unit_cell = False).ravel(), \
-            (self.N, 1))
+        av_force = ensemble.get_average_forces(get_error = False).ravel()
+        new_av_force = np.tile(av_force, (n_cell, 1))
+        f -= np.tile(new_av_force, (self.N, 1)) 
         f *= Ensemble.Bohr
 
         self.X = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
