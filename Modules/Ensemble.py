@@ -56,6 +56,11 @@ try:
 except: 
     __SPGLIB__ = False
     
+__ASE__ = True 
+try:
+    import ase, ase.io
+except:
+    __ASE__ = False
 
 # The small value considered zero
 __EPSILON__ =  1e-6
@@ -425,6 +430,107 @@ class Ensemble:
             
             # Allow the garbage collector to free the memory
             del self.stresses
+
+    def load_from_calculator_output(self, directory, out_ext = ".pwo"):
+        """
+        LOAD THE ENSEMBLE FROM A CALCULATION
+        ====================================
+
+        This subroutine allows to directly load the ensemble from the output files
+        of a calculation. This works and has been tested for quantum espresso,
+        however in principle any output file from an ase supported format 
+        should be readed.
+
+        NOTE: This subroutine requires ASE to be correctly installed.
+
+        Parameters
+        ----------
+            directory : string
+                Path to the directory that contains the output of the calculations
+            out_ext : string
+                The extension of the files that will be readed.
+        """
+
+        assert __ASE__, "ASE library required to load from the calculator output file."
+
+        # Get all the output file
+        output_files = ["{}/{}".format(directory, x) for x in os.listdir(directory) if x.endswith(out_ext)]
+
+        self.N = len(output_files)
+        nat_sc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms
+
+        self.forces = np.zeros( (self.N, nat_sc, 3), order = "F", dtype = np.float64)
+        self.xats = np.zeros( (self.N, nat_sc, 3), order = "C", dtype = np.float64)
+
+        self.stresses = np.zeros( (self.N, 3,3), order = "F", dtype = np.float64)
+        
+        self.sscha_energies = np.zeros(self.N, dtype = np.float64)
+        self.energies = np.zeros(self.N, dtype = np.float64)
+        self.sscha_forces = np.zeros( (self.N, nat_sc, 3), order = "F", dtype = np.float64)
+        
+        self.u_disps = np.zeros( (self.N, nat_sc * 3), order = "F", dtype = np.float64)
+        
+        # Add a counter to check if all the stress tensors are present
+        count_stress = 0 
+        
+        # Superstructure
+        dyn_supercell = self.dyn_0.GenerateSupercellDyn(self.supercell)
+        super_structure = dyn_supercell.structure
+        super_fc = dyn_supercell.dynmats[0]
+
+        self.structures = []
+
+        for i, outf in enumerate(output_files):
+            ase_struct = ase.io.read(outf)
+
+            # Get the structure
+            structure = CC.Structure.Structure()
+            structure.generate_from_ase_atoms(ase_struct)
+
+            self.xats[i, :, :] = structure.coords
+            self.structures.append(structure)
+
+            # Get the displacement [ANGSTROM]
+            self.u_disps[i,:] = structure.get_displacement(super_structure).reshape( 3 * nat_sc)
+
+            # Get the energy
+            energy = ase_struct.get_potential_energy()
+            energy /= Rydberg
+            self.energies[i] = energy
+
+            # Get the forces [eV/A -> Ry/A]
+            forces = ase_struct.get_forces() / Rydberg 
+            self.forces[i, :, :] = forces
+
+            # Get the stress if any
+            try:
+                stress = ase_struct.get_stress(voigt=False)
+                # eV/A^3 -> Ry/bohr^3
+                stress /= Rydberg / Bohr**3
+                count_stress += 1
+                self.stresses[i, :, :] = stress
+            except:
+                pass
+
+            # Get the sscha energy and forces            
+            energy, force = self.dyn_0.get_energy_forces(structure, supercell = self.supercell, real_space_fc=super_fc)
+
+            self.sscha_energies[i] = energy 
+            self.sscha_forces[i,:,:] = force
+
+        self.rho = np.ones(self.N, dtype = np.float64)
+
+        t1 = time.time()
+        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell, self.u_disps)
+        t2 = time.time()
+        self.current_q = self.q_start.copy()
+
+        if count_stress == self.N:
+            self.has_stress = True
+        else:
+            self.has_stress = False
+            
+
         
     def save(self, data_dir, population):
         """
