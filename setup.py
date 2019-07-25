@@ -18,6 +18,16 @@ if os.environ.has_key("MPICC"):
         print("Parallel compiler setted to:", mpicc)
         print()
 
+# Check for the python parallel libraries
+python_parallel = True
+try:
+        import pypar
+except:
+        try:
+                import mpi4py
+        except:
+                parallel = False
+                python_parallel = False
 
 # Setup the parallel environemnt
 if parallel:
@@ -82,10 +92,25 @@ if not parallel:
         print("Note: clean the build directory if you whish to recompile the code.")
         print("=======================")
         print()
+elif not python_parallel:
+        print()
+        print("======= WARNING =======")
+        print("No Python MPI library found")
+        print("Supported libraries:")
+        print(" - pypar ")
+        print(" - mpi4py ")
+        print()
+        print("Note: Fast MPI implemetation will crash if used")
+        print("      consider to install one of these libraries.")
+        print("      (No need to reinstall python-sscha)")
+        print("=======================")
+        print()
 else:
         print()
         print(" PARALLEL ENVIRONMENT DETECTED CORRECTLY ")
         print()
+
+
 
 def readme():
     with open("README.md") as f:
