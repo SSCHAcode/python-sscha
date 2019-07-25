@@ -145,7 +145,11 @@ static PyObject *ApplyV3ToDyn(PyObject * self, PyObject * args) {
   // Check the mode
   if (mode == 1) {
     OMP_ApplyD3ToDyn(X, Y, rho, w, T, N_modes, N_configs, input, output, symmetries, N_symmetries, n_deg, good_deg_space);
-  } else {
+  } else if (mode == 2) {
+    // Use the MPI version
+    MPI_ApplyD3ToDyn(X, Y, rho, w, T, N_modes, N_configs, input, output, symmetries, N_symmetries, n_deg, good_deg_space);
+  }
+  else {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
     fprintf(stderr, "mode %d not implemented.\n", mode);
     exit(EXIT_FAILURE);
@@ -236,7 +240,10 @@ static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args) {
     //printf("I'm here\n");
     fflush(stdout);
     OMP_ApplyD3ToVector(X, Y, rho, w, T, N_modes, N_configs, input, output, symmetries, N_symmetries, n_deg, good_deg_space);
-  } else {
+  } else if (mode == 2) {
+    MPI_ApplyD3ToVector(X, Y, rho, w, T, N_modes, N_configs, input, output, symmetries, N_symmetries, n_deg, good_deg_space);
+  }
+  else {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
     fprintf(stderr, "mode %d not implemented.\n", mode);
     exit(EXIT_FAILURE);
@@ -359,7 +366,10 @@ static PyObject *ApplyV4ToDyn(PyObject * self, PyObject * args) {
   // Check the mode
   if (mode == 1) {
     OMP_ApplyD4ToDyn(X, Y, rho, w, T, N_modes, N_configs, input, output, symmetries, N_symmetries, n_deg, good_deg_space);
-  } else {
+  } else if (mode == 2) {
+    MPI_ApplyD4ToDyn(X, Y, rho, w, T, N_modes, N_configs, input, output, symmetries, N_symmetries, n_deg, good_deg_space); 
+  }
+  else {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
     fprintf(stderr, "mode %d not implemented.\n", mode);
     exit(EXIT_FAILURE);
@@ -395,62 +405,62 @@ static PyObject *ApplyV4ToDyn(PyObject * self, PyObject * args) {
  *          The output array that will be filled with the v3
  */
 
-#ifdef _MPI
-static PyObject * GetV3(PyObject * self, PyObject * args) {
-  int N_modes, N_random;
-  PyObject * npy_X, *npy_Y, *npy_v3;
-  double *X;
-  double *Y;
-  double *v3;
-  double tmp1, tmp2;
+// #ifdef _MPI
+// static PyObject * GetV3(PyObject * self, PyObject * args) {
+//   int N_modes, N_random;
+//   PyObject * npy_X, *npy_Y, *npy_v3;
+//   double *X;
+//   double *Y;
+//   double *v3;
+//   double tmp1, tmp2;
   
-  // Get the path dir
-  if (!PyArg_ParseTuple(args, "OOiiO", &npy_X, &npy_Y, &N_modes, &N_random, &npy_v3))
-    return NULL;
+//   // Get the path dir
+//   if (!PyArg_ParseTuple(args, "OOiiO", &npy_X, &npy_Y, &N_modes, &N_random, &npy_v3))
+//     return NULL;
 
-  // Convert the array
-  //numpy_array = PyArray_FROM_OTF(bare_array, NPY_DOUBLE, NPY_ARRAY_IN_ARRAY);
+//   // Convert the array
+//   //numpy_array = PyArray_FROM_OTF(bare_array, NPY_DOUBLE, NPY_ARRAY_IN_ARRAY);
 
-  X = (double*) PyArray_DATA(npy_X);
-  Y = (double*) PyArray_DATA(npy_Y);
-  v3 = (double*) PyArray_DATA(npy_v3);
+//   X = (double*) PyArray_DATA(npy_X);
+//   Y = (double*) PyArray_DATA(npy_Y);
+//   v3 = (double*) PyArray_DATA(npy_v3);
 
 
-  int i;
-  int rank=0, size=1;
+//   int i;
+//   int rank=0, size=1;
 
-  // Check the parallelization and assign the size and the rank
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
+//   // Check the parallelization and assign the size and the rank
+//   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+//   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-  int a, b, c;
-  for (a = 0; a < N_modes; ++a) {
-    for (b = 0; b < N_modes; ++b) {
-      for (c = 0; c < N_modes; ++c) {
-        // Compute the averages
-        tmp1 = 0;
-        for (i = rank; i < N_random; i += size) {
-          tmp1 += 
-            X[N_random*a + i] * X[N_random*b + i] * Y[N_random*c + i] +
-            X[N_random*a + i] * Y[N_random*b + i] * X[N_random*c + i] +
-            Y[N_random*a + i] * X[N_random*b + i] * X[N_random*c + i];
-        }
-        tmp2 = tmp1;
-        // Perform the reduction
-        MPI_Allreduce(&tmp1, &tmp2, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+//   int a, b, c;
+//   for (a = 0; a < N_modes; ++a) {
+//     for (b = 0; b < N_modes; ++b) {
+//       for (c = 0; c < N_modes; ++c) {
+//         // Compute the averages
+//         tmp1 = 0;
+//         for (i = rank; i < N_random; i += size) {
+//           tmp1 += 
+//             X[N_random*a + i] * X[N_random*b + i] * Y[N_random*c + i] +
+//             X[N_random*a + i] * Y[N_random*b + i] * X[N_random*c + i] +
+//             Y[N_random*a + i] * X[N_random*b + i] * X[N_random*c + i];
+//         }
+//         tmp2 = tmp1;
+//         // Perform the reduction
+//         MPI_Allreduce(&tmp1, &tmp2, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
         
         
-        v3[a * N_modes*N_modes + b * N_modes + c] = - tmp2 / (3*N_random); 
+//         v3[a * N_modes*N_modes + b * N_modes + c] = - tmp2 / (3*N_random); 
          
-      }
-    }
-  }
+//       }
+//     }
+//   }
 
 
-  Py_INCREF(Py_None);
-  return Py_None;
-}
-#endif
+//   Py_INCREF(Py_None);
+//   return Py_None;
+// }
+// #endif
 
 
 /*
@@ -477,7 +487,7 @@ static PyObject * GetV3(PyObject * self, PyObject * args) {
  *          The output array that will be filled with the v3
  */
 
-#ifndef _MPI
+//#ifndef _MPI
 static PyObject * GetV3(PyObject * self, PyObject * args) {
   int N_modes, N_random;
   PyObject * npy_X, *npy_Y, *npy_v3;
@@ -527,7 +537,7 @@ static PyObject * GetV3(PyObject * self, PyObject * args) {
   Py_INCREF(Py_None);
   return Py_None;
 }
-#endif
+//#endif
 
 
 /*
@@ -561,7 +571,7 @@ static PyObject * GetV3(PyObject * self, PyObject * args) {
  *          The output array that will be filled with the v3
  */
 
-#ifndef _MPI
+//#ifndef _MPI
 static PyObject * ApplyV4(PyObject * self, PyObject * args) {
   int N_modes, N_random;
   PyObject * npy_X, *npy_Y, *npy_vin, *npy_vout;
@@ -623,7 +633,7 @@ static PyObject * ApplyV4(PyObject * self, PyObject * args) {
   Py_INCREF(Py_None);
   return Py_None;
 }
-#endif 
+//#endif 
 
 
 
@@ -666,7 +676,7 @@ static PyObject * ApplyV4(PyObject * self, PyObject * args) {
  *        The number of elements different from zero.
  */
 
-#ifndef _MPI
+//#ifndef _MPI
 static PyObject * GetV4(PyObject * self, PyObject * args) {
   int N_modes, N_random;
   PyObject * npy_X, *npy_Y, *npy_rows, *npy_cols, *npy_v4out, *npy_Lambda;
@@ -863,4 +873,4 @@ static PyObject * GetV4(PyObject * self, PyObject * args) {
 
   return PyInt_FromLong(n_tot);
 }
-#endif 
+//#endif 

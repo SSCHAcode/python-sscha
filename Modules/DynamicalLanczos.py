@@ -20,6 +20,10 @@ import cellconstructor.symmetries
 import Ensemble
 import sscha_HP_odd
 
+# Override the print function to print in parallel only from the master
+import Parallel
+from Parallel import print
+
 # Define a generic type for the double precision.
 TYPE_DP = np.double
 __EPSILON__ = 1e-8
@@ -75,7 +79,8 @@ class Lanczos:
                 The mode of the speedup.
                    0) Slow python implementation 
                       Use this just for testing
-                   1) Fast C parallel (OpenMP)
+                   1) Fast C serial code
+                   2) Fast C parallel (MPI)
 
         """
 
@@ -83,7 +88,7 @@ class Lanczos:
 
         # Define the order
         order = "C"
-        if self.mode == 1:
+        if self.mode >= 1:
             order = "F"
     
         self.T = 0

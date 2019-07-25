@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from numpy.distutils.core import setup, Extension
 import os, sys 
 import numpy 
@@ -12,8 +14,18 @@ parallel = False
 if os.environ.has_key("MPICC"):
         mpicc = os.environ["MPICC"]
         parallel = True
+        print ()
+        print("Parallel compiler setted to:", mpicc)
+        print()
 else:
+        print()
+        print("======= WARNING =======")
         print("No MPI compiler found, please specify MPICC environmental variable")
+        print("For example, try to run: ")
+        print(" >>> MPICC=mpicc " + " ".join(sys.argv))
+        print("Note: clean the build directory if you whish to recompile the code.")
+        print("=======================")
+        print()
 
 # Setup the parallel environemnt
 if parallel:

@@ -3,11 +3,20 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 
 #define RY_TO_K 157887.32400374097
 #define __EPSILON__ 1e-6
+
+//#define D_MPI
+#ifdef _MPI
+#include <mpi.h>
+#endif
+
+// NOTE: For now OpenMP parallelization is not active.
+
 /*
- * Apply the D3 matrix to a vector (OpenMP)
+ * Apply the D3 matrix to a vector (OpenMP/MPI)
  * ===============================
  * 
  * Apply the d3 matrix to a vector.
@@ -44,10 +53,13 @@
 void OMP_ApplyD3ToVector(const double * X, const double * Y, const double * rho, const double * w, 
 			 double T, int N_modes, int N_configs, const double * input_vector, double * output_dyn,
 			 double * sym_matrix, int N_sym, int * N_degeneracy, int ** degenerate_space);
+void MPI_ApplyD3ToVector(const double * X, const double * Y, const double * rho, const double * w, 
+			 double T, int N_modes, int N_configs,  double * input_vector, double * output_dyn,
+			 double * sym_matrix, int N_sym, int * N_degeneracy, int ** degenerate_space);
 
 
 /*
- * Apply the D3 matrix to a dyn (OpenMP)
+ * Apply the D3 matrix to a dyn (OpenMP/MPI)
  * ============================
  * 
  * Apply the d3 matrix to a dyn.
@@ -79,9 +91,24 @@ void OMP_ApplyD3ToVector(const double * X, const double * Y, const double * rho,
  *      degenerate_space : array of array [N_modes, N_degeneracy[i]]
  *          The mode indices that compose the degenerate subspace in which the first mode label belong to.
  */
-void OMP_ApplyD3ToVector(const double * X, const double * Y, const double * rho, const double * w, 
+
+void OMP_ApplyD3ToDyn(const double * X, const double * Y, const double * rho, const double * w, 
 			 double T, int N_modes, int N_configs, const double * input_dyn, double * output_vector,
 			 double * sym_matrix, int N_sym, int * N_degeneracy, int ** degenerate_space);
+void MPI_ApplyD3ToDyn(const double * X, const double * Y, const double * rho, const double * w, 
+			 double T, int N_modes, int N_configs,  double * input_dyn, double * output_vector,
+			 double * sym_matrix, int N_sym, int * N_degeneracy, int ** degenerate_space);
+
+
+
+// Here the method to apply the d4 matrix (dyn to dyn)
+
+void OMP_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, const double * w, 
+		      double T, int N_modes, int N_configs, const double * input_dyn, double * output_dyn,
+		      double * symmetries, int N_sym, int * N_degeneracy, int ** degenerate_space);
+void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, const double * w, 
+		      double T, int N_modes, int N_configs,  double * input_dyn, double * output_dyn,
+		      double * symmetries, int N_sym, int * N_degeneracy, int ** degenerate_space);
 
 
 
