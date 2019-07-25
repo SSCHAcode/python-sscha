@@ -181,7 +181,7 @@ class Lanczos:
         f -= ensemble.sscha_forces.reshape(self.N, 3 * self.nat)
         # Subtract also the average force to clean more the stochastic noise
         av_force = ensemble.get_average_forces(get_error = False).ravel()
-        new_av_force = np.tile(av_force, (n_cell, 1))
+        new_av_force = np.tile(av_force, (n_cell, 1)).ravel()
         f -= np.tile(new_av_force, (self.N, 1)) 
         f *= Ensemble.Bohr
 
