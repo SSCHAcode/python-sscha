@@ -22,7 +22,7 @@ import sscha_HP_odd
 
 # Override the print function to print in parallel only from the master
 import Parallel
-from Parallel import print
+from Parallel import pprint as print
 
 # Define a generic type for the double precision.
 TYPE_DP = np.double

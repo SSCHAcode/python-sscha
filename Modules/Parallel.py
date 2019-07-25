@@ -46,7 +46,7 @@ def am_i_the_master():
     else:
         return True 
 
-def print(*argv):
+def pprint(*argv):
     """
     PARALLEL PRINTING
     =================
