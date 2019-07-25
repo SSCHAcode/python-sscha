@@ -358,8 +358,8 @@ void MPI_ApplyD3ToVector(const double * X, const double * Y, const double * rho,
 	int mpi_index;
 	for (mpi_index = start; mpi_index < stop; ++mpi_index) {
 		c = mpi_index % N_modes;
-		b = (mpi_index - c) % N_modes;
-		a = (mpi_index - c - b*N_modes) % N_modes;
+		b = (mpi_index/ N_modes) % N_modes;
+		a = (mpi_index/N_modes) / N_modes;
 
 		if (DEB) {
 			printf("RANK %d, index = %d (%d, %d). a = %d, b = %d, c = %d\n",
@@ -724,8 +724,8 @@ void MPI_ApplyD3ToDyn(const double * X, const double * Y, const double * rho, co
 	int mpi_index;
 	for (mpi_index = start; mpi_index < stop; ++mpi_index) {
 		c = mpi_index % N_modes;
-		b = (mpi_index - c) % N_modes;
-		a = (mpi_index - c - b*N_modes) % N_modes;
+		b = (mpi_index/ N_modes) % N_modes;
+		a = (mpi_index/N_modes) / N_modes;
 
 		double tmp = 0;
 
@@ -1011,9 +1011,9 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 	for (mpi_index = start; mpi_index < stop; ++mpi_index) {
 		
 		d = mpi_index % N_modes;
-		c = (mpi_index - d) % N_modes;
-		b = (mpi_index - d - c*N_modes) % N_modes;
-		a = (mpi_index - d - c*N_modes - b * N_modes*N_modes) % N_modes;
+		c = (mpi_index/N_modes) % N_modes;
+		b = (mpi_index/(N_modes * N_modes)) % N_modes;
+		a = (mpi_index/(N_modes*N_modes)) / N_modes;
 
 		// Check if the operation is allowed by symmetries
 		int stop = 0;
