@@ -115,6 +115,7 @@ class Lanczos:
         self.N_degeneracy = None
         self.initialized = False
         self.perturbation_modulus = 1
+        self.q_vectors = None # The q vectors of each mode
 
         # Perform a bare initialization if the ensemble is not provided
         if ensemble is None:
@@ -129,6 +130,7 @@ class Lanczos:
         self.T = ensemble.current_T
 
         ws, pols = self.dyn.DiagonalizeSupercell()
+
 
         self.nat = superdyn.structure.N_atoms
 
@@ -148,6 +150,17 @@ class Lanczos:
 
         self.n_modes = len(self.w)
 
+
+        # Prepare the list of q point starting from the polarization vectors
+        #q_list = CC.symmetries.GetQForEachMode(self.pols, self.uci_structure, self.super_structure, self.dyn.GetSupercell())
+        # Store the q vectors in crystal space
+        bg = self.uci_structure.get_reciprocal_vectors() / 2* np.pi
+        self.q_vectors = np.zeros((self.n_modes, 3), dtype = np.double, order = "C")
+        #for iq, q in enumerate(q_list):
+        #    self.q_vectors[iq, :] = CC.Methods.covariant_coordinate(bg, q)
+        
+
+
         # Ignore v3 or v4. You can set them for testing
         self.ignore_v3 = False
         self.ignore_v4 = False
@@ -157,15 +170,24 @@ class Lanczos:
         self.rho = ensemble.rho.copy() 
         self.N_eff = np.sum(self.rho)
 
-        u = ensemble.u_disps
+        u = ensemble.u_disps / Ensemble.Bohr
         f = ensemble.forces.reshape(self.N, 3 * self.nat).copy()
         f -= ensemble.sscha_forces.reshape(self.N, 3 * self.nat)
+        f *= Ensemble.Bohr
 
         self.X = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
-        self.X[:,:] = np.einsum("a,ia, ab->ib", np.sqrt(self.m), u, self.pols) / Ensemble.Bohr
+        #self.X[:,:] = np.einsum("a,ia, ab->ib", np.sqrt(self.m), u, self.pols) / Ensemble.Bohr
 
         self.Y = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
-        self.Y[:,:] = np.einsum("a,ia, ab->ib", 1/np.sqrt(self.m), f, self.pols) * Ensemble.Bohr
+        #self.Y[:,:] = np.einsum("a,ia, ab->ib", 1/np.sqrt(self.m), f, self.pols) * Ensemble.Bohr
+
+        ups_mat = self.dyn.GetUpsilonMatrix(self.T)
+        v_vec = u.dot(ups_mat)
+
+        # Convert in the polarization basis
+        pol_mat = np.einsum("ab, a->ab", self.pols, 1 / np.sqrt(self.m))
+        self.X[:,:] = v_vec.dot(pol_mat)
+        self.Y[:,:] = f.dot(pol_mat)
 
         # Prepare the variable used for the working
         self.psi = np.zeros(self.n_modes + self.n_modes*self.n_modes, dtype = TYPE_DP)
@@ -189,6 +211,28 @@ class Lanczos:
         self.reverse_L = False
         self.shift_value = 0
         self.symmetrize = False
+
+    def reset(self):
+        """
+        RESET THE LANCZOS
+        =================
+
+        This function reset the Lanczos algorithm, allowing for a new responce function calculation
+        with the same ensemble and the same settings.
+        """
+
+
+        # Prepare the solution of the Lanczos algorithm
+        self.eigvals = None
+        self.eigvects = None 
+
+        # Store the basis and the coefficients of the Lanczos procedure
+        # In the custom lanczos mode
+        self.a_coeffs = [] #Coefficients on the diagonal
+        self.b_coeffs = [] # Coefficients close to the diagonal
+        self.krilov_basis = [] # The basis of the krilov subspace
+        self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
+
 
 
 
@@ -250,11 +294,11 @@ class Lanczos:
 
     def prepare_ir(self, effective_charges = None, pol_vec = np.array([1,0,0])):
         """
-        PREPARE LANCZOS FOR IR COMPUTATION
-        ==================================
+        PREPARE LANCZOS FOR INFRARED SPECTRUM COMPUTATION
+        =================================================
 
         In this subroutine we prepare the lanczos algorithm for the computation of the
-        IR signal.
+         signal.
 
         Parameters
         ----------
@@ -645,7 +689,8 @@ class Lanczos:
                             N_degeneracy = self.N_degeneracy,
                             initialized = self.initialized,
                             degenerate_space = self.degenerate_space,
-                            perturbation_modulus = self.perturbation_modulus)
+                            perturbation_modulus = self.perturbation_modulus,
+                            q_vectors = self.q_vectors)
             
     def load_status(self, file):
         """
@@ -691,6 +736,7 @@ class Lanczos:
         
         if "perturbation_modulus" in data.keys():
             self.perturbation_modulus = data["perturbation_modulus"]
+            self.q_vectors = data["q_vectors"]
 
         # Rebuild the Linear operator
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
@@ -925,7 +971,8 @@ Starting from step %d
 
             # Apply the matrix L
             t1 = time.time()
-            self.psi = self.apply_full_L()
+            #self.psi = self.apply_full_L()
+            self.psi = self.L_linop.dot(self.psi)
             t2 = time.time()
 
             if verbose:
@@ -938,6 +985,7 @@ Starting from step %d
 
 
             # Lets repeat twice the orthogonalization
+            converged = False
             for k_orth in range(N_REP_ORTH):
                 for j in range(len(self.krilov_basis)):
                     coeff = new_vect.dot(self.krilov_basis[j])
@@ -955,15 +1003,17 @@ Starting from step %d
 
                 # Check the normalization (If zero the algorithm converged)
                 if norm < __EPSILON__:
+                    converged = True
                     if verbose:
                         print("Obtained a linear dependent vector.")
                         print("The algorithm converged.")
-                    return
+                    break
                 
                 new_vect /= norm 
 
-            self.krilov_basis.append(new_vect)
-            self.psi = new_vect
+            if not converged:
+                self.krilov_basis.append(new_vect)
+                self.psi = new_vect
             t2 = time.time()
 
             # Add the coefficients to the variables
@@ -989,6 +1039,10 @@ Starting from step %d
             
             if verbose:
                 print("Lanczos step %d ultimated." % i)
+            
+
+            if converged:
+                return
 
 
     def build_lanczos_matrix_from_coeffs(self, use_arnoldi=True):
@@ -1155,6 +1209,165 @@ Starting from step %d
         return fc_matrix
 
 
+    def get_all_green_functions(self, N_steps = 100, mode_mixing = True, save_step_dir = None, verbose = True):
+        """
+        GET ALL THE GREEN FUNCTIONS
+        ===========================
+
+        This will compute a set of lanczos coefficients for each element of the odd matrix.
+        a_n and b_n.
+        We will run lanczos for all the elements and all the crosses.
+        In this way we have the whole evolution with frequency of the matrix.
+
+        NOTE: This can be a very intensive computation.
+
+        Parameters
+        ----------
+            N_steps : int
+                The number of Lanczos iteration for each green function
+            mode_mixing : bool
+                If True also non diagonal elements are computed, otherwise the 
+                SSCHA eigenvector are supposed to be conserved, and only diagonal
+                green functions are considered.
+                If False the computation is much less expensive (a factor nat_sc),
+                but it is approximated.
+            save_step_dir : string
+                If not None, the path to the directory in which you want to save 
+                each step. So even if stopped the calculation can restart.
+            verbose : bool
+                If true print all the progress to standard output
+
+        Results
+        -------
+            a_ns : ndarray( (n_modes, n_modes, N_steps))
+                The a coefficients for each element in the mode x mode space
+            b_ns : ndarray( (n_modes, n_modes, N_steps-1))
+                The b_n coefficients for each mode in the space.
+        """
+
+        # Time the function
+        t_start = time.time()
+
+        # Check if the save directory exists
+        # Otherwise we create it
+        if not save_step_dir is None:
+            if not os.path.exists(save_step_dir):
+                os.makedirs(save_step_dir)
+
+        # Load all the data
+        a_ns = np.zeros( (self.n_modes, self.n_modes, N_steps), dtype = np.double)
+        b_ns = np.zeros( (self.n_modes, self.n_modes, N_steps-1), dtype = np.double)
+
+        # Incompatible with shift for now
+        self.shift_value = 0
+
+        # Compute the diagonal parts
+        for i in range(self.n_modes):
+            if verbose:
+                print("\n")
+                print("  ==========================  ")
+                print("  |                        |  ")
+                print("  |   DIAGONAL ELEMENTS    |  ")
+                print("  |       STEP {:5d}       |  ".format(i))
+                print("  |                        |  ")
+                print("  ==========================  ")
+                print()
+            
+            # Setup the Lanczos
+            self.reset()
+
+            # Prepare the perturbation
+            self.psi[:] = 0
+            self.psi[i] = 1
+
+            # Run the Lanczos perturbation
+            self.run(N_steps, save_dir = save_step_dir, verbose = verbose)
+
+            if verbose:
+                print()
+                print("   ---- > LANCZOS RUN COMPLEATED < ----   ")
+                print()
+
+            # Save the status
+            if save_step_dir:
+                self.save_status("full_lanczos_diagonal_{}".format(i))
+            
+            # Fill the a_n and b_n
+            a_tmp = np.zeros(N_steps, dtype = np.double)
+            a_tmp[:len(self.a_coeffs)] = self.a_coeffs
+            b_tmp = np.zeros(N_steps-1, dtype = np.double)
+            b_tmp[:len(self.b_coeffs)] = self.b_coeffs
+            a_ns[i, i, :] = a_tmp
+            b_ns[i, i, :] = b_tmp
+    
+        # If we must compute the mode mixing
+        if mode_mixing:
+            for i in range(self.n_modes):
+                for j in range(i+1, self.n_modes):
+                    # TODO: Neglect (i,j) forbidden by symmetries
+
+                    if verbose:
+                        print("\n")
+                        print("  ============================  ")
+                        print("  |                          |  ")
+                        print("  |   NON DIAGONAL ELEMENT   |  ")
+                        print("  |    STEP ({:5d},{:5d})    |  ".format(i, j))
+                        print("  |                          |  ")
+                        print("  ============================  ")
+                        print()
+                    
+                    # Setup the Lanczos
+                    self.reset()
+
+                    # Prepare the perturbation
+                    self.psi[:] = 0
+                    self.psi[i] = 1
+                    self.psi[j] = 1
+
+                    # Run the Lanczos perturbation
+                    self.run(N_steps, save_dir = save_step_dir, verbose = verbose)
+
+                    if verbose:
+                        print()
+                        print("   ---- > LANCZOS RUN COMPLEATED < ----   ")
+                        print()
+
+                    # Save the status
+                    if save_step_dir:
+                        self.save_status("full_lanczos_off_diagonal_{}_{}".format(i, j))
+                    
+                    # Fill the a_n and b_n
+                    a_tmp = np.zeros(N_steps, dtype = np.double)
+                    a_tmp[:len(self.a_coeffs)] = self.a_coeffs
+                    b_tmp = np.zeros(N_steps-1, dtype = np.double)
+                    b_tmp[:len(self.b_coeffs)] = self.b_coeffs
+                    a_ns[i, j, :] = a_tmp
+                    b_ns[i, j, :] = b_tmp
+                    a_ns[j, i, :] = a_tmp
+                    b_ns[j, i, :] = b_tmp
+
+        t_end = time.time()
+
+        total_time = t_end - t_start
+        minutes = int(total_time / 60)
+        hours = int(minutes / 60)
+        minutes -= hours * 60
+        seconds = int(total_time - hours*3600 - minutes * 60)
+
+        if verbose:
+            print()
+            print()
+            print("     ======================     ")
+            print("     |                    |     ")
+            print("     |        DONE        |      ")
+            print("     |   In {:3d}:{:02d}:{:02d}s  |     ".format(hours, minutes, seconds))
+            print("     ======================     ")
+            print()
+            print()
+            
+        return a_ns, b_ns
+
+
 
     def get_spectral_function_from_Lenmann(self, w_array, smearing, use_arnoldi=True):
         """
@@ -1272,7 +1485,7 @@ Starting from step %d
         
         w_a = np.tile(self.w, (self.n_modes,1)).ravel()
         w_b = np.tile(self.w, (self.n_modes,1)).T.ravel()
-        chi_beta = -.5 * np.sqrt((w_a + w_b)/(w_a*w_b))
+        chi_beta = -.5 * np.sqrt(w_a + w_b)/(np.sqrt(w_a)*np.sqrt(w_b))
 
 
         B_mat = (w_a + w_b)**2
@@ -1281,17 +1494,37 @@ Starting from step %d
         
 
         # Compute the d3 operator
-        new_X = np.einsum("ia,a->ai", self.X, f_ups(self.w, self.T))
-        new_Y = np.einsum("ia,i->ai", self.Y, self.rho)
+        #new_X = np.einsum("ia,a->ai", self.X, f_ups(self.w, self.T))
+        N_eff = np.sum(self.rho)
+        Y_weighted = np.einsum("ia, i->ia", self.Y, self.rho)
+        #new_Y = np.einsum("ia,i->ai", self.Y, self.rho)
         N_eff = np.sum(self.rho)
 
         if not self.ignore_v3:
             if verbose:
                 print("Computing d3...")
-            d3 =  np.einsum("ai,bi,ci", new_X, new_X, new_Y)
-            d3 += np.einsum("ai,bi,ci", new_X, new_Y, new_X)
-            d3 += np.einsum("ai,bi,ci", new_Y, new_X, new_X)
-            d3 /= - 3 * N_eff
+            d3_noperm = np.einsum("ia,ib,ic->abc", self.X, self.X, Y_weighted)
+            d3_noperm /= -N_eff 
+
+            # Apply the permuatations
+            d3 = d3_noperm.copy()
+            d3 += np.einsum("abc->acb", d3_noperm)
+            d3 += np.einsum("abc->bac", d3_noperm)
+            d3 += np.einsum("abc->bca", d3_noperm)
+            d3 += np.einsum("abc->cab", d3_noperm)
+            d3 += np.einsum("abc->cba", d3_noperm)
+            d3 /= 6
+
+            if verbose:
+                np.save("d3_modes_nosym.npy", d3)
+
+            # Perform the standard symmetrization
+            d3 = symmetrize_d3_muspace(d3, self.symmetries)
+
+            if verbose:
+                np.save("d3_modes_sym.npy", d3)
+                np.save("symmetries_modes.npy", self.symmetries)
+            
 
             # Reshape the d3
             d3_reshaped = d3.reshape((self.n_modes, self.n_modes * self.n_modes))
@@ -1309,6 +1542,9 @@ Starting from step %d
             d4 += np.einsum("ai,bi,ci,di", new_X, new_Y, new_X, new_X)
             d4 += np.einsum("ai,bi,ci,di", new_Y, new_X, new_X, new_X)
             d4 /= - 4 * N_eff
+
+            if verbose:
+                np.save("d4_modes_nosym.npy", d4)
 
             # Reshape the d4
             d4_reshaped = d4.reshape((self.n_modes*self.n_modes, self.n_modes * self.n_modes))
@@ -1552,10 +1788,13 @@ def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn,  symmetries, n_degeneracies, de
     i = 0
     i_mode = 0
     j_mode = 0
-    #print("len1 = ", len(deg_space_new), "len2 = ", len(n_degeneracies))
-    while i_mode < len(deg_space_new):
+    #print("len1 = ", len(deg_space_new), "len2 = ", n_modes)
+    #print("Mapping degeneracies:", np.sum(n_degeneracies))
+    while i_mode < n_modes:
         #print("i= ", i_mode, "Ndeg:", n_degeneracies[i_mode], "j = ", j_mode, "len = ", len(degenerate_space[i_mode]))
         #print("new_i = ", i, "tot = ", np.sum(n_degeneracies))
+        #print("cross_modes: ({}, {}) | deg_imu = {} | i = {}".format(i_mode, j_mode, n_degeneracies[i_mode], i))
+
         deg_space_new[i] = degenerate_space[i_mode][j_mode]
         j_mode += 1
         i+=1
@@ -1620,7 +1859,9 @@ def FastApplyD3ToVector(X, Y, rho, w, T, input_vector, symmetries, n_degeneracie
     i = 0
     i_mode = 0
     j_mode = 0
-    while i_mode < len(deg_space_new):
+    #print("Mapping degeneracies:", np.sum(n_degeneracies))
+    while i_mode < n_modes:
+        #print("cross_modes: ({}, {}) | deg_i = {}".format(i_mode, j_mode, n_degeneracies[i_mode]))
         deg_space_new[i] = degenerate_space[i_mode][j_mode]
         j_mode += 1
         i += 1
@@ -1748,13 +1989,16 @@ def FastApplyD4ToDyn(X, Y, rho, w, T, input_dyn, symmetries, n_degeneracies, deg
     i = 0
     i_mode = 0
     j_mode = 0
-    while i_mode < len(deg_space_new):
+    #print("Mapping degeneracies:", np.sum(n_degeneracies))
+    while i_mode < n_modes:
+        #print("cross_modes: ({}, {}) | deg_i = {}".format(i_mode, j_mode, n_degeneracies[i_mode]))
         deg_space_new[i] = degenerate_space[i_mode][j_mode]
         j_mode += 1
         i += 1
         if j_mode == n_degeneracies[i_mode]:
             i_mode += 1
             j_mode = 0
+
 
     
     #print( "Apply to vector, nmodes:", n_modes, "shape:", np.shape(output_dyn))
@@ -1763,3 +2007,154 @@ def FastApplyD4ToDyn(X, Y, rho, w, T, input_dyn, symmetries, n_degeneracies, deg
 
 
 
+
+
+# Here some functions to analyze the data that comes out by a Lanczos
+def GetFreeEnergyCurvatureFromContinuedFraction(a_ns, b_ns, pols_sc, masses, mode_mixing = True,\
+    use_terminator = True, last_average = 5, smearing = 0):
+    """
+    GET THE FREE ENERGY CURVATURE FROM MANY LANCZOS
+    ===============================================
+
+    This function computes the free energy curvature from the result
+    of a full Lanczos computation between all possible perturbations.
+
+    Parameters
+    ----------
+        a_ns : ndarray(size = (n_modes, n_modes, N_steps))
+            The a_n coefficients for each Lanczos perturbation
+        b_ns : ndarray(size = (n_modes, n_modes, N_steps-1))
+            The b_n coefficients for each Lanczos perturbation
+        pols_sc : ndarray(size = (3*nat_sc, n_modes))
+            The polarization vectors in the supercell
+        masses : ndarray(size = (3*nat_sc))
+            The mass associated to each component of pols_sc
+        use_terminator : bool
+            If true the infinite volume interpolation is performed trought the
+            terminator trick
+        last_average : int
+            Used in combination with the terminator, average the last 'last_average'
+            coefficients and replicate them.
+        smearing : float
+            The smearing for the green function calculation. 
+            Usually not needed for this kind of calculation.
+
+    Results
+    -------
+        odd_fc : ndarray( (3*nat_sc, 3*nat_sc))
+            The free energy curvature in the supercell
+
+    """
+
+    n_modes = np.shape(pols_sc)[1]
+    nat_sc = int(np.shape(pols_sc)[0] / 3)
+    N_steps = np.shape(a_ns)[2]
+
+    assert N_steps -1 == np.shape(b_ns)[2], "Error, an and bn has an incompatible size:\n a_n = {}, b_n = {}".format(np.shape(a_ns), np.shape(b_ns))
+    
+    
+    mat_pol = np.zeros( (n_modes, n_modes), dtype = np.double)
+    for i in range(n_modes):
+
+        # Get the number of steps
+        n_steps = np.arange(N_steps-1)[b_ns[i, i, :] == 0]
+        if len(n_steps) == 0:
+            n_steps = N_steps
+        else:
+            n_steps = n_steps[0] + 1
+
+        
+        # Create the Lanczos class
+        lanc = Lanczos(None)
+        lanc.a_coeffs = a_ns[i, i, :n_steps]
+        lanc.b_coeffs = b_ns[i, i, :n_steps - 1]
+        lanc.perturbation_modulus = 1
+
+
+        print("Computing ({},{}) ... n_steps = {}".format(i, i, n_steps))
+
+        # get the green function from continued fraction
+        gf = lanc.get_green_function_continued_fraction(np.array([0]), use_terminator = use_terminator, \
+            smearing = smearing, last_average = last_average)[0]
+        
+        mat_pol[i,i] = np.real(gf)
+
+    # If there is the mode-mixing compute also the off-diagonal terms
+    if mode_mixing:
+        for i in range(n_modes):
+            for j in range(i+1, n_modes):
+                # Get the number of steps
+                n_steps = np.arange(N_steps-1)[b_ns[i, j, :] == 0]
+                if len(n_steps) == 0:
+                    n_steps = N_steps
+                else:
+                    n_steps = n_steps[0] + 1
+
+
+                # Create the Lanczos class)
+                lanc = Lanczos(None)
+                lanc.a_coeffs = a_ns[i, j, :n_steps]
+                lanc.b_coeffs = b_ns[i, j, :n_steps-1]
+                lanc.perturbation_modulus = 2
+
+                print("Computing ({},{}) ..., n_steps = {}".format(i, j, n_steps))
+
+                # get the green function from continued fraction
+                gf = lanc.get_green_function_continued_fraction(np.array([0]), use_terminator = use_terminator, \
+                    smearing = smearing, last_average = last_average)[0]
+                
+                # Lanczos can compute only diagonal green functions
+                # Therefore we need to trick it to get the off-diagonal elements
+                # <1|L|2> = 1/2*( <1+2|L|1+2> - <1|L|1>  - <2|L|2>)
+                mat_pol[i,j] = (np.real(gf) - mat_pol[i,i] - mat_pol[j,j]) / 2
+                mat_pol[j,i] = (np.real(gf) - mat_pol[i,i] - mat_pol[j,j]) / 2
+
+    # The green function is the inverse of the free energy curvature
+    np.savetxt("gf_mat.dat", mat_pol)
+    fc_pols = np.linalg.inv(mat_pol)
+    np.savetxt("fc_pols.dat", fc_pols)
+
+    # Get back into real space
+    epols_m = np.einsum("ab, a->ab", pols_sc, np.sqrt(masses)) 
+    fc_odd = np.einsum("ab, ca, da ->cd", fc_pols, epols_m, epols_m)
+
+    return fc_odd
+
+
+def symmetrize_d3_muspace(d3, symmetries):
+    """
+    SYMMETRIZE D3 IN MODE SPACE
+    ===========================
+
+    This function symmetrizes the d3 in the mu space.
+    It is quite fast.
+
+    Parameters
+    ----------
+        d3 : ndarray(n_modes, n_modes, n_modes)
+            The d3 tensor to be symmetrized
+        symmetries : ndarray(N_sym, n_modes, n_modes)
+            The full symmetry matrix
+
+    Results
+    -------
+        new_d3 : ndarray(n_modes, n_modes, n_modes)
+            The d3 tensor symmetrized
+    """
+
+    new_d3 = np.zeros(np.shape(d3), dtype = np.double)
+
+    N_sym, nmode, dumb = np.shape(symmetries)
+
+    for i in range(N_sym):
+        symmat = symmetries[i, :, :]
+
+        ap = np.einsum("abc, lc ->abl", d3, symmat)
+        ap = np.einsum("abc, lb ->alc", ap, symmat)
+        ap = np.einsum("abc, la ->lbc", ap, symmat)
+        #ap = np.einsum("abc, aa, bb, cc->abc", d3, symmat, symmat, symmat)
+
+        new_d3 += ap 
+    
+    new_d3 /= N_sym
+    return new_d3
