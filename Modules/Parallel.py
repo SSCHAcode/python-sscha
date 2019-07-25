@@ -1,9 +1,9 @@
+from __future__ import print_function
 """
 This files contains a setup utility to manage the parallelization with different
 modules.
 """
 
-from __future__ import print_function
 import numpy as np 
 import time
 
@@ -54,5 +54,6 @@ def pprint(*argv):
     This will print on stdout only once in parallel execution of the code
     """
     if am_i_the_master():
+        print("Hey!")
         print(*argv)
 
