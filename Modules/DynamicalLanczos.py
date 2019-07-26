@@ -602,6 +602,7 @@ class Lanczos:
             out_dyn = SlowApplyD4ToDyn(self.X, self.Y, self.rho, self.w, self.T, dyn)
         elif self.mode >= 1:
             # The fast C implementation
+            print ("Inside v4 MPI, this will take a while")
             out_dyn = FastApplyD4ToDyn(self.X, self.Y, self.rho, self.w, self.T, dyn,
                                        self.symmetries, self.N_degeneracy, self.degenerate_space, self.mode)       
             
