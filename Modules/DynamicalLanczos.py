@@ -327,6 +327,9 @@ class Lanczos:
         if not effective_charges is None:
             ec = effective_charges
         
+
+        n_supercell = np.prod(self.dyn.GetSupercell())
+
         # Check the effective charges
         assert not ec is None, "Error, no effective charge found. Cannot initialize IR responce"
 
@@ -335,13 +338,13 @@ class Lanczos:
         Error, effective charges of the wrong shape: {}
         """.format(ec_size)
         assert len(ec_size) == 3, MSG
-        assert ec_size[0] * ec_size[2] == self.n_modes + 3
+        assert ec_size[0] * ec_size[2] * n_supercell == self.n_modes + 3
         assert ec_size[1] == ec_size[2] == 3
 
         z_eff = np.einsum("abc, b", ec, pol_vec)
 
         # Get the gamma effective charge
-        new_zeff = np.tile(z_eff.ravel(), np.prod(self.dyn.GetSupercell()))
+        new_zeff = np.tile(z_eff.ravel(), n_supercell)
         self.prepare_perturbation(new_zeff, masses_exp = -1)
 
 
