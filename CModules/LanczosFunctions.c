@@ -983,7 +983,8 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 	// MPI parallelization
 	// NOTE MPI must be initialized
 	int size=1, rank=0;
-	int count, remainer, start, stop;
+	long long count;
+	int remainer, start, stop;
 	#ifdef _MPI
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -994,9 +995,9 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 
 
 	// The workload for each MPI process
-	count = (N_modes*N_modes*N_modes*N_modes) / size;
+	count = (N_modes*N_modes * (long long) N_modes*N_modes) / size;
 	// If the number of MPI process does not match, distribute them correctly
-	remainer = (N_modes*N_modes*N_modes*N_modes) % size;
+	remainer = (N_modes*N_modes* (long long) N_modes*N_modes) % size;
 
 	// Distribute the work in a clever way 
 	if (rank < remainer) {
