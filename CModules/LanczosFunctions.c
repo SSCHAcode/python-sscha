@@ -983,8 +983,8 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 	// MPI parallelization
 	// NOTE MPI must be initialized
 	int size=1, rank=0;
-	long long count;
-	int remainer, start, stop;
+	long long count, start, stop;
+	int remainer;
 	#ifdef _MPI
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -1008,7 +1008,10 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 		stop = start + count;
 	}
 
-	int mpi_index;
+	// Print what we need to do for each processors
+	printf("MPI process %d runs [%lld, %lld) out of %lld\n", rank, start, stop, count);
+
+	long long mpi_index;
 	for (mpi_index = start; mpi_index < stop; ++mpi_index) {
 		
 		d = mpi_index % N_modes;
