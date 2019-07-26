@@ -991,7 +991,11 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 
 	// Send the data to everyone
 	MPI_Bcast(input_dyn, N_modes*N_modes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	printf("MPI active\n");
     #endif
+	#ifndef _MPI
+	printf("Warning: MPI NOT ACTIVE! Check the compliation.");
+	#endif
 
 
 	// The workload for each MPI process
