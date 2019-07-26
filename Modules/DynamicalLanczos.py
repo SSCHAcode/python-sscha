@@ -10,6 +10,8 @@ import sys, os
 import time
 import numpy as np
 
+from timeit import default_timer as timer
+
 # Import the scipy Lanczos modules
 import scipy, scipy.sparse.linalg
 
@@ -644,9 +646,17 @@ class Lanczos:
             
             
         # Apply the whole L step by step to self.psi
+        t1 = timer()
         output = self.apply_L1()
+        t2 = timer()
         output += self.apply_L2()
+        t3 = timer()
         output += self.apply_L3()
+        t4 = timer()
+
+        print("Time to apply L1: {}".format(t2 - t1))
+        print("Time to apply L2: {}".format(t3-t2))
+        print("Time to apply L3: {}".format(t4-t3))
 
         # Apply the shift reverse
         #print ("Output before:")
