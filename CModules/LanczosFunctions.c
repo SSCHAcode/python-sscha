@@ -991,7 +991,7 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 
 	// Send the data to everyone
 	MPI_Bcast(input_dyn, N_modes*N_modes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	printf("MPI active\n");
+	//printf("MPI active\n");
     #endif
 	#ifndef _MPI
 	printf("Warning: MPI NOT ACTIVE! Check the compliation.");
@@ -1013,7 +1013,7 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 	}
 
 	// Print what we need to do for each processors
-	printf("MPI process %d runs [%lld, %lld) out of %lld\n", rank, start, stop, count);
+	printf("MPI process %d runs [%lld, %lld)\n", rank, start, stop);
 
 	long long mpi_index;
 	for (mpi_index = start; mpi_index < stop; ++mpi_index) {
