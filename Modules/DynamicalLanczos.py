@@ -966,6 +966,13 @@ Starting from step %d
 """ % i_step
             print(header)
 
+            OPTIONS = """
+Should I ignore the third order effect? {}
+Should I ignore the fourth order effect? {}
+Max number of iterations: {}
+""".format(self.ignore_v3, self.ignore_v4, n_iter)
+            print(OPTIONS)
+
 
         # If this is the current step initialize the algorithm
         if i_step == 0:
