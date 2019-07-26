@@ -59,7 +59,10 @@ def f_ups(w, T):
         n_w = 1 / (np.exp(w * __RyToK__ / T) - 1)
     return 2*w / (1 + n_w)
 
-
+# Modes for the calculation
+MODE_FAST_MPI = 2
+MODE_FAST_SERIAL = 1
+MODE_SLOW_SERIAL = 0
 
 
 class Lanczos:
