@@ -330,6 +330,10 @@ class Lanczos:
         # Get the raman vector
         raman_v = self.dyn.GetRamanVector(pol_vec_in, pol_vec_out)
 
+        # Get the raman vector in the supercell
+        n_supercell = np.prod(self.dyn.GetSupercell())
+        new_raman_v = np.tile(raman_v.ravel(), n_supercell)
+
         # Convert in the polarization basis and store the intensity
         self.prepare_perturbation(raman_v, masses_exp=-1)
 
