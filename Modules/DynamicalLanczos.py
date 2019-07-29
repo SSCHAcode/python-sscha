@@ -305,13 +305,27 @@ class Lanczos:
         self.N_degeneracy = N_deg
         self.degenerate_space = deg_space
 
+    def prepare_raman(self, pol_vec_in= np.array([1,0,0]), pol_vec_out = np.array([1,0,0])):
+        """
+        PREPARE LANCZOS FOR RAMAN SPECTRUM
+        ==================================
+
+        This subroutines prepare the perturbation for the Raman signal.
+
+        Parameters
+        ----------
+            pol_vec_in : ndarray (size =3)
+                The polarization vector of the incoming light
+            pol_vec_out : ndarray (size = 3)
+        """
+
     def prepare_ir(self, effective_charges = None, pol_vec = np.array([1,0,0])):
         """
         PREPARE LANCZOS FOR INFRARED SPECTRUM COMPUTATION
         =================================================
 
         In this subroutine we prepare the lanczos algorithm for the computation of the
-         signal.
+        infrared spectrum signal.
 
         Parameters
         ----------
