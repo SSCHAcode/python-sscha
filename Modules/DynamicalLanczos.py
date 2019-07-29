@@ -314,12 +314,25 @@ class Lanczos:
 
         This subroutines prepare the perturbation for the Raman signal.
 
+        The raman tensor is read from the dynamical matrix provided by the original ensemble.
+
         Parameters
         ----------
             pol_vec_in : ndarray (size =3)
                 The polarization vector of the incoming light
             pol_vec_out : ndarray (size = 3)
+                The polarization vector for the outcoming light
         """
+
+        # Check if the raman tensor is present
+        assert not self.dyn.raman_tensor is None, "Error, no Raman tensor found. Cannot initialize the Raman responce"
+
+        # Get the raman vector
+        raman_v = self.dyn.GetRamanVector(pol_vec_in, pol_vec_out)
+
+        # Convert in the polarization basis and store the intensity
+        self.prepare_perturbation(raman_v, masses_exp=-1)
+
 
     def prepare_ir(self, effective_charges = None, pol_vec = np.array([1,0,0])):
         """
