@@ -983,20 +983,25 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 	// MPI parallelization
 	// NOTE MPI must be initialized
 	int size=1, rank=0;
-	int count, remainer, start, stop;
+	long long count, start, stop;
+	int remainer;
 	#ifdef _MPI
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
 	// Send the data to everyone
 	MPI_Bcast(input_dyn, N_modes*N_modes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	//printf("MPI active\n");
     #endif
+	#ifndef _MPI
+	printf("Warning: MPI NOT ACTIVE! Check the compliation.");
+	#endif
 
 
 	// The workload for each MPI process
-	count = (N_modes*N_modes*N_modes*N_modes) / size;
+	count = (N_modes*N_modes * (long long) N_modes*N_modes) / size;
 	// If the number of MPI process does not match, distribute them correctly
-	remainer = (N_modes*N_modes*N_modes*N_modes) % size;
+	remainer = (N_modes*N_modes* (long long) N_modes*N_modes) % size;
 
 	// Distribute the work in a clever way 
 	if (rank < remainer) {
@@ -1007,7 +1012,10 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 		stop = start + count;
 	}
 
-	int mpi_index;
+	// Print what we need to do for each processors
+	printf("MPI process %d runs [%lld, %lld)\n", rank, start, stop);
+
+	long long mpi_index;
 	for (mpi_index = start; mpi_index < stop; ++mpi_index) {
 		
 		d = mpi_index % N_modes;
