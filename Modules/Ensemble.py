@@ -38,6 +38,8 @@ import cellconstructor.Methods
 import cellconstructor.Manipulate
 import cellconstructor.Settings
 
+import Parallel
+
 
 import SCHAModules
 import sscha_HP_odd
@@ -618,16 +620,18 @@ class Ensemble:
                 several ensembles in the same data_dir
         """
         
-        np.save("%s/energies_pop%d.npy" % (data_dir, population_id), self.energies)
-        np.save("%s/forces_pop%d.npy" % (data_dir, population_id), self.forces)
-        
-        # Save the structures
-        np.save("%s/xats_pop%d.npy" % (data_dir, population_id), self.xats)
-        
-        if self.has_stress:
-            np.save("%s/stresses_pop%d.npy" % (data_dir, population_id), self.stresses)
-        
-        self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
+
+        if Parallel.am_i_the_master():
+            np.save("%s/energies_pop%d.npy" % (data_dir, population_id), self.energies)
+            np.save("%s/forces_pop%d.npy" % (data_dir, population_id), self.forces)
+            
+            # Save the structures
+            np.save("%s/xats_pop%d.npy" % (data_dir, population_id), self.xats)
+            
+            if self.has_stress:
+                np.save("%s/stresses_pop%d.npy" % (data_dir, population_id), self.stresses)
+            
+            self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
         
         
         
