@@ -335,7 +335,7 @@ class Lanczos:
         new_raman_v = np.tile(raman_v.ravel(), n_supercell)
 
         # Convert in the polarization basis and store the intensity
-        self.prepare_perturbation(raman_v, masses_exp=-1)
+        self.prepare_perturbation(new_raman_v, masses_exp=-1)
 
 
     def prepare_ir(self, effective_charges = None, pol_vec = np.array([1,0,0])):
