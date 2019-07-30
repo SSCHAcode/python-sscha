@@ -307,13 +307,44 @@ class Lanczos:
         self.N_degeneracy = N_deg
         self.degenerate_space = deg_space
 
+    def prepare_raman(self, pol_vec_in= np.array([1,0,0]), pol_vec_out = np.array([1,0,0])):
+        """
+        PREPARE LANCZOS FOR RAMAN SPECTRUM
+        ==================================
+
+        This subroutines prepare the perturbation for the Raman signal.
+
+        The raman tensor is read from the dynamical matrix provided by the original ensemble.
+
+        Parameters
+        ----------
+            pol_vec_in : ndarray (size =3)
+                The polarization vector of the incoming light
+            pol_vec_out : ndarray (size = 3)
+                The polarization vector for the outcoming light
+        """
+
+        # Check if the raman tensor is present
+        assert not self.dyn.raman_tensor is None, "Error, no Raman tensor found. Cannot initialize the Raman responce"
+
+        # Get the raman vector
+        raman_v = self.dyn.GetRamanVector(pol_vec_in, pol_vec_out)
+
+        # Get the raman vector in the supercell
+        n_supercell = np.prod(self.dyn.GetSupercell())
+        new_raman_v = np.tile(raman_v.ravel(), n_supercell)
+
+        # Convert in the polarization basis and store the intensity
+        self.prepare_perturbation(new_raman_v, masses_exp=-1)
+
+
     def prepare_ir(self, effective_charges = None, pol_vec = np.array([1,0,0])):
         """
         PREPARE LANCZOS FOR INFRARED SPECTRUM COMPUTATION
         =================================================
 
         In this subroutine we prepare the lanczos algorithm for the computation of the
-         signal.
+        infrared spectrum signal.
 
         Parameters
         ----------
@@ -695,32 +726,33 @@ class Lanczos:
             file += ".npz"
         
         # Save all the data
-        np.savez_compressed(file, 
-                            T = self.T,
-                            nat = self.nat,
-                            m = self.m,
-                            w = self.w,
-                            pols = self.pols,
-                            n_modes = self.n_modes,
-                            ignore_v3 = self.ignore_v3,
-                            ignore_v4 = self.ignore_v4,
-                            N = self.N,
-                            rho = self.rho,
-                            X = self.X,
-                            Y = self.Y,
-                            psi = self.psi,
-                            a_coeffs = self.a_coeffs,
-                            b_coeffs = self.b_coeffs,
-                            krilov_basis = self.krilov_basis,
-                            arnoldi_matrix = self.arnoldi_matrix,
-                            reverse = self.reverse_L,
-                            shift = self.shift_value,
-                            symmetries = self.symmetries,
-                            N_degeneracy = self.N_degeneracy,
-                            initialized = self.initialized,
-                            degenerate_space = self.degenerate_space,
-                            perturbation_modulus = self.perturbation_modulus,
-                            q_vectors = self.q_vectors)
+        if Parallel.am_i_the_master():
+            np.savez_compressed(file, 
+                                T = self.T,
+                                nat = self.nat,
+                                m = self.m,
+                                w = self.w,
+                                pols = self.pols,
+                                n_modes = self.n_modes,
+                                ignore_v3 = self.ignore_v3,
+                                ignore_v4 = self.ignore_v4,
+                                N = self.N,
+                                rho = self.rho,
+                                X = self.X,
+                                Y = self.Y,
+                                psi = self.psi,
+                                a_coeffs = self.a_coeffs,
+                                b_coeffs = self.b_coeffs,
+                                krilov_basis = self.krilov_basis,
+                                arnoldi_matrix = self.arnoldi_matrix,
+                                reverse = self.reverse_L,
+                                shift = self.shift_value,
+                                symmetries = self.symmetries,
+                                N_degeneracy = self.N_degeneracy,
+                                initialized = self.initialized,
+                                degenerate_space = self.degenerate_space,
+                                perturbation_modulus = self.perturbation_modulus,
+                                q_vectors = self.q_vectors)
             
     def load_status(self, file):
         """
