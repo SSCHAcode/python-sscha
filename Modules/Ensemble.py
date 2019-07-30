@@ -431,6 +431,55 @@ class Ensemble:
             # Allow the garbage collector to free the memory
             del self.stresses
 
+    def merge(self, other_ensemble):
+        """
+        MERGE TWO ENSEMBLES
+        ===================
+
+        This function merges into this self ensemble another ensemble.
+        The two ensembles must be generated with the same dynamical matrix.
+
+        Note the weights will be updated to the settings of the current ensemble.
+
+        Parameters
+        ----------
+            other_ensemble : Ensemble()
+                The ensemble to be merged into this self.
+        """
+
+        # Check if the two original dynamical matrix are the same
+        super1 = self.dyn_0.GenerateSupercellDyn(self.dyn_0.GetSupercell())
+        super2 = other_ensemble.dyn_0.GenerateSupercellDyn(self.supercell)
+
+        delta_dyn = super1.dynmats[0] - super2.dynmats[0]
+        assert np.sqrt(np.sum(delta_dyn**2)) < 1e-7, "The given ensemble is incompatible!"
+
+        # Concatenate the two ensembles
+        self.N = self.N + other_ensemble.N
+        self.energies = np.concatenate((self.energies, other_ensemble.energies))
+        self.xats = np.concatenate((self.xats, other_ensemble.xats))
+        self.forces = np.concatenate((self.forces, other_ensemble.forces))
+        if self.has_stress and other_ensemble.has_stress:
+            self.stresses = np.concatenate((self.stresses, other_ensemble.stresses))
+        else:
+            self.has_stress = False
+        self.structures = self.structures + other_ensemble.structures
+        
+        # Recreate the other auxiliary variables
+        nat_sc = self.dyn_0.structure.N_atoms * np.prod(self.supercell)
+        self.u_disps = np.zeros( (self.N, nat_sc * 3), order = "F", dtype = np.float64)
+        self.sscha_energies = np.zeros(self.N, dtype = np.float64)
+        self.sscha_forces = np.zeros( (self.N, nat_sc, 3), order = "F", dtype = np.float64)
+        self.rho = np.ones(self.N, dtype = np.float64)
+        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, super1, self.u_disps)
+        self.current_q = self.q_start.copy()
+
+        # Recompute the auxiliary variables
+        self.update_weights(self.current_dyn, self.current_T)
+
+
+        
+
     def load_from_calculator_output(self, directory, out_ext = ".pwo"):
         """
         LOAD THE ENSEMBLE FROM A CALCULATION

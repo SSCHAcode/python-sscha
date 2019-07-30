@@ -954,7 +954,7 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
     double N_eff = 0;
     int i;
 
-    #pragma omp parallel for private(i) reduction(+:N_eff)
+    //#pragma omp parallel for private(i) reduction(+:N_eff)
     for (i = 0; i < N_configs; ++i)
         N_eff += rho[i];
 
@@ -994,7 +994,7 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 	//printf("MPI active\n");
     #endif
 	#ifndef _MPI
-	printf("Warning: MPI NOT ACTIVE! Check the compliation.");
+	printf("Warning: MPI NOT ACTIVE! Check the compliation.\n");
 	#endif
 
 
