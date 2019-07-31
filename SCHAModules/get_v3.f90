@@ -118,8 +118,8 @@ subroutine get_v3 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v3, &
         end do
       end do
     end do
-    !$omp end do
-    !$omp end parallel
+    !!$omp end do
+    !!$omp end parallel
   
     deallocate(e,ur,u2,f2,fun)
   
