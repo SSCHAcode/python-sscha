@@ -1509,18 +1509,23 @@ Max number of iterations: {}
 
         gf = np.zeros(np.shape(w_array), dtype = np.complex128)
 
+        sign =1
+        if self.reverse_L:
+            sign = -1
+
         # Get the terminator
         if use_terminator:
             a_av = np.mean(self.a_coeffs[-last_average:])
             b_av = np.mean(self.b_coeffs[-last_average:])
 
-            gf[:] = (a_av - w_array**2 - np.sqrt( (a_av - w_array**2)**2 - 4*b_av**2 + 0j))/(2*b_av**2)
-        else:
-            gf[:] = 1/ (self.a_coeffs[-1] - w_array**2 + 2j*w_array*smearing)
+            a = a_av * sign - sign* self.shift_value
+            b = b_av * sign
 
-        sign =1
-        if self.reverse_L:
-            sign = -1
+            gf[:] = (a - w_array**2 - np.sqrt( (a - w_array**2)**2 - 4*b**2 + 0j))/(2*b**2)
+        else:
+            a = self.a_coeffs[-1] * sign - sign* self.shift_value
+            gf[:] = 1/ (a - w_array**2 + 2j*w_array*smearing)
+
         for i in range(n_iters-2, -1, -1):
             a = self.a_coeffs[i] * sign - sign* self.shift_value
             b = self.b_coeffs[i] * sign
