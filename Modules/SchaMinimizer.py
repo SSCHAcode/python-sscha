@@ -609,8 +609,8 @@ class SSCHA_Minimizer:
 
         
         if __SCHA_PRINTSTRESS__ in keys:
-            if not __SCHA_FILDYN__ in keys:
-                raise ValueError("Error, please specify a dynamical matrix.")
+            #if not __SCHA_FILDYN__ in keys:
+            #    raise ValueError("Error, please specify a dynamical matrix.")
             self.ensemble.has_stress = True
         
     def print_info(self):
