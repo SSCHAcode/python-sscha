@@ -90,8 +90,7 @@ __SCHA_ALLOWED_KEYS__ = [__SCHA_LAMBDA_A__, __SCHA_ISBIN__,
                          __SCHA_MAXSTEPS__, __SCHA_STRESSOFFSET__,
                          __SCHA_GRADIOP__, __SCHA_POPULATION__,
                          __SCHA_PRINTSTRESS__, __SCHA_USESPGLIB__]
-__SCHA_MANDATORY_KEYS__ = [__SCHA_FILDYN__, __SCHA_NQIRR__, __SCHA_NQIRR__,
-                           __SCHA_T__]
+__SCHA_MANDATORY_KEYS__ = [__SCHA_T__]
 
 class SSCHA_Minimizer:
     
@@ -207,7 +206,22 @@ class SSCHA_Minimizer:
         self.__gw_err__ = []
         self.__KL__ = []
 
+    
+    def is_initialized(self):
+        """
+        CHECK IF THE DYNAMICAL MATRIX EXISTS
+        ====================================
+        """
+
+        if self.dyn is None:
+            return False
+        if self.ensemble is None:
+            return False 
+        if np.max(self.ensemble.rho) == 0:
+            # Check if the forces has been computed
+            return False
         
+        return True
         
         
     def minimization_step(self, custom_function_gradient = None):
@@ -848,6 +862,11 @@ Maybe data_dir is missing from your input?"""
                 It is called after the two gradients have been computed, and it is used to 
                 impose some constraint on the minimization.
         """
+
+        # Check if everything is initialized
+        if not self.is_initialized:
+            print("Attention: The ensemble results uninitialized, try to run the init function before.")
+            raise ValueError("Error, the dynamical matrix or the ensemble are not properly initialized.")
         
         # Eliminate the convergence flag
         self.__converged__ = False

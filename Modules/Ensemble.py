@@ -763,7 +763,7 @@ class Ensemble:
             self.u_disps[i, :] = s.get_displacement(super_dyn.structure).reshape((3* Nat_sc))
             self.xats[i, :, :] = s.coords
         
-        self.rho = np.ones(self.N, dtype = np.float64)
+        self.rho = np.zeros(self.N, dtype = np.float64)
         self.current_dyn = self.dyn_0.Copy()
         self.current_T = self.T0
         
