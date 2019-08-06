@@ -26,14 +26,14 @@ except:
         try:
                 import mpi4py
         except:
-                parallel = False
+                #parallel = False
                 python_parallel = False
 
 # Setup the parallel environemnt
 if parallel:
         # If we are here we can compile using MPI support
-        mpi_compile_args = os.popen("%s --showme:compile" % mpicc).read().strip().split(' ')
-        mpi_link_args    = os.popen("%s --showme:link" % mpicc).read().strip().split(' ')
+        mpi_compile_args = os.popen("%s -show" % mpicc).read().strip().split(' ')[1:]
+        mpi_link_args    = os.popen("%s -show" % mpicc).read().strip().split(' ')[1:]
         extra_flags_c += ["-D_MPI"]
 
 
@@ -82,8 +82,19 @@ setup( name = "python-sscha",
                   "scripts/plot_lanczos_convergence.py"],
        license = "GPLv3"
        )
-
-if not parallel:
+                                                                                                                                                          
+if not python_parallel and not parallel:                                                                                                                      
+        print()                                                                                                                                               
+        print("======= WARNING =======")                                                                                                                      
+        print("Nor python parallel neither MPI compiler found.")                                                                                              
+        print("If you whish to activate MPI acceleration,")                                                                                                   
+        print("Consider installing either pypar or mpi4py")                                                                                                   
+        print("For example, try to run: ")                                                                                                                    
+        print(" >>> MPICC=mpicc python " + " ".join(sys.argv))                                                                                                
+        print("Note: clean the build directory if you whish to recompile the code.")                                                                          
+        print("=======================")                                                                                                                      
+        print()                                                                                                                                               
+elif not parallel:
         print()
         print("======= WARNING =======")
         print("No MPI compiler found, please specify MPICC environmental variable")
