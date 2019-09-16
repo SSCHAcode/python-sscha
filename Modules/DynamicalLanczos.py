@@ -766,7 +766,11 @@ class Lanczos:
             raise IOError("Error while loading %s" % file)
 
         
-        data = np.load(file) 
+        # Fix the allow pickle error in numpy >= 1.14.4
+        try:
+            data = np.load(file, allow_pickle = True)
+        except:
+            data = np.load(file) 
 
         self.T = data["T"]
         self.nat = data["nat"]
