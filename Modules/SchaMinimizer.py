@@ -191,6 +191,10 @@ class SSCHA_Minimizer:
 
         # This is used to polish the ensemble energy
         self.eq_energy = 0
+
+        # This is used to store the number of symmetries
+        # It is used almost to check that no symmetry is broken along the minimization
+        self.N_symmetries = 1
         
         # This is the maximum number of steps (if negative = infinity)
         self.max_ka = -1
@@ -625,6 +629,16 @@ class SSCHA_Minimizer:
         print " compute the stress tensor = ", self.ensemble.has_stress
         print " total number of atoms = ", self.dyn.structure.N_atoms * np.prod(self.ensemble.supercell)
         print ""
+        print ("")
+        print("--- SYMMETRY INFO ----")
+        print (" use spglib = ", self.use_spglib)
+        tmp_str = "unit"
+        if self.use_spglib:
+            tmp_str = "super"
+            import spglib
+            print (" Symmetry group = {}".format(spglib.get_spacegroup(self.dyn.structure.get_ase_atoms())))
+        print (" Number of symmetries in the {} cell = ".format(tmp_str), self.N_symmetries)
+        
         print ""
         print " --- STRUCT MINIMIZATION --- "
         print " minim_struct = ", self.minim_struct
@@ -739,15 +753,33 @@ Maybe data_dir is missing from your input?"""
         
         # Symmetrize the starting dynamical matrix and apply the sum rule
         if verbosity:
-            print "Symmetry initialization..."
+            print("Symmetry initialization...")
         qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
-        fcq = np.array(self.dyn.dynmats)
-        qe_sym.SymmetrizeFCQ(fcq, self.dyn.q_stars, asr = "custom")
-        for iq in range(len(self.dyn.q_tot)):
-            self.dyn.dynmats[iq] = fcq[iq, :, :]
+        qe_sym.SetupQPoint(verbose = verbosity)
+
+        if self.use_spglib:
+            qe_sym.SetupFromSPGLIB()
+
+            import spglib
+            if verbosity:
+                print("Symmetry group: ", spglib.get_spacegroup(self.dyn.structure.get_ase_atoms()))
+            
+            self.N_symmetries = qe_sym.QE_nsym
+
+            # Symmetrize the dynamical matrix
+            self.dyn.SymmetrizeSupercell()
+        else:
+            fcq = np.array(self.dyn.dynmats)
+            qe_sym.SymmetrizeFCQ(fcq, self.dyn.q_stars, asr = "custom")
+            for iq in range(len(self.dyn.q_tot)):
+                self.dyn.dynmats[iq] = fcq[iq, :, :]
+        
+        # Save the number of symmetries
+        self.N_symmetries = qe_sym.QE_nsym
         
         if verbosity:
-            print "Check for the imaginary frequencies..."
+            print("Total number of symmetries: {}".format(self.N_symmetries))
+            print("Check for the imaginary frequencies...")
         
         self.check_imaginary_frequencies()
         self.update()
