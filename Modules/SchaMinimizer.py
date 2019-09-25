@@ -233,8 +233,10 @@ class SSCHA_Minimizer:
         
         if self.use_spglib:
             qe_sym.SetupFromSPGLIB()
-        
-        #qe_sym.SetupQPoint(verbose = False)
+            self.N_symmetries = qe_sym.QE_nsym
+        else:
+            qe_sym.SetupQPoint(verbose = False)
+            self.N_symmetries = qe_sym.QE_nsym
         
         
         # Get the gradient of the free-energy respect to the dynamical matrix
@@ -632,12 +634,10 @@ class SSCHA_Minimizer:
         print ("")
         print("--- SYMMETRY INFO ----")
         print (" use spglib = ", self.use_spglib)
-        tmp_str = "unit"
         if self.use_spglib:
-            tmp_str = "super"
             import spglib
             print (" Symmetry group = {}".format(spglib.get_spacegroup(self.dyn.structure.get_ase_atoms())))
-        print (" Number of symmetries in the {} cell = ".format(tmp_str), self.N_symmetries)
+        print (" Number of symmetries in the unit cell = ", self.N_symmetries)
         
         print ""
         print " --- STRUCT MINIMIZATION --- "
@@ -932,6 +932,8 @@ Maybe data_dir is missing from your input?"""
             # Print the step
             if verbose >= 1:
                 print ""
+                print ("")
+                print("Number of symmetries before the step: ", self.N_symmetries)
                 print "Harmonic contribution to free energy = %16.8f meV" % (harm_fe * __RyTomev__)
                 print "Anharmonic contribution to free energy = %16.8f +- %16.8f meV" % (anharm_fe * __RyTomev__,
                                                                                          np.real(err) * __RyTomev__)
