@@ -934,6 +934,9 @@ Maybe data_dir is missing from your input?"""
                 print ""
                 print ("")
                 print("Number of symmetries before the step: ", self.N_symmetries)
+                if self.use_spglib:
+                    import spglib
+                    print("Group space: ", spglib.get_spacegroup(self.dyn.structure.get_ase_atoms()))
                 print "Harmonic contribution to free energy = %16.8f meV" % (harm_fe * __RyTomev__)
                 print "Anharmonic contribution to free energy = %16.8f +- %16.8f meV" % (anharm_fe * __RyTomev__,
                                                                                          np.real(err) * __RyTomev__)
