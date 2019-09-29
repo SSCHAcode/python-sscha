@@ -40,7 +40,11 @@ import cellconstructor.Settings
 
 
 import SCHAModules
-import sscha_HP_odd
+
+_SSCHA_ODD_ = False 
+try:
+    import sscha_HP_odd
+    _SSCHA_ODD_ = True
 
 # Try to load the parallel library if any
 try:
@@ -2388,6 +2392,8 @@ class Ensemble:
                 else:
                     # Lets call the C code with openMP support
                     # to compute the d3 faster
+                    if not _SSCHA_ODD_:
+                        raise ImportError("Error, sscha_HP_odd is required to use openmp, thid is deprecated. Pleas use get_free_energy_hessian instead.")
                     sscha_HP_odd.GetV3(X, Y, n_modes_sc, self.N, d3)
                     d3 *= self.N / N_eff
             else:
