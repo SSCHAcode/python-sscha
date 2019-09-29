@@ -2213,7 +2213,7 @@ class Ensemble:
             store_v4 = True, progress = False, frequencies = 0, smearing = 5e-5, v4_conv_thr = 1e-2,
             return_only_correction = False, save_all = False, load_d3 = None, use_omp = False):
         """
-        RAFFAELLO'S BIANCO ODD CORRECTION TESTING VERSION
+        RAFFAELLO BIANCO'S ODD CORRECTION TESTING VERSION
         =================================================
 
         NOTE: THIS IS DEPRECATED! USE get_free_energy_hessian instead!
