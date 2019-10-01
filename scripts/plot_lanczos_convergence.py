@@ -6,6 +6,7 @@ import sys, os
 
 import numpy as np
 import matplotlib.pyplot as plt
+from cycler import cycler
 
 import cellconstructor as CC
 import cellconstructor.Phonons
@@ -13,53 +14,61 @@ import cellconstructor.Phonons
 import sscha, sscha.DynamicalLanczos
 import sscha.Ensemble
 
+# Get from command line the last lanczos step
+if not len(sys.argv) == 2:
+    print("Error, I require the Lanczos .npz file to be analyzed (the last)")
+    raise ValueError("Error, I require the Lanczos .npz file to be analyzed (the last)")
+
+fname = sys.argv[1]
+
+# Check if the file exists
+if not os.path.exists(fname):
+    raise IOError("Error, the specified file '{}' does not exist.".format(fname))
+
 # Check how many files are here
-files = [x for x in  os.listdir(".") if "LANCZOS_STEP" in x and ".npz" in x]
+#files = [x for x in  os.listdir(".") if "LANCZOS_STEP" in x and ".npz" in x]
+
 
 data = []
 nat = 0
-print ("Reading the lanczos files (N = %d)..." % len(files))
-for f in files:
-    l_tmp = sscha.DynamicalLanczos.Lanczos()
-    l_tmp.load_status(f)
-    data.append(l_tmp)
-    nat = l_tmp.nat
-
-# Order the data
-l_steps = []
-for d in data:
-    l_steps.append(len(d.a_coeffs))
-
-sort_mask = np.argsort(l_steps)
-sorted_data = [data[x] for x in sort_mask]
-sorted_steps = [l_steps[x] for x in sort_mask]
+print ("Reading the lanczos file...")
+data = sscha.DynamicalLanczos.Lanczos()
+data.load_status(fname)
+nat = data.nat
+N_iters = len(data.a_coeffs) - 1
 
 # Now get the static converge
 W_START = 0
 W_END = 10000 / CC.Phonons.RY_TO_CM
 NW = 10000
-SMEARING = 10 / CC.Phonons.RY_TO_CM
+SMEARING = 2 / CC.Phonons.RY_TO_CM
 
 print ("Computing the static responce...")
-freqs = np.zeros((len(data), 3*nat))
-dynamical = np.zeros((len(data), NW))
-dynamical_lenmann = np.zeros((len(data), NW))
+freqs = np.zeros((N_iters, 3*nat))
+dynamical = np.zeros((N_iters, NW))
+dynamical_noterm = np.zeros((N_iters, NW))
 w_array = np.linspace(W_START, W_END, NW)
 
-for i, dat in enumerate(sorted_data):
-    fc_odd = dat.get_static_odd_fc(False)
-    fc_odd /= np.sqrt(np.outer(dat.m, dat.m))
-    w, p = np.linalg.eigh(fc_odd)
-    sign_mask = np.sign(w)
-    w = sign_mask * np.sqrt(np.abs(w))
-    w *= CC.Phonons.RY_TO_CM
-    freqs[i, :] = w 
+a_coeffs = np.copy(data.a_coeffs)
+b_coeffs = np.copy(data.b_coeffs)
 
-    dynamical_lenmann[i, :] = dat.get_spectral_function_from_Lenmann(w_array, SMEARING, False)
-    dynamical[i, :] = -np.imag( dat.get_green_function_continued_fraction(w_array, use_terminator = False, smearing = SMEARING))
+for i in range(N_iters):
+    data.a_coeffs = a_coeffs[:i+1]
+    data.b_coeffs = b_coeffs[:i]
+
+    #fc_odd = data.get_static_odd_fc(False)
+    #fc_odd /= np.sqrt(np.outer(data.m, data.m))
+    #w, p = np.linalg.eigh(fc_odd)
+    #sign_mask = np.sign(w)
+    #w = sign_mask * np.sqrt(np.abs(w))
+    #w *= CC.Phonons.RY_TO_CM
+    #freqs[i, :] = w 
+
+    dynamical_noterm[i, :] = -np.imag( data.get_green_function_continued_fraction(w_array, use_terminator = False, smearing = SMEARING))
+    dynamical[i, :] = -np.imag( data.get_green_function_continued_fraction(w_array, use_terminator = True, smearing = SMEARING))
     
     if i % 10 == 0:
-        sys.stderr.write("\rProgress %% %d" % (i * 100 / len(sorted_data)))
+        sys.stderr.write("\rProgress %% %d" % (i * 100 / N_iters))
         sys.stderr.flush()
 sys.stderr.write("\n")
 
@@ -68,15 +77,15 @@ print ("Plotting the results...")
 plt.figure(dpi = 160)
 plt.title("Static Odd")
 for i in range(3*nat):
-    plt.plot(sorted_steps, freqs[:, i])
+    plt.plot(np.arange(N_iters) + 1, freqs[:, i])
 
 plt.xlabel("Lanczos step")
 plt.ylabel("frequencies [cm-1]")
 plt.tight_layout()
 
 plt.figure(dpi = 160)
-plt.title("Green function from Lenmann")
-plt.imshow(np.log(dynamical_lenmann), aspect = "auto", origin = "upper", extent = [W_START*CC.Phonons.RY_TO_CM, W_END*CC.Phonons.RY_TO_CM, max(l_steps), min(l_steps)])
+plt.title("Green function without terminator")
+plt.imshow(dynamical_noterm, aspect = "auto", origin = "upper", extent = [W_START*CC.Phonons.RY_TO_CM, W_END*CC.Phonons.RY_TO_CM, 1, N_iters])
 plt.xlabel("Frequency [cm-1]")
 plt.ylabel("Steps")
 plt.colorbar()
@@ -84,11 +93,28 @@ plt.tight_layout()
 
 
 plt.figure(dpi = 160)
-plt.title("Green function from continued fraction")
-plt.imshow(np.log(dynamical), aspect = "auto", origin = "upper", extent = [W_START*CC.Phonons.RY_TO_CM, W_END*CC.Phonons.RY_TO_CM, max(l_steps), min(l_steps)])
+plt.title("Green function with terminator")
+plt.imshow(dynamical, aspect = "auto", origin = "upper", extent = [W_START*CC.Phonons.RY_TO_CM, W_END*CC.Phonons.RY_TO_CM, 1, N_iters])
 plt.xlabel("Frequency [cm-1]")
 plt.ylabel("Steps")
 plt.colorbar()
+plt.tight_layout()
+
+
+
+# get colormap
+cmap=plt.cm.viridis
+# build cycler with 5 equally spaced colors from that colormap
+c = cycler('color', cmap(np.linspace(0,1,N_iters)) )
+# supply cycler to the rcParam
+plt.rcParams["axes.prop_cycle"] = c
+
+plt.figure(dpi = 160)
+plt.title("Green function with terminator")
+for i in range(N_iters):
+    plt.plot(w_array * CC.Phonons.RY_TO_CM, dynamical[i, :])
+plt.xlabel("Frequency [cm-1]")
+plt.ylabel("Steps")
 plt.tight_layout()
 
 plt.show()
