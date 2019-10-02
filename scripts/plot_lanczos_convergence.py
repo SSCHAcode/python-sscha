@@ -113,6 +113,9 @@ plt.figure(dpi = 160)
 plt.title("Green function with terminator")
 for i in range(N_iters):
     plt.plot(w_array * CC.Phonons.RY_TO_CM, dynamical[i, :])
+
+# The last one is plotted in red underlined
+plt.plot(w_array * CC.Phonons.RY_TO_CM, dynamical[-1, :], color = "r", linewidth = 3.5)
 plt.xlabel("Frequency [cm-1]")
 plt.ylabel("Steps")
 plt.tight_layout()
