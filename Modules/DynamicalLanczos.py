@@ -1027,6 +1027,12 @@ Max number of iterations: {}
             first_vector = self.psi / np.sqrt(self.psi.dot(self.psi))
             self.krilov_basis.append(first_vector)
         else:
+            # Convert everything in a list
+            self.krilov_basis = list(self.krilov_basis)
+            self.a_coeffs = list(self.a_coeffs)
+            self.b_coeffs = list(self.b_coeffs)
+            self.arnoldi_matrix = list(self.arnoldi_matrix)
+
             if len(self.krilov_basis) != i_step + 1:
                 print("Krilov dim: %d, number of steps perfomed: %d" % (len(self.krilov_basis), i_step))
                 print("Error, the krilov basis dimension should be 1 more than the number of steps")
@@ -1041,6 +1047,8 @@ Max number of iterations: {}
 
  """ % i
                 print(step_txt)
+                print("Length of the coefficiets: a = {}, b = {}".format(len(self.a_coeffs), len(self.b_coeffs)))
+                print()
 
             # Apply the matrix L
             t1 = time.time()
@@ -1475,8 +1483,9 @@ Max number of iterations: {}
         spectral = np.zeros(len(w_array), dtype = np.complex128)
 
         kb = np.array(self.krilov_basis)
-        kb = kb[:-1,:]
-        #print (np.shape(eigvects), np.shape(kb))
+        if np.shape(kb)[0] > Na:
+            kb = kb[:-1,:]
+        print ("Shape check: eigvects = {}, kb = {}".format( np.shape(eigvects), np.shape(kb)))
         new_eigv = np.einsum("ab, ac->cb", eigvects, kb)
 
         for j in range(Na):
