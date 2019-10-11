@@ -43,6 +43,19 @@ requested (add a sudo before the command).
 Please, consider adopting anaconda-python to install the software on clusters where you do not have 
 administration rights.
 
+Installation on clusters:
+It is suggested to install the package with the anaconda distribution.
+For MPI enable parallelism (used by the Lanczos algorithm), you need to specify the MPICC 
+environment flag. 
+Please, remember that if you use the intel compiler, you need to delete the lapack linking from the
+setup.py and include the -mkl (as done for cellconstructor).
+Note that you must force to use the same liker compiler as the one used for the compilation.
+it may be necessary to specify
+MPICC=mpiicc LDSHARED="mpiicc -shared" python setup.py install
+
+Remember to use the same compiler that you used to compile the pypar library, 
+otherwise when calling MPI_Init() on the initialization, the code will complain and crash.
+
 ## Usage
 
 The installer will build and install both the python library and the executable.
