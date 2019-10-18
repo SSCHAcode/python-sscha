@@ -15,11 +15,15 @@ import sscha, sscha.DynamicalLanczos
 import sscha.Ensemble
 
 # Get from command line the last lanczos step
-if not len(sys.argv) == 2:
-    print("Error, I require the Lanczos .npz file to be analyzed (the last)")
+if not len(sys.argv) in [2, 3]:
+    print("Error, I require the Lanczos .npz file to be analyzed (the last), and (optionally) the smearing [cm-1]")
     raise ValueError("Error, I require the Lanczos .npz file to be analyzed (the last)")
 
 fname = sys.argv[1]
+
+smearing = 1
+if len(sys.argv) == 3:
+    smearing = float(sys.argv[2])
 
 # Check if the file exists
 if not os.path.exists(fname):
@@ -39,9 +43,9 @@ N_iters = len(data.a_coeffs) - 1
 
 # Now get the static converge
 W_START = 0
-W_END = 10000 / CC.Phonons.RY_TO_CM
+W_END = 10000 / CC.Units.RY_TO_CM
 NW = 10000
-SMEARING = 2 / CC.Phonons.RY_TO_CM
+SMEARING = smearing / CC.Units.RY_TO_CM
 
 print ("Computing the static responce...")
 freqs = np.zeros((N_iters, 3*nat))
