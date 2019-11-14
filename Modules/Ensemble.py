@@ -45,6 +45,9 @@ _SSCHA_ODD_ = False
 try:
     import sscha_HP_odd
     _SSCHA_ODD_ = True
+except:
+    _SSCHA_ODD_ = False 
+
 
 # Try to load the parallel library if any
 try:
@@ -71,7 +74,6 @@ try:
     Rydberg = units["Ry"]
     Bohr = units["Bohr"]
     __RyToK__ =  Rydberg / units["kB"]
-    
 except:
     Rydberg = 13.605698066
     Bohr = 1/__A_TO_BOHR__
