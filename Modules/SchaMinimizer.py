@@ -1305,7 +1305,7 @@ Maybe data_dir is missing from your input?"""
         """
         
         
-        return self.ensemble.get_stress_tensor(self.stress_offset)
+        return self.ensemble.get_stress_tensor(self.stress_offset, use_spglib= self.use_spglib)
     
 
 def get_root_dyn(dyn_fc, root_representation):

@@ -1424,7 +1424,7 @@ class Ensemble:
         return cov_mat
     
     
-    def get_stress_tensor(self, offset_stress = None, add_centroid_contrib = False):
+    def get_stress_tensor(self, offset_stress = None, add_centroid_contrib = False, use_spglib = False):
         """
         GET STRESS TENSOR
         =================
@@ -1443,6 +1443,8 @@ class Ensemble:
             add_centroid_contrib : bool, optional
                 If true the contribution of the centroid is added. This is always zero when
                 the system is relaxed.
+            use_spglib : bool
+                If true use the spglib library to perform the symmetrization
         
         Results
         -------
@@ -1545,6 +1547,10 @@ class Ensemble:
 
         # Symmetrize the stress tensor
         qe_sym = CC.symmetries.QE_Symmetry(self.current_dyn.structure)
+        if not use_spglib:
+            qe_sym.SetupQPoint()
+        else:
+            qe_sym.SetupFromSPGLIB()
         qe_sym.ApplySymmetryToMatrix(stress, err_stress)
         
         return stress, err_stress
