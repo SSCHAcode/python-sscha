@@ -375,7 +375,7 @@ class SSCHA_Minimizer:
 
         
         # Store the gradient in the minimization
-        self.__gc__.append(np.real(np.einsum("abc,acb", dyn_grad, dyn_grad)))
+        self.__gc__.append(np.real(np.einsum("abc,acb", dyn_grad, np.conj(dyn_grad))))
         self.__gc_err__.append(np.real(np.einsum("abc, acb", err, err)))
             
         # Perform the step for the dynamical matrix respecting the root representation
@@ -679,7 +679,15 @@ class SSCHA_Minimizer:
         """
         
         self.ensemble.update_weights(self.dyn, self.ensemble.current_T)
-        
+   
+    def first_step(self):
+	"""
+	================
+
+	This method evaluates the original displacemtents, Upsilon matrix e the product u_a Upsilon_{ab} u_b
+	"""   
+	self.ensemble.original()
+	
         
     def get_free_energy(self, return_error = False):
         """
@@ -720,6 +728,23 @@ class SSCHA_Minimizer:
         #    raise ValueError("Error, the ensemble dynamical matrix has not been updated. You forgot to call self.update() before")
         
         return self.ensemble.get_free_energy(return_error = return_error) / np.prod(self.ensemble.supercell)
+
+    def get_entropy(self):
+	"""
+	Obtain the entropy for the system.
+	Done by taking minus the derivative of the Free energy with respect to the temperature.
+
+	The result is in Ry/K
+
+	.. math ::
+
+		\\S = - \\frac{d F}{d T} = -k_B \\sum_\mu ln(1- e^{-\beta \hbar \omega_\mu}) + \sum_\mu \\frac{\hbar}{T} n_\mu \omega_\mu
+
+        Where n_\mu is the bosonic occupation factor
+
+	"""
+
+	return self.ensemble.get_entropy() / np.prod(self.ensemble.supercell)
     
     def init(self, verbosity = False):
         """
@@ -750,7 +775,10 @@ Maybe data_dir is missing from your input?"""
             print "Check for the imaginary frequencies..."
         
         self.check_imaginary_frequencies()
+	self.first_step()
         self.update()
+	
+	
         
         # Clean all the minimization variables
         self.__fe__ = []
@@ -986,6 +1014,7 @@ Maybe data_dir is missing from your input?"""
         print "Struct gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gw__[-1] * __RyTomev__,
                                                                     self.__gw_err__[-1] * __RyTomev__)
         print "Kong-Liu effective sample size = ", self.ensemble.get_effective_sample_size()
+	print "Entropy = %16.8f meV/K " %  (self.get_entropy() * __RyTomev__)
         print ""
         
         if self.ensemble.has_stress and verbose >= 1:
@@ -1036,7 +1065,36 @@ Maybe data_dir is missing from your input?"""
         
             print ""
         
+    def print_stress(self,filename):
+	doc=open(filename,"w")
+	doc.write(" ==== STRESS TENSOR [GPa] ====\n")
+	
+	stress, err = self.get_stress_tensor()
             
+        # Convert in GPa
+        stress *= __RyBohr3_to_GPa__
+        err *= __RyBohr3_to_GPa__
+           
+	doc.write("%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f\n" % (stress[0,0], stress[0,1], stress[0,2], "",
+                                                                err[0,0], err[0,1], err[0,2]))
+	doc.write("%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f\n" % (stress[1,0], stress[1,1], stress[1,2], "    +-    ",
+                                                                err[1,0], err[1,1], err[1,2]))
+	doc.write("%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f\n" % (stress[2,0], stress[2,1], stress[2,2], "",
+                                                                err[2,0], err[2,1], err[2,2]))
+
+	abinit_stress = self.ensemble.get_average_stress()
+        abinit_stress *= __RyBohr3_to_GPa__	
+	
+	av=(stress[0,0]+stress[1,1]+stress[2,2])/3
+	av_err=(err[0,0]+err[1,1]+err[2,2])/3
+
+	doc.write(" Ab initio average stress [GPa]:\n")
+	doc.write("%16.8f%16.8f%16.8f\n" % (abinit_stress[0,0], abinit_stress[0,1], abinit_stress[0,2]))
+	doc.write("%16.8f%16.8f%16.8f\n" % (abinit_stress[1,0], abinit_stress[1,1], abinit_stress[1,2]))
+	doc.write("%16.8f%16.8f%16.8f\n" % (abinit_stress[2,0], abinit_stress[2,1], abinit_stress[2,2]))
+	doc.write(" ===== PRESSURE [GPa] =====\n")
+	doc.write("%16.8f %16.8f\n" % (av,av_err))
+	doc.close()        
 
     def check_imaginary_frequencies(self):
         """
@@ -1268,7 +1326,7 @@ Maybe data_dir is missing from your input?"""
         """
         
         
-        return self.ensemble.get_stress_tensor(self.stress_offset)
+        return self.ensemble.get_stress_tensor(self.stress_offset,use_spglib = self.use_spglib)
     
 
 def get_root_dyn(dyn_fc, root_representation):

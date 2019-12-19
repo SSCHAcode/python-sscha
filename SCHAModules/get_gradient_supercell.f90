@@ -18,7 +18,7 @@
 subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_disp, eforces, &
      wr_sc, epols_sc, trans, T, mass, ityp_sc, log_err, grad, grad_err, preconditioned)
 
-
+  use omp_lib
   use stochastic
   
   implicit none
@@ -151,6 +151,10 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
   
   
   call cpu_time(t1)
+  !!$omp parallel PRIVATE(ical,jcal)
+  !!$omp do COLLAPSE(4)
+  !print *,"PARALLELIZED"
+  !$OMP PARALLEL DO COLLAPSE(4) PRIVATE(ical,jcal)
   do alpha = 1, 3
      do beta = 1, 3
         do i = 1, natsc
@@ -165,6 +169,10 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
         end do
      end do
   end do
+  !$OMP END PARALLEL DO
+  !!$omp end do
+  !!$omp end parallel
+  !print *,"parallelized"
 
   ! Impose the hermitianity
   ! do ical = 1, 3*natsc
