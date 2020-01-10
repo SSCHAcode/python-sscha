@@ -144,13 +144,14 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
   ! print *, "DISP FORCES:"
   ! do i = 1, size(u_disp(:, 1,1))
   !    print *, "CONFIG", i, "RHO:", rho(i)
-  !    do j = 1, natsc
+  !    do j = 1, natsc(
   !       print *, "U:", u_disp(i,j,:), "F:", eforces(i,j,:)
   !    end do
   ! end do
   
   
   call cpu_time(t1)
+  !$OMP PARALLEL DO COLLAPSE(4) PRIVATE(ical, jcal)
   do alpha = 1, 3
      do beta = 1, 3
         do i = 1, natsc
@@ -165,6 +166,7 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
         end do
      end do
   end do
+  !$OMP END PARALLEL DO
 
   ! Impose the hermitianity
   ! do ical = 1, 3*natsc

@@ -45,6 +45,9 @@ _SSCHA_ODD_ = False
 try:
     import sscha_HP_odd
     _SSCHA_ODD_ = True
+except:
+    _SSCHA_ODD_ = False 
+
 
 # Try to load the parallel library if any
 try:
@@ -71,7 +74,6 @@ try:
     Rydberg = units["Ry"]
     Bohr = units["Bohr"]
     __RyToK__ =  Rydberg / units["kB"]
-    
 except:
     Rydberg = 13.605698066
     Bohr = 1/__A_TO_BOHR__
@@ -1422,7 +1424,7 @@ class Ensemble:
         return cov_mat
     
     
-    def get_stress_tensor(self, offset_stress = None, add_centroid_contrib = False):
+    def get_stress_tensor(self, offset_stress = None, add_centroid_contrib = False, use_spglib = False):
         """
         GET STRESS TENSOR
         =================
@@ -1441,6 +1443,8 @@ class Ensemble:
             add_centroid_contrib : bool, optional
                 If true the contribution of the centroid is added. This is always zero when
                 the system is relaxed.
+            use_spglib : bool
+                If true use the spglib library to perform the symmetrization
         
         Results
         -------
@@ -1543,6 +1547,10 @@ class Ensemble:
 
         # Symmetrize the stress tensor
         qe_sym = CC.symmetries.QE_Symmetry(self.current_dyn.structure)
+        if not use_spglib:
+            qe_sym.SetupQPoint()
+        else:
+            qe_sym.SetupFromSPGLIB()
         qe_sym.ApplySymmetryToMatrix(stress, err_stress)
         
         return stress, err_stress
