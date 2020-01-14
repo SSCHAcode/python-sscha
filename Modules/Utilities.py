@@ -6,6 +6,7 @@ The function are classified as:
 CGF : custom_gradient_function
 
 """
+from __future__ import print_function
 import difflib
 import cellconstructor as CC
 import cellconstructor.Phonons
@@ -65,9 +66,9 @@ def get_custom_functions_from_namelist(namelist, dyn):
     # Check for unknown keys
     for k in keys:
         if not k in __ALLOWED_KEYS__:
-            print "Error with the key:", k
+            print ("Error with the key:", k)
             s =  "Did you mean something like:" + str( difflib.get_close_matches(k, __ALLOWED_KEYS__))
-            print s
+            print (s)
             raise IOError("Error in "+__UTILS_NAMESPACE__+" namespace: key '" + k +"' not recognized.\n" + s)
     
     
@@ -82,10 +83,10 @@ def get_custom_functions_from_namelist(namelist, dyn):
     
     def cfp(minim):
         if use_io:
-            print "SAVING"
+            print ("SAVING")
             return io_info.CFP_SaveAll(minim)
         else:
-            print "NOT SAVING"
+            print ("NOT SAVING")
         
     # Setup the mode projection
     locking = False

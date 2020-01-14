@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 
 """
 This module performs the relax over more
@@ -159,9 +160,9 @@ class SSCHA:
         # Check the allowed keys
         for k in keys: 
             if not k in __ALLOWED_KEYS__:
-                print "Error with the key:", k
+                print ("Error with the key:", k)
                 s = "Did you mean something like:" + str( difflib.get_close_matches(k, __ALLOWED_KEYS__))
-                print s
+                print (s)
                 raise IOError("Error in calculator namespace: key '" + k +"' not recognized.\n" + s)
         
         # Check for mandatory keys
@@ -175,8 +176,8 @@ class SSCHA:
         if __RELAX_TYPE__ in keys:
             rtype = c_info[__RELAX_TYPE__]
             if not rtype in __ALLOWED_RELAX_TYPES__:
-                print "Unknown relaxation option:", rtype
-                print "Did you mean:", difflib.get_close_matches(rtype, __ALLOWED_RELAX_TYPES__)
+                print ("Unknown relaxation option:", rtype)
+                print ("Did you mean:", difflib.get_close_matches(rtype, __ALLOWED_RELAX_TYPES__))
                 raise ValueError("Error with key %s" % __RELAX_TYPE__)
         
             # Setup custom functions
@@ -261,7 +262,7 @@ class SSCHA:
             
             self.minim.population = pop
             self.minim.init()
-            
+
             self.minim.run(custom_function_pre = self.__cfpre__,
                            custom_function_post = self.__cfpost__,
                            custom_function_gradient = self.__cfg__)
@@ -270,11 +271,11 @@ class SSCHA:
             self.minim.finalize()
             
             # Perform the symmetrization
-            print "Checking the symmetries of the dynamical matrix:"
+            print ("Checking the symmetries of the dynamical matrix:")
             qe_sym = CC.symmetries.QE_Symmetry(self.minim.dyn.structure)
             qe_sym.SetupQPoint(verbose = True)
             
-            print "Forcing the symmetries in the dynamical matrix."
+            print ("Forcing the symmetries in the dynamical matrix.")
             fcq = np.array(self.minim.dyn.dynmats, dtype = np.complex128)
             qe_sym.SymmetrizeFCQ(fcq, self.minim.dyn.q_stars, asr = "custom")
             for iq,q in enumerate(self.minim.dyn.q_tot):
@@ -419,8 +420,8 @@ class SSCHA:
             if kind_minimizer == "RPSD":
                 # Compute the static bulk modulus
                 sbm = GetStaticBulkModulus(self.minim.dyn.structure, self.calc)
-                print "BM:"
-                print sbm
+                print ("BM:")
+                print (sbm)
                 BFGS = sscha.Optimizer.SD_PREC_UC(self.minim.dyn.structure.unit_cell, sbm)
 
             # Generate the ensemble
@@ -461,28 +462,52 @@ class SSCHA:
             helmoltz = self.minim.get_free_energy() * sscha.SchaMinimizer.__RyToev__
             gibbs = helmoltz + target_press_evA3 * Vol - self.minim.eq_energy
             
-            
+            # Prepare a mark to underline which quantity is actually minimized by the
+            # Variable relaxation algorithm if the helmoltz free energy (in case of fixed volume)
+            # Or the Gibbs free energy (in case of fixed pressure)
+            mark_helmoltz = ""
+            mark_gibbs = ""
+            if fix_volume:
+                mark_helmoltz = "<--"
+            else:
+                mark_helmoltz = "<--"
+
             # Print the enthalpic contribution
-            print ""
-            print " ENTHALPIC CONTRIBUTION "
-            print " ====================== "
-            print ""
-            print "  P = %.4f GPa    V = %.4f A^3" % (target_press , Vol)
-            print ""
-            print "  P V = %.8e eV " % (target_press_evA3 * Vol)
-            print ""
-            print " Helmoltz Free energy = %.8e eV " % helmoltz,
-            if fix_volume:
-                print "  <-- "
-            else:
-                print ""
-            print " Gibbs Free energy = %.8e eV " % gibbs,
-            if fix_volume:
-                print ""
-            else:
-                print "  <-- "
-            print " (Zero energy = %.8e eV) " % self.minim.eq_energy
-            print ""
+            message = """
+ ====================== 
+ ENTHALPIC CONTRIBUTION 
+ ====================== 
+
+ P = {:.4f} GPa   V = {:.4f} A^3
+
+ P V = {:.8e} eV
+
+ Helmoltz Free energy = {:.8e} eV {}
+ Gibbs Free energy = {:.8e} eV {}
+ Zero energy = {:.8e} eV
+
+ """.format(target_press , Vol,target_press_evA3 * Vol, helmoltz, mark_helmoltz, gibbs, mark_gibbs, self.minim.eq_energy)
+            print(message)
+            # print " ====================== "
+            # print " ENTHALPIC CONTRIBUTION "
+            # print " ====================== "
+            # print ""
+            # print "  P = %.4f GPa    V = %.4f A^3" % (target_press , Vol)
+            # print ""
+            # print "  P V = %.8e eV " % (target_press_evA3 * Vol)
+            # print ""
+            # print " Helmoltz Free energy = %.8e eV " % helmoltz,
+            # if fix_volume:
+            #     print "  <-- "
+            # else:
+            #     print ""
+            # print " Gibbs Free energy = %.8e eV " % gibbs,
+            # if fix_volume:
+            #     print ""
+            # else:
+            #     print "  <-- "
+            # print " (Zero energy = %.8e eV) " % self.minim.eq_energy
+            # print ""
         
             # Perform the cell step
             cell_gradient = (stress_tensor - I *target_press_evA3)
@@ -495,17 +520,17 @@ class SSCHA:
             #self.minim.dyn.structure.change_unit_cell(new_uc)
             
 
-            print " New unit cell:"
-            print " v1 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[0,0], new_uc[0,1], new_uc[0,2])
-            print " v2 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[1,0], new_uc[1,1], new_uc[1,2])
-            print " v3 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[2,0], new_uc[2,1], new_uc[2,2])
+            print (" New unit cell:")
+            print (" v1 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[0,0], new_uc[0,1], new_uc[0,2]))
+            print (" v2 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[1,0], new_uc[1,1], new_uc[1,2]))
+            print (" v3 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[2,0], new_uc[2,1], new_uc[2,2]))
             
-            print ""
-            print "Check the symmetries in the new cell:"
+            print ()
+            print ("Check the symmetries in the new cell:")
             qe_sym = CC.symmetries.QE_Symmetry(self.minim.dyn.structure)
             qe_sym.SetupQPoint(verbose = True)
             
-            print "Forcing the symmetries in the dynamical matrix."
+            print ("Forcing the symmetries in the dynamical matrix.")
             fcq = np.array(self.minim.dyn.dynmats, dtype = np.complex128)
             qe_sym.SymmetrizeFCQ(fcq, self.minim.dyn.q_stars, asr = "custom")
             for iq,q in enumerate(self.minim.dyn.q_tot):

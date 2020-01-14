@@ -1,6 +1,8 @@
 #!python
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function
+from __future__ import division
 
 """
 This is part of the program python-sscha
@@ -101,13 +103,13 @@ if not sscha.SchaMinimizer.__SCHA_NAMELIST__ in namelist.keys():
 # Check if the relax is hypothized
 if sscha.Relax.__RELAX_NAMESPACE__ in namelist.keys():
     relax = sscha.Relax.SSCHA()
-    print "Found a %s namespace!" % sscha.Relax.__RELAX_NAMESPACE__
-    print "Performing a whole relaxation."
+    print ("Found a %s namespace!" % sscha.Relax.__RELAX_NAMESPACE__)
+    print ("Performing a whole relaxation.")
     
     relax.setup_from_namelist(namelist)
     
     # Save the final dynamical matrix
-    print "Saving the final dynamical matrix in %s" % (relax.minim.dyn_path + "_popuation%d_" % relax.minim.population)
+    print ("Saving the final dynamical matrix in %s" % (relax.minim.dyn_path + "_popuation%d_" % relax.minim.population))
     relax.minim.dyn.save_qe(relax.minim.dyn_path + "_population%d_" % minim.population)
     
     # Plot the results
@@ -118,18 +120,18 @@ if sscha.Relax.__RELAX_NAMESPACE__ in namelist.keys():
 
 # Parse the input file
 t1 = time.time()
-print "Loading everything..."
+print ("Loading everything...")
 minim.setup_from_namelist(namelist)
 t2 = time.time()
-print "Loaded in %.4f seconds." % (t2 - t1)
+print ("Loaded in %.4f seconds." % (t2 - t1))
 
 # Start the minimization
-print ""
-print "Initialization..."
+print ()
+print ("Initialization...")
 minim.init()
-print "System initialized."
+print ("System initialized.")
 minim.print_info()
-print ""
+print ()
 
 # If present, setup the custom functions
 if sscha.Utilities.__UTILS_NAMESPACE__ in namelist:
@@ -137,16 +139,15 @@ if sscha.Utilities.__UTILS_NAMESPACE__ in namelist:
     minim.run(custom_function_pre = cfs[0], 
               custom_function_gradient = cfs[1],
               custom_function_post = cfs[2])
-    print "I'm here"
 else:
     minim.run()
     
-print ""
-print "Minimization ended."
+print ()
+print ("Minimization ended.")
 minim.finalize(2)
 
 # Save the final dynamical matrix
-print "Saving the final dynamical matrix in %s" % (minim.dyn_path + "_popuation%d_" % minim.population)
+print ("Saving the final dynamical matrix in %s" % (minim.dyn_path + "_popuation%d_" % minim.population))
 minim.dyn.save_qe(minim.dyn_path + "_population%d_" % minim.population)
 
 # Plot the results

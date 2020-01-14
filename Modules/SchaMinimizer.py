@@ -1,5 +1,6 @@
  # -*- coding: utf-8 -*-
 
+from __future__ import print_function
 """
 This is part of the program python-sscha
 Copyright (C) 2018  Lorenzo Monacelli
@@ -295,7 +296,7 @@ class SSCHA_Minimizer:
         else:
             CC.symmetries.CustomASR(dyn_grad[0, :,:])
         t2 = time.time()
-        print "Time elapsed to symmetrize the gradient:", t2 - t1, "s"
+        print ("Time elapsed to symmetrize the gradient:", t2 - t1, "s")
         
 #        # get the gradient in the supercell
 #        new_grad_tmp = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot),
@@ -334,7 +335,7 @@ class SSCHA_Minimizer:
             struct_grad_reshaped = - struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
             t2 = time.time()
             
-            print "Time elapsed to compute the structure gradient:", t2 - t1, "s"
+            print ("Time elapsed to compute the structure gradient:", t2 - t1, "s")
             
             
             # Preconditionate the gradient for the wyckoff minimization
@@ -445,9 +446,9 @@ class SSCHA_Minimizer:
         # Check if there is an unknown key
         for k in keys:
             if not k in __SCHA_ALLOWED_KEYS__:
-                print "Error with the key:", k
+                print ("Error with the key:", k)
                 s = "Did you mean something like:" + str( difflib.get_close_matches(k, __SCHA_ALLOWED_KEYS__))
-                print s
+                print (s)
                 raise IOError("Error in inputscha namespace: key '" + k +"' not recognized.\n" + s)
     
     
@@ -614,26 +615,26 @@ class SSCHA_Minimizer:
         the minimizer on the standard output.
         """
         
-        print ""
-        print ""
-        print " ====== MINIMIZER SETTINGS ====== "
+        print ()
+        print ()
+        print (" ====== MINIMIZER SETTINGS ====== ")
         print ()
         print ( "Current population = {}".format(self.population))
         print ( "Dynamical matrix file = {}".format(self.dyn_path))
-        print ""
-        print ""
-        print " --- GENERAL SETTINGS --- "
-        print " original temperature = ", self.ensemble.T0
-        print " current temperature = ", self.ensemble.current_T
-        print " number of configurations = ", self.ensemble.N
-        print " max number of steps (infinity if negative) = ", self.max_ka
-        print " meaningful factor = ", self.meaningful_factor
-        print " gradient to watch (for stopping) = ", self.gradi_op
-        print " Kong-Liu minimum effective sample size = ", self.ensemble.N * self.kong_liu_ratio
-        print " (Kong-Liu ratio = ", self.kong_liu_ratio, ")"
-        print " compute the stress tensor = ", self.ensemble.has_stress
-        print " total number of atoms = ", self.dyn.structure.N_atoms * np.prod(self.ensemble.supercell)
-        print ""
+        print ()
+        print ()
+        print (" --- GENERAL SETTINGS --- ")
+        print (" original temperature = ", self.ensemble.T0)
+        print (" current temperature = ", self.ensemble.current_T)
+        print (" number of configurations = ", self.ensemble.N)
+        print (" max number of steps (infinity if negative) = ", self.max_ka)
+        print (" meaningful factor = ", self.meaningful_factor)
+        print (" gradient to watch (for stopping) = ", self.gradi_op)
+        print (" Kong-Liu minimum effective sample size = ", self.ensemble.N * self.kong_liu_ratio)
+        print (" (Kong-Liu ratio = ", self.kong_liu_ratio, ")")
+        print (" compute the stress tensor = ", self.ensemble.has_stress)
+        print (" total number of atoms = ", self.dyn.structure.N_atoms * np.prod(self.ensemble.supercell))
+        print ()
         print ("")
         print("--- SYMMETRY INFO ----")
         print (" use spglib = ", self.use_spglib)
@@ -642,17 +643,17 @@ class SSCHA_Minimizer:
             print (" Symmetry group = {}".format(spglib.get_spacegroup(self.dyn.structure.get_ase_atoms())))
         print (" Number of symmetries in the unit cell = ", self.N_symmetries)
         
-        print ""
-        print " --- STRUCT MINIMIZATION --- "
-        print " minim_struct = ", self.minim_struct
-        print " preconditioning = ", self.precond_wyck
-        print " minimization step (lambda_w) = ", self.min_step_struc
-        print ""
-        print ""
-        print " --- FC MINIMIZATION --- "
-        print " preconditioning = ", self.precond_dyn
-        print " minimization step (lambda_a) = ", self.min_step_dyn
-        print " supercell size = ", " ".join([str(x) for x in self.ensemble.supercell])
+        print ()
+        print (" --- STRUCT MINIMIZATION --- ")
+        print (" minim_struct = ", self.minim_struct)
+        print (" preconditioning = ", self.precond_wyck)
+        print (" minimization step (lambda_w) = ", self.min_step_struc)
+        print ()
+        print ()
+        print (" --- FC MINIMIZATION --- ")
+        print (" preconditioning = ", self.precond_dyn)
+        print (" minimization step (lambda_a) = ", self.min_step_dyn)
+        print (" supercell size = ", " ".join([str(x) for x in self.ensemble.supercell]))
         
         # Get the current frequencies
         w, pols = self.dyn.GenerateSupercellDyn(self.ensemble.supercell).DyagDinQ(0)
@@ -662,12 +663,12 @@ class SSCHA_Minimizer:
         w0, p0 = self.ensemble.dyn_0.GenerateSupercellDyn(self.ensemble.supercell).DyagDinQ(0)
         w0 *= __RyToCm__
         
-        print ""
-        print " Current dyn frequencies [cm-1] = ", "\t".join(["%.2f" % x for x in w])
-        print ""
-        print " Start dyn frequencies [cm-1] = ", "\t".join(["%.2f" % x for x in w0])
-        print ""
-        print ""
+        print ()
+        print (" Current dyn frequencies [cm-1] = ", "\t".join(["%.2f" % x for x in w]))
+        print ()
+        print (" Start dyn frequencies [cm-1] = ", "\t".join(["%.2f" % x for x in w0]))
+        print ()
+        print ()
         
     def is_converged(self):
         """
@@ -751,7 +752,7 @@ class SSCHA_Minimizer:
         if not self.ensemble.structures:
             s = """The ensemble has not been initialized.
 Maybe data_dir is missing from your input?"""
-            print s
+            print (s)
             raise IOError(s)
         
         # Symmetrize the starting dynamical matrix and apply the sum rule
@@ -805,10 +806,10 @@ Maybe data_dir is missing from your input?"""
         # Get the initial gradient
         #grad = self.ensemble.get_fc_from_self_consistency(True, False)
         if verbosity:
-            print "Get the gradient for the first time..."
+            print ("Get the gradient for the first time...")
         grad = self.ensemble.get_preconditioned_gradient(True)
         if verbosity:
-            print "After gradient."
+            print ("After gradient.")
         self.prev_grad = grad
         
         # For now check that if root representation is activated
@@ -842,7 +843,7 @@ Maybe data_dir is missing from your input?"""
         # Prepare the minimization step rescaling to its best
         if not self.precond_wyck:
             if verbosity:
-                print "Get wickoff best step..."
+                print ("Get wickoff best step...")
             self.min_step_struc *= GetBestWykoffStep(self.dyn)
 
     
@@ -901,21 +902,21 @@ Maybe data_dir is missing from your input?"""
             old_dyn = self.dyn.Copy()
             
             if verbose >= 1:
-                print ""
-                print " # ---------------- NEW MINIMIZATION STEP --------------------"
-                print "Step ka = ", len(self.__fe__)
+                print ()
+                print (" # ---------------- NEW MINIMIZATION STEP --------------------")
+                print ("Step ka = ", len(self.__fe__))
             
             # Perform the minimization step
             t1 = time.time()
             self.minimization_step(custom_function_gradient)
             t2 = time.time()
             if verbose >=1:
-                print "Time elapsed to perform the minimization step:", t2 - t1, "s"
+                print ("Time elapsed to perform the minimization step:", t2 - t1, "s")
             
             
             if self.check_imaginary_frequencies():
-                print "Immaginary frequencies found."
-                print "Minimization aborted."
+                print ("Immaginary frequencies found.")
+                print ("Minimization aborted.")
                 break
             
             # Compute the free energy and its error
@@ -934,24 +935,24 @@ Maybe data_dir is missing from your input?"""
             
             # Print the step
             if verbose >= 1:
-                print ""
+                print ()
                 print ("")
                 print("Number of symmetries before the step: ", self.N_symmetries)
                 if self.use_spglib:
                     import spglib
                     print("Group space: ", spglib.get_spacegroup(self.dyn.structure.get_ase_atoms()))
-                print "Harmonic contribution to free energy = %16.8f meV" % (harm_fe * __RyTomev__)
-                print "Anharmonic contribution to free energy = %16.8f +- %16.8f meV" % (anharm_fe * __RyTomev__,
-                                                                                         np.real(err) * __RyTomev__)
-                print "Free energy = %16.8f +- %16.8f meV" % (self.__fe__[-1] * __RyTomev__, 
-                                                              self.__fe_err__[-1] * __RyTomev__)
+                print ("Harmonic contribution to free energy = %16.8f meV" % (harm_fe * __RyTomev__))
+                print ("Anharmonic contribution to free energy = %16.8f +- %16.8f meV" % (anharm_fe * __RyTomev__,
+                                                                                         np.real(err) * __RyTomev__))
+                print ("Free energy = %16.8f +- %16.8f meV" % (self.__fe__[-1] * __RyTomev__, 
+                                                              self.__fe_err__[-1] * __RyTomev__))
                 
-                print "FC gradient modulus = %16.8f +- %16.8f bohr^2" % (self.__gc__[-1] * __RyTomev__, 
-                                                                       self.__gc_err__[-1] * __RyTomev__)
-                print "Struct gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gw__[-1] * __RyTomev__,
-                                                                            self.__gw_err__[-1] * __RyTomev__)
-                print "Kong-Liu effective sample size = ", self.__KL__[-1]
-                print ""
+                print ("FC gradient modulus = %16.8f +- %16.8f bohr^2" % (self.__gc__[-1] * __RyTomev__, 
+                                                                       self.__gc_err__[-1] * __RyTomev__))
+                print ("Struct gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gw__[-1] * __RyTomev__,
+                                                                            self.__gw_err__[-1] * __RyTomev__))
+                print ("Kong-Liu effective sample size = ", self.__KL__[-1])
+                print ()
             
             if verbose >= 2:
                 # Print the dynamical matrix at each step
@@ -961,11 +962,11 @@ Maybe data_dir is missing from your input?"""
             
             # Get the stopping criteria
             running = not self.check_stop()
-            print "Check the stopping criteria: Running = ", running
+            print ("Check the stopping criteria: Running = ", running)
             
             
             if len(self.__fe__) > self.max_ka and self.max_ka > 0:
-                print "Maximum number of steps reached."
+                print ("Maximum number of steps reached.")
                 running = False
             
             # Invoke the custom function (if any)
@@ -978,13 +979,13 @@ Maybe data_dir is missing from your input?"""
         # If your stopped not for convergence then 
         # restore the last dynamical matrix
         if not self.is_converged():
-            print ""
-            print "Restoring the last good dynamical matrix."
+            print ()
+            print ("Restoring the last good dynamical matrix.")
             self.dyn = old_dyn
             
-            print "Updating the importance sampling..."
+            print ("Updating the importance sampling...")
             self.update()
-            print ""
+            print ()
             
         
     def finalize(self, verbose = 1):
@@ -1005,76 +1006,76 @@ Maybe data_dir is missing from your input?"""
         
         
         
-        print ""
-        print " * * * * * * * * "
-        print " *             * "
-        print " *   RESULTS   * "
-        print " *             * "
-        print " * * * * * * * * "
-        print ""
+        print ()
+        print (" * * * * * * * * ")
+        print (" *             * ")
+        print (" *   RESULTS   * ")
+        print (" *             * ")
+        print (" * * * * * * * * ")
+        print ()
         
-        print ""
-        print "Minimization ended after %d steps" % len(self.__gc__)
-        print ""
+        print ()
+        print ("Minimization ended after %d steps" % len(self.__gc__))
+        print ()
 
         fe, ferr = self.get_free_energy(True)
         fe -= self.eq_energy
-        print "Free energy = %16.8f +- %16.8f meV" % (fe * __RyTomev__, 
-                                                      ferr * __RyTomev__)
-        print "FC gradient modulus = %16.8f +- %16.8f bohr^2" % (self.__gc__[-1] * __RyTomev__, 
-                                                               self.__gc_err__[-1] * __RyTomev__)
-        print "Struct gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gw__[-1] * __RyTomev__,
-                                                                    self.__gw_err__[-1] * __RyTomev__)
-        print "Kong-Liu effective sample size = ", self.ensemble.get_effective_sample_size()
-        print ""
+        print ("Free energy = %16.8f +- %16.8f meV" % (fe * __RyTomev__, 
+                                                      ferr * __RyTomev__))
+        print ("FC gradient modulus = %16.8f +- %16.8f bohr^2" % (self.__gc__[-1] * __RyTomev__, 
+                                                               self.__gc_err__[-1] * __RyTomev__))
+        print ("Struct gradient modulus = %16.8f +- %16.8f meV/A" % (self.__gw__[-1] * __RyTomev__,
+                                                                    self.__gw_err__[-1] * __RyTomev__))
+        print ("Kong-Liu effective sample size = ", self.ensemble.get_effective_sample_size())
+        print ()
         
         if self.ensemble.has_stress and verbose >= 1:
-            print ""
-            print " ==== STRESS TENSOR [GPa] ==== "
+            print ()
+            print (" ==== STRESS TENSOR [GPa] ==== ")
             stress, err = self.get_stress_tensor()
             
             # Convert in GPa
             stress *= __RyBohr3_to_GPa__
             err *= __RyBohr3_to_GPa__
             
-            print "%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f" % (stress[0,0], stress[0,1], stress[0,2], "",
-                                                                err[0,0], err[0,1], err[0,2])
-            print "%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f" % (stress[1,0], stress[1,1], stress[1,2], "    +-    ",
-                                                                err[1,0], err[1,1], err[1,2])
+            print ("%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f" % (stress[0,0], stress[0,1], stress[0,2], "",
+                                                                err[0,0], err[0,1], err[0,2]))
+            print ("%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f" % (stress[1,0], stress[1,1], stress[1,2], "    +-    ",
+                                                                err[1,0], err[1,1], err[1,2]))
             
-            print "%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f" % (stress[2,0], stress[2,1], stress[2,2], "",
-                                                                err[2,0], err[2,1], err[2,2])
+            print ("%16.8f%16.8f%16.8f%10s%16.8f%16.8f%16.8f" % (stress[2,0], stress[2,1], stress[2,2], "",
+                                                                err[2,0], err[2,1], err[2,2]))
             
-            print ""
+            print ()
             
             abinit_stress = self.ensemble.get_average_stress()
             abinit_stress *= __RyBohr3_to_GPa__
-            print " Ab initio average stress [GPa]:"
-            print "%16.8f%16.8f%16.8f" % (abinit_stress[0,0], abinit_stress[0,1], abinit_stress[0,2])
-            print "%16.8f%16.8f%16.8f" % (abinit_stress[1,0], abinit_stress[1,1], abinit_stress[1,2])          
-            print "%16.8f%16.8f%16.8f" % (abinit_stress[2,0], abinit_stress[2,1], abinit_stress[2,2])
-            print ""
+            print (" Ab initio average stress [GPa]:")
+            print ("%16.8f%16.8f%16.8f" % (abinit_stress[0,0], abinit_stress[0,1], abinit_stress[0,2]))
+            print ("%16.8f%16.8f%16.8f" % (abinit_stress[1,0], abinit_stress[1,1], abinit_stress[1,2]))         
+            print ("%16.8f%16.8f%16.8f" % (abinit_stress[2,0], abinit_stress[2,1], abinit_stress[2,2]))
+            print ()
             
         
         
         if verbose >= 2:
-            print " ==== FINAL STRUCTURE [A] ==== "
+            print (" ==== FINAL STRUCTURE [A] ==== ")
             nat = self.dyn.structure.N_atoms
             for i in range(nat):
-                print "%5s %16.8f%16.8f%16.8f" % (self.dyn.structure.atoms[i], 
+                print ("%5s %16.8f%16.8f%16.8f" % (self.dyn.structure.atoms[i], 
                                                   self.dyn.structure.coords[i,0],
                                                   self.dyn.structure.coords[i,1],
-                                                  self.dyn.structure.coords[i,2])
-            print ""
-            print " ==== FINAL FREQUENCIES [cm-1] ==== "
+                                                  self.dyn.structure.coords[i,2]))
+            print ()
+            print (" ==== FINAL FREQUENCIES [cm-1] ==== ")
             super_dyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
             w, pols = super_dyn.DyagDinQ(0)
             trans = CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())
             
             for i in range(len(w)):
-                print "Mode %5d:   freq %16.8f cm-1  | is translation? " % (i+1, w[i] * __RyToCm__), trans[i] 
+                print ("Mode %5d:   freq %16.8f cm-1  | is translation? " % (i+1, w[i] * __RyToCm__), trans[i])
         
-            print ""
+            print ()
         
             
 
@@ -1097,7 +1098,7 @@ Maybe data_dir is missing from your input?"""
 
         # Frequencies are ordered, check if the first one is negative.
         if w[0] < 0:
-            print "Total frequencies (excluding translations):"
+            print ("Total frequencies (excluding translations):")
             superdyn0 = self.ensemble.dyn_0.GenerateSupercellDyn(self.ensemble.supercell)
             wold, pold = superdyn0.DyagDinQ(0)
             
@@ -1114,8 +1115,8 @@ Maybe data_dir is missing from your input?"""
                 total_mask.pop(np.argmax(scalar))
                 
                 
-            print "\n".join(["%d) %.4f  | %.4f cm-1" % (i, x, wold[i]) for i, x in enumerate(ws)])
-            print ""
+            print ("\n".join(["%d) %.4f  | %.4f cm-1" % (i, x, wold[i]) for i, x in enumerate(ws)]))
+            print ()
             return True
         return False
             
@@ -1147,11 +1148,11 @@ Maybe data_dir is missing from your input?"""
         total_cond = False
         
         if gc_cond:
-            print ""
-            print "The gc gradient satisfy the convergence condition."
+            print ()
+            print ("The gc gradient satisfy the convergence condition.")
         if gw_cond:
-            print ""
-            print "The gw gradient satisfy the convergence condition."
+            print ()
+            print ("The gw gradient satisfy the convergence condition.")
         
         if self.gradi_op == "gc":
             total_cond = gc_cond
@@ -1164,7 +1165,7 @@ Maybe data_dir is missing from your input?"""
         
         if total_cond:
             self.__converged__ = True
-            print "The system satisfy the convergence criteria according to the input."
+            print ("The system satisfy the convergence criteria according to the input.")
             return True
         
         # Check the KL
@@ -1172,15 +1173,15 @@ Maybe data_dir is missing from your input?"""
         
         if kl / float(self.ensemble.N) < self.kong_liu_ratio:
             self.__converged__ = False
-            print "KL:", kl, "KL/N:", kl / float(self.ensemble.N), "KL RAT:", self.kong_liu_ratio
-            print "  According to your input criteria"
-            print "  you are out of the statistical sampling." 
+            print ("KL:", kl, "KL/N:", kl / float(self.ensemble.N), "KL RAT:", self.kong_liu_ratio)
+            print ("  According to your input criteria")
+            print ("  you are out of the statistical sampling." )
             return True
 
         # Check if there are imaginary frequencies
         im_freq = self.check_imaginary_frequencies()
         if im_freq:
-            print "ERROR: imaginary frequencies found in the minimization"
+            print ("ERROR: imaginary frequencies found in the minimization")
             sys.stderr.write("ERROR: imaginary frequencies found in the minimization\n")
             return True
             
@@ -1250,17 +1251,17 @@ Maybe data_dir is missing from your input?"""
         # Check if the results need to be saved on a file
         if save_filename is not None:            
             #print "Lengths:", len(fe), len(gc), len(gw), len(kl), len(steps)       
-            print "Saving the minimization results..."
+            print ("Saving the minimization results...")
             save_data = [steps, fe, fe_err, gc, gc_err, gw, gw_err, kl]
             np.savetxt(save_filename, np.real(np.transpose(save_data)),
                        header = "Steps; Free energy +- error [meV]; FC gradient +- error [bohr^2]; Structure gradient +- error [meV / A]; Kong-Liu N_eff")
-            print "Minimization data saved in %s." % save_filename
+            print ("Minimization data saved in %s." % save_filename)
         
         
         # Plot
         if plot:
             if not __MATPLOTLIB__:
-                print "MATPLOTLIB NOT FOUND."
+                print ("MATPLOTLIB NOT FOUND.")
                 raise ImportError("Error, matplotlib required to plot")
             plt.figure()
             plt.title("Free energy")
