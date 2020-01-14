@@ -1,4 +1,4 @@
-! Connection file to the MARCONI supercomputer
+! Connection file to the MARCONI supercomputer at CINECA
 ! this is just an example.
 ! MARCONI works with standard slurm utilities
 ! therefore no custom variable declaration is needed
@@ -43,7 +43,7 @@
 	! This means 10 jobs per works
 	job_numbers = 10
 	! Runned togheter 2 by 2 (sharing the same nodes)
-	n_together = 2
+	n_together = 1
 	timeout=6 ! Max number of second per single job
 &end
 

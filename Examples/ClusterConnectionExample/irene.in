@@ -15,7 +15,7 @@
 	hostname = "irene"
 	account = "ra4186@skylake"
 	partition_name = "skylake"
-	pwd = "C0ns3rv@t0ri0!!!"
+	pwd = "my_beautifull_password"
 	
 	! This is necessary, the directory in which to carry the
 	! simulation.
@@ -44,10 +44,11 @@
 	! Note you can also specify the ram as n_ram
 
 	! We can specify the submission strategy
-	! This means 10 jobs per works
+	! This means 10 calculations per jub submitted
 	job_numbers = 10
-	! Runned togheter 2 by 2 (sharing the same nodes)
-	n_together = 2
+	
+	! How many jobs are in parallel on the same node?
+	n_together = 1
 	timeout=6 ! Max number of second per single job
 &end
 
@@ -66,6 +67,8 @@
 
 	! Here the pseudopotentials
 	! Note they are pseudo_ followed by the atom name
+	! The pseudo will be searched in the pseudo_dir or, if omitted,
+	! in the standard espresso path for pseudos $HOME/espresso/pseudo
 	pseudo_H = "H.bare.upf"
 
 	! Here all the specific qe variables

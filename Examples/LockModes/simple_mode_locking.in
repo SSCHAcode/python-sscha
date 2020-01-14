@@ -1,0 +1,66 @@
+! MODE LOCKING EXAMPLE
+! ====================
+!
+! This is an example of constrained sscha minimization
+! only in a subspace identified by the vibrons of the ice.
+!
+! Run this code as usual:
+! sscha -i simple_mode_locking.in [--plot-results]
+! Use the last options if you want fancy plots of the minimization at the end.
+!
+! Note that a file frequencies.dat is generated
+! (thanks to save_freq_filename keyword)
+! You can plot the rows of the files to see how the frequencies are evolving
+! Example (using ipython):
+! >>> %pylab
+! >>> data = loadtxt("frequencies.dat")
+! >>> n_steps, n_freqs = shape(data)
+! >>> for i in range(n_freqs):
+! >>>     plot(data[:, i])
+! >>> show()
+!
+! This will show the frequencies (in Ry), as a function of the minimization.
+! You can show cm-1 using the cellconstructor.Phonons.RY_TO_CM constant
+!
+!
+! In the case of a supercell, the modes will be blocked in the whole q space.
+! Make sure they do not cross with other modes in the Brilluin zone.
+! To have a more detailed control on the modes to lock, use the python script instead
+! 
+!
+
+! Setup the standard sscha
+&inputscha
+	fildyn_prefix = "../ensemble_data_test/dyn"
+	nqirr = 1
+	supercell_size = 1 1 1
+
+	data_dir = "../ensemble_data_test"
+
+	T = 0
+	Tg = 0
+
+	eq_energy = -144.40680397
+	n_random = 100
+	n_random_eff = 50
+	population = 2
+	meaningful_factor = 0.5
+&end
+
+! Now in this namespace we setup the mode locking and
+! some fancy printing
+&utils
+	! We lock everithing but the last three modes
+	! Note, we can do the opposite using the
+	! mu_lock_start and mu_lock_end.
+	mu_free_start = 30
+	mu_free_end = 36
+
+	! We project on the mode subspace only the dynamical matrix
+	! leaving the structure to be optimized in all the space.
+	project_dyn = .true.
+	project_structure = .false.
+
+	! Setup the file in which to save the frequency evolution
+	save_freq_filename = "frequencies.dat"
+&end

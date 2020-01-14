@@ -261,9 +261,7 @@ class SSCHA:
             
             self.minim.population = pop
             self.minim.init()
-
-            self.minim.print_info()
-        
+            
             self.minim.run(custom_function_pre = self.__cfpre__,
                            custom_function_post = self.__cfpost__,
                            custom_function_gradient = self.__cfg__)

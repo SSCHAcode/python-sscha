@@ -107,8 +107,8 @@ if sscha.Relax.__RELAX_NAMESPACE__ in namelist.keys():
     relax.setup_from_namelist(namelist)
     
     # Save the final dynamical matrix
-    print "Saving the final dynamical matrix in %s" % (minim.dyn_path + "_popuation%d_" % minim.population)
-    relax.minim.dyn.save_qe(minim.dyn_path + "_population%d_" % minim.population)
+    print "Saving the final dynamical matrix in %s" % (relax.minim.dyn_path + "_popuation%d_" % relax.minim.population)
+    relax.minim.dyn.save_qe(relax.minim.dyn_path + "_population%d_" % minim.population)
     
     # Plot the results
     relax.minim.plot_results(args.save_data, args.plot)

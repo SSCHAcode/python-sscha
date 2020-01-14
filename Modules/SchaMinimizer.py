@@ -145,7 +145,7 @@ class SSCHA_Minimizer:
             dyn = self.ensemble.current_dyn.Copy()
 
         self.dyn = dyn
-        self.dyn_path = ""
+        self.dyn_path = "dyn"
         self.population = 0
         
         # Projection. This is chosen to fix some constraint on the minimization
@@ -617,6 +617,9 @@ class SSCHA_Minimizer:
         print ""
         print ""
         print " ====== MINIMIZER SETTINGS ====== "
+        print ()
+        print ( "Current population = {}".format(self.population))
+        print ( "Dynamical matrix file = {}".format(self.dyn_path))
         print ""
         print ""
         print " --- GENERAL SETTINGS --- "
