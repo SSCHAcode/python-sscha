@@ -1,6 +1,7 @@
 """
 Here the optimizer for the cell and the gradient
 """
+from __future__ import print_function
 import numpy as np
 import SCHAModules
 
@@ -142,11 +143,11 @@ class UC_OPTIMIZER:
         strain = np.transpose(self.uc_0_inv.dot(unit_cell) - I)
         
         if verbose:
-            print "ALPHA:", self.alpha
-            print "VOLUME:", volume
+            print ("ALPHA:", self.alpha)
+            print ("VOLUME:", volume)
             
-            print "CURRENT STRAIN:"
-            print strain
+            print ("CURRENT STRAIN:")
+            print (strain)
         
         # Get the gradient with respect to the strain
         grad_mat =  - volume * stress_tensor.dot(np.linalg.inv(I + strain.transpose()))
@@ -162,16 +163,16 @@ class UC_OPTIMIZER:
         grad = self.mat_to_line(grad_mat)
 
         if verbose:
-            print "GRAD MAT:"
-            print grad_mat
+            print ("GRAD MAT:")
+            print (grad_mat)
         
         x_new = self.perform_step(x_old, grad)
         
         strain_new  = self.line_to_mat(x_new)
         
         if verbose:
-            print "NEW STRAIN:"
-            print strain_new
+            print ("NEW STRAIN:")
+            print (strain_new)
              
         unit_cell[:,:] = self.uc_0.dot( I + strain_new.transpose())
         
@@ -180,7 +181,7 @@ class UC_OPTIMIZER:
             unit_cell[:,:] *= (np.linalg.det(self.uc_0) / np.linalg.det(unit_cell))**(1/np.float64(3))
         
         if verbose:
-            print "NEW VOLUME:", np.linalg.det(unit_cell)
+            print ("NEW VOLUME:", np.linalg.det(unit_cell))
             
 
 class BFGS_UC(UC_OPTIMIZER):
@@ -243,7 +244,7 @@ class BFGS_UC(UC_OPTIMIZER):
         self.last_direction = new_dir
         self.last_grad = grad
         
-        print "HESSIAN eigvals:", 1 / np.linalg.eigvalsh(self.hessian)
+        print ("HESSIAN eigvals:", 1 / np.linalg.eigvalsh(self.hessian))
         
         return x
             
@@ -270,8 +271,8 @@ class SD_PREC_UC(UC_OPTIMIZER):
                 hessian[i,i] = 1
 
         self.preconditioner = np.linalg.inv(hessian)
-        print "PRECOND:"
-        print self.preconditioner
+        print ("PRECOND:")
+        print (self.preconditioner)
 
     
     def perform_step(self, old_x, grad):

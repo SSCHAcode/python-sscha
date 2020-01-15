@@ -22,7 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 This module contains usefull subroutines to work with
 """
-
+from __future__ import print_function
 import cellconstructor as CC
 import scipy, scipy.linalg
 import numpy as np
