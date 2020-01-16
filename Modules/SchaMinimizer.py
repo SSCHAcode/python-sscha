@@ -94,10 +94,10 @@ __SCHA_ALLOWED_KEYS__ = [__SCHA_LAMBDA_A__, __SCHA_ISBIN__,
 __SCHA_MANDATORY_KEYS__ = [__SCHA_FILDYN__, __SCHA_NQIRR__, __SCHA_NQIRR__,
                            __SCHA_T__]
 
-class SSCHA_Minimizer:
+class SSCHA_Minimizer(object):
     
     def __init__(self, ensemble = None, root_representation = "normal",
-                 kong_liu_ratio = 0.5, meaningful_factor = 0.1,
+                 kong_liu_ratio = 0.5, meaningful_factor = 1,
                  minimization_algorithm = "sdes", lambda_a = 1):
         """
         This class create a minimizer to perform the sscha minimization.
@@ -212,6 +212,33 @@ class SSCHA_Minimizer:
         self.__gw_err__ = []
         self.__KL__ = []
 
+
+
+        # Setup the attribute control
+        self.__total_attributes__ = [item for item in self.__dict__.keys()]
+        self.fixed_attributes = True # This must be the last attribute to be setted
+
+
+    def __setattr__(self, name, value):
+        """
+        This method is used to set an attribute.
+        It will raise an exception if the attribute does not exists (with a suggestion of similar entries)
+        """
+
+        
+        if "fixed_attributes" in self.__dict__:
+            if name in self.__total_attributes__:
+                super(SSCHA_Minimizer, self).__setattr__(name, value)
+            elif self.fixed_attributes:
+                similar_objects = str( difflib.get_close_matches(name, self.__total_attributes__))
+                ERROR_MSG = """
+        Error, the attribute '{}' is not a member of '{}'.
+        Suggested similar attributes: {} ?
+        """.format(name, type(self).__name__,  similar_objects)
+
+                raise AttributeError(ERROR_MSG)
+        else:
+            super(SSCHA_Minimizer, self).__setattr__(name, value)
         
         
         

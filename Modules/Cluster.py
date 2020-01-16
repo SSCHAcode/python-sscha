@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 import sys, os
 import subprocess
 import threading
@@ -89,7 +90,7 @@ __CLUSTER_KEYS__ = [__CLUSTER_NAMELIST__, __CLUSTER_TEMPLATE__, __CLUSTER_HOST__
                     __CLUSTER_ATTEMPTS__]
 
 
-class Cluster:
+class Cluster(object):
     
     # The host name for the connection
     hostname=""
@@ -212,6 +213,36 @@ class Cluster:
             
         self.binary = binary
         self.mpi_cmd = mpi_cmd
+
+        # Fix the attributes
+
+        # Setup the attribute control
+        self.__total_attributes__ = [item for item in self.__dict__.keys()]
+        self.fixed_attributes = True # This must be the last attribute to be setted
+
+
+    def __setattr__(self, name, value):
+        """
+        This method is used to set an attribute.
+        It will raise an exception if the attribute does not exists (with a suggestion of similar entries)
+        """
+
+        
+        if "fixed_attributes" in self.__dict__:
+            if name in self.__total_attributes__:
+                super(Cluster, self).__setattr__(name, value)
+            elif self.fixed_attributes:
+                similar_objects = str( difflib.get_close_matches(name, self.__total_attributes__))
+                ERROR_MSG = """
+        Error, the attribute '{}' is not a member of '{}'.
+        Suggested similar attributes: {} ?
+        """.format(name, type(self).__name__,  similar_objects)
+
+                raise AttributeError(ERROR_MSG)
+        else:
+            super(Cluster, self).__setattr__(name, value)
+        
+        
         
     def ExecuteCMD(self, cmd, raise_error = True, return_output = False):
         """
@@ -389,8 +420,8 @@ class Cluster:
             
             #cp_res = os.system(cmd + " > /dev/null")
             if not cp_res:
-                print "Error while executing:", cmd
-                print "Return code:", cp_res
+                print ("Error while executing:", cmd)
+                print ("Return code:", cp_res)
                 sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
                 continue
             
@@ -457,8 +488,8 @@ class Cluster:
         cp_res = self.ExecuteCMD(cmd, False)
         #cp_res = os.system(cmd  + " > /dev/null")
         if not cp_res:
-            print "Error while executing:", cmd
-            print "Return code:", cp_res
+            print ("Error while executing:", cmd)
+            print ("Return code:", cp_res)
             sys.stderr.write(cmd + ": exit with code " + str(cp_res))
             return results#[None] * N_structs
         
@@ -596,8 +627,8 @@ class Cluster:
         cp_res = self.ExecuteCMD(cmd, False)
         #cp_res = os.system(cmd)
         if not cp_res:
-            print "Error while executing:", cmd
-            print "Return code:", cp_res
+            print ("Error while executing:", cmd)
+            print ("Return code:", cp_res)
             sys.stderr.write(cmd + ": exit with code " + str(cp_res))
             return
             
@@ -633,9 +664,9 @@ class Cluster:
         # Check if there is an unknown key
         for k in keys:
             if not k in __CLUSTER_KEYS__:
-                print "Error with the key:", k
+                print ("Error with the key:", k)
                 s = "Did you mean something like:" + str( difflib.get_close_matches(k, __CLUSTER_KEYS__))
-                print s
+                print (s)
                 raise IOError("Error in cluster namespace: key '" + k +"' not recognized.\n" + s)
         
         # First of all, check if a template is present
@@ -643,14 +674,14 @@ class Cluster:
             # Check if the environment variable has been defined
             fname = c_info[__CLUSTER_TEMPLATE__]
             if os.path.exists(fname):
-                print "Reading cluster info from:", os.path.abspath(fname)
+                print ("Reading cluster info from:", os.path.abspath(fname))
                 self.setup_from_namelist(CC.Methods.read_namelist(fname))
             elif __TEMPLATE_ENV__ in os.environ.keys():
                 if os.path.exists(os.environ[__TEMPLATE_ENV__]):
                     newfname = os.environ[__TEMPLATE_ENV__] + "/" + fname
-                    print "Reading cluster info from:", os.path.abspath(newfname)
+                    print ("Reading cluster info from:", os.path.abspath(newfname))
                     if not os.path.exists(newfname):
-                        print "Error, Environ variable", __TEMPLATE_ENV__, "exists, but no file", fname, "found."
+                        print ("Error, Environ variable", __TEMPLATE_ENV__, "exists, but no file", fname, "found.")
                         raise IOError("Error while reading the cluster template.")
                     
                     self.setup_from_namelist(CC.Methods.read_namelist(newfname))
@@ -701,17 +732,17 @@ class Cluster:
             self.use_multiple_submission = True
             self.job_number = int(c_info[__CLUSTER_JOBNUMBER__])
             if self.job_number < 1:
-                print "Error, the number of job per batch must be >= 1"
+                print ("Error, the number of job per batch must be >= 1")
                 raise ValueError("Error in the %s input variable." % __CLUSTER_JOBNUMBER__)
         
         if __CLUSTER_NPARALLEL__ in keys:
             self.n_together_def = int(c_info[__CLUSTER_NPARALLEL__])
             
             if self.n_together_def < 1:
-                print "Error, the number of parallel jobs must be >= 1"
+                print ("Error, the number of parallel jobs must be >= 1")
                 raise ValueError("Error in the %s input variable." % __CLUSTER_NPARALLEL__)
             if self.n_together_def > self.job_number:
-                print "Error, the number of parallel runs must be <= than the number of runs per job"
+                print ("Error, the number of parallel runs must be <= than the number of runs per job")
                 raise ValueError("Error, check the cluster keys %s and %s" % (__CLUSTER_NPARALLEL__, __CLUSTER_JOBNUMBER__))
             
             
@@ -797,11 +828,11 @@ class Cluster:
             
         
         if __CLUSTER_BINARY__ in keys:
-            print "Binary before parsing:"
-            print c_info[__CLUSTER_BINARY__]
+            print ("Binary before parsing:")
+            print (c_info[__CLUSTER_BINARY__])
             self.binary = self.parse_string(c_info[__CLUSTER_BINARY__])
-            print "Cluster binary setted to:"
-            print self.binary
+            print ("Cluster binary setted to:")
+            print (self.binary)
             
         # If all the cluster has been setted, setup the working directory
         if __CLUSTER_WORKDIR__ in keys:
@@ -969,7 +1000,7 @@ class Cluster:
             
             recalc += 1
             if recalc > num_batch_offset + self.max_recalc:
-                print "Expected batch ordinary resubmissions:", num_batch_offset
+                print ("Expected batch ordinary resubmissions:", num_batch_offset)
                 raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
                 break
             
@@ -1056,7 +1087,7 @@ class Cluster:
             
             recalc += 1
             if recalc > num_batch_offset + self.max_recalc:
-                print "Expected batch ordinary resubmissions:", num_batch_offset
+                print ("Expected batch ordinary resubmissions:", num_batch_offset)
                 raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
                 break
             

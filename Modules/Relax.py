@@ -90,6 +90,37 @@ class SSCHA:
         self.__cfpre__ = None
         self.__cfpost__ = None
         self.__cfg__ = None
+
+
+        # Fix the attributes
+
+        # Setup the attribute control
+        self.__total_attributes__ = [item for item in self.__dict__.keys()]
+        self.fixed_attributes = True # This must be the last attribute to be setted
+
+
+    def __setattr__(self, name, value):
+        """
+        This method is used to set an attribute.
+        It will raise an exception if the attribute does not exists (with a suggestion of similar entries)
+        """
+
+        
+        if "fixed_attributes" in self.__dict__:
+            if name in self.__total_attributes__:
+                super(SSCHA, self).__setattr__(name, value)
+            elif self.fixed_attributes:
+                similar_objects = str( difflib.get_close_matches(name, self.__total_attributes__))
+                ERROR_MSG = """
+        Error, the attribute '{}' is not a member of '{}'.
+        Suggested similar attributes: {} ?
+        """.format(name, type(self).__name__,  similar_objects)
+
+                raise AttributeError(ERROR_MSG)
+        else:
+            super(SSCHA, self).__setattr__(name, value)
+        
+        
         
     def setup_from_namelist(self, namelist):
         """
