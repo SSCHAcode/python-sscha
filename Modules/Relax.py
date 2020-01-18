@@ -41,7 +41,7 @@ __ALLOWED_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__, __RELAX_MAX_POP__,
                     __RELAX_FIXVOLUME__, __RELAX_TARGET_PRESSURE__,
                     __RELAX_BULK_MODULUS__, __RELAX_GENERATE_FIRST_ENSEMBLE__]
 
-class SSCHA:
+class SSCHA(object):
     minim = sscha.SchaMinimizer.SSCHA_Minimizer()
     bulk_modulus = 100
     target_pressure = 0
@@ -292,7 +292,7 @@ class SSCHA:
                     self.minim.ensemble.save_bin(ensemble_loc, pop)
             
             self.minim.population = pop
-            self.minim.init()
+            self.minim.init(delete_previous_data = False)
 
             self.minim.run(custom_function_pre = self.__cfpre__,
                            custom_function_post = self.__cfpost__,
@@ -469,7 +469,7 @@ class SSCHA:
                     self.minim.ensemble.save_bin(ensemble_loc, pop)
             
             self.minim.population = pop
-            self.minim.init()
+            self.minim.init(delete_previous_data = False)
         
             self.minim.run(custom_function_pre = self.__cfpre__,
                            custom_function_post = self.__cfpost__,

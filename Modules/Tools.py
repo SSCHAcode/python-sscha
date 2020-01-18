@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function
 """
 This is part of the program python-sscha
 Copyright (C) 2018  Lorenzo Monacelli
@@ -22,7 +23,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 This module contains usefull subroutines to work with
 """
-from __future__ import print_function
 import cellconstructor as CC
 import scipy, scipy.linalg
 import numpy as np

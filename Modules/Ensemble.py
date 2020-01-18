@@ -2752,6 +2752,11 @@ class Ensemble:
             
             # Setup the ASE calculator
             atms.set_calculator(ase_calculator)
+
+
+            # Print the status
+            if rank == 0:
+                print ("Computing configuration %d / %d" % (i0+1, N_rand / size))
             
             # Avoid for errors
             run = True
@@ -2780,9 +2785,6 @@ class Ensemble:
             energies[i0] = energy
             forces[nat3*i0 : nat3*i0 + nat3] = forces_.reshape( nat3 )
             
-            # Print the status
-            if rank == 0:
-                print ("conf %d / %d" % (i0, N_rand / size))
 
             
         

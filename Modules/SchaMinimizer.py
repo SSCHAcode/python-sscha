@@ -766,13 +766,20 @@ class SSCHA_Minimizer(object):
         
         return self.ensemble.get_free_energy(return_error = return_error) / np.prod(self.ensemble.supercell)
     
-    def init(self, verbosity = False):
+    def init(self, verbosity = False, delete_previous_data = True):
         """
         INITIALIZE THE MINIMIZATION
         ===========================
         
         This subroutine initialize the variables needed by the minimization.
         Call this before the first time you invoke the run function.
+
+        Parameters
+        ----------
+            verbosity : bool
+                If true prints some debugging information
+            delete_previous_data : bool
+                If true, it will clean previous minimizations from the free energies, gradients...
         """
         
         # Check the ensemble size
@@ -816,19 +823,37 @@ Maybe data_dir is missing from your input?"""
         self.update()
         
         # Clean all the minimization variables
-        self.__fe__ = []
-        self.__fe_err__ = []
+        if delete_previous_data:
+            self.__fe__ = []
+            self.__fe_err__ = []
+            self.__gc__ = []
+            self.__gc_err__ = []
+            self.__KL__ = []
+            self.__gw__ = []
+            self.__gw_err__ = []
+
         self.__converged__ = False
-        self.__gc__ = []
-        self.__gc_err__ = []
-        self.__KL__ = []
-        self.__gw__ = []
-        self.__gw_err__ = []
+
+        # Check that the minimization data are in a good shape
+        ERR_ON_LEN= """
+ Something wired happened: Did a previous minimization crashed?
+ If so, call the init() function of the {} module destroying previous minimization data
+ """.format(type(self).__name__)
+        assert len(self.__gc__) == len(self.__gc_err__), ERR_ON_LEN
+        assert len(self.__gw__) == len(self.__gw_err__) , ERR_ON_LEN
+        assert len(self.__gw__) == len(self.__gc__), ERR_ON_LEN
+        assert len(self.__KL__) == len(self.__fe__), ERR_ON_LEN
+        assert len(self.__fe__) == len(self.__fe_err__), ERR_ON_LEN
         
-        # Get the free energy
-        fe, err = self.get_free_energy(True)
-        self.__fe__.append(fe - self.eq_energy)
-        self.__fe_err__.append(err)
+        # Start filling the free energy
+        if len(self.__fe__) == len(self.__gc__):
+            fe, err = self.get_free_energy(True)
+            self.__fe__.append(fe - self.eq_energy)
+            self.__fe_err__.append(err)
+
+            # Compute the KL ratio
+            self.__KL__.append(self.ensemble.get_effective_sample_size())
+
         
         # Get the initial gradient
         #grad = self.ensemble.get_fc_from_self_consistency(True, False)
@@ -864,8 +889,6 @@ Maybe data_dir is missing from your input?"""
 #        self.__gc__.append(gc)
 #        self.__gc_err__.append(gc_err)
         
-        # Compute the KL ratio
-        self.__KL__.append(self.ensemble.get_effective_sample_size())
         
         # Prepare the minimization step rescaling to its best
         if not self.precond_wyck:
@@ -1591,7 +1614,7 @@ def ApplyFCPrecond(current_dyn, matrix, T = 0):
 
 
 def GetStructPrecond(current_dyn):
-    """
+    r"""
     GET THE PRECONDITIONER FOR THE STRUCTURE MINIMIZATION
     =====================================================
     
@@ -1603,7 +1626,7 @@ def GetStructPrecond(current_dyn):
     
     .. math::
         
-        \\Phi_{\\alpha\\beta}^{-1} = \\frac{1}{\\sqrt{M_\\alpha M_\\beta}} \\sum_\\mu \\frac{e_\\mu^\\alpha e_\\mu^\\beta}{\\omega_\\mu^2}
+        \Phi_{\alpha\beta}^{-1} = \frac{1}{\sqrt{M_\alpha M_\beta}}\sum_\mu \frac{e_\mu^\alpha e_\mu^\beta}{\omega_\mu^2}
         
     Where the sum is restricted to the non translational modes.
     
@@ -1637,12 +1660,14 @@ def GetStructPrecond(current_dyn):
     
     # Delete the translations from the dynamical matrix
     w = w[not_trans]
-    pols = np.real(pols[:, not_trans])
+    pols = pols[:, not_trans]
     
     wm2 = 1 / w**2
     
     # Compute the precondition using the einsum
-    precond = np.einsum("a,b,c,ac,bc -> ab", _msi_, _msi_, wm2, pols, pols)
+    dyn_inv = np.real(np.einsum("c, ac, bc", wm2, pols, np.conj(pols)))
+    precond = np.outer(_msi_, _msi_) * dyn_inv
+    #precond = np.einsum("a,b,c,ac,bc -> ab", _msi_, _msi_, wm2, pols, pols)
     return precond * CC.Phonons.BOHR_TO_ANGSTROM**2
 
 
