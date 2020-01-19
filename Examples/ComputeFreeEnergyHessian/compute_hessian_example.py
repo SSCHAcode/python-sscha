@@ -11,7 +11,7 @@ import sscha, sscha.Ensemble
 
 # Here the input information
 DATA_DIR = "../ensemble_data_test"
-N_RANDOM = 10000
+N_RANDOM = 100
 DYN_PREFIX = "../ensemble_data_test/dyn"
 FINAL_DYN = "../ensemble_data_test/dyn"
 SAVE_PREFIX = "dyn_plus_odd"
@@ -64,7 +64,8 @@ print("Computing the free energy hessian...")
 # Set get_full_hessian to false to have only the odd correction
 # Usefull if you want to study the convergence with the number of configuration
 dyn_hessian = ens.get_free_energy_hessian(include_v4 = INCLUDE_V4,
-                                          get_full_hessian = True)
+                                          get_full_hessian = True,
+                                          verbose = True)
 
 print("Saving the hessian to {}...".format(SAVE_PREFIX))
 dyn_hessian.save_qe(SAVE_PREFIX)
