@@ -401,7 +401,7 @@ class SSCHA_Minimizer(object):
             # Prepare the gradient imposing the constraints
             if custom_function_gradient is not None:
                 custom_function_gradient(dyn_grad, np.zeros(self.dyn.structure.N_atoms, 3)) 
-            
+             
             # Append the gradient modulus to the minimization info
             self.__gw__.append(0)
             self.__gw_err__.append(0)
