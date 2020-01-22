@@ -92,72 +92,6 @@ __CLUSTER_KEYS__ = [__CLUSTER_NAMELIST__, __CLUSTER_TEMPLATE__, __CLUSTER_HOST__
 
 class Cluster(object):
     
-    # The host name for the connection
-    hostname=""
-    pwd=""
-    sshcmd="ssh"
-    workdir=r""
-    submit_command="sbatch --wait"
-    submit_name="SBATCH"
-    terminal="#!/bin/bash"
-    v_nodes="-N "
-    use_nodes = True
-    v_cpu="-n "
-    use_cpu = True
-    v_account="-A "
-    use_account = True
-    v_time="--time="
-    use_time = True
-    v_memory="--mem="
-    use_memory = False
-    v_partition="--partition="
-    use_partition= False
-    timeout = 1000
-    use_timeout = False
-    
-    job_number = 1
-    n_together_def = 1
-    use_multiple_submission = False
-    
-    # This is a set of lines to be runned before the calculation
-    # It can be used to load the needed modules in the cluster
-    load_modules=""
-    
-    # Setup the number of cpu, nodes and pools for the calculation
-    n_nodes = 1
-    n_cpu = 1
-    n_pool = 1
-    
-    # This is the default label, change it if you are going to submit
-    # two different calculations in the same working directory
-    label = "ESP_"
-    
-    # This is the maximum number of resubmissions after the expected one
-    # from the batch size. It can be use to resubmit the failed jobs.
-    max_recalc = 10
-    connection_attempts = 1
-    
-    # This is the time string. Faster job will be the less in the queue,
-    time="00:02:00" # 2minutes
-    
-    # The ram required for the calculation
-    ram="10000Mb" # 10Gb
-    
-    # The default partition in which to submit calculations
-    partition_name = ""
-    
-    # Still unused
-    prefix_name = "prefix" # Variable in the calculator for differentiating the calculations
-    
-    # This directory is used to work with clusters.
-    local_workdir = "cluster_work/"
-    
-    # The batch size is the maximum number of job to be submitted together.
-    # The new jobs will be submitted only after a batch is compleated
-    # Useful if the cluster has a limit for the maximum number of jobs allowed.
-    batch_size = 1000
-    
-    
     def __init__(self, hostname=None, pwd=None, extra_options="", workdir = "",
                  account_name = "", partition_name = "", binary="pw.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo",
                  mpi_cmd=r"srun --mpi=pmi2 -n NPROC"):
@@ -193,6 +127,12 @@ class Cluster(object):
         """
         
         self.hostname = hostname
+        self.pwd = pwd
+
+        self.sshcmd = "ssh"
+        self.sshcmd = "ssh " + extra_options
+        self.scpcmd = "scp " + extra_options.replace("-p", "-P")
+
         if not pwd is None:
             self.pwd = pwd
             res = os.system("sshpass > /dev/null")
@@ -213,6 +153,69 @@ class Cluster(object):
             
         self.binary = binary
         self.mpi_cmd = mpi_cmd
+
+        self.workdir=r""
+        self.submit_command="sbatch --wait"
+        self.submit_name="SBATCH"
+        self.terminal="#!/bin/bash"
+        self.v_nodes="-N "
+        self.use_nodes = True
+        self.v_cpu="-n "
+        self.use_cpu = True
+        self.v_account="-A "
+        self.use_account = True
+        self.v_time="--time="
+        self.use_time = True
+        self.v_memory="--mem="
+        self.use_memory = False
+        self.v_partition="--partition="
+        self.use_partition= False
+        self.timeout = 1000
+        self.use_timeout = False
+
+
+        self.job_number = 1
+        self.n_together_def = 1
+        self.use_multiple_submission = False
+
+
+        # This is a set of lines to be runned before the calculation
+        # It can be used to load the needed modules in the cluster
+        self.load_modules=""
+        
+        # Setup the number of cpu, nodes and pools for the calculation
+        self.n_nodes = 1
+        self.n_cpu = 1
+        self.n_pool = 1
+        
+        # This is the default label, change it if you are going to submit
+        # two different calculations in the same working directory
+        self.label = "ESP_"
+        
+        # This is the maximum number of resubmissions after the expected one
+        # from the batch size. It can be use to resubmit the failed jobs.
+        self.max_recalc = 10
+        self.connection_attempts = 1
+        
+        # This is the time string. Faster job will be the less in the queue,
+        self.time="00:02:00" # 2minutes
+        
+        # The ram required for the calculation
+        self.ram="10000Mb" # 10Gb
+        
+        # The default partition in which to submit calculations
+        self.partition_name = ""
+        
+        # Still unused
+        self.prefix_name = "prefix" # Variable in the calculator for differentiating the calculations
+        
+        # This directory is used to work with clusters.
+        self.local_workdir = "cluster_work/"
+        
+        # The batch size is the maximum number of job to be submitted together.
+        # The new jobs will be submitted only after a batch is compleated
+        # Useful if the cluster has a limit for the maximum number of jobs allowed.
+        self.batch_size = 1000
 
         # Fix the attributes
 
@@ -298,6 +301,20 @@ class Cluster(object):
             return success, output
         return success
             
+
+    def set_timeout(self, timeout):
+        """
+        Set a timeout time for each single calculation.
+        This is very usefull as sometimes the calculations gets stucked after some times on clusters.
+
+        Parameters
+        ----------
+            timeout: int
+                The timeout in seconds after which a single calculation is killed.
+        """
+
+        self.use_timeout = True
+        self.timeout = timeout
         
         
             
