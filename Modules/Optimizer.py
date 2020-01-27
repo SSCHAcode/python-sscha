@@ -41,6 +41,9 @@ class UC_OPTIMIZER:
         self.n_step = 0
         self.uc_0 = np.float64(starting_unit_cell.copy())
         self.uc_0_inv = np.linalg.inv(self.uc_0)
+
+        # If true the line minimization is employed during the minimization
+        self.use_line_step = False
         
     def mat_to_line(self, matrix):
         """
@@ -97,7 +100,10 @@ class UC_OPTIMIZER:
         The step, hierarchical structure.
         Here a standard steepest descent
         """
-        self.get_line_step(grad)
+
+        if self.use_line_step:
+            self.get_line_step(grad)
+
         self.last_direction = grad
         self.last_grad = grad
 
@@ -106,7 +112,7 @@ class UC_OPTIMIZER:
         return x_new
 
             
-    def UpdateCell(self, unit_cell, stress_tensor, fix_volume = False, verbose = True):
+    def UpdateCell(self, unit_cell, stress_tensor, fix_volume = False, verbose = False):
         """
         PERFORM THE CELL UPDATE
         =======================
