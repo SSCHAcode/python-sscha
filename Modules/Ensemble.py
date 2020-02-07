@@ -630,7 +630,7 @@ class Ensemble:
         self.current_q = self.q_start.copy()
 
         
-    def generate(self, N, evenodd = True, project_on_modes = None):
+    def generate(self, N, evenodd = True, project_on_modes = None,fast=False):
         """
         GENERATE THE ENSEMBLE
         =====================
@@ -657,39 +657,72 @@ class Ensemble:
         Nat_sc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms
         self.structures = []
         super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
-        if evenodd:
-            structs = super_dyn.ExtractRandomStructures(N / 2, self.T0, project_on_vectors = project_on_modes)
-
-
-            for i, s in enumerate(structs):
-                self.structures.append(s)
-                new_s = s.copy()
-                # Get the opposite displacement structure
-                new_s.coords = super_dyn.structure.coords - new_s.get_displacement(super_dyn.structure)
-                self.structures.append(new_s)
-        else:
-            self.structures = super_dyn.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
-
-            
-        # Compute the sscha energy and forces
+	t1=time.time()
+	
+	#initialize the basic structures
         self.sscha_energies = np.zeros( ( self.N), dtype = np.float64)
         self.sscha_forces = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "F")
         self.energies = np.zeros(self.N, dtype = np.float64)
         self.forces = np.zeros( (self.N, Nat_sc, 3), dtype = np.float64, order = "F")
         self.stresses = np.zeros( (self.N, 3, 3), dtype = np.float64, order = "F")
-        self.u_disps = np.zeros( (self.N, Nat_sc * 3), dtype = np.float64, order = "F")
         self.xats = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "C")
-        for i, s in enumerate(self.structures):
-            energy, force  = self.dyn_0.get_energy_forces(s, supercell = self.supercell, 
+        self.u_disps = np.zeros( (self.N, Nat_sc * 3), dtype = np.float64, order = "F")
+
+	if fast:
+	    if evenodd:
+		structs, disps = super_dyn.ExtractRandomStructures(N/2,self.T0,fast=fast,project_on_vectors=project_on_modes)
+	    	self.u_disps[::2,:]=disps.transpose()
+	    	self.u_disps[1::2,:]=-disps.transpose()
+		
+		for i, s in enumerate(structs):
+                    self.structures.append(s)
+                    new_s = s.copy()
+                    # Get the opposite displacement structure
+		    new_s.coords = super_dyn.structure.coords + self.u_disps[2*i+1,:].reshape(Nat_sc,3)
+                    self.structures.append(new_s)
+            else:
+                self.structures,disps = super_dyn.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
+		self.u_disps=disps.transpose()
+	    t2=time.time()
+	    print ("Time elapsed to generate the structures:", t2 - t1, "s")
+
+        # Compute the sscha energy and forces
+	    t1=time.time()
+	    for i,s in enumerate(self.structures):
+	        self.xats[i,:,:] = s.coords	
+	    forces,self.sscha_energies =SCHAModules.harmonic.update(super_dyn.dynmats[0],self.u_disps,Nat_sc,self.N)
+	    self.sscha_forces=forces.reshape(self.N,Nat_sc,3)
+
+	else:
+            if evenodd:
+                structs = super_dyn.ExtractRandomStructures(N / 2, self.T0, project_on_vectors = project_on_modes)
+                for i, s in enumerate(structs):
+                    self.structures.append(s)
+                    new_s = s.copy()
+                    # Get the opposite displacement structure
+                    new_s.coords = super_dyn.structure.coords - new_s.get_displacement(super_dyn.structure)
+                    self.structures.append(new_s)
+            else:
+                self.structures = super_dyn.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
+	    t2=time.time()
+	    print ("Time elapsed to generate the structures:", t2 - t1, "s")
+            
+ 	    t1=time.time()
+            # Compute the sscha energy and forces
+            for i, s in enumerate(self.structures):
+                energy, force  = self.dyn_0.get_energy_forces(s, supercell = self.supercell, 
                                                          real_space_fc=super_dyn.dynmats[0])
             
-            self.sscha_energies[i] = energy
-            self.sscha_forces[i,:,:] = force
+                self.sscha_energies[i] = energy
+                self.sscha_forces[i,:,:] = force
             
-            # Get the displacements
-            self.u_disps[i, :] = s.get_displacement(super_dyn.structure).reshape((3* Nat_sc))
-            self.xats[i, :, :] = s.coords
-        
+                # Get the displacements
+                self.u_disps[i, :] = s.get_displacement(super_dyn.structure).reshape((3* Nat_sc))
+                self.xats[i, :, :] = s.coords
+	
+
+        t2=time.time()
+	print ("Time elapsed to compute energy forces and to set disp and coords:", t2 - t1, "s")
         self.rho = np.ones(self.N, dtype = np.float64)
         self.current_dyn = self.dyn_0.Copy()
         self.current_T = self.T0
@@ -697,7 +730,7 @@ class Ensemble:
         
         
         # Generate the q_start
-        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, super_dyn)
+        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, super_dyn,self.u_disps)
         self.current_q = self.q_start.copy()
         
         
@@ -2827,7 +2860,7 @@ class Ensemble:
             N_rand = self.N
             
         # Only for the master
-  
+
         # Prepare the energy, forces and stress array
         energies = np.zeros( N_rand / size, dtype = np.float64)
         forces = np.zeros( ( N_rand / size) * nat3 , dtype = np.float64)
@@ -2841,11 +2874,12 @@ class Ensemble:
             total_forces = np.empty( N_rand * nat3, dtype = np.float64)
             total_stress = np.empty( N_rand * 9, dtype = np.float64)
             
-
+	
         # If an MPI istance is running, split the calculation
         for i0 in xrange(N_rand / size):
-            i = i0 + size * rank
-            
+            #i = i0 + size * rank
+            #i=i0*rank+size or 
+	    i=i0+N_rand/size*rank
             
             struct = structures[i]
             atms = struct.get_ase_atoms()
@@ -2856,6 +2890,7 @@ class Ensemble:
             # Avoid for errors
             run = True
             count_fails = 0
+	    
             while run:
                 try:
                     energy = atms.get_total_energy() / Rydberg # eV => Ry
@@ -2865,12 +2900,12 @@ class Ensemble:
                     count_fails += 1
                     if count_fails >= 5:
                         #Anyway save the partial results
-         		np.save("%s/partial_energies_pop%d.npy" % (data_dir, population_id), self.energies)
-   		        np.save("%s/partial_forces_pop%d.npy" % (data_dir, population_id), self.forces)
-        	        if self.has_stress:
-            		    np.save("%s/partla_stresses_pop%d.npy" % (data_dir, population_id), self.stresses)
-                        run = False
-                        raise ValueError("Error in the ASE calculator for more than 5 times")
+         		#np.save("%s/partial_energies_pop%d.npy" % (data_dir, population_id), self.energies)
+   		        #np.save("%s/partial_forces_pop%d.npy" % (data_dir, population_id), self.forces)
+        	        #if self.has_stress:
+            		#    np.save("%s/partla_stresses_pop%d.npy" % (data_dir, population_id), self.stresses)
+                       run = False
+                       raise ValueError("Error in the ASE calculator for more than 5 times")
             
             # Get energy, forces (and stress)
             energy = atms.get_total_energy() / Rydberg # eV => Ry
