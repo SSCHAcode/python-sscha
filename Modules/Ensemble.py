@@ -825,7 +825,7 @@ class Ensemble:
         trans_mask = CC.Methods.get_translations(pols, new_super_dyn.structure.get_masses_array()) 
 
         # Check if the new dynamical matrix satisfies the sum rule
-        if (np.sum(trans_mask.as_type(int)) != 3) or (np.sum(trans_original.as_type(int)) != 3):
+        if (np.sum(trans_mask.astype(int)) != 3) or (np.sum(trans_original.astype(int)) != 3):
             ERR_MSG = """
 ERROR WHILE UPDATING THE WEIGHTS
     
