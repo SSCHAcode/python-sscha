@@ -38,7 +38,7 @@ import time
 
 import sys, os
 
-import Ensemble
+import sscha.Ensemble as Ensemble
 
 # Rydberg to cm-1 and meV conversion factor
 __RyToCm__  = 109691.40235

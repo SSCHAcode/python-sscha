@@ -1313,7 +1313,7 @@ DETAILS OF ERROR:
         w, pols = supercell_dyn.DyagDinQ(0)
         trans = CC.Methods.get_translations(pols, supercell_dyn.structure.get_masses_array())
         ityp = supercell_dyn.structure.get_ityp() + 1 # Py to fortran convertion
-        mass = np.array(supercell_dyn.structure.masses.values())
+        mass = np.array(list(supercell_dyn.structure.masses.values()))
         
         log_err = "err_yesrho"
         
@@ -1430,7 +1430,7 @@ DETAILS OF ERROR:
  #
     
     def get_covmat_from_ensemble(self):
-        """
+        r"""
         GET THE COVARIANCE STOCASTICALLY
         ================================
         
@@ -1441,7 +1441,7 @@ DETAILS OF ERROR:
         
         .. math::
             
-            \Upsilon^{-1}_{ab} = \\left< u_a u_b\\right>
+            \Upsilon^{-1}_{ab} = \left< u_a u_b\right>
         
         Results
         -------
