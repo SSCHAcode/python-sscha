@@ -428,7 +428,7 @@ class SSCHA:
             # Generate the ensemble
             self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
             if pop != start_pop or not restart_from_ens:
-                self.minim.ensemble.generate(self.N_configs)
+                self.minim.ensemble.generate(self.N_configs,fast=True)
             
                 # Compute energies and forces
                 self.minim.ensemble.compute_ensemble(self.calc, True, stress_numerical,
