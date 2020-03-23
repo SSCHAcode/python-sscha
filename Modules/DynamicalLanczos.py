@@ -205,7 +205,10 @@ class Lanczos:
         self.Y[:,:] = f.dot(pol_mat)
 
         # Prepare the variable used for the working
-        self.psi = np.zeros(self.n_modes + self.n_modes*self.n_modes, dtype = TYPE_DP)
+        finite_temperature_factor = 1
+        if self.T > 0:
+            finite_temperature_factor = 2
+        self.psi = np.zeros(self.n_modes + finite_temperature_factor*self.n_modes*self.n_modes, dtype = TYPE_DP)
 
         # Prepare the L as a linear operator
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
@@ -218,6 +221,7 @@ class Lanczos:
         # In the custom lanczos mode
         self.a_coeffs = [] #Coefficients on the diagonal
         self.b_coeffs = [] # Coefficients close to the diagonal
+        self.g_coeffs = [] # Coefficients for the non symmetric Lanczos (finite temperature)
         self.krilov_basis = [] # The basis of the krilov subspace
         self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
 
@@ -226,6 +230,7 @@ class Lanczos:
         self.reverse_L = False
         self.shift_value = 0
         self.symmetrize = False
+
 
     def reset(self):
         """
@@ -1645,6 +1650,135 @@ Max number of iterations: {}
         
         self.L_linop = L_operator
         return L_operator
+
+
+    def get_full_L_operator_FT(self, verbose = False):
+        """
+        GET THE FULL L OPERATOR (FINITE TEMPERATURE)
+        ============================================
+
+        Get the the full matrix L for the biconjugate Lanczos algorithm.
+        Use this method to test everithing. I returns the full L operator as a matrix.
+        It is very memory consuming, but it should be fast for small systems.
+
+        Results
+        -------
+           L_op : ndarray(size = (nmodes * (2*nmodes + 1)), dtype = TYPE_DP)
+              The full L operator.
+        """
+
+        L_operator = np.zeros( shape = (self.n_modes + 2*self.n_modes * self.n_modes, self.n_modes + 2*self.n_modes * self.n_modes), dtype = TYPE_DP)
+
+        # Set the Z''
+        L_operator[:self.n_modes, :self.n_modes] = np.diag(self.w**2)
+
+        
+        w_a = np.tile(self.w, (self.n_modes,1)).ravel()
+        w_b = np.tile(self.w, (self.n_modes,1)).T.ravel()
+
+        n_a = np.zeros(np.shape(w_a), dtype = TYPE_DP)
+        n_b = np.zeros(np.shape(w_a), dtype = TYPE_DP)
+        if self.T > 0:
+            n_a = 1 / (np.exp(- w_a / (CC.Units.K_B * self.T)) - 1)
+            n_b = 1 / (np.exp(- w_b / (CC.Units.K_B * self.T)) - 1)
+
+        # Apply the non interacting X operator
+        start_Y = self.n_modes
+        start_A = self.n_modes + self.n_modes**2
+
+        # Get the operator that exchanges the frequencies
+        # For each index i (a,b), exchange_frequencies[i] is the index that correspond to (b,a)
+        exchange_frequencies = np.array([ (i // self.n_modes) + self.n_modes * (i % self.n_modes) for i in np.arange(self.n_modes**2)])
+        #xx = np.tile(np.arange(self.n_modes), (self.n_modes, 1)).T.ravel()
+        #yy = np.tile(np.arange(self.n_modes), (self.n_modes, 1)).ravel()
+        #all_modes = np.arange(self.n_modes**2)
+        #exchange_frequencies = xx + yy
+
+        # Apply the operator to himself and to the exchange on the frequencies.
+        X_ab_NI = -w_a**2 - w_b**2 - (2*w_a *w_b) /( (2*n_a + 1) * (2*n_b + 1))
+        L_operator[start_Y: start_A, start_Y:start_A] = - np.diag(X_ab_NI) / 2
+        L_operator[start_Y + np.arange(self.n_modes**2) , start_Y + exchange_frequencies] -= X_ab_NI / 2
+
+        # Perform the same on the A side
+        Y_ab_NI = - (8 * w_a * w_b) / ( (2*n_a + 1) * (2*n_b + 1))
+        L_operator[start_Y : start_A, start_A:] = - np.diag(Y_ab_NI) / 2
+        L_operator[start_Y + np.arange(self.n_modes**2), start_A + exchange_frequencies] -=  Y_ab_NI / 2
+
+        X1_ab_NI = - (2*n_a*n_b + n_a + n_b) * (2*n_a*n_b + n_a + n_b + 1)*(2 * w_a * w_b) / ( (2*n_a + 1) * (2*n_b + 1))
+        L_operator[start_A:, start_Y : start_A] = - np.diag(X1_ab_NI) / 2
+        L_operator[start_A + np.arange(self.n_modes**2), start_Y + exchange_frequencies] -= X1_ab_NI / 2
+
+        Y1_ab_NI = - w_a**2 - w_b**2 + (2*w_a *w_b) /( (2*n_a + 1) * (2*n_b + 1))
+        L_operator[start_A:, start_A:] = -np.diag(Y1_ab_NI) / 2
+        L_operator[start_A + np.arange(self.n_modes**2),  start_A + exchange_frequencies] -= Y1_ab_NI / 2
+
+        # We added all the non interacting propagators
+
+        # Compute the d3 operator
+        #new_X = np.einsum("ia,a->ai", self.X, f_ups(self.w, self.T))
+        N_eff = np.sum(self.rho)
+        Y_weighted = np.einsum("ia, i->ia", self.Y, self.rho)
+        #new_Y = np.einsum("ia,i->ai", self.Y, self.rho)
+
+        if not self.ignore_v3:
+            if verbose:
+                print("Computing d3...")
+            d3_noperm = np.einsum("ia,ib,ic->abc", self.X, self.X, Y_weighted)
+            d3_noperm /= -N_eff 
+
+            # Apply the permuatations
+            d3 = d3_noperm.copy()
+            d3 += np.einsum("abc->acb", d3_noperm)
+            d3 += np.einsum("abc->bac", d3_noperm)
+            d3 += np.einsum("abc->bca", d3_noperm)
+            d3 += np.einsum("abc->cab", d3_noperm)
+            d3 += np.einsum("abc->cba", d3_noperm)
+            d3 /= 6
+
+            if verbose:
+                np.save("d3_modes_nosym.npy", d3)
+
+            # Perform the standard symmetrization
+            d3 = symmetrize_d3_muspace(d3, self.symmetries)
+
+            if verbose:
+                np.save("d3_modes_sym.npy", d3)
+                np.save("symmetries_modes.npy", self.symmetries)
+            
+
+            # Reshape the d3
+            d3_reshaped = d3.reshape((self.n_modes* self.n_modes, self.n_modes))
+            d3_reshaped1 = d3.reshape((self.n_modes, self.n_modes* self.n_modes))
+            
+            # Get the Z coefficient
+            Z_coeff = 2 * ((2*n_a + 1)*w_b + (2*n_b + 1)*w_a) / ((2*n_a + 1) * (2*n_b + 1))
+            Z_coeff = np.einsum("ab,a -> ab", d3_reshaped, Z_coeff)
+            L_operator[start_Y: start_A, :start_Y] = Z_coeff
+
+            # Get the Z' coefficients
+            Z1_coeff = 2 * ( (2*n_a + 1)*w_b*n_b*(n_b + 1) + (2*n_b + 1)*w_a*n_a*(n_a+1)) / ((2*n_a + 1) * (2*n_b + 1))
+            Z1_coeff = np.einsum("ab,a -> ab", d3_reshaped, Z1_coeff)
+            L_operator[start_A:, :start_Y] = Z1_coeff
+
+            # The other coeff between Y and R
+            # X''
+            X2_coeff = (2*n_b + 1) * (2*n_a +1) / (8*w_a *w_b)
+            X2_coeff = np.einsum("ab,b->ab", d3_reshaped1, X2_coeff)
+            L_operator[:start_Y, start_Y: start_A] = X2_coeff
+
+            # The coeff between A and R is zero.
+        if not self.ignore_v4:
+            raise NotImplementedError("Still d4 not implemented in this feature.")
+
+        if verbose:
+            print("L superoperator computed.")
+            np.savez_compressed("L_super.npz", L_operator)
+        
+        self.L_linop = L_operator
+        return L_operator
+
+
+
             
 
 
