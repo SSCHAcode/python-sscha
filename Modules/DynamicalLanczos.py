@@ -115,7 +115,10 @@ class Lanczos:
         # In the custom lanczos mode
         self.a_coeffs = [] #Coefficients on the diagonal
         self.b_coeffs = [] # Coefficients close to the diagonal
+        self.c_coeffs = [] # Coefficients in the case of the biconjugate Lanczos
         self.krilov_basis = [] # The basis of the krilov subspace
+        self.P_basis = [] # The basis of the P vectors for the biconjugate Lanczos
+        self.Q_basis = [] # The basis of the Q vectors for the biconjugate Lanczos
         self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
         self.reverse_L = False
         self.shift_value = 0
@@ -1820,8 +1823,214 @@ Max number of iterations: {}
 
 
             
+    def run_FT(self, n_iter, save_dir = ".", verbose = True):
+        """
+        RUN LANCZOS ITERATIONS FOR FINITE TEMPERATURE
+        =============================================
+
+        This method performs the biconjugate Lanczos algorithm to find
+        the sequence of a and b and c coefficients that are the tridiagonal representation 
+        of the L matrix to be inverted.
+
+        Parameters
+        ----------
+            n_iter : int
+                The number of iterations to be performed in the Lanczos algorithm.
+            save_dir : string
+                The directory in which you want to store the results step by step,
+                in order to do a preliminar analysis or restart the calculation later.
+            verbose : bool
+                If true all the info during the minimization will be printed on output.
+        """
+
+        # Check if the symmetries has been initialized
+        if not self.initialized:
+            self.prepare_symmetrization()
+
+        # Get the current step
+        i_step = len(self.a_coeffs)
+
+        if verbose:
+            header = """
+<=====================================>
+|                                     |
+|          LANCZOS ALGORITHM          |
+|                                     |
+<=====================================>
+
+Starting the algorithm. It may take a while.
+Starting from step %d
+""" % i_step
+            print(header)
+
+            OPTIONS = """
+Should I ignore the third order effect? {}
+Should I ignore the fourth order effect? {}
+Max number of iterations: {}
+""".format(self.ignore_v3, self.ignore_v4, n_iter)
+            print(OPTIONS)
 
 
+        # If this is the current step initialize the algorithm
+        if i_step == 0:
+            self.basis_Q = []
+            self.basis_P = []
+            first_vector = self.psi / np.sqrt(self.psi.dot(self.psi))
+            self.basis_Q.append(first_vector)
+            self.basis_P.append(first_vector)
+        else:
+            # Convert everything in a list
+            self.basis_Q = list(self.basis_Q)
+            self.basis_P = list(self.basis_P)
+            self.a_coeffs = list(self.a_coeffs)
+            self.b_coeffs = list(self.b_coeffs)
+            self.c_coeffs = list(self.c_coeffs)
+            self.arnoldi_matrix = list(self.arnoldi_matrix)
+
+            if len(self.basis_Q) != i_step + 1:
+                print("Krilov dim: %d, number of steps perfomed: %d" % (len(self.krilov_basis), i_step))
+                print("Error, the krilov basis dimension should be 1 more than the number of steps")
+                raise ValueError("Error the starting krilov basis does not matches the matrix, Look stdout.")
+
+        assert len(self.basis_Q) == len(self.basis_P), "Something wrong when restoring the Lanczos."
+        assert len(self.b_coeffs) == len(self.c_coeffs), "Something wrong when restoring the Lanczos."
+
+
+        # Select the two vectors for the biconjugate Lanczos iterations
+        psi_q = self.basis_Q[-1]
+        psi_p = self.basis_P[-1]
+
+        for i in range(i_step, i_step+n_iter):
+            if verbose:
+                step_txt = """
+ ===== NEW STEP %d =====
+
+ """ % i
+                print(step_txt)
+                print("Length of the coefficiets: a = {}, b = {}".format(len(self.a_coeffs), len(self.b_coeffs)))
+                print()
+
+            # Apply the matrix L
+            t1 = time.time()
+
+            L_q = self.L_linop.dot(psi_q)
+            p_L = psi_p.dot(self.L_linop)
+
+            t2 = time.time()
+
+            if verbose:
+                print("Time to apply the full L: %d s" % (t2 -t1))
+
+            # Get the a coefficient
+            a_coeff = psi_p.dot(L_q)
+
+            # Get the two residual vectors
+            rk = L_q - a_coeff * psi_q 
+            if len(self.basis_Q) > 1:
+                rk -= self.c_coeffs[-1] * self.basis_Q[-2]
+            sk = p_L - a_coeff * psi_p 
+            if len(self.basis_P) > 1:
+                sk -= self.b_coeffs[-1] * self.baiss_P[-2]
+            
+            b_coeff = np.sqrt( rk.dot(rk) )
+            c_coeff = sk.dot(rk) / b_coeff
+
+            # Check the convergence
+            if b_coeff < __EPSILON__:
+                if verbose:
+                    print("Converged (b coefficient is 0)")
+                converged = True
+                break 
+            if c_coeff < __EPSILON__:
+                if verbose:
+                    print("Converged (c coefficient is 0)")
+                converged = True
+                break
+
+            # Add the new coefficients to the Arnoldi matrix
+            self.a_coeffs.append(a_coeff)
+            self.b_coeffs.append(b_coeff)
+            self.c_coeffs.append(c_coeff)
+
+            # Get the vectors for the next iteration
+            psi_q = rk / b_coeff
+            psi_p = sk / c_coeff
+
+            t1 = time.time()
+
+
+            # Lets repeat twice the orthogonalization
+            converged = False
+            new_q = psi_q.copy()
+            new_p = psi_p.copy()
+            for k_orth in range(N_REP_ORTH):
+                for j in range(len(self.basis_P)):
+                    coeff1 = self.basis_P[j].dot(new_q)
+                    coeff2 = self.basis_Q[j].dot(new_p)
+
+                    # Gram Schmidt
+                    new_q -= coeff1 * self.basis_P[j]
+                    new_p -= coeff2 * self.basis_Q[j]
+            
+                # Add the new vector to the Krilov Basis
+                normq = np.sqrt(new_q.dot(new_q))
+                if verbose:
+                    print("Vector norm after GS number {}: {:16.8e}".format(k_orth, normq))
+
+                # Check the normalization (If zero the algorithm converged)
+                if normq < __EPSILON__:
+                    converged = True
+                    if verbose:
+                        print("Obtained a linear dependent Q vector.")
+                        print("The algorithm converged.")
+                    break
+                
+                new_q /= normq
+
+                # Normalize the p with respect to the scalar product with q
+                normp = new_p.dot(new_q)
+
+                # Check the normalization (If zero the algorithm converged)
+                if normp < __EPSILON__:
+                    converged = True
+                    if verbose:
+                        print("Obtained a linear dependent P vector.")
+                        print("The algorithm converged.")
+                    break
+            
+                new_p /= normp
+
+
+            if not converged:
+                self.basis_Q.append(new_q)
+                self.basis_P.append(new_p)
+                psi_q = new_q
+                psi_p = new_p
+
+            t2 = time.time()
+
+
+            if verbose:
+                print("Time to perform the Gram-Schmidt and retrive the coefficients: %d s" % (t2-t1))
+                print()
+                print("a_%d = %.8e" % (i, self.a_coeffs[-1]))
+                if i > 0:
+                    print("b_%d = %.8e" % (i, self.b_coeffs[-1]))
+                print()
+            
+            # Save the step
+            if not save_dir is None:
+                self.save_status("%s/LANCZOS_STEP%d" % (save_dir, i))
+        
+                if verbose:
+                    print("Status saved into '%s/LANCZOS_STEP%d'" % (save_dir, i))
+            
+            if verbose:
+                print("Lanczos step %d ultimated." % i)
+            
+
+            if converged:
+                return
             
 
             
@@ -2001,11 +2210,6 @@ def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn,  symmetries, n_degeneracies, de
 
     This is a wrapper to the fast C function.
 
-    Remember to use the correct dtype value:
-    if mode == GPU:
-       dtype = np.float32
-    if mode == CPU:
-       dtype = np.float64
 
     For details on the mode, look at the parameters list
 
@@ -2075,11 +2279,6 @@ def FastApplyD3ToVector(X, Y, rho, w, T, input_vector, symmetries, n_degeneracie
 
     This is a wrapper to the fast C function.
 
-    Remember to use the correct dtype value:
-    if mode == GPU:
-       dtype = np.float32
-    if mode == CPU:
-       dtype = np.float64
 
     For details on the mode, look at the parameters list
 
