@@ -2134,7 +2134,7 @@ DETAILS OF ERROR:
         
 
         n_modes = len(w)
-        nat_sc = np.shape(pols)[0] / 3
+        nat_sc = np.shape(pols)[0] // 3
 
         # Get the polarization vectors in the correct format
         new_pol = np.zeros( (nat_sc, n_modes, 3), dtype = np.double)
