@@ -29,7 +29,7 @@ from Parallel import pprint as print
 # Define a generic type for the double precision.
 TYPE_DP = np.double
 __EPSILON__ = 1e-8
-N_REP_ORTH = 2
+N_REP_ORTH = 1
 
 try:
     from ase.units import create_units
@@ -117,8 +117,8 @@ class Lanczos:
         self.b_coeffs = [] # Coefficients close to the diagonal
         self.c_coeffs = [] # Coefficients in the case of the biconjugate Lanczos
         self.krilov_basis = [] # The basis of the krilov subspace
-        self.P_basis = [] # The basis of the P vectors for the biconjugate Lanczos
-        self.Q_basis = [] # The basis of the Q vectors for the biconjugate Lanczos
+        self.basis_P = [] # The basis of the P vectors for the biconjugate Lanczos
+        self.basis_Q = [] # The basis of the Q vectors for the biconjugate Lanczos
         self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
         self.reverse_L = False
         self.shift_value = 0
@@ -253,6 +253,11 @@ class Lanczos:
         # In the custom lanczos mode
         self.a_coeffs = [] #Coefficients on the diagonal
         self.b_coeffs = [] # Coefficients close to the diagonal
+        self.c_coeffs = []
+
+        # The krilov basis for the symmetric and unsymmetric Lanczos
+        self.basis_P = []
+        self.basis_Q = []
         self.krilov_basis = [] # The basis of the krilov subspace
         self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
 
@@ -532,8 +537,6 @@ class Lanczos:
 
         print("Shift value:", self.shift_value)
 
-        
-        
     def apply_L1(self):
         """
         APPLY THE L1
@@ -562,6 +565,75 @@ class Lanczos:
         out_vect[self.n_modes:] = new_out.ravel() * self.psi[self.n_modes:]
 
         #print("out 0 (just end):", out_vect[0])
+        return out_vect
+
+    def apply_L1_FT(self):
+        """
+        APPLY THE L1 AT FINITE TEMPERATURE
+        ==================================
+
+        This is the first part of the application, it involves only harmonic propagation.
+
+        Results
+        -------
+            out_vect : ndarray(shape(self.psi))
+                It returns the application of the harmonic part of the L matrix
+        """
+
+        # The elements where w_a and w_b are exchanged are dependent
+        # So we must avoid including them
+        i_a = np.tile(np.arange(self.n_modes), (self.n_modes,1)).ravel()
+        i_b = np.tile(np.arange(self.n_modes), (self.n_modes,1)).T.ravel()
+
+        new_i_a = np.array([i_a[i] for i in range(len(i_a)) if i_a[i] >= i_b[i]])
+        new_i_b = np.array([i_b[i] for i in range(len(i_a)) if i_a[i] >= i_b[i]])
+        
+        w_a = self.w[new_i_a]
+        w_b = self.w[new_i_b]
+
+        N_w2 = len(w_a)
+
+        # Prepare the free propagator on the positions
+        out_vect = np.zeros(np.shape(self.psi), dtype = TYPE_DP)
+
+        # Get the harmonic responce function
+        out_vect[:self.n_modes] = (self.psi[:self.n_modes] * self.w) * self.w
+
+
+        n_a = np.zeros(np.shape(w_a), dtype = TYPE_DP)
+        n_b = np.zeros(np.shape(w_a), dtype = TYPE_DP)
+        if self.T > 0:
+            n_a = 1 / (np.exp( w_a / np.double(CC.Units.K_B * self.T)) - 1)
+            n_b = 1 / (np.exp( w_b / np.double(CC.Units.K_B * self.T)) - 1)
+
+
+        # Apply the non interacting X operator
+        start_Y = self.n_modes
+        start_A = self.n_modes + N_w2
+
+        assert len(self.psi) == start_A + N_w2, "Error, the psi vector must be initialized at finite temperature"
+
+        # Apply the free propagation
+        X_ab_NI = -w_a**2 - w_b**2 - (2*w_a *w_b) /( (2*n_a + 1) * (2*n_b + 1))
+        out_vect[start_Y: start_A] = - X_ab_NI * self.psi[start_Y: start_A]
+
+        # Perform the same on the A side
+        Y_ab_NI = - (8 * w_a * w_b) / ( (2*n_a + 1) * (2*n_b + 1))
+        out_vect[start_Y : start_A] += - Y_ab_NI * self.psi[start_A: ]
+        #L_operator[start_Y : start_A, start_A:] = - np.diag(Y_ab_NI) * extra_count
+        #L_operator[start_Y + np.arange(self.n_modes**2), start_A + exchange_frequencies] -=  Y_ab_NI / 2
+
+        X1_ab_NI = - (2*n_a*n_b + n_a + n_b) * (2*n_a*n_b + n_a + n_b + 1)*(2 * w_a * w_b) / ( (2*n_a + 1) * (2*n_b + 1))
+        out_vect[start_A:] += - X1_ab_NI * self.psi[start_Y: start_A]
+        #L_operator[start_A:, start_Y : start_A] = - np.diag(X1_ab_NI) / 1 * extra_count
+        #L_operator[start_A + np.arange(self.n_modes**2), start_Y + exchange_frequencies] -= X1_ab_NI / 2
+
+        Y1_ab_NI = - w_a**2 - w_b**2 + (2*w_a *w_b) /( (2*n_a + 1) * (2*n_b + 1))
+        out_vect[start_A:] += - Y1_ab_NI * self.psi[start_A:]
+        #L_operator[start_A:, start_A:] = -np.diag(Y1_ab_NI) / 1 * extra_count
+        #L_operator[start_A + np.arange(self.n_modes**2),  start_A + exchange_frequencies] -= Y1_ab_NI / 2
+
+
         return out_vect
 
     def apply_L2(self):
@@ -1134,7 +1206,7 @@ Max number of iterations: {}
                 return
 
 
-    def build_lanczos_matrix_from_coeffs(self, use_arnoldi=True):
+    def build_lanczos_matrix_from_coeffs(self, use_arnoldi=False):
         """
         BUILD THE LANCZOS MATRIX
         ========================
@@ -1155,9 +1227,15 @@ Max number of iterations: {}
             for i in range(N_size):
                 matrix[i,i] = self.a_coeffs[i]
                 if i>= 1:
-                    matrix[i-1,i] = self.b_coeffs[i-1]
+                    # Use the non-symmetric Lanczos if also c_coeffs are present
+                    c_coeff = self.b_coeffs[i-1]
+                    if len(self.c_coeffs) == len(self.b_coeffs):
+                        c_coeff = self.c_coeffs[i-1]
+                    matrix[i-1,i] = c_coeff
                     matrix[i,i-1] = self.b_coeffs[i-1]
         else:
+            # Check if there are c_coeffs, in this way arnoldi matrix is not computed
+            assert len(self.b_coeffs) > len(self.c_coeffs), "Error, cannot Arnoldi with non-symmetric Lanczos not implemented"
             for i in range(N_size):
                 matrix[:i+1, i] = self.arnoldi_matrix[i]
                 matrix[i, :i+1] = self.arnoldi_matrix[i]
@@ -1198,6 +1276,8 @@ Max number of iterations: {}
 
         # Get the Lanczos matrix
         matrix = self.build_lanczos_matrix_from_coeffs(use_arnoldi)
+
+        assert len(self.c_coeffs) < len(self.b_coeffs), "Lenmann cannot be used with non-symmetric Lanczos"
 
         # Convert the vectors in the polarization basis
         new_va = np.einsum("a, a, ab->b", 1/np.sqrt(self.m), v_a, self.pols)
@@ -1538,11 +1618,15 @@ Max number of iterations: {}
         if use_terminator:
             a_av = np.mean(self.a_coeffs[-last_average:])
             b_av = np.mean(self.b_coeffs[-last_average:])
+            c_av = b_av
+            if len(self.c_coeffs) == len(self.b_coeffs): # Non-symmetric Lanczos
+                c_av = np.mean(self.c_coeffs[-last_average:])
 
             a = a_av * sign - sign* self.shift_value
             b = b_av * sign
+            c = c_av * sign
 
-            gf[:] = (a - w_array**2 - np.sqrt( (a - w_array**2)**2 - 4*b**2 + 0j))/(2*b**2)
+            gf[:] = (a - w_array**2 - np.sqrt( (a - w_array**2)**2 - 4*b*c + 0j))/(2*b*c)
         else:
             a = self.a_coeffs[-1] * sign - sign* self.shift_value
             gf[:] = 1/ (a - w_array**2 + 2j*w_array*smearing)
@@ -1550,7 +1634,10 @@ Max number of iterations: {}
         for i in range(n_iters-2, -1, -1):
             a = self.a_coeffs[i] * sign - sign* self.shift_value
             b = self.b_coeffs[i] * sign
-            gf = 1. / (a - w_array**2  + 2j*w_array*smearing - b**2 * gf)
+            c = b
+            if len(self.c_coeffs) == len(self.b_coeffs): # Non-symmetric Lanczos
+                c = self.c_coeffs[i] * sign
+            gf = 1. / (a - w_array**2  + 2j*w_array*smearing - b*c * gf)
 
         return gf * self.perturbation_modulus
 
@@ -1893,13 +1980,18 @@ Max number of iterations: {}
                 raise ValueError("Error the starting krilov basis does not matches the matrix, Look stdout.")
 
         assert len(self.basis_Q) == len(self.basis_P), "Something wrong when restoring the Lanczos."
-        assert len(self.b_coeffs) == len(self.c_coeffs), "Something wrong when restoring the Lanczos."
+        assert len(self.b_coeffs) == len(self.c_coeffs), "Something wrong when restoring the Lanczos. {} {}".format(len(self.b_coeffs), len(self.c_coeffs))
 
 
         # Select the two vectors for the biconjugate Lanczos iterations
         psi_q = self.basis_Q[-1]
         psi_p = self.basis_P[-1]
 
+        print("Q basis:", self.basis_Q)
+        print("P basis:", self.basis_P)
+        print("SHAPE PSI Q, P :", psi_q.shape, psi_p.shape)
+
+        next_converged = False
         for i in range(i_step, i_step+n_iter):
             if verbose:
                 step_txt = """
@@ -1915,7 +2007,6 @@ Max number of iterations: {}
 
             L_q = self.L_linop.dot(psi_q)
             p_L = psi_p.dot(self.L_linop)
-
             t2 = time.time()
 
             if verbose:
@@ -1928,29 +2019,27 @@ Max number of iterations: {}
             rk = L_q - a_coeff * psi_q 
             if len(self.basis_Q) > 1:
                 rk -= self.c_coeffs[-1] * self.basis_Q[-2]
+
             sk = p_L - a_coeff * psi_p 
             if len(self.basis_P) > 1:
-                sk -= self.b_coeffs[-1] * self.baiss_P[-2]
+                sk -= self.b_coeffs[-1] * self.basis_P[-2]
             
             b_coeff = np.sqrt( rk.dot(rk) )
             c_coeff = sk.dot(rk) / b_coeff
 
             # Check the convergence
-            if b_coeff < __EPSILON__:
+            self.a_coeffs.append(a_coeff)
+            if np.abs(b_coeff) < __EPSILON__ or next_converged:
                 if verbose:
                     print("Converged (b coefficient is 0)")
                 converged = True
                 break 
-            if c_coeff < __EPSILON__:
+            if np.abs(c_coeff) < __EPSILON__ or next_converged:
                 if verbose:
                     print("Converged (c coefficient is 0)")
                 converged = True
                 break
 
-            # Add the new coefficients to the Arnoldi matrix
-            self.a_coeffs.append(a_coeff)
-            self.b_coeffs.append(b_coeff)
-            self.c_coeffs.append(c_coeff)
 
             # Get the vectors for the next iteration
             psi_q = rk / b_coeff
@@ -1964,14 +2053,21 @@ Max number of iterations: {}
             new_q = psi_q.copy()
             new_p = psi_p.copy()
             for k_orth in range(N_REP_ORTH):
+                ortho_q = 0
+                ortho_p = 0
                 for j in range(len(self.basis_P)):
-                    coeff1 = self.basis_P[j].dot(new_q)
+                    coeff1 = self.basis_P[j].dot(new_q) / np.sqrt(self.basis_P[j].dot(self.basis_P[j]))
                     coeff2 = self.basis_Q[j].dot(new_p)
 
                     # Gram Schmidt
                     new_q -= coeff1 * self.basis_P[j]
                     new_p -= coeff2 * self.basis_Q[j]
-            
+
+                    print("REP {} COEFF {}: scalar: {}".format(k_orth, j, coeff1))
+
+                    ortho_q += np.abs(coeff1)
+                    ortho_p += np.abs(ortho_p)
+
                 # Add the new vector to the Krilov Basis
                 normq = np.sqrt(new_q.dot(new_q))
                 if verbose:
@@ -1979,11 +2075,11 @@ Max number of iterations: {}
 
                 # Check the normalization (If zero the algorithm converged)
                 if normq < __EPSILON__:
-                    converged = True
+                    next_converged = True
                     if verbose:
                         print("Obtained a linear dependent Q vector.")
                         print("The algorithm converged.")
-                    break
+                    
                 
                 new_q /= normq
 
@@ -1992,13 +2088,16 @@ Max number of iterations: {}
 
                 # Check the normalization (If zero the algorithm converged)
                 if normp < __EPSILON__:
-                    converged = True
+                    next_converged = True
                     if verbose:
                         print("Obtained a linear dependent P vector.")
                         print("The algorithm converged.")
-                    break
             
                 new_p /= normp
+
+                # We have a correctly satisfied orthogonality condition
+                if ortho_p < __EPSILON__ and ortho_q < __EPSILON__:
+                    break
 
 
             if not converged:
@@ -2006,6 +2105,10 @@ Max number of iterations: {}
                 self.basis_P.append(new_p)
                 psi_q = new_q
                 psi_p = new_p
+
+                # Add the new coefficients to the Arnoldi matrix
+                self.b_coeffs.append(b_coeff)
+                self.c_coeffs.append(c_coeff)
 
             t2 = time.time()
 
@@ -2016,6 +2119,7 @@ Max number of iterations: {}
                 print("a_%d = %.8e" % (i, self.a_coeffs[-1]))
                 if i > 0:
                     print("b_%d = %.8e" % (i, self.b_coeffs[-1]))
+                    print("c_%d = %.8e" % (i, self.c_coeffs[-1]))
                 print()
             
             # Save the step

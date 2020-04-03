@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #define RY_TO_K 157887.32400374097
+#define K_B 8.617330337217213e-05
 #define __EPSILON__ 1e-6
 
 //#define D_MPI
@@ -14,6 +15,9 @@
 #endif
 
 // NOTE: For now OpenMP parallelization is not active.
+
+// The following functions works at T = 0 only,
+// To see the functions at finite temperature see below
 
 /*
  * Apply the D3 matrix to a vector (OpenMP/MPI)
@@ -110,6 +114,35 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 		      double T, int N_modes, int N_configs,  double * input_dyn, double * output_dyn,
 		      double * symmetries, int N_sym, int * N_degeneracy, int ** degenerate_space);
 
+// ---------------------------------------------------
+/*
+ * From now on the Finite temperature functions
+ * 
+ * Note, the linear response at finite temperature is much different
+ * to the one at T=0, therefore a more complex setup is needed.
+ * Here we will define all the function to work at any temperature.
+ */
 
+
+/*
+ * Here we define some working methods that are usefull to be
+ * called outside. They take the frequency and the occupation number
+ */
+// The coefficient applied on R to Y
+double Z_coeff(double w_a,double n_a, double w_b, double n_b);
+
+// The coefficient applied on R to A
+double Z1_coeff(double w_a, double n_a, double w_b, double n_b);
+
+// The coefficient between on Y to R
+double X2_coeff(double w_a, double n_a, double w_b, double n_b);
+
+
+/* 
+ * Here the function that, given the modes, returns the corresponding
+ * vectorial index.
+ */
+int index_Y(int mode_a, int mode_b, int n_modes);
+int index_A(int mode_a, int mode_b, int n_modes);
 
 #endif
