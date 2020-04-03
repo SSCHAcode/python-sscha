@@ -631,7 +631,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 	// Reduce the output dyn
 	#ifdef _MPI
-	MPI_Allreduce(new_output, output_dyn, N_modes*N_modes, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	MPI_Allreduce(new_output, output_psi, N_modes*N_modes, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	#endif
 	#ifndef _MPI
 	// Copy the new output inside the output file.
