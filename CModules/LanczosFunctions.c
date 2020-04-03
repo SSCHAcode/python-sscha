@@ -635,7 +635,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 	#endif
 	#ifndef _MPI
 	// Copy the new output inside the output file.
-	for (i = 0; i < N_modes*N_modes; ++i)
+	for (i = 0; i < end_A; ++i)
 		output_psi[i] = new_output[i];
 	#endif
 	   
