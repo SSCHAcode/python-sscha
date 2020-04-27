@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 
 import difflib
 __ASE_CALC__ = False
@@ -102,7 +103,7 @@ def prepare_calculator_from_namelist(namelist):
     tot_keys = __ALLOWED_KEYS__
     if __CALCULATOR_TYPE__ in ks:
         if not c_info[__CALCULATOR_TYPE__] in __CALCULATOR_SYNONIMOUS__.keys():
-            print "List of supported calculators:", __CALCULATOR_SYNONIMOUS__.keys
+            print ("List of supported calculators:", __CALCULATOR_SYNONIMOUS__.keys)
             raise ValueError("Error, the specified calculator '%s' is not in supported." % c_info[__CALCULATOR_TYPE__])
             
         calc = __CALCULATOR_SYNONIMOUS__[c_info[__CALCULATOR_TYPE__]]
@@ -128,8 +129,8 @@ def prepare_calculator_from_namelist(namelist):
         if __PSEUDO_LIST__ in k:
             continue
         if (not k in tot_keys) and check:
-            print "Error with the key:", k
-            print "Did you mean something like:", difflib.get_close_matches(k, tot_keys)
+            print ("Error with the key:", k)
+            print ("Did you mean something like:", difflib.get_close_matches(k, tot_keys))
             raise IOError("Error in calculator namespace: key '" + k +"' not recognized.")
     
     # Check for mandatory keys

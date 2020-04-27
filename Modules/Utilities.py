@@ -225,7 +225,7 @@ class ModeProjection:
             raise ValueError("Error, note that the pols argument must have 3 indices: 3*nat, nmodes and iq")
         
         self.pols = pols.copy()  
-        self.nat = np.shape(self.pols)[0] / 3
+        self.nat = np.shape(self.pols)[0] // 3
         self.nmodes = np.shape(self.pols)[1]
         self.nq = np.shape(self.pols)[2]
         

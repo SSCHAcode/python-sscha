@@ -808,7 +808,7 @@ class Ensemble:
         """
         
         self.current_T = newT
-        
+
             
         
         t1 = time.time()
@@ -817,7 +817,8 @@ class Ensemble:
         w, pols = super_dyn.DyagDinQ(0)
         
         # Exclude translations
-        w = w[~CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())]
+        trans_original = CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array()) 
+        w = w[~trans_original]
 
         # Convert from Ry to Ha and in fortran double precision
         w = np.array(w/2, dtype = np.float64)
@@ -828,7 +829,29 @@ class Ensemble:
         # Now do the same for the new dynamical matrix
         new_super_dyn = new_dynamical_matrix.GenerateSupercellDyn(self.supercell)
         w, pols = new_super_dyn.DyagDinQ(0)
-        w = w[~CC.Methods.get_translations(pols, new_super_dyn.structure.get_masses_array())]
+
+        trans_mask = CC.Methods.get_translations(pols, new_super_dyn.structure.get_masses_array()) 
+
+        # Check if the new dynamical matrix satisfies the sum rule
+        if (np.sum(trans_mask.astype(int)) != 3) or (np.sum(trans_original.astype(int)) != 3):
+            ERR_MSG = """
+ERROR WHILE UPDATING THE WEIGHTS
+    
+Error, one dynamical matrix does not satisfy the acoustic sum rule.
+       If this problem arises on a sscha run, 
+       it may be due to a gradient that violates the sum rule.
+       Please, be sure you are not using a custom gradient function.
+
+DETAILS OF ERROR:
+    Number of translatinal modes in the original dyn = {}
+    Number of translational modes in the target dyn = {}
+    (They should be both 3)
+""".format(np.sum(trans_original.as_type(int)), np.sum(trans_mask.as_type(int)))
+
+            print(ERR_MSG)
+            raise ValueError(ERR_MSG)
+
+        w = w[~trans_mask]
         w = np.array(w/2, dtype = np.float64)
         new_a = SCHAModules.thermodynamic.w_to_a(w, newT)
         
@@ -1299,7 +1322,7 @@ class Ensemble:
         w, pols = supercell_dyn.DyagDinQ(0)
         trans = CC.Methods.get_translations(pols, supercell_dyn.structure.get_masses_array())
         ityp = supercell_dyn.structure.get_ityp() + 1 # Py to fortran convertion
-        mass = np.array(supercell_dyn.structure.masses.values())
+        mass = np.array(list(supercell_dyn.structure.masses.values()))
         
         log_err = "err_yesrho"
         
@@ -1419,7 +1442,7 @@ class Ensemble:
  #
     
     def get_covmat_from_ensemble(self):
-        """
+        r"""
         GET THE COVARIANCE STOCASTICALLY
         ================================
         
@@ -1430,7 +1453,7 @@ class Ensemble:
         
         .. math::
             
-            \Upsilon^{-1}_{ab} = \\left< u_a u_b\\right>
+            \Upsilon^{-1}_{ab} = \left< u_a u_b\right>
         
         Results
         -------
