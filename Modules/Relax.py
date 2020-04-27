@@ -42,10 +42,6 @@ __ALLOWED_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__, __RELAX_MAX_POP__,
                     __RELAX_BULK_MODULUS__, __RELAX_GENERATE_FIRST_ENSEMBLE__]
 
 class SSCHA(object):
-    minim = sscha.SchaMinimizer.SSCHA_Minimizer()
-    bulk_modulus = 100
-    target_pressure = 0
-    fix_volume = False
     
     def __init__(self, minimizer = None, ase_calculator=None, N_configs=1, max_pop = 20, 
                  save_ensemble = False, cluster = None):
@@ -72,8 +68,11 @@ class SSCHA(object):
                 will be runned in the provided cluster.
         """
         
-        if minimizer is not None:
+        if minimizer == None:
+            self.minim = sscha.SchaMinimizer.SSCHA_Minimizer()
+        else:
             self.minim = minimizer
+
         self.calc = ase_calculator
         self.N_configs = N_configs
         self.max_pop = max_pop
@@ -92,12 +91,16 @@ class SSCHA(object):
         self.__cfg__ = None
 
 
-        # Fix the attributes
+        # The variable cell attributes
+        self.bulk_modulus = 15
+        self.cluster = None 
+        self.target_pressure = 0
+        self.fix_volume = False
+
 
         # Setup the attribute control
         self.__total_attributes__ = [item for item in self.__dict__.keys()]
         self.fixed_attributes = True # This must be the last attribute to be setted
-
 
     def __setattr__(self, name, value):
         """

@@ -36,6 +36,7 @@ __CLUSTER_ACCOUNT__ = "account"
 __CLUSTER_BINARY__ = "binary_path"
 __CLUSTER_MPICMD__ = "mpicmd"
 __CLUSTER_ATTEMPTS__ = "reconnect_attempts"
+__CLUSTER_PORT__ = "port"
 
 
 __CLUSTER_TERMINAL__ = "shell"
@@ -69,6 +70,7 @@ __CLUSTER_TIMEOUT__ = "timeout"
 __CLUSTER_JOBNUMBER__ = "job_numbers"
 __CLUSTER_NPARALLEL__ = "n_together"
 
+
 __CLUSTER_WORKDIR__ = "workdir"
 
 
@@ -87,7 +89,7 @@ __CLUSTER_KEYS__ = [__CLUSTER_NAMELIST__, __CLUSTER_TEMPLATE__, __CLUSTER_HOST__
                     __CLUSTER_LOCALWD__, __CLUSTER_VACCOUNT__, __CLUSTER_UACCOUNT__, __CLUSTER_SSHCMD__,
                     __CLUSTER_SCPCMD__, __CLUSTER_WORKDIR__, __CLUSTER_TIMEOUT__, 
                     __CLUSTER_JOBNUMBER__, __CLUSTER_NPARALLEL__, __CLUSTER_NPOOLS__,
-                    __CLUSTER_ATTEMPTS__]
+                    __CLUSTER_ATTEMPTS__, __CLUSTER_PORT__]
 
 
 class Cluster(object):
@@ -735,6 +737,16 @@ class Cluster(object):
             
             self.sshcmd = "sshpass -p '" + self.pwd + "' " + self.sshcmd
             self.scpcmd = "sshpass -p '" + self.pwd + "' " + self.scpcmd
+
+        # Add the port
+        if __CLUSTER_PORT__ in keys:
+            # Check if the password has been setup
+            if not self.pwd is None:
+                self.sshcmd += " -P {:.0f}".format(c_info[__CLUSTER_PORT__])
+                self.scpcmd += " -P {:.0f}".format(c_info[__CLUSTER_PORT__])
+            else:
+                self.sshcmd += " -p {:.0f}".format(c_info[__CLUSTER_PORT__])
+                self.scpcmd += " -P {:.0f}".format(c_info[__CLUSTER_PORT__])
             
         if __CLUSTER_ACCOUNT__ in keys:
             self.account_name = c_info[__CLUSTER_ACCOUNT__]
@@ -855,6 +867,7 @@ class Cluster(object):
         if __CLUSTER_WORKDIR__ in keys:
             self.workdir = c_info[__CLUSTER_WORKDIR__]
             self.setup_workdir()
+
             
     def setup_workdir(self, verbose = True):
         """
