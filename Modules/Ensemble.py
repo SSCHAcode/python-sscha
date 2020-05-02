@@ -846,7 +846,7 @@ DETAILS OF ERROR:
     Number of translatinal modes in the original dyn = {}
     Number of translational modes in the target dyn = {}
     (They should be both 3)
-""".format(np.sum(trans_original.as_type(int)), np.sum(trans_mask.as_type(int)))
+""".format(np.sum(trans_original.astype(int)), np.sum(trans_mask.astype(int)))
 
             print(ERR_MSG)
             raise ValueError(ERR_MSG)
@@ -1069,7 +1069,6 @@ DETAILS OF ERROR:
             err = np.sqrt( f2 - force**2 )
             return force, err
         return force
-    
     
     
     def get_free_energy(self, return_error = False):
