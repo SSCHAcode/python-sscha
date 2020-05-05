@@ -741,12 +741,8 @@ class Cluster(object):
         # Add the port
         if __CLUSTER_PORT__ in keys:
             # Check if the password has been setup
-            if not self.pwd is None:
-                self.sshcmd += " -P {:.0f}".format(c_info[__CLUSTER_PORT__])
-                self.scpcmd += " -P {:.0f}".format(c_info[__CLUSTER_PORT__])
-            else:
-                self.sshcmd += " -p {:.0f}".format(c_info[__CLUSTER_PORT__])
-                self.scpcmd += " -P {:.0f}".format(c_info[__CLUSTER_PORT__])
+            self.sshcmd += " -p {:.0f}".format(c_info[__CLUSTER_PORT__])
+            self.scpcmd += " -P {:.0f}".format(c_info[__CLUSTER_PORT__])
             
         if __CLUSTER_ACCOUNT__ in keys:
             self.account_name = c_info[__CLUSTER_ACCOUNT__]
@@ -1120,5 +1116,4 @@ class Cluster(object):
                 print ("Expected batch ordinary resubmissions:", num_batch_offset)
                 raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
                 break
-            
             
