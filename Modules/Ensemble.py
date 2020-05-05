@@ -464,6 +464,10 @@ class Ensemble:
                 older versions of the sscha code
         """
         A_TO_BOHR = 1.889725989
+
+        # Check if the data dir exists
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
         
         # Check if the ensemble has really been initialized
         if self.N == 0:
@@ -532,6 +536,10 @@ class Ensemble:
                 The id of the population. This can be used to save
                 several ensembles in the same data_dir
         """
+
+        # Check if the data dir exists
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
         
         np.save("%s/energies_pop%d.npy" % (data_dir, population_id), self.energies)
         np.save("%s/forces_pop%d.npy" % (data_dir, population_id), self.forces)
@@ -838,7 +846,7 @@ DETAILS OF ERROR:
     Number of translatinal modes in the original dyn = {}
     Number of translational modes in the target dyn = {}
     (They should be both 3)
-""".format(np.sum(trans_original.as_type(int)), np.sum(trans_mask.as_type(int)))
+""".format(np.sum(trans_original.astype(int)), np.sum(trans_mask.astype(int)))
 
             print(ERR_MSG)
             raise ValueError(ERR_MSG)
@@ -1063,7 +1071,6 @@ DETAILS OF ERROR:
         return force
     
     
-    
     def get_free_energy(self, return_error = False):
         """
         SSCHA FREE ENERGY
@@ -1261,7 +1268,7 @@ DETAILS OF ERROR:
     
     def get_preconditioned_gradient(self, subtract_sscha = True, return_error = False, 
                                     use_ups_supercell = True, preconditioned = 1,
-                                    fast_grad = False):
+                                    fast_grad = False, verbose = True):
         """
         SELF CONSISTENT SCHA EQUATION
         =============================
@@ -1306,6 +1313,7 @@ DETAILS OF ERROR:
                 The real space force constant matrix obtained by the
                 self-consistent equation.
         """
+
         t1 = time.time()
         supercell_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
         
@@ -1336,22 +1344,24 @@ DETAILS OF ERROR:
         pols = np.real(pols)
         
         t2 = time.time()
-        print( " [GRADIENT] Time to prepare the gradient calculation:", t2 -t1,"s")
+        if verbose:
+            print( " [GRADIENT] Time to prepare the gradient calculation:", t2 -t1,"s")
             
 
         t1 = time.time()
-        if not fast_grad:
+        if fast_grad or not preconditioned:
             grad, grad_err = SCHAModules.get_gradient_supercell(self.rho, u_disp, eforces, w, pols, trans,
                                                                 self.current_T, mass, ityp, log_err, self.N,
                                                                 nat, 3*nat, len(mass), preconditioned)
         else:
-            grad, grad_err = SCHAModules.get_gradient_supercell_fast(self.rho, u_disp, eforces, w, pols, trans,
+            grad, grad_err = SCHAModules.get_gradient_supercell_new(self.rho, u_disp, eforces, w, pols, trans,
                                                                      self.current_T, mass, ityp, log_err, self.N,
-                                                                     nat, 3*nat, len(mass), preconditioned)
+                                                                     nat, 3*nat, len(mass))
         
             
         t2 = time.time()
-        print (" [GRADIENT] Time to call the fortran code:", t2 - t1, "s")
+        if verbose:
+            print (" [GRADIENT] Time to call the fortran code:", t2 - t1, "s")
     
         # Perform the fourier transform
         q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
@@ -1359,7 +1369,8 @@ DETAILS OF ERROR:
         q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
                                                        self.current_dyn.structure, supercell_dyn.structure)
         t1 = time.time()
-        print (" [GRADIENT] Time to get back in fourier space:", t1 - t2, "s")
+        if verbose:
+            print (" [GRADIENT] Time to get back in fourier space:", t1 - t2, "s")
         
         
         if return_error:
@@ -2176,7 +2187,7 @@ DETAILS OF ERROR:
             qe_sym.ApplySymmetryToTensor3(d3)
 
         if verbose:
-            print("Saving the third order force constants as d3.npy")
+            print("Saving the third order force constants as d3_realspace_sym.npy [Ha units]")
             np.save("d3_realspace_sym.npy", d3)
 
         # Check if the v4 must be included

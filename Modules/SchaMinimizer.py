@@ -1155,7 +1155,7 @@ Maybe data_dir is missing from your input?"""
             trans_mask = ~CC.Methods.get_translations(pold, superdyn0.structure.get_masses_array())
             wold = wold[trans_mask] * __RyToCm__
             pold = pold[:, trans_mask]
-            total_mask = range(len(w))
+            total_mask = list(range(len(w)))
             ws = np.zeros(len(w))
             for i in range(len(w)):
                 # Look for the fequency association
