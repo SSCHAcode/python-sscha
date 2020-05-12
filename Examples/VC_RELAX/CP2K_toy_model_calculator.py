@@ -1,3 +1,4 @@
+from __future__ import print_function
 """
 Here we set up a calculator for the CP2K water Toy Model
 """
@@ -84,11 +85,11 @@ class CP2K_water_calculator(FileIOCalculator):
         FileIOCalculator.read(self, label)
 
         # We can read the output file from cp2k
-        outfile = file("%s.out" % label, "r")
+        outfile = open("%s.out" % label, "r")
         outlines = [line.strip() for line in  outfile.readlines() ]
         outfile.close()
 
-        print "READING!"
+
 
         unit_cell = np.zeros((3,3), dtype = np.float64)
         reading_atoms = False
@@ -129,10 +130,10 @@ class CP2K_water_calculator(FileIOCalculator):
         self.atoms = Atoms(atm_type, atm_coords, cell=unit_cell)
         self.read_results()
 
-        print "Test results:"
-        print "energy:", self.results["energy"]
-        print "forces:", self.results["forces"]
-        print "stress:", self.results["stress"]
+        print ("Test results:")
+        print ("energy:", self.results["energy"])
+        print ("forces:", self.results["forces"])
+        print ("stress:", self.results["stress"])
 
 
     def read_results(self):
@@ -140,14 +141,14 @@ class CP2K_water_calculator(FileIOCalculator):
         Read from the output forces and stress file the results
         """
 
-        outfile = file("%s.out" % self.label, "r")
+        outfile = open("%s.out" % self.label, "r")
         outlines = [line.strip().split()[-1] for line in  outfile.readlines() if "ENERGY|" in line]
         outfile.close()
 
         energy = float(outlines[-1]) * 2 * Rydberg
 
         # Now read the forces and the stress
-        fforc = file("TM-forces-1.xyz")
+        fforc = open("TM-forces-1.xyz")
         f_lines = [l.strip() for l in fforc.readlines()]
         fforc.close()
 
@@ -162,7 +163,7 @@ class CP2K_water_calculator(FileIOCalculator):
         forces = np.array(forces, dtype = np.float64)
 
         # Read the stress
-        fstress = file("TM-stress-1.stress_tensor")
+        fstress = open("TM-stress-1.stress_tensor")
         s_lines = [l.strip() for l in fstress.readlines()]
         fstress.close()
 

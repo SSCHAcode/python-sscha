@@ -2763,10 +2763,10 @@ DETAILS OF ERROR:
         # Only for the master
         
         # Prepare the energy, forces and stress array
-        energies = np.zeros( N_rand / size, dtype = np.float64)
-        forces = np.zeros( ( N_rand / size) * nat3 , dtype = np.float64)
+        energies = np.zeros( N_rand // size, dtype = np.float64)
+        forces = np.zeros( ( N_rand // size) * nat3 , dtype = np.float64)
         if compute_stress:
-            stress = np.zeros( (N_rand / size) * 9, dtype = np.float64)
+            stress = np.zeros( (N_rand // size) * 9, dtype = np.float64)
 
         if rank == 0:
             total_forces = np.zeros( N_rand * nat3, dtype = np.float64)
@@ -2777,7 +2777,7 @@ DETAILS OF ERROR:
             
 
         # If an MPI istance is running, split the calculation
-        for i0 in xrange(N_rand / size):
+        for i0 in xrange(N_rand // size):
             i = i0 + size * rank
             
             

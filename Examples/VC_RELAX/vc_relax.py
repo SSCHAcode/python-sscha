@@ -17,7 +17,7 @@ import os
 dynmat = CC.Phonons.Phonons("../ensemble_data_test/dyn")
 
 calc = CP2K_water_calculator()
-print calc.implemented_properties
+
 atms = dynmat.structure.get_ase_atoms()
 atms.set_calculator(calc)
 
