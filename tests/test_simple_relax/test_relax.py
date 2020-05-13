@@ -42,7 +42,7 @@ def test_update_weights(verbose = False):
             print("Python RHO:")
             print(ens.rho)
             
-    assert delta_rho > 1e-7
+    assert delta_rho < 2e-5
 
 def test_simple_relax(verbose = False):
     total_path = os.path.dirname(os.path.abspath(__file__))
@@ -51,7 +51,10 @@ def test_simple_relax(verbose = False):
     DATA_PATH = "../../Examples/ensemble_data_test/"
 
     dyn_start = CC.Phonons.Phonons(os.path.join(DATA_PATH, "dyn"))
-    dyn_target = CC.Phonons.Phonons(os.path.join(DATA_PATH, "dyn1_population2"), full_name = True)
+
+    # We do not use the dyn1_population2 matrix (the fortran one) because it seems it has problem with the wyckoff minimization.
+    # It is printing the structure slightly displaced
+    dyn_target = CC.Phonons.Phonons(os.path.join(DATA_PATH, "dyn_population2_"))
 
     
     
@@ -61,25 +64,27 @@ def test_simple_relax(verbose = False):
     ens.load(DATA_PATH, 2, 1000)
 
     minim = sscha.SchaMinimizer.SSCHA_Minimizer(ens)
-    minim.minim_struct = False
+    minim.minim_struct = True
     minim.min_step_dyn = 0.5
     minim.min_step_struc = 0.5
-    minim.meaningful_factor = 1e-8
+    minim.meaningful_factor = 1e-10
     minim.init()
     minim.run()
     minim.finalize()
 
     # Check the differences in the atomic positions
     delta_s = np.max(np.abs(dyn_target.structure.coords - minim.dyn.structure.coords))
-    starting_delta = np.max(np.abs(minim.dyn.structure.coords - dyn_start.structure.coords))
+    starting_delta_s = np.max(np.abs(minim.dyn.structure.coords - dyn_start.structure.coords))
+    starting_delta = np.max(np.abs(minim.dyn.dynmats[0] - dyn_start.dynmats[0]))
     
     
     # Compare the final dynamical matrices
     delta = np.max(np.abs(dyn_target.dynmats[0] - minim.dyn.dynmats[0]))
 
     if verbose:
-        print("The difference with the original struct is {}".format(starting_delta))
+        print("The difference with the original struct is {}".format(starting_delta_s))
         print("The difference on the structure is {}".format(delta_s))
+        print("The difference on the original FC is {}".format(starting_delta))
         print("The difference on FC is {}".format(delta))
         
     EPS = 1e-5
