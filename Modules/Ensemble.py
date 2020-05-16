@@ -622,7 +622,7 @@ class Ensemble:
         self.current_q = self.q_start.copy()
 
         
-    def generate(self, N, evenodd = True, project_on_modes = None):
+    def generate(self, N, evenodd = True, project_on_modes = None, compute_sscha_forces = True, get_q_vectors = False):
         """
         GENERATE THE ENSEMBLE
         =====================
@@ -666,22 +666,28 @@ class Ensemble:
 
             
         # Compute the sscha energy and forces
-        self.sscha_energies = np.zeros( ( self.N), dtype = np.float64)
-        self.sscha_forces = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "F")
+        if compute_sscha_forces or get_q_vectors:
+            super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
+
+        if compute_sscha_forces:
+            self.sscha_energies = np.zeros( ( self.N), dtype = np.float64)
+            self.sscha_forces = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "F")
+
         self.energies = np.zeros(self.N, dtype = np.float64)
         self.forces = np.zeros( (self.N, Nat_sc, 3), dtype = np.float64, order = "F")
         self.stresses = np.zeros( (self.N, 3, 3), dtype = np.float64, order = "F")
         self.u_disps = np.zeros( (self.N, Nat_sc * 3), dtype = np.float64, order = "F")
         self.xats = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "C")
         for i, s in enumerate(self.structures):
-            energy, force  = self.dyn_0.get_energy_forces(s, supercell = self.supercell, 
-                                                         real_space_fc=super_dyn.dynmats[0])
-            
-            self.sscha_energies[i] = energy
-            self.sscha_forces[i,:,:] = force
+            if compute_sscha_forces:
+                energy, force  = self.dyn_0.get_energy_forces(s, supercell = self.supercell, 
+                                                            real_space_fc=super_dyn.dynmats[0])
+                
+                self.sscha_energies[i] = energy
+                self.sscha_forces[i,:,:] = force
             
             # Get the displacements
-            self.u_disps[i, :] = s.get_displacement(super_dyn.structure).reshape((3* Nat_sc))
+            self.u_disps[i, :] = s.get_displacement(super_struct).reshape((3* Nat_sc))
             self.xats[i, :, :] = s.coords
         
         self.rho = np.ones(self.N, dtype = np.float64)
@@ -690,8 +696,9 @@ class Ensemble:
         
         
         # Generate the q_start
-        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, super_dyn)
-        self.current_q = self.q_start.copy()
+        if get_q_vectors:
+            self.q_start = CC.Manipulate.GetQ_vectors(self.structures, super_dyn)
+            self.current_q = self.q_start.copy()
         
         
     def unwrap_symmetries(self):
