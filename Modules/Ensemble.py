@@ -307,7 +307,7 @@ class Ensemble:
         
         # Check if the given data_dir is a real directory
         if not os.path.isdir(data_dir):
-            raise IOError("Error, the given data_dir %s is not a valid directory." % data_dir)
+            raise IOError("Error, the given data_dir '%s' is not a valid directory." % data_dir)
         
         # Remove the tailoring slash if any
         if data_dir[-1] == "/":
@@ -345,9 +345,9 @@ class Ensemble:
         for i in xrange(self.N):
             # Load the structure
             structure = CC.Structure.Structure()
-            if os.path.exists("%s/scf_population%d_%d.dat" % (data_dir, population, i+1)) and not load_displacements:
+            if os.path.exists(os.path.join(data_dir, "scf_population%d_%d.dat" % (population, i+1))) and not load_displacements:
                 t1 = time.time()
-                structure.read_scf("%s/scf_population%d_%d.dat" % (data_dir, population, i+1), alat = self.dyn_0.alat)
+                structure.read_scf(os.path.join(data_dir, "scf_population%d_%d.dat" % (population, i+1)), alat = self.dyn_0.alat)
                 t2 = time.time()
                 total_t_for_loading += t2 - t1
                 
@@ -360,7 +360,7 @@ class Ensemble:
             else:
                 structure = super_structure.copy()
                 t1 = time.time()
-                disp =np.loadtxt("%s/u_population%d_%d.dat" % (data_dir, population, i+1)) /__A_TO_BOHR__
+                disp =np.loadtxt(os.path.join(data_dir, "u_population%d_%d.dat" % (population, i+1))) /__A_TO_BOHR__
                 t2 = time.time()
                 total_t_for_loading += t2 - t1
                 
@@ -373,11 +373,11 @@ class Ensemble:
             
             # Load forces (Forces are in Ry/bohr, convert them in Ry /A)
             t1 = time.time()
-            self.forces[i,:,:] = np.loadtxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1)) * A_TO_BOHR
+            self.forces[i,:,:] = np.loadtxt(os.path.join(data_dir, "forces_population%d_%d.dat" % (population, i+1))) * A_TO_BOHR
             
             # Load stress
-            if os.path.exists("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)):
-                self.stresses[i,:,:] =  np.loadtxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1)) 
+            if os.path.exists(os.path.join(data_dir, "pressures_population%d_%d.dat" % (population, i+1))):
+                self.stresses[i,:,:] =  np.loadtxt(os.path.join(data_dir, "pressures_population%d_%d.dat" % (population, i+1)))
                 count_stress += 1
             t2 = time.time()
             total_t_for_loading += t2 - t1
@@ -410,7 +410,7 @@ class Ensemble:
         
         t1 = time.time()
         # Load the energy
-        total_energies = np.loadtxt("%s/energies_supercell_population%d.dat" % (data_dir, population))
+        total_energies = np.loadtxt(os.path.join(data_dir, "energies_supercell_population%d.dat" % (population))
         t2 = time.time()
         total_t_for_sscha_ef += t2 - t1
         self.energies = total_energies[:N]
@@ -485,7 +485,7 @@ class Ensemble:
             
         
         # Save the energies
-        np.savetxt("%s/energies_supercell_population%d.dat" % (data_dir, population), self.energies)
+        np.savetxt(os.path.join(data_dir, "energies_supercell_population%d.dat" % (population)), self.energies)
         
         self.dyn_0.save_qe("dyn_start_population%d_" % population)
         self.current_dyn.save_qe("dyn_end_population%d_" % population)
@@ -648,19 +648,21 @@ class Ensemble:
         self.N = N
         Nat_sc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms
         self.structures = []
-        super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
+        #super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
+        super_struct = self.dyn_0.structure.generate_supercell(self.dyn_0.GetSupercell())
+
         if evenodd:
-            structs = super_dyn.ExtractRandomStructures(N / 2, self.T0, project_on_vectors = project_on_modes)
+            structs = self.dyn_0.ExtractRandomStructures(N // 2, self.T0, project_on_vectors = project_on_modes)
 
 
             for i, s in enumerate(structs):
                 self.structures.append(s)
                 new_s = s.copy()
                 # Get the opposite displacement structure
-                new_s.coords = super_dyn.structure.coords - new_s.get_displacement(super_dyn.structure)
+                new_s.coords = super_struct.coords - new_s.get_displacement(super_struct.structure)
                 self.structures.append(new_s)
         else:
-            self.structures = super_dyn.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
+            self.structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
 
             
         # Compute the sscha energy and forces
