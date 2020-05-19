@@ -219,6 +219,10 @@ class Cluster(object):
         # Useful if the cluster has a limit for the maximum number of jobs allowed.
         self.batch_size = 1000
 
+
+        # Allow to setup additional custom extra parameters
+        self.custom_params = {}
+
         # Fix the attributes
 
         # Setup the attribute control
@@ -484,6 +488,10 @@ class Cluster(object):
             submission += "#%s %s%s\n" % (self.submit_name, self.v_memory, self.ram)
         if self.use_partition:
             submission += "#%s %s%s\n" % (self.submit_name, self.v_partition, self.partition_name)
+
+        # Append the additional parameters
+        for add_parameter in self.custom_params:
+            submission += "#{} --{}={}\n".format(self.submit_name, add_parameter, self.custom_params[add_parameter])
         
         # Add the set -x option
         submission += "set -x\n"
@@ -586,6 +594,11 @@ class Cluster(object):
             submission += "#%s %s%s\n" % (self.submit_name, self.v_memory, self.ram)
         if self.use_partition:
             submission += "#%s %s%s\n" % (self.submit_name, self.v_partition, self.partition_name)
+
+
+        # Append the additional parameters
+        for add_parameter in self.custom_params:
+            submission += "#{} --{}={}\n".format(self.submit_name, add_parameter, self.custom_params[add_parameter])
         
         # Add the loading of the modules
         submission += self.load_modules + "\n"

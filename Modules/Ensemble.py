@@ -410,7 +410,7 @@ class Ensemble:
         
         t1 = time.time()
         # Load the energy
-        total_energies = np.loadtxt(os.path.join(data_dir, "energies_supercell_population%d.dat" % (population))
+        total_energies = np.loadtxt(os.path.join(data_dir, "energies_supercell_population%d.dat" % (population)))
         t2 = time.time()
         total_t_for_sscha_ef += t2 - t1
         self.energies = total_energies[:N]
@@ -1552,7 +1552,6 @@ DETAILS OF ERROR:
                 # Refold the forces in the unit cell
                 super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
                 itau = super_structure.get_itau(self.current_dyn.structure) - 1 # Fort -> Py
-                
                 nat = self.dyn_0.structure.N_atoms
                 new_forces = np.zeros((self.N, nat, 3), dtype  =np.float64, order = "C")
                 
