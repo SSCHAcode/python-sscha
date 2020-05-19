@@ -11,7 +11,7 @@ mpi_link_args = []
 
 # Get the MPI from environmental variables
 parallel = False 
-if os.environ.has_key("MPICC"):
+if "MPICC" in  os.environ:
         mpicc = os.environ["MPICC"]
         parallel = True
         print ()
