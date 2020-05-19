@@ -659,7 +659,7 @@ class Ensemble:
                 self.structures.append(s)
                 new_s = s.copy()
                 # Get the opposite displacement structure
-                new_s.coords = super_struct.coords - new_s.get_displacement(super_struct.structure)
+                new_s.coords = super_struct.coords - new_s.get_displacement(super_struct)
                 self.structures.append(new_s)
         else:
             self.structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
