@@ -93,7 +93,6 @@ class SSCHA(object):
 
         # The variable cell attributes
         self.bulk_modulus = 15
-        self.cluster = None 
         self.target_pressure = 0
         self.fix_volume = False
 

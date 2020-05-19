@@ -2701,6 +2701,7 @@ DETAILS OF ERROR:
                 If None the calculation is performed on the same computer of
                 the sscha code.
         """
+
         
         # Check if the calculator is a cluster
         is_cluster = False
