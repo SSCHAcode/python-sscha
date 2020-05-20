@@ -823,7 +823,7 @@ class Ensemble:
         t1 = time.time()
         # Get the frequencies of the original dynamical matrix
         super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
-        w, pols = super_dyn.DyagDinQ(0)
+        w, pols = self.dyn_0.DiagonalizeSupercell()#super_dyn.DyagDinQ(0)
         
         # Exclude translations
         trans_original = CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array()) 
@@ -837,7 +837,7 @@ class Ensemble:
         
         # Now do the same for the new dynamical matrix
         new_super_dyn = new_dynamical_matrix.GenerateSupercellDyn(self.supercell)
-        w, pols = new_super_dyn.DyagDinQ(0)
+        w, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
 
         trans_mask = CC.Methods.get_translations(pols, new_super_dyn.structure.get_masses_array()) 
 
@@ -870,13 +870,17 @@ DETAILS OF ERROR:
         # Get the new displacements in the supercell
         t3 = time.time()
         old_disps = np.zeros(np.shape(self.u_disps), dtype = np.double)
-        for i in xrange(self.N):
-            self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
+
+        self.u_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_structure.coords.ravel(), (self.N,1))
+        old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_dyn.structure.coords.ravel(), (self.N,1))
+
+        # for i in xrange(self.N):
+        #     self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
             
-            old_disps[i,:] = (self.xats[i, :, :] - super_dyn.structure.coords).reshape( 3*Nat_sc )
+        #     old_disps[i,:] = (self.xats[i, :, :] - super_dyn.structure.coords).reshape( 3*Nat_sc )
             
-            # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
-            self.sscha_energies[i], self.sscha_forces[i, :,:] = new_super_dyn.get_energy_forces(self.structures[i], real_space_fc = new_super_dyn.dynmats[0], displacement = self.u_disps[i, :])
+        #     # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
+        self.sscha_energies[:], self.sscha_forces[:,:,:] = new_super_dyn.get_energy_forces(None, displacement = self.u_disps)
         t4 = time.time()
 
         if update_q:
