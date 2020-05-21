@@ -2511,7 +2511,7 @@ def FastD3_FT(X, Y, rho, w, T, input_psi, symmetries, n_degeneracies, degenerate
 
     # Get the start and end_A
     start_A = ((n_modes + 1) * n_modes) // 2 + n_modes 
-    end_A = n_modes + (n_modes + 1) * n_modes)
+    end_A = n_modes + (n_modes + 1) * n_modes
 
 
     deg_space_new = np.zeros(np.sum(n_degeneracies), dtype = np.intc)
