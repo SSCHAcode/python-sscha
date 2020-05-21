@@ -618,7 +618,12 @@ class Lanczos:
 
         print("start_Y: {} | start_A: {} | end_A: {} | len_psi: {}".format(start_Y, start_A, start_A + N_w2, len(self.psi)))
 
-        assert len(self.psi) == start_A + N_w2, "Error, the psi vector must be initialized at finite temperature"
+        ERR_MSG ="""
+ERROR,
+The initial vector for the Lanczos algorithm has a wrong dimension. 
+This may be caused by the Lanczos initialized at the wrong temperature.
+"""
+        assert len(self.psi) == start_A + N_w2, ERR_MSG
 
         # Apply the free propagation
         X_ab_NI = -w_a**2 - w_b**2 - (2*w_a *w_b) /( (2*n_a + 1) * (2*n_b + 1))
@@ -693,7 +698,7 @@ class Lanczos:
         Apply the full matrix at finite temperature.
         """ 
 
-        return FastApplyV3_FT(self.X, self.Y, self.rho, self.w, self.T, self.psi, self.symmetries, self.N_degeneracy, self.degenerate_space, self.mode)
+        return FastD3_FT(self.X, self.Y, self.rho, self.w, self.T, self.psi, self.symmetries, self.N_degeneracy, self.degenerate_space, self.mode)
 
     def apply_L3(self):
         """
