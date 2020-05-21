@@ -512,6 +512,9 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
     #endif
 
 
+	printf("Rank %d inside MPI D3 finite temperature.\n", rank);
+	fflush(stdout);
+
 
 
 	// The workload for each MPI process
