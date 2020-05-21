@@ -823,6 +823,7 @@ class Ensemble:
         t1 = time.time()
         # Get the frequencies of the original dynamical matrix
         super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
+
         w, pols = self.dyn_0.DiagonalizeSupercell()#super_dyn.DyagDinQ(0)
         
         # Exclude translations
@@ -837,6 +838,7 @@ class Ensemble:
         
         # Now do the same for the new dynamical matrix
         new_super_dyn = new_dynamical_matrix.GenerateSupercellDyn(self.supercell)
+        
         w, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
 
         trans_mask = CC.Methods.get_translations(pols, new_super_dyn.structure.get_masses_array()) 
