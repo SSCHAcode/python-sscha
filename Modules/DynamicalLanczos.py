@@ -681,6 +681,13 @@ class Lanczos:
         out_vect[self.n_modes:] = out_d
         return out_vect
 
+    def apply_L2_FT(self):
+        """
+        Apply the full matrix at finite temperature.
+        """ 
+
+        return FastApplyV3_FT(self.X, self.Y, self.rho, self.w, self.T, self.psi, self.symmetries, self.N_degeneracy, self.degenerate_space, self.mode)
+
     def apply_L3(self):
         """
         APPLY THE L3
@@ -727,7 +734,7 @@ class Lanczos:
         return output
 
 
-    def apply_full_L(self, target=None):
+    def apply_full_L(self, target=None, force_t_0 = False, force_FT = False):
         """
         APPLY THE L 
         ===========
@@ -742,16 +749,25 @@ class Lanczos:
             target : ndarray ( size = shape(self.psi)), optional
                 The garget vector to which you want to apply the
                 full L matrix
-            symmetrize : bool
-                If true before and after the application the vector will be symmetrized.
+            force_t_0 : bool
+                If False (default) the temperature is looked to chose if use the T = 0 or the finite temperature.
+                If True it is forced the T=0 method (This will lead to wrong results at finite temperature).
+            force_FT : bool
+                If True the finite temperature method is forced even if T = 0.
+                The results should be good, use it for testing.
+                NOTE: only one between force_t_0 and force_FT should be true
+
         """
+
+        if force_t_0 and force_FT:
+            raise ValueError("Error, only one between force_t_0 and force_FT can be True")
 
         # Setup the target vector to the self.psi
         if not target is None:
             self.psi = target 
 
-        if self.symmetrize:
-            self.symmetrize_psi()
+        #if self.symmetrize:
+        #    self.symmetrize_psi()
 
         #print("Psi before:")
         #print(self.psi[:self.n_modes])
@@ -759,11 +775,20 @@ class Lanczos:
             
         # Apply the whole L step by step to self.psi
         t1 = timer()
-        output = self.apply_L1()
+        if (force_t_0 or self.T < __EPSILON__) and not force_FT:
+            output = self.apply_L1()
+        else:
+            output = self.apply_L1_FT()
         t2 = timer()
-        output += self.apply_L2()
+        if (force_t_0 or self.T < __EPSILON__) and not force_FT:
+            output += self.apply_L2()
+        else:
+            output += self.apply_L2_FT()
         t3 = timer()
-        output += self.apply_L3()
+        if (force_t_0 or self.T < __EPSILON__) and not force_FT:
+            output += self.apply_L3()
+        else:
+            raise NotImplementedError("Error, d4 at finite temperature not yet implemented")
         t4 = timer()
 
         print("Time to apply L1: {}".format(t2 - t1))
@@ -782,8 +807,8 @@ class Lanczos:
         # Now return the output
         #print ("out just before return:", output[0])
         self.psi = output
-        if self.symmetrize:
-            self.symmetrize_psi()
+        #if self.symmetrize:
+        #    self.symmetrize_psi()
         
         return self.psi
 
@@ -2376,6 +2401,7 @@ def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn,  symmetries, n_degeneracies, de
     sscha_HP_odd.ApplyV3ToDyn(X, Y, rho, w, T, input_dyn, output_vector, mode, symmetries, n_degeneracies, deg_space_new)
     return output_vector
 
+
 def FastApplyD3ToVector(X, Y, rho, w, T, input_vector, symmetries, n_degeneracies, degenerate_space, mode = 1):
     """
     Apply the D3 to vector
@@ -2435,6 +2461,76 @@ def FastApplyD3ToVector(X, Y, rho, w, T, input_vector, symmetries, n_degeneracie
     
     sscha_HP_odd.ApplyV3ToVector(X, Y, rho, w, T, input_vector, output_dyn, mode, symmetries, n_degeneracies, deg_space_new)
     return output_dyn
+
+
+def FastD3_FT(X, Y, rho, w, T, input_psi, symmetries, n_degeneracies, degenerate_space, mode = 1):
+    """
+    Apply the D3 to vector
+    ======================
+
+    This is a wrapper to the fast C function.
+
+
+    For details on the mode, look at the parameters list
+
+    Parameters
+    ----------
+       X : ndarray(size = (n_modes, n_configs), dtype = np.double / np.float32)
+           The X array (displacement in mode basis). Note that the dtype should match the mode
+       Y : ndarray(size = (n_modes, n_configs))
+           The Y array (forces in mode basis).
+       rho : ndarray(size = n_configs)
+           The weights of the configurations
+       w : ndarray(size = n_modes)
+           The list of frequencies
+       T : float
+           The temperature
+       input_psi : ndarray
+           The input density matrix
+       mode : int
+           The mode for the execution:
+              1) CPU : OpenMP parallelization
+       symmetries : ndarray( size =(n_sym, n_modes, n_modes), dtype = np.double)
+           The symmetries in the polarization basis.
+       n_degeneracies : ndarray( size = n_modes, dtype = np.intc)
+           The number of degenerate eigenvalues for each mode
+       degenerate_space : list of lists
+           The list of modes in the eigen subspace in which that mode belongs to.
+
+    Results
+    -------
+       output_psi : ndarray 
+           The output density matrix
+    """
+    n_modes = len(w)
+
+    total_length = len(input_psi)
+
+    output_psi = np.zeros(total_length, dtype = TYPE_DP)
+    #print( "Apply to vector, nmodes:", n_modes, "shape:", np.shape(output_dyn))
+
+    # Get the start and end_A
+    start_A = ((n_modes + 1) * n_modes) // 2 + n_modes 
+    end_A = n_modes + (n_modes + 1) * n_modes)
+
+
+    deg_space_new = np.zeros(np.sum(n_degeneracies), dtype = np.intc)
+    i = 0
+    i_mode = 0
+    j_mode = 0
+    #print("Mapping degeneracies:", np.sum(n_degeneracies))
+    while i_mode < n_modes:
+        #print("cross_modes: ({}, {}) | deg_i = {}".format(i_mode, j_mode, n_degeneracies[i_mode]))
+        deg_space_new[i] = degenerate_space[i_mode][j_mode]
+        j_mode += 1
+        i += 1
+        if j_mode == n_degeneracies[i_mode]:
+            i_mode += 1
+            j_mode = 0
+    
+    sscha_HP_odd.ApplyV3_FT(X, Y, rho, w, T, input_psi, output_psi, mode, symmetries, n_degeneracies, deg_space_new, start_A, end_A)
+    return output_dyn
+
 
     
 
