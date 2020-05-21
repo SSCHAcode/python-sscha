@@ -213,6 +213,8 @@ class Lanczos:
             len_psi += self.n_modes**2
         else:
             len_psi += self.n_modes * (self.n_modes + 1)
+            print("N MODES:", self.n_modes)
+            print("LEN PSI:", len_psi)
 
         self.psi = np.zeros(len_psi, dtype = TYPE_DP)
 
