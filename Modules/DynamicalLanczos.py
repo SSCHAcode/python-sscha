@@ -737,6 +737,26 @@ class Lanczos:
         return output
 
 
+    def apply_L3_FT(self):
+        """
+        APPLY THE L3
+        ============
+
+        This is the last part of the L matrix, it puts in communication 
+        the dyn part of psi with herselfs.
+        """
+
+        simple_output = np.zeros(np.shape(self.psi), dtype = TYPE_DP)
+
+        #simple_output[self.n_modes:] = self.psi[self.n_modes:] * (w_a + w_b)**2
+
+        if self.ignore_v4:
+            return simple_output
+        else:
+            raise NotImplementedError("Error v4 with finite temperature not yet implemented")
+
+
+
     def apply_full_L(self, target=None, force_t_0 = False, force_FT = False):
         """
         APPLY THE L 
@@ -791,7 +811,7 @@ class Lanczos:
         if (force_t_0 or self.T < __EPSILON__) and not force_FT:
             output += self.apply_L3()
         else:
-            raise NotImplementedError("Error, d4 at finite temperature not yet implemented")
+            output += self.apply_L3_FT()
         t4 = timer()
 
         print("Time to apply L1: {}".format(t2 - t1))
