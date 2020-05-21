@@ -208,10 +208,13 @@ class Lanczos:
         self.Y[:,:] = f.dot(pol_mat)
 
         # Prepare the variable used for the working
-        finite_temperature_factor = 1
-        if self.T > 0:
-            finite_temperature_factor = 2
-        self.psi = np.zeros(self.n_modes + finite_temperature_factor*self.n_modes*self.n_modes, dtype = TYPE_DP)
+        len_psi = self.n_modes
+        if self.T < __EPSILON__:
+            len_psi += self.n_modes**2
+        else:
+            len_psi += self.n_modes * (self.n_modes + 1)
+
+        self.psi = np.zeros(len_psi, dtype = TYPE_DP)
 
         # Prepare the L as a linear operator
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
