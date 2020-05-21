@@ -614,6 +614,8 @@ class Lanczos:
         start_Y = self.n_modes
         start_A = self.n_modes + N_w2
 
+        print("start_Y: {} | start_A: {} | end_A: {} | len_psi: {}".format(start_Y, start_A, start_A + N_w2, len(self.psi)))
+
         assert len(self.psi) == start_A + N_w2, "Error, the psi vector must be initialized at finite temperature"
 
         # Apply the free propagation
