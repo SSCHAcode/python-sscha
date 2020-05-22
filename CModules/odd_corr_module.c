@@ -181,7 +181,7 @@ static PyObject *ApplyV3_FT(PyObject * self, PyObject * args) {
   int index_mode = 0, index_config = 1;
 
   // Parse the python arguments
-  if (!PyArg_ParseTuple(args, "OOOOdOOiOOOii", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode,
+  if (!PyArg_ParseTuple(args, "OOOOdOOiOOOiiii", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode,
 			&npy_symmetries, &npy_n_deg, &npy_deg_space, &start_A, &end_A))
     return NULL;
   
