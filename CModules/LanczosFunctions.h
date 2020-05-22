@@ -107,10 +107,10 @@ void MPI_ApplyD3ToDyn(const double * X, const double * Y, const double * rho, co
 
 
 /*
- * Apply the D3 in the Finite Temperature Lanczos
+ * Apply the D3 and D4 in the Finite Temperature Lanczos
  * ==============================================
  * 
- * Apply the d3 to the full response
+ * Apply the d3 to the full response (the d4 follows)
  * 
  * Parameters
  * ----------
@@ -148,6 +148,10 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 			 int N_configs, double * input_psi, double * output_psi,
 			 double * symmetries, int N_sym, int * N_degeneracy, int ** degenerate_space ) ;
 
+void MPI_D4_FT(const double * X, const double * Y, const double * rho, const double * w, double T, int N_modes, int start_A, int end_A,
+			 int N_configs, double * input_psi, double * output_psi,
+			 double * symmetries, int N_sym, int * N_degeneracy, int ** degenerate_space ) ;
+
 
 
 // Here the method to apply the d4 matrix (dyn to dyn)
@@ -181,6 +185,12 @@ double Z1_coeff(double w_a, double n_a, double w_b, double n_b);
 
 // The coefficient between on Y to R
 double X2_coeff(double w_a, double n_a, double w_b, double n_b);
+
+// The coefficient between on Y and Y
+double X_coeff(double w_a, double n_a, double w_b, double n_b, double w_c, double n_c, double w_d, double n_d);
+
+// The coefficient between on Y and RA
+double X1_coeff(double w_a, double n_a, double w_b, double n_b, double w_c, double n_c, double w_d, double n_d);
 
 
 /* 

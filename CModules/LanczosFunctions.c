@@ -634,7 +634,239 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 	// Reduce the output dyn
 	#ifdef _MPI
-	MPI_Allreduce(new_output, output_psi, N_modes*N_modes, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	MPI_Allreduce(new_output, output_psi, end_A, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	#endif
+	#ifndef _MPI
+	// Copy the new output inside the output file.
+	for (i = 0; i < end_A; ++i)
+		output_psi[i] = new_output[i];
+	#endif
+	   
+    // Free memory
+    free(new_output);
+}
+
+
+
+// Apply the full D3 at finite temperature
+void MPI_D4_FT(const double * X, const double * Y, const double * rho, const double * w, double T, int N_modes, int start_A, int end_A,
+			 int N_configs, double * input_psi, double * output_psi,
+			 double * symmetries, int N_sym, int * N_degeneracy, int ** degenerate_space ) {
+
+    // Compute the N_eff
+    double N_eff = 0;
+    int i;
+
+    //#pragma omp parallel for private(i) reduction(+:N_eff)
+    for (i = 0; i < N_configs; ++i)
+        N_eff += rho[i];
+
+    if (DEB) {
+      printf("File %s, Line %d: N_eff = %.4f\n", __FILE__, __LINE__, N_eff);
+      fflush(stdout);
+    }
+    
+    // Prepare the new modified X
+    //double * new_X = malloc(sizeof(double) * N_configs* N_modes);
+
+    //#pragma omp parallel for private(i)
+    //for (i = 0; i < N_configs*N_modes; ++i) {
+    //    new_X[i] = X[i] * f_ups(w[i / N_configs], T);
+    //}
+
+    if (DEB) {
+      printf("File %s, Line %d: Got the new X\n", __FILE__, __LINE__);
+      fflush(stdout);
+    }
+
+	// Allocate a new output (This is used to perform a reduction of the MPI processors)
+	double * new_output = (double*) calloc(sizeof(double),  end_A);
+    
+
+    // Initialize the output
+    for (i = 0; i < end_A; ++i)
+        output_psi[i] = 0;
+
+    if (DEB) printf("Applying the d3 to vector!\n");
+
+    // Perform the application
+    int a, b, c, d, new_a, new_b, new_c, new_d;
+    int j, k, h, i_sym, N_sym_tmp;
+    double sym_coeff = 0;
+	double * n_w = (double*) calloc(sizeof(double), N_modes);
+
+	// Fill the boson occupation numbers
+	if (T > 0) 
+		for (i = 0; i < N_modes; ++i) 
+			n_w[i] = 1.0 / (exp(w[i] / (K_B * T)) - 1);
+
+	// MPI parallelization
+	// NOTE MPI must be initialized
+	int size=1, rank=0;
+	unsigned long long int count, remainer, start, stop;
+	#ifdef _MPI
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	// Send the data to everyone
+	MPI_Bcast(input_psi, end_A, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    #endif
+
+
+	printf("Rank %d inside MPI D3 finite temperature.\n", rank);
+	fflush(stdout);
+
+
+
+	// The workload for each MPI process
+	count = (N_modes*N_modes* (unsigned long long int) N_modes * N_modes) / size;
+	// If the number of MPI process does not match, distribute them correctly
+	remainer = (N_modes*N_modes* (unsigned long long int) N_modes * N_modes) % size;
+
+	// Distribute the work in a clever way 
+	if (rank < remainer) {
+		start = rank * (count + 1);
+		stop = start + count + 1;
+	} else {
+		start = rank * count + remainer;
+		stop = start + count;
+	}
+
+	unsigned long long int mpi_index;
+	for (mpi_index = start; mpi_index < stop; ++mpi_index) {
+		
+		d = mpi_index % N_modes;
+		c = (mpi_index/N_modes) % N_modes;
+		b = (mpi_index/(N_modes * N_modes)) % N_modes;
+		a = (mpi_index/(N_modes*N_modes)) / N_modes;
+
+
+		// Check if this element is zero by symmetry
+		int stop= 0;
+
+		for (i = 0; i < N_sym; ++i) {
+		  if (fabs(symmetries[i * N_modes*N_modes + a*N_modes + a] *
+			   symmetries[i * N_modes*N_modes + b*N_modes + b] *
+			   symmetries[i * N_modes*N_modes + c*N_modes + c] *
+			   symmetries[i * N_modes*N_modes + d*N_modes + d] + 1) < __EPSILON__) {
+		    stop = 1;
+		    break;
+		  }
+		}
+
+		if (stop == 1) continue;
+		if (DEB)printf("I'm computing this element.\n");
+	
+
+		// This is the time consuming part!!!
+		// N_degeneracy is usually below 10, while N_configs can be hundreds of thounsands
+		double tmp = 0;
+		
+		for (i = 0; i < N_configs; ++i) {
+			tmp += X[N_configs*a + i] * X[N_configs*b + i] * X[N_configs*c +i] * Y[N_configs*d +i] * rho[i];
+		}
+
+
+		// Apply all the symmetries in the degenerate subspace
+		for (i = 0; i < N_degeneracy[a]; ++i) {
+		  new_a = degenerate_space[a][i];
+		  for (j = 0; j < N_degeneracy[b]; ++j) {
+		    new_b = degenerate_space[b][j];
+		    for (k = 0; k < N_degeneracy[c]; ++k) {
+		      new_c = degenerate_space[c][k];
+			  for (h = 0; h < N_degeneracy[d]; ++h) {
+				new_d = degenerate_space[d][h];
+
+				// Check if there are degeneracies
+				// If not, symmetries are useless, apply only the identity
+				N_sym_tmp = N_sym;
+				if (N_degeneracy[a] * N_degeneracy[b] * N_degeneracy[c] * N_degeneracy[d] == 1)
+					N_sym_tmp = 1;
+
+				
+				for (i_sym = 0; i_sym < N_sym_tmp; ++i_sym) {
+					sym_coeff = symmetries[i_sym * N_modes * N_modes + a * N_modes + new_a] *
+						symmetries[i_sym * N_modes * N_modes + b * N_modes + new_b] *
+						symmetries[i_sym * N_modes * N_modes + c * N_modes + new_c] *
+						symmetries[i_sym * N_modes * N_modes + d * N_modes + new_d];
+
+					// Here we must apply all the terms that contain d3
+					// Get the final d3 with the correct symmetry coefficient
+					tmp = -tmp * sym_coeff /  (24 * N_eff * N_sym_tmp);
+
+					int extra_count = 1; // (ab) (cd)
+					if (new_c != new_d) extra_count = 2;
+					new_output[index_Y(new_a, new_b, N_modes)] += tmp * input_psi[index_Y(new_c, new_d, N_modes)] * X_coeff(w[new_a], n_w[new_a],
+						w[new_b], n_w[new_b], w[new_c], n_w[new_c], w[new_d], n_w[new_d]) * extra_count;
+					
+					extra_count = 1; // (ac) (bd)
+					if (new_b != new_d) extra_count = 2;
+					new_output[index_Y(new_a, new_c, N_modes)] += tmp * input_psi[index_Y(new_b, new_d, N_modes)] * X_coeff(w[new_a], n_w[new_a],
+						w[new_c], n_w[new_c], w[new_b], n_w[new_b], w[new_d], n_w[new_d]) * extra_count;
+					
+					extra_count = 1; // (ad) (bc)
+					if (new_b != new_c) extra_count = 2;
+					new_output[index_Y(new_a, new_d, N_modes)] += tmp * input_psi[index_Y(new_b, new_c, N_modes)] * 
+						X_coeff(w[new_a], n_w[new_a], w[new_d], n_w[new_d], w[new_b], n_w[new_b], w[new_c], n_w[new_c]) * extra_count;
+					
+					extra_count = 1; // (bc) (ad)
+					if (new_a != new_d) extra_count = 2;
+					new_output[index_Y(new_b, new_c, N_modes)] += tmp * input_psi[index_Y(new_a, new_d, N_modes)] * X_coeff(w[new_b], n_w[new_b],
+						w[new_c], n_w[new_c], w[new_a], n_w[new_a], w[new_d], n_w[new_d]) * extra_count;
+
+					extra_count = 1; // (bd) (ac)
+					if (new_a != new_c) extra_count = 2;
+					new_output[index_Y(new_b, new_d, N_modes)] += tmp * input_psi[index_Y(new_a, new_c, N_modes)] * X_coeff(w[new_b], n_w[new_b],
+						w[new_d], n_w[new_d], w[new_a], n_w[new_a], w[new_c], n_w[new_c]) * extra_count;
+
+					extra_count = 1; // (cd) (ab)
+					if (new_a != new_b) extra_count = 2;
+					new_output[index_Y(new_c, new_d, N_modes)] += tmp * input_psi[index_Y(new_a, new_b, N_modes)] * X_coeff(w[new_c], n_w[new_c],
+						w[new_d], n_w[new_d], w[new_a], n_w[new_a], w[new_b], n_w[new_b]) * extra_count;
+
+
+
+					// Now apply the X1
+					extra_count = 1; // (ab) (cd)
+					if (new_c != new_d) extra_count = 2;
+					new_output[index_A(new_a, new_b, N_modes)] += tmp * input_psi[index_Y(new_c, new_d, N_modes)] * X1_coeff(w[new_a], n_w[new_a],
+						w[new_b], n_w[new_b], w[new_c], n_w[new_c], w[new_d], n_w[new_d]) * extra_count;
+					
+					extra_count = 1; // (ac) (bd)
+					if (new_b != new_d) extra_count = 2;
+					new_output[index_A(new_a, new_c, N_modes)] += tmp * input_psi[index_Y(new_b, new_d, N_modes)] * X1_coeff(w[new_a], n_w[new_a],
+						w[new_c], n_w[new_c], w[new_b], n_w[new_b], w[new_d], n_w[new_d]) * extra_count;
+					
+					extra_count = 1; // (ad) (bc)
+					if (new_b != new_c) extra_count = 2;
+					new_output[index_A(new_a, new_d, N_modes)] += tmp * input_psi[index_Y(new_b, new_c, N_modes)] * 
+						X_coeff(w[new_a], n_w[new_a], w[new_d], n_w[new_d], w[new_b], n_w[new_b], w[new_c], n_w[new_c]) * extra_count;
+					
+					extra_count = 1; // (bc) (ad)
+					if (new_a != new_d) extra_count = 2;
+					new_output[index_A(new_b, new_c, N_modes)] += tmp * input_psi[index_Y(new_a, new_d, N_modes)] * X1_coeff(w[new_b], n_w[new_b],
+						w[new_c], n_w[new_c], w[new_a], n_w[new_a], w[new_d], n_w[new_d]) * extra_count;
+
+					extra_count = 1; // (bd) (ac)
+					if (new_a != new_c) extra_count = 2;
+					new_output[index_A(new_b, new_d, N_modes)] += tmp * input_psi[index_Y(new_a, new_c, N_modes)] * X1_coeff(w[new_b], n_w[new_b],
+						w[new_d], n_w[new_d], w[new_a], n_w[new_a], w[new_c], n_w[new_c]) * extra_count;
+
+					extra_count = 1; // (cd) (ab)
+					if (new_a != new_b) extra_count = 2;
+					new_output[index_A(new_c, new_d, N_modes)] += tmp * input_psi[index_Y(new_a, new_b, N_modes)] * X1_coeff(w[new_c], n_w[new_c],
+						w[new_d], n_w[new_d], w[new_a], n_w[new_a], w[new_b], n_w[new_b]) * extra_count;
+
+				}
+		      }
+		    }
+		  }
+		}
+	}
+
+	// Reduce the output dyn
+	#ifdef _MPI
+	MPI_Allreduce(new_output, output_psi, end_A, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	#endif
 	#ifndef _MPI
 	// Copy the new output inside the output file.
@@ -1342,6 +1574,15 @@ double Z1_coeff(double w_a, double n_a, double w_b, double n_b) {
 
 double X2_coeff(double w_a, double n_a, double w_b, double n_b) {
 	return -(2*n_b + 1) * (2*n_a +1) / (8*w_a *w_b);
+}
+
+
+double X_coeff(double w_a, double n_a, double w_b, double n_b, double w_c, double n_c, double w_d, double n_d) {
+	return (2*n_c +1) * (2*n_d + 1)* (2*w_a * n_b + w_a + 2*w_b * n_a + w_b) / (4 * w_c * w_d * (2*n_a + 1)* (2*n_b + 1)); 
+}
+
+double X1_coeff(double w_a, double n_a, double w_b, double n_b, double w_c, double n_c, double w_d, double n_d) {
+	return (2*n_c +1) * (2*n_d + 1)* (w_a*n_a*(n_a+1)*(2*n_b+1) + w_b*n_b*(n_b+1)*(2*n_a+1)) / (4 * w_c * w_d * (2*n_a + 1)* (2*n_b + 1)); 
 }
 
 int index_Y(int a, int b, int N) {
