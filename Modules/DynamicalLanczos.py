@@ -2561,7 +2561,7 @@ def FastD3_FT(X, Y, rho, w, T, input_psi, symmetries, n_degeneracies, degenerate
             j_mode = 0
     
     sscha_HP_odd.ApplyV3_FT(X, Y, rho, w, T, input_psi, output_psi, mode, symmetries, n_degeneracies, deg_space_new, start_A, end_A)
-    return output_dyn
+    return output_psi
 
 
     
