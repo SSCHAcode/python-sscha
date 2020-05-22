@@ -24,7 +24,7 @@ static PyMethodDef odd_engine[] = {
     {"ApplyV3ToDyn", ApplyV3ToDyn, METH_VARARGS, "Apply the v3 to a given dynamical matrix"},
     {"ApplyV3ToVector", ApplyV3ToVector, METH_VARARGS, "Apply the v3 to a given vector"},
     {"ApplyV4ToDyn", ApplyV4ToDyn, METH_VARARGS, "Apply the v3 to a given dynamical matrix"},
-    {"ApplyV3_FT", ApplyV4ToDyn, METH_VARARGS, "Apply the full v3 at finite temperature"},
+    {"ApplyV3_FT", ApplyV3_FT, METH_VARARGS, "Apply the full v3 at finite temperature"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -181,7 +181,7 @@ static PyObject *ApplyV3_FT(PyObject * self, PyObject * args) {
   int index_mode = 0, index_config = 1;
 
   // Parse the python arguments
-  if (!PyArg_ParseTuple(args, "OOOOdOOiOOOiiii", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode,
+  if (!PyArg_ParseTuple(args, "OOOOdOOiOOOii", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode,
 			&npy_symmetries, &npy_n_deg, &npy_deg_space, &start_A, &end_A))
     return NULL;
   
