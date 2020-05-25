@@ -1433,7 +1433,7 @@ Max number of iterations: {}
         #     #w_kb = matrix.dot(v_kb)
         #     # Convert back in the polarization space
         #     #new_w = np.einsum("ab, a", kb[:, :self.n_modes], w_kb)
-        #     # Convert back in real space
+        #     # Convert back in real spaceDoes anyone know if there is a windows binary or a source code to run QE with GPU enhancement on windows. 
         #     w = np.einsum("a, b, ab ->a", 1/np.sqrt(self.m), new_w, self.pols)
 
         #     fc_matrix[i, :] = w
