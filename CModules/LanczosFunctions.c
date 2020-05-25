@@ -727,10 +727,8 @@ void MPI_D4_FT(const double * X, const double * Y, const double * rho, const dou
     #endif
 
 
-	printf("Rank %d inside MPI D4 finite temperature.\n", rank);
-	fflush(stdout);
-
-
+	clock_t d4_timing = 0, sym_timing = 0;
+	clock_t tmp_timing;
 
 	// The workload for each MPI process
 	count = (N_modes*N_modes* (unsigned long long int) N_modes * N_modes) / size;
@@ -745,6 +743,10 @@ void MPI_D4_FT(const double * X, const double * Y, const double * rho, const dou
 		start = rank * count + remainer;
 		stop = start + count;
 	}
+
+
+	printf("Fast D4 FT Computation | rank %d computes from %u to %u\n", rank, start, stop);
+	fflush(stdout);
 
 	unsigned long long int mpi_index;
 	for (mpi_index = start; mpi_index < stop; ++mpi_index) {
@@ -775,11 +777,12 @@ void MPI_D4_FT(const double * X, const double * Y, const double * rho, const dou
 		// This is the time consuming part!!!
 		// N_degeneracy is usually below 10, while N_configs can be hundreds of thounsands
 		double tmp = 0;
-		
+		tmp_timing = clock();
 		for (i = 0; i < N_configs; ++i) {
 			tmp += X[N_configs*a + i] * X[N_configs*b + i] * X[N_configs*c +i] * Y[N_configs*d +i] * rho[i];
 		}
-
+		d4_timing += clock() - tmp_timing;
+		tmp_timing = clock();
 
 		// Apply all the symmetries in the degenerate subspace
 		for (i = 0; i < N_degeneracy[a]; ++i) {
@@ -876,7 +879,13 @@ void MPI_D4_FT(const double * X, const double * Y, const double * rho, const dou
 		    }
 		  }
 		}
+		sym_timing += clock() - tmp_timing;
 	}
+
+
+
+	printf("Fast D4 FT | rank %d | D3 timing: %.4lf sec | Sym timing: %.4lf sec\n", rank, d4_timing * 1.0 / CLOCKS_PER_SEC, sym_timing * 1.0 / CLOCKS_PER_SEC);
+	fflush(stdout);
 
 	// Reduce the output dyn
 	#ifdef _MPI
