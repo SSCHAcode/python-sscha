@@ -536,6 +536,10 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 	printf("Fast D3 FT Computation | rank %d computes from %u to %u\n", rank, start, stop);
 	fflush(stdout);
 
+	clock_t d3_timing, sym_timing;
+	clock_t tmp_timing;
+
+
 	unsigned long long int mpi_index;
 	for (mpi_index = start; mpi_index < stop; ++mpi_index) {
 		c = mpi_index % N_modes;
@@ -549,6 +553,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 		// Check if this element is zero by symmetry
 		int stop= 0;
+
 
 		if (DEB) printf("Element a=%d, b=%d, c=%d ... \n", a, b, c);
 	        for (i = 0; i < N_sym; ++i) {
@@ -571,12 +576,15 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 		// N_degeneracy is usually below 10, while N_configs can be hundreds of thounsands
 		double tmp = 0;
 		
+		tmp_timing = clock();
 		for (i = 0; i < N_configs; ++i) {
 			tmp += X[N_configs*a + i] * X[N_configs*b + i] * Y[N_configs*c +i] * rho[i];
 		}
+		d3_timing += clock() - tmp_timing;
 
 
 		// Apply all the symmetries in the degenerate subspace
+		tmp_timing = clock();
 		for (i = 0; i < N_degeneracy[a]; ++i) {
 		  new_a = degenerate_space[a][i];
 		  for (j = 0; j < N_degeneracy[b]; ++j) {
@@ -632,7 +640,11 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 		    }
 		  }
 		}
+		sym_timing += clock() -tmp_timing;
 	}
+
+	printf("Fast D3 FT | rank %d | D3 timing: %.4lf sec | Sym timing: %.4lf sec\n", rank, d3_timing * 1.0 / CLOCKS_PER_SEC, sym_timing * 1.0 / CLOCKS_PER_SEC);
+	fflush(stdout);
 
 	// Reduce the output dyn
 	#ifdef _MPI

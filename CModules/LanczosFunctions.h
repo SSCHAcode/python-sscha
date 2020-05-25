@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define RY_TO_K 157887.32400374097
 #define K_B 8.617330337217213e-05
