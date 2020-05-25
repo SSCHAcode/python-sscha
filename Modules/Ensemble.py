@@ -2174,7 +2174,13 @@ DETAILS OF ERROR:
 
         # Get the atomic types
         ityp = dyn_supercell.structure.get_ityp() + 1 #Py to Fortran indexing
-        amass = np.array(self.current_dyn.structure.masses.values(), dtype = np.double)
+        n_typ = len(self.current_dyn.structure.masses)
+
+        amass = np.array(n_typ, dtype = np.double)
+
+        for at_type in self.current_dyn.structure.masses:
+            index = self.current_dyn.structure.atoms.index(at_type)
+            amass[index] = self.current_dyn.structure.masses[at_type]
 
         # Get the forces and conver in the correct units
         f = (self.forces - self.sscha_forces)# * Bohr 
