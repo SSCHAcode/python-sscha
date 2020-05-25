@@ -502,7 +502,8 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 	// MPI parallelization
 	// NOTE MPI must be initialized
 	int size=1, rank=0;
-	int count, remainer, start, stop;
+	int count, remainer;
+	unsigned long long int start, stop;
 	#ifdef _MPI
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -512,8 +513,6 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
     #endif
 
 
-	printf("Rank %d inside MPI D3 finite temperature.\n", rank);
-	fflush(stdout);
 
 
 
@@ -533,6 +532,9 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 	if (DEB) printf("Division: %d in %d ranks, with %d remainer\n",
 		count*size, size, remainer);
+
+	printf("Fast D3 FT Computation | rank %d computes from %u to %u\n", rank, start, stop);
+	fflush(stdout);
 
 	unsigned long long int mpi_index;
 	for (mpi_index = start; mpi_index < stop; ++mpi_index) {
@@ -713,7 +715,7 @@ void MPI_D4_FT(const double * X, const double * Y, const double * rho, const dou
     #endif
 
 
-	printf("Rank %d inside MPI D3 finite temperature.\n", rank);
+	printf("Rank %d inside MPI D4 finite temperature.\n", rank);
 	fflush(stdout);
 
 
