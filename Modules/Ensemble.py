@@ -2176,10 +2176,10 @@ DETAILS OF ERROR:
         ityp = dyn_supercell.structure.get_ityp() + 1 #Py to Fortran indexing
         n_typ = len(self.current_dyn.structure.masses)
 
-        amass = np.array(n_typ, dtype = np.double)
+        amass = np.zeros(n_typ, dtype = np.double)
 
         for at_type in self.current_dyn.structure.masses:
-            index = self.current_dyn.structure.atoms.index(at_type)
+            index = ityp[self.current_dyn.structure.atoms.index(at_type)] - 1
             amass[index] = self.current_dyn.structure.masses[at_type]
 
         # Get the forces and conver in the correct units
