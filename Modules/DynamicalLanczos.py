@@ -767,7 +767,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         #simple_output[self.n_modes:] = self.psi[self.n_modes:] * (w_a + w_b)**2
 
         if not self.ignore_v4:
-            simple_output[:] = FastD3_FT(self.X, self.Y, self.rho, self.w, self.T, self.psi, self.symmetries, self.N_degeneracy, self.degenerate_space, self.mode)
+            simple_output[:] = FastD4_FT(self.X, self.Y, self.rho, self.w, self.T, self.psi, self.symmetries, self.N_degeneracy, self.degenerate_space, self.mode)
 
 
         return simple_output
