@@ -536,7 +536,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 	printf("Fast D3 FT Computation | rank %d computes from %u to %u\n", rank, start, stop);
 	fflush(stdout);
 
-	clock_t d3_timing, sym_timing;
+	clock_t d3_timing = 0, sym_timing = 0;
 	clock_t tmp_timing;
 
 
