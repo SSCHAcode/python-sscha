@@ -267,6 +267,15 @@ class Lanczos:
         self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
 
 
+    def init(self):
+        """
+        INITIALIZE THE CALCULATION
+        ==========================
+
+        Perform everithing needed to initialize the calculation
+        """
+        self.prepare_symmetrization()
+        self.initialized = True
 
 
     def prepare_symmetrization(self):
@@ -660,8 +669,6 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         if self.ignore_v3:
             return np.zeros(np.shape(self.psi), dtype = TYPE_DP)
 
-        if not self.initialized:
-            self.prepare_symmetrization()
 
 
         w_a = np.tile(self.w, (self.n_modes, 1)).ravel()
@@ -759,12 +766,11 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         #simple_output[self.n_modes:] = self.psi[self.n_modes:] * (w_a + w_b)**2
 
-        if self.ignore_v4:
-            return simple_output
-        else:
-            raise NotImplementedError("Error v4 with finite temperature not yet implemented")
+        if not self.ignore_v4:
+            simple_output[:] = FastD3_FT(self.X, self.Y, self.rho, self.w, self.T, self.psi, self.symmetries, self.N_degeneracy, self.degenerate_space, self.mode)
 
 
+        return simple_output
 
     def apply_full_L(self, target=None, force_t_0 = False, force_FT = False):
         """
@@ -797,6 +803,10 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         # Setup the target vector to the self.psi
         if not target is None:
             self.psi = target 
+
+        # Check the initialization
+        if not self.initialized:
+            raise ValueError("Error, this class must be initialized before lunching the computation:\n Use the .init()")
 
         #if self.symmetrize:
         #    self.symmetrize_psi()
@@ -2563,6 +2573,76 @@ def FastD3_FT(X, Y, rho, w, T, input_psi, symmetries, n_degeneracies, degenerate
     sscha_HP_odd.ApplyV3_FT(X, Y, rho, w, T, input_psi, output_psi, mode, symmetries, n_degeneracies, deg_space_new, start_A, end_A)
     return output_psi
 
+
+
+def FastD4_FT(X, Y, rho, w, T, input_psi, symmetries, n_degeneracies, degenerate_space, mode = 1):
+    """
+    Apply the D4 to vector
+    ======================
+
+    This is a wrapper to the fast C function.
+
+
+    For details on the mode, look at the parameters list
+
+    Parameters
+    ----------
+       X : ndarray(size = (n_modes, n_configs), dtype = np.double / np.float32)
+           The X array (displacement in mode basis). Note that the dtype should match the mode
+       Y : ndarray(size = (n_modes, n_configs))
+           The Y array (forces in mode basis).
+       rho : ndarray(size = n_configs)
+           The weights of the configurations
+       w : ndarray(size = n_modes)
+           The list of frequencies
+       T : float
+           The temperature
+       input_psi : ndarray
+           The input density matrix
+       mode : int
+           The mode for the execution:
+              1) CPU : OpenMP parallelization
+       symmetries : ndarray( size =(n_sym, n_modes, n_modes), dtype = np.double)
+           The symmetries in the polarization basis.
+       n_degeneracies : ndarray( size = n_modes, dtype = np.intc)
+           The number of degenerate eigenvalues for each mode
+       degenerate_space : list of lists
+           The list of modes in the eigen subspace in which that mode belongs to.
+
+    Results
+    -------
+       output_psi : ndarray 
+           The output density matrix
+    """
+    n_modes = len(w)
+
+    total_length = len(input_psi)
+
+    output_psi = np.zeros(total_length, dtype = TYPE_DP)
+    #print( "Apply to vector, nmodes:", n_modes, "shape:", np.shape(output_dyn))
+
+    # Get the start and end_A
+    start_A = ((n_modes + 1) * n_modes) // 2 + n_modes 
+    end_A = n_modes + (n_modes + 1) * n_modes
+
+
+    deg_space_new = np.zeros(np.sum(n_degeneracies), dtype = np.intc)
+    i = 0
+    i_mode = 0
+    j_mode = 0
+    #print("Mapping degeneracies:", np.sum(n_degeneracies))
+    # Preparing the symmetry variables for the fast calculation
+    while i_mode < n_modes:
+        #print("cross_modes: ({}, {}) | deg_i = {}".format(i_mode, j_mode, n_degeneracies[i_mode]))
+        deg_space_new[i] = degenerate_space[i_mode][j_mode]
+        j_mode += 1
+        i += 1
+        if j_mode == n_degeneracies[i_mode]:
+            i_mode += 1
+            j_mode = 0
+    
+    sscha_HP_odd.ApplyV4_FT(X, Y, rho, w, T, input_psi, output_psi, mode, symmetries, n_degeneracies, deg_space_new, start_A, end_A)
+    return output_psi
 
     
 
