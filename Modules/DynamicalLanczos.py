@@ -716,7 +716,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         """ 
 
         if self.ignore_v3:
-            return self.zeros(self.psi.shape, dtype = TYPE_DP)
+            return np.zeros(self.psi.shape, dtype = TYPE_DP)
 
         return FastD3_FT(self.X, self.Y, self.rho, self.w, self.T, self.psi, self.symmetries, self.N_degeneracy, self.degenerate_space, self.mode, transpose)
 
