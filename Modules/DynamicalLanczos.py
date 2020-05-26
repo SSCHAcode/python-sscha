@@ -438,7 +438,7 @@ class Lanczos:
                 masses.
         """
 
-        self.psi = np.zeros(self.n_modes + self.n_modes*self.n_modes, dtype = TYPE_DP)
+        self.psi = np.zeros(self.psi.shape, dtype = TYPE_DP)
 
         # Convert the vector in the polarization space
         m_on = np.sqrt(self.m) ** masses_exp
