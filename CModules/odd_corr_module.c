@@ -178,13 +178,14 @@ static PyObject *ApplyV3_FT(PyObject * self, PyObject * args) {
   int N_configs;
   int N_modes;
   int mode, start_A, end_A;
+  int transpose;
   double T;
 
   int index_mode = 0, index_config = 1;
 
   // Parse the python arguments
-  if (!PyArg_ParseTuple(args, "OOOOdOOiOOOii", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode,
-			&npy_symmetries, &npy_n_deg, &npy_deg_space, &start_A, &end_A))
+  if (!PyArg_ParseTuple(args, "OOOOdOOiOOOiii", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode,
+			&npy_symmetries, &npy_n_deg, &npy_deg_space, &start_A, &end_A, &transpose))
     return NULL;
   
   // Check the array memory setting
@@ -253,7 +254,8 @@ static PyObject *ApplyV3_FT(PyObject * self, PyObject * args) {
   //  exit(EXIT_FAILURE);
   if (mode == 2) {
     // Use the MPI version
-    MPI_D3_FT(X, Y, rho, w, T, N_modes, start_A, end_A, N_configs, input, output, symmetries, N_symmetries, n_deg, good_deg_space);
+    MPI_D3_FT(X, Y, rho, w, T, N_modes, start_A, end_A, N_configs, input, output, symmetries, N_symmetries, n_deg, good_deg_space,
+      transpose);
   }
   else {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
@@ -281,12 +283,13 @@ static PyObject *ApplyV4_FT(PyObject * self, PyObject * args) {
   int N_modes;
   int mode, start_A, end_A;
   double T;
+  int transpose;
 
   int index_mode = 0, index_config = 1;
 
   // Parse the python arguments
-  if (!PyArg_ParseTuple(args, "OOOOdOOiOOOii", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode,
-			&npy_symmetries, &npy_n_deg, &npy_deg_space, &start_A, &end_A))
+  if (!PyArg_ParseTuple(args, "OOOOdOOiOOOiii", &npy_X, &npy_Y, &npy_rho, &npy_omega, &T, &npy_input, &npy_output, &mode,
+			&npy_symmetries, &npy_n_deg, &npy_deg_space, &start_A, &end_A, &transpose))
     return NULL;
   
   // Check the array memory setting
@@ -355,7 +358,7 @@ static PyObject *ApplyV4_FT(PyObject * self, PyObject * args) {
   //  exit(EXIT_FAILURE);
   if (mode == 2) {
     // Use the MPI version
-    MPI_D4_FT(X, Y, rho, w, T, N_modes, start_A, end_A, N_configs, input, output, symmetries, N_symmetries, n_deg, good_deg_space);
+    MPI_D4_FT(X, Y, rho, w, T, N_modes, start_A, end_A, N_configs, input, output, symmetries, N_symmetries, n_deg, good_deg_space, transpose);
   }
   else {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);

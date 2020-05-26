@@ -143,15 +143,17 @@ void MPI_ApplyD3ToDyn(const double * X, const double * Y, const double * rho, co
  *          The degree of degeneracy of the mode
  *      degenerate_space : array of array [N_modes, N_degeneracy[i]]
  *          The mode indices that compose the degenerate subspace in which the first mode label belong to.
+ *      transpose : int
+ * 	        If 1 Apply the transposed L matrix, if 0 apply the non transposed L matrix
  */
 
 void MPI_D3_FT(const double * X, const double * Y, const double * rho, const double * w, double T, int N_modes, int start_A, int end_A,
 			 int N_configs, double * input_psi, double * output_psi,
-			 double * symmetries, int N_sym, int * N_degeneracy, int ** degenerate_space ) ;
+			 double * symmetries, int N_sym, int * N_degeneracy, int ** degenerate_space, int transpose ) ;
 
 void MPI_D4_FT(const double * X, const double * Y, const double * rho, const double * w, double T, int N_modes, int start_A, int end_A,
 			 int N_configs, double * input_psi, double * output_psi,
-			 double * symmetries, int N_sym, int * N_degeneracy, int ** degenerate_space ) ;
+			 double * symmetries, int N_sym, int * N_degeneracy, int ** degenerate_space, int transpose ) ;
 
 
 
