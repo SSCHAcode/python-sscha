@@ -1981,7 +1981,13 @@ Max number of iterations: {}
             print("L superoperator computed.")
             np.savez_compressed("L_super.npz", L_operator)
         
-        self.L_linop = L_operator
+
+        def matvec(x):
+            return L_operator.dot(x)
+        def rmatvec(x):
+            return x.dot(L_operator)
+
+        self.L_linop = scipy.sparse.linalg.LinearOperator(L_operator.shape, matvec = matvec, rmatvec = rmatvec)
         return L_operator
 
 
@@ -2082,8 +2088,8 @@ Max number of iterations: {}
             # Apply the matrix L
             t1 = time.time()
 
-            L_q = self.L_linop.dot(psi_q)
-            p_L = psi_p.dot(self.L_linop)
+            L_q = self.L_linop.matvec(psi_q)
+            p_L = self.L_linop.rmatvec(psi_p)
             t2 = time.time()
 
             if verbose:
