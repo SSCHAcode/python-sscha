@@ -218,8 +218,10 @@ class Lanczos:
 
         self.psi = np.zeros(len_psi, dtype = TYPE_DP)
 
-        # Prepare the L as a linear operator
-        self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
+        # Prepare the L as a linear operator (Prepare the possibility to transpose the matrix)
+        def L_transp(psi):
+            return self.apply_full_L(psi, transpose= True)
+        self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, rmatvec = L_transp, dtype = TYPE_DP)
 
         # Prepare the solution of the Lanczos algorithm
         self.eigvals = None
@@ -581,7 +583,7 @@ class Lanczos:
         #print("out 0 (just end):", out_vect[0])
         return out_vect
 
-    def apply_L1_FT(self):
+    def apply_L1_FT(self, transpose = False):
         """
         APPLY THE L1 AT FINITE TEMPERATURE
         ==================================
@@ -640,12 +642,20 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         # Perform the same on the A side
         Y_ab_NI = - (8 * w_a * w_b) / ( (2*n_a + 1) * (2*n_b + 1))
-        out_vect[start_Y : start_A] += - Y_ab_NI * self.psi[start_A: ]
+        if not transpose:
+            out_vect[start_Y : start_A] += - Y_ab_NI * self.psi[start_A: ]
+        else:
+            out_vect[start_A:] += - Y_ab_NI * self.psi[start_Y : start_A]
+
         #L_operator[start_Y : start_A, start_A:] = - np.diag(Y_ab_NI) * extra_count
         #L_operator[start_Y + np.arange(self.n_modes**2), start_A + exchange_frequencies] -=  Y_ab_NI / 2
 
         X1_ab_NI = - (2*n_a*n_b + n_a + n_b) * (2*n_a*n_b + n_a + n_b + 1)*(2 * w_a * w_b) / ( (2*n_a + 1) * (2*n_b + 1))
-        out_vect[start_A:] += - X1_ab_NI * self.psi[start_Y: start_A]
+
+        if not transpose:
+            out_vect[start_A:] += - X1_ab_NI * self.psi[start_Y: start_A]
+        else:
+            out_vect[start_Y: start_A] += - X1_ab_NI * self.psi[start_A:]
         #L_operator[start_A:, start_Y : start_A] = - np.diag(X1_ab_NI) / 1 * extra_count
         #L_operator[start_A + np.arange(self.n_modes**2), start_Y + exchange_frequencies] -= X1_ab_NI / 2
 
@@ -700,12 +710,12 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         out_vect[self.n_modes:] = out_d
         return out_vect
 
-    def apply_L2_FT(self):
+    def apply_L2_FT(self, transpose = False):
         """
         Apply the full matrix at finite temperature.
         """ 
 
-        return FastD3_FT(self.X, self.Y, self.rho, self.w, self.T, self.psi, self.symmetries, self.N_degeneracy, self.degenerate_space, self.mode)
+        return FastD3_FT(self.X, self.Y, self.rho, self.w, self.T, self.psi, self.symmetries, self.N_degeneracy, self.degenerate_space, self.mode, transpose)
 
     def apply_L3(self):
         """
@@ -753,7 +763,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         return output
 
 
-    def apply_L3_FT(self):
+    def apply_L3_FT(self, transpose = False):
         """
         APPLY THE L3
         ============
@@ -767,12 +777,12 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         #simple_output[self.n_modes:] = self.psi[self.n_modes:] * (w_a + w_b)**2
 
         if not self.ignore_v4:
-            simple_output[:] = FastD4_FT(self.X, self.Y, self.rho, self.w, self.T, self.psi, self.symmetries, self.N_degeneracy, self.degenerate_space, self.mode)
+            simple_output[:] = FastD4_FT(self.X, self.Y, self.rho, self.w, self.T, self.psi, self.symmetries, self.N_degeneracy, self.degenerate_space, self.mode, transpose)
 
 
         return simple_output
 
-    def apply_full_L(self, target=None, force_t_0 = False, force_FT = False):
+    def apply_full_L(self, target=None, force_t_0 = False, force_FT = False, transpose = False):
         """
         APPLY THE L 
         ===========
@@ -820,17 +830,17 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         if (force_t_0 or self.T < __EPSILON__) and not force_FT:
             output = self.apply_L1()
         else:
-            output = self.apply_L1_FT()
+            output = self.apply_L1_FT(transpose)
         t2 = timer()
         if (force_t_0 or self.T < __EPSILON__) and not force_FT:
             output += self.apply_L2()
         else:
-            output += self.apply_L2_FT()
+            output += self.apply_L2_FT(transpose)
         t3 = timer()
         if (force_t_0 or self.T < __EPSILON__) and not force_FT:
             output += self.apply_L3()
         else:
-            output += self.apply_L3_FT()
+            output += self.apply_L3_FT(transpose)
         t4 = timer()
 
         print("Time to apply L1: {}".format(t2 - t1))
@@ -2374,7 +2384,7 @@ def SlowApplyD3ToDyn(X, Y, rho, w, T, input_dyn):
     
     return v_out
 
-def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn,  symmetries, n_degeneracies, degenerate_space, mode = 1):
+def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn,  symmetries, n_degeneracies, degenerate_space, mode = 1, transpose = False):
     """
     Apply the D3 to dyn
     ======================
@@ -2417,6 +2427,10 @@ def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn,  symmetries, n_degeneracies, de
 
     n_modes = len(w)
 
+    transp = 0
+    if transpose:
+        transp = 1
+
     output_vector = np.zeros(n_modes, dtype = TYPE_DP)
     #print( "Apply to dyn, nmodes:", n_modes, "shape:", np.shape(output_vector))
     
@@ -2440,7 +2454,7 @@ def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn,  symmetries, n_degeneracies, de
             j_mode = 0
     
 
-    sscha_HP_odd.ApplyV3ToDyn(X, Y, rho, w, T, input_dyn, output_vector, mode, symmetries, n_degeneracies, deg_space_new)
+    sscha_HP_odd.ApplyV3ToDyn(X, Y, rho, w, T, input_dyn, output_vector, mode, symmetries, n_degeneracies, deg_space_new, transp)
     return output_vector
 
 
@@ -2505,7 +2519,7 @@ def FastApplyD3ToVector(X, Y, rho, w, T, input_vector, symmetries, n_degeneracie
     return output_dyn
 
 
-def FastD3_FT(X, Y, rho, w, T, input_psi, symmetries, n_degeneracies, degenerate_space, mode = 1):
+def FastD3_FT(X, Y, rho, w, T, input_psi, symmetries, n_degeneracies, degenerate_space, mode = 1, transpose = False):
     """
     Apply the D3 to vector
     ======================
@@ -2546,6 +2560,11 @@ def FastD3_FT(X, Y, rho, w, T, input_psi, symmetries, n_degeneracies, degenerate
     """
     n_modes = len(w)
 
+
+    transp = 0
+    if transpose:
+        transp = 1
+
     total_length = len(input_psi)
 
     output_psi = np.zeros(total_length, dtype = TYPE_DP)
@@ -2570,7 +2589,7 @@ def FastD3_FT(X, Y, rho, w, T, input_psi, symmetries, n_degeneracies, degenerate
             i_mode += 1
             j_mode = 0
     
-    sscha_HP_odd.ApplyV3_FT(X, Y, rho, w, T, input_psi, output_psi, mode, symmetries, n_degeneracies, deg_space_new, start_A, end_A)
+    sscha_HP_odd.ApplyV3_FT(X, Y, rho, w, T, input_psi, output_psi, mode, symmetries, n_degeneracies, deg_space_new, start_A, end_A, transp)
     return output_psi
 
 
