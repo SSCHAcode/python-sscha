@@ -1971,7 +1971,7 @@ Max number of iterations: {}
             # The other coeff between Y and R
             # X''
             extra_count = np.ones(N_w2, dtype = np.intc)
-            extra_count[new_i_a != new_i_b] = 2
+            #extra_count[new_i_a != new_i_b] = 2
             X2_coeff = (2*n_b + 1) * (2*n_a +1) / (8*w_a *w_b)
             X2_coeff = np.einsum("ab,a->ba", d3_small_space, X2_coeff * extra_count)
             L_operator[:start_Y, start_Y: start_A] = -X2_coeff
