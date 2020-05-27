@@ -630,10 +630,10 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 
 				if (DEB)
-				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", index_Y(new_a, new_b, N_modes), new_c, tmp * mult_coeff * extra_count, new_a, new_b);
+				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d | T = %d\n", index_Y(new_a, new_b, N_modes), new_c, tmp * mult_coeff * extra_count, new_a, new_b, transpose);
 				
 				if (DEB)
-				printf("L_OP[ %d; %d] = %e | A modes = %d; %d\n", index_A(new_a, new_b, N_modes), new_c, tmp  * Z1_coeff(w[new_a], n_w[new_a], w[new_b], n_w[new_b]) * extra_count, new_a, new_b);
+				printf("L_OP[ %d; %d] = %e | A modes = %d; %d | T = %d\n", index_A(new_a, new_b, N_modes), new_c, tmp  * Z1_coeff(w[new_a], n_w[new_a], w[new_b], n_w[new_b]) * extra_count, new_a, new_b, transpose);
 				
 				extra_count = get_extra_count(new_a, new_c, transpose);
 				if (transpose == 0) mult_coeff = Z_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
@@ -644,10 +644,10 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 					new_output[index_A(new_a, new_c, N_modes)] += tmp * input_psi[new_b] * Z1_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]) * extra_count;
 
 				if (DEB)
-				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", index_Y(new_a, new_c, N_modes), new_b, tmp * mult_coeff*extra_count, new_a, new_c);
+				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d | T = %d\n", index_Y(new_a, new_c, N_modes), new_b, tmp * mult_coeff*extra_count, new_a, new_c, transpose);
 
 				if (DEB)
-				printf("L_OP[ %d; %d] = %e | A modes = %d; %d\n", index_A(new_a, new_c, N_modes), new_b, tmp  * Z1_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]) * extra_count, new_a, new_c);
+				printf("L_OP[ %d; %d] = %e | A modes = %d; %d | T = %d\n", index_A(new_a, new_c, N_modes), new_b, tmp  * Z1_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]) * extra_count, new_a, new_c, transpose);
 
 
 				extra_count = get_extra_count(new_b, new_c, transpose);
@@ -659,10 +659,10 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 					new_output[index_A(new_b, new_c, N_modes)] += tmp * input_psi[new_a] * Z1_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]) * extra_count;
 
 				if (DEB)
-				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", index_Y(new_b, new_c, N_modes), new_a, tmp * mult_coeff * extra_count, new_b, new_c);
+				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d | T = %d\n", index_Y(new_b, new_c, N_modes), new_a, tmp * mult_coeff * extra_count, new_b, new_c, transpose);
 
 				if (DEB)
-				printf("L_OP[ %d; %d] = %e | A modes = %d; %d\n", index_A(new_b, new_c, N_modes), new_a, tmp * Z1_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]) * extra_count, new_b, new_c);
+				printf("L_OP[ %d; %d] = %e | A modes = %d; %d | T = %d\n", index_A(new_b, new_c, N_modes), new_a, tmp * Z1_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]) * extra_count, new_b, new_c, transpose);
 
 				// We now apply on R to fill the A values of the output (Y2 is zero)
 				// if (transpose == 0) {
@@ -682,7 +682,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				new_output[new_a] += tmp * input_psi[index_Y(new_b, new_c, N_modes)] * mult_coeff * extra_count;
 
 				if (DEB)
-				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", new_a, index_Y(new_b, new_c, N_modes), tmp * mult_coeff * extra_count, new_b, new_c);
+				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d | T = %d\n", new_a, index_Y(new_b, new_c, N_modes), tmp * mult_coeff * extra_count, new_b, new_c, transpose);
 
 
 
@@ -695,7 +695,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 
 				if (DEB)
-				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", new_b, index_Y(new_a, new_c, N_modes), tmp * mult_coeff * extra_count, new_a, new_c);
+				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d | T = %d\n", new_b, index_Y(new_a, new_c, N_modes), tmp * mult_coeff * extra_count, new_a, new_c, transpose);
 
 
 				//extra_count = 1;
@@ -706,7 +706,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				new_output[new_c] += tmp * input_psi[index_Y(new_b, new_a, N_modes)] * mult_coeff * extra_count;
 
 				if (DEB)
-				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", new_c, index_Y(new_a, new_b, N_modes), tmp * mult_coeff * extra_count, new_a, new_b);
+				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d | T = %d\n", new_c, index_Y(new_a, new_b, N_modes), tmp * mult_coeff * extra_count, new_a, new_b, transpose);
 
 		      }
 		    }
