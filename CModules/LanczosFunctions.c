@@ -1655,8 +1655,8 @@ int index_Y(int a, int b, int N) {
 	// Get the symmetric index
 	int ret = N;
 
-	if (a >= b) ret += N*a - ((a - 1)*a) / 2 + b;
-	else ret += N*b - ((b - 1)*b) / 2 + a;
+	if (a <= b) ret += N*a - ((a - 1)*a) / 2 + (b - a);
+	else ret += N*b - ((b - 1)*b) / 2 + (a - b);
 
 	return ret;
 }
@@ -1669,8 +1669,8 @@ int index_A(int a, int b, int N) {
 	// Go to Start-A
 	ret += ((N+1)*N) / 2;
 
-	if (a >= b) ret += N*a - ((a - 1)*a) / 2 + b;
-	else ret += N*b - ((b - 1)*b) / 2 + a;
+	if (a <= b) ret += N*a - ((a - 1)*a) / 2 + (b - a);
+	else ret += N*b - ((b - 1)*b) / 2 + (a - b);
 
 	return ret;
 }
