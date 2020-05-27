@@ -1865,7 +1865,8 @@ Max number of iterations: {}
         L_operator = np.zeros( shape = (self.n_modes + 2*N_w2, self.n_modes + 2*N_w2), dtype = TYPE_DP)
 
         # Set the Z''
-        L_operator[:self.n_modes, :self.n_modes] = np.diag(self.w**2)
+        if not self.ignore_harmonic:
+            L_operator[:self.n_modes, :self.n_modes] = np.diag(self.w**2)
 
 
         #w_a = np.tile(self.w, (self.n_modes,1)).ravel()
@@ -1894,24 +1895,24 @@ Max number of iterations: {}
         #yy = np.tile(np.arange(self.n_modes), (self.n_modes, 1)).ravel()
         #all_modes = np.arange(self.n_modes**2)
         #exchange_frequencies = xx + yy
+        if not self.ignore_harmonic:
+            # Apply the operator to himself and to the exchange on the frequencies.
+            X_ab_NI = -w_a**2 - w_b**2 - (2*w_a *w_b) /( (2*n_a + 1) * (2*n_b + 1))
+            L_operator[start_Y: start_A, start_Y:start_A] = - np.diag(X_ab_NI)  * extra_count
+            #L_operator[start_Y + np.arange(self.n_modes**2) , start_Y + exchange_frequencies] -= X_ab_NI / 2
 
-        # Apply the operator to himself and to the exchange on the frequencies.
-        X_ab_NI = -w_a**2 - w_b**2 - (2*w_a *w_b) /( (2*n_a + 1) * (2*n_b + 1))
-        L_operator[start_Y: start_A, start_Y:start_A] = - np.diag(X_ab_NI)  * extra_count
-        #L_operator[start_Y + np.arange(self.n_modes**2) , start_Y + exchange_frequencies] -= X_ab_NI / 2
+            # Perform the same on the A side
+            Y_ab_NI = - (8 * w_a * w_b) / ( (2*n_a + 1) * (2*n_b + 1))
+            L_operator[start_Y : start_A, start_A:] = - np.diag(Y_ab_NI) * extra_count
+            #L_operator[start_Y + np.arange(self.n_modes**2), start_A + exchange_frequencies] -=  Y_ab_NI / 2
 
-        # Perform the same on the A side
-        Y_ab_NI = - (8 * w_a * w_b) / ( (2*n_a + 1) * (2*n_b + 1))
-        L_operator[start_Y : start_A, start_A:] = - np.diag(Y_ab_NI) * extra_count
-        #L_operator[start_Y + np.arange(self.n_modes**2), start_A + exchange_frequencies] -=  Y_ab_NI / 2
+            X1_ab_NI = - (2*n_a*n_b + n_a + n_b) * (2*n_a*n_b + n_a + n_b + 1)*(2 * w_a * w_b) / ( (2*n_a + 1) * (2*n_b + 1))
+            L_operator[start_A:, start_Y : start_A] = - np.diag(X1_ab_NI) / 1 * extra_count
+            #L_operator[start_A + np.arange(self.n_modes**2), start_Y + exchange_frequencies] -= X1_ab_NI / 2
 
-        X1_ab_NI = - (2*n_a*n_b + n_a + n_b) * (2*n_a*n_b + n_a + n_b + 1)*(2 * w_a * w_b) / ( (2*n_a + 1) * (2*n_b + 1))
-        L_operator[start_A:, start_Y : start_A] = - np.diag(X1_ab_NI) / 1 * extra_count
-        #L_operator[start_A + np.arange(self.n_modes**2), start_Y + exchange_frequencies] -= X1_ab_NI / 2
-
-        Y1_ab_NI = - w_a**2 - w_b**2 + (2*w_a *w_b) /( (2*n_a + 1) * (2*n_b + 1))
-        L_operator[start_A:, start_A:] = -np.diag(Y1_ab_NI) / 1 * extra_count
-        #L_operator[start_A + np.arange(self.n_modes**2),  start_A + exchange_frequencies] -= Y1_ab_NI / 2
+            Y1_ab_NI = - w_a**2 - w_b**2 + (2*w_a *w_b) /( (2*n_a + 1) * (2*n_b + 1))
+            L_operator[start_A:, start_A:] = -np.diag(Y1_ab_NI) / 1 * extra_count
+            #L_operator[start_A + np.arange(self.n_modes**2),  start_A + exchange_frequencies] -= Y1_ab_NI / 2
 
         # We added all the non interacting propagators
 
