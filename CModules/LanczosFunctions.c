@@ -613,7 +613,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 				// Here we must apply all the terms that contain d3
 				// Get the final d3 with the correct symmetry coefficient
-				tmp = -tmp * sym_coeff /  (6 * N_eff * N_sym_tmp);
+				tmp = -tmp * sym_coeff /  (3 * N_eff * N_sym_tmp);
 
 				// We start applying them on R to fill the Y values of the output
 				// This must take into account the transposition
