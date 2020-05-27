@@ -666,7 +666,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				// We must pay attention to double counting frequencies with exchange of axis.
 				// NOTE: the fact that new_b and new_c are present also exchanged in the sum already accounts for this
 				//       we must instead account for the inverse extra count... in the other parameters (I divided tmp / 6 instead of 3)
-				extra_count = 2;
+				extra_count = get_extra_count(new_b, new_c, 1 - transpose);
 				//if (new_b != new_c) extra_count = 2;
 				if (transpose == 0) mult_coeff = X2_coeff(w[new_b], n_w[new_b], w[new_c], n_w[new_c]);
 				else mult_coeff = Z_coeff(w[new_b], n_w[new_b], w[new_c], n_w[new_c]);
@@ -678,6 +678,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 
 				//extra_count = 1;
+				extra_count = get_extra_count(new_a, new_c, 1 - transpose);
 				//if (new_a != new_c) extra_count = 2;
 				if (transpose == 0) mult_coeff =  X2_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
 				else mult_coeff = Z_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
@@ -690,6 +691,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 				//extra_count = 1;
 				//if (new_a != new_b) extra_count = 2;
+				extra_count = get_extra_count(new_b, new_a, 1 - transpose);
 				if (transpose == 0) mult_coeff = X2_coeff(w[new_b], n_w[new_b], w[new_a], n_w[new_a]);
 				else mult_coeff = Z_coeff(w[new_b], n_w[new_b], w[new_a], n_w[new_a]);
 				new_output[new_c] += tmp * input_psi[index_Y(new_b, new_a, N_modes)] * mult_coeff * extra_count;
