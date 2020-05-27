@@ -540,6 +540,8 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 	clock_t tmp_timing;
 	double mult_coeff;
 
+	int extra_count;
+
 
 	unsigned long long int mpi_index;
 	for (mpi_index = start; mpi_index < stop; ++mpi_index) {
@@ -613,54 +615,74 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 				// Here we must apply all the terms that contain d3
 				// Get the final d3 with the correct symmetry coefficient
-				tmp = -tmp * sym_coeff /  (3 * N_eff * N_sym_tmp);
+				tmp = -tmp * sym_coeff /  (6 * N_eff * N_sym_tmp);
 
 				// We start applying them on R to fill the Y values of the output
 				// This must take into account the transposition
+				extra_count = 1;
+				if (new_a == new_b) extra_count = 2;
 				if (transpose == 0) mult_coeff = Z_coeff(w[new_a], n_w[new_a], w[new_b], n_w[new_b]);
 				else mult_coeff = X2_coeff(w[new_a], n_w[new_a], w[new_b], n_w[new_b]);
-				new_output[index_Y(new_a, new_b, N_modes)] += tmp * input_psi[new_c] * mult_coeff;
+				new_output[index_Y(new_a, new_b, N_modes)] += tmp * input_psi[new_c] * mult_coeff * extra_count;
+
+				// Apply also the A with the same extracount
+				if (transpose == 0)
+					new_output[index_A(new_a, new_b, N_modes)] += tmp * input_psi[new_c] * Z1_coeff(w[new_a], n_w[new_a], w[new_b], n_w[new_b]) * extra_count;
+
 
 				if (DEB)
-				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", index_Y(new_a, new_b, N_modes), new_c, tmp * mult_coeff, new_a, new_b);
-
+				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", index_Y(new_a, new_b, N_modes), new_c, tmp * mult_coeff * extra_count, new_a, new_b);
+				
+				extra_count = 1;
+				if (new_a == new_b) extra_count = 2;
 				if (transpose == 0) mult_coeff = Z_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
 				else mult_coeff = X2_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
-				new_output[index_Y(new_a, new_c, N_modes)] += tmp * input_psi[new_b] * mult_coeff;
+				new_output[index_Y(new_a, new_c, N_modes)] += tmp * input_psi[new_b] * mult_coeff * extra_count;
+
+				if (transpose == 0)
+					new_output[index_A(new_a, new_c, N_modes)] += tmp * input_psi[new_b] * Z1_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]) * extra_count;
 
 				if (DEB)
-				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", index_Y(new_a, new_c, N_modes), new_b, tmp * mult_coeff, new_a, new_c);
+				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", index_Y(new_a, new_c, N_modes), new_b, tmp * mult_coeff*extra_count, new_a, new_c);
 
+
+				extra_count = 1;
+				if (new_a == new_b) extra_count = 2;
 				if (transpose == 0) mult_coeff = Z_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]);
 				else  mult_coeff = X2_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]);
-				new_output[index_Y(new_b, new_c, N_modes)] += tmp * input_psi[new_a] * mult_coeff;
+				new_output[index_Y(new_b, new_c, N_modes)] += tmp * input_psi[new_a] * mult_coeff * extra_count;
+
+				if (transpose == 0)
+					new_output[index_A(new_b, new_c, N_modes)] += tmp * input_psi[new_a] * Z1_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]) * extra_count;
 
 				if (DEB)
-				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", index_Y(new_b, new_c, N_modes), new_a, tmp * mult_coeff, new_b, new_c);
+				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", index_Y(new_b, new_c, N_modes), new_a, tmp * mult_coeff * extra_count, new_b, new_c);
 
 				// We now apply on R to fill the A values of the output (Y2 is zero)
-				if (transpose == 0) {
-					new_output[index_A(new_a, new_b, N_modes)] += tmp * input_psi[new_c] * Z1_coeff(w[new_a], n_w[new_a], w[new_b], n_w[new_b]);
-					new_output[index_A(new_a, new_c, N_modes)] += tmp * input_psi[new_b] * Z1_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
-					new_output[index_A(new_b, new_c, N_modes)] += tmp * input_psi[new_a] * Z1_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]);
-				}
+				// if (transpose == 0) {
+				// 	new_output[index_A(new_a, new_b, N_modes)] += tmp * input_psi[new_c] * Z1_coeff(w[new_a], n_w[new_a], w[new_b], n_w[new_b]);
+				// 	new_output[index_A(new_a, new_c, N_modes)] += tmp * input_psi[new_b] * Z1_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
+				// 	new_output[index_A(new_b, new_c, N_modes)] += tmp * input_psi[new_a] * Z1_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]);
+				// }
 
 				// Finally we apply on Y to fill the R values of the output
 				// We must pay attention to double counting frequencies with exchange of axis.
-				int extra_count = 1;
-				if (new_b != new_c) extra_count = 2;
+				// NOTE: the fact that new_b and new_c are present also exchanged in the sum already accounts for this
+				//       we must instead account for the inverse extra count... in the other parameters (I divided tmp / 6 instead of 3)
+				extra_count = 1;
+				//if (new_b != new_c) extra_count = 2;
 				if (transpose == 0) mult_coeff = X2_coeff(w[new_b], n_w[new_b], w[new_c], n_w[new_c]);
 				else mult_coeff = Z_coeff(w[new_b], n_w[new_b], w[new_c], n_w[new_c]);
 				new_output[new_a] += tmp * input_psi[index_Y(new_b, new_c, N_modes)] * mult_coeff * extra_count;
 
-				extra_count = 1;
-				if (new_a != new_c) extra_count = 2;
+				//extra_count = 1;
+				//if (new_a != new_c) extra_count = 2;
 				if (transpose == 0) mult_coeff =  X2_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
 				else mult_coeff = Z_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
 				new_output[new_b] += tmp * input_psi[index_Y(new_a, new_c, N_modes)] * mult_coeff * extra_count;
 
-				extra_count = 1;
-				if (new_a != new_b) extra_count = 2;
+				//extra_count = 1;
+				//if (new_a != new_b) extra_count = 2;
 				if (transpose == 0) mult_coeff = X2_coeff(w[new_b], n_w[new_b], w[new_a], n_w[new_a]);
 				else mult_coeff = Z_coeff(w[new_b], n_w[new_b], w[new_a], n_w[new_a]);
 				new_output[new_c] += tmp * input_psi[index_Y(new_b, new_a, N_modes)] * mult_coeff * extra_count;
