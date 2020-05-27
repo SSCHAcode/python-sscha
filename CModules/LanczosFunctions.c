@@ -621,14 +621,22 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				else mult_coeff = X2_coeff(w[new_a], n_w[new_a], w[new_b], n_w[new_b]);
 				new_output[index_Y(new_a, new_b, N_modes)] += tmp * input_psi[new_c] * mult_coeff;
 
+				if (DEB)
+				printf("L_OP[ %d; %d] = %e\n", index_Y(new_a, new_b, N_modes), new_c, tmp * mult_coeff);
+
 				if (transpose == 0) mult_coeff = Z_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
 				else mult_coeff = X2_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
 				new_output[index_Y(new_a, new_c, N_modes)] += tmp * input_psi[new_b] * mult_coeff;
+
+				if (DEB)
+				printf("L_OP[ %d; %d] = %e\n", index_Y(new_a, new_c, N_modes), new_b, tmp * mult_coeff);
 
 				if (transpose == 0) mult_coeff = Z_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]);
 				else  mult_coeff = X2_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]);
 				new_output[index_Y(new_b, new_c, N_modes)] += tmp * input_psi[new_a] * mult_coeff;
 
+				if (DEB)
+				printf("L_OP[ %d; %d] = %e\n", index_Y(new_b, new_c, N_modes), new_a, tmp * mult_coeff);
 
 				// We now apply on R to fill the A values of the output (Y2 is zero)
 				if (transpose == 0) {
