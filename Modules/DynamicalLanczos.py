@@ -281,13 +281,18 @@ class Lanczos:
         self.initialized = True
 
 
-    def prepare_symmetrization(self):
+    def prepare_symmetrization(self, no_sym = False):
         """
         PREPARE THE SYMMETRIZATION
         ==========================
 
         This function analyzes the character of the symmetry operations for each polarization vectors.
-        This will allow the method do know how many modes are degenerate
+        This will allow the method do know how many modes are degenerate.
+
+        Parameters
+        ----------
+            no_sym : bool
+                If True, the symmetries are neglected.
         """
 
         self.initialized = True
@@ -297,9 +302,17 @@ class Lanczos:
         w, pols = self.dyn.DiagonalizeSupercell()
 
         # Get the symmetries of the super structure
-        if not __SPGLIB__:
-            raise ImportError("Error, spglib module required to perform symmetrization in a supercell")
+        if not __SPGLIB__ and not no_sym:
+            raise ImportError("Error, spglib module required to perform symmetrization in a supercell. Otherwise, use no_sym")
         
+        # Neglect the symmetries
+        if no_sym:
+            self.symmetries = np.zeros( (1, self.n_modes, self.n_modes), dtype = TYPE_DP)
+            self.symmetries[0, :, :] = np.eye(self.n_modes)
+            self.N_degeneracy = np.ones(self.n_modes, dtype = np.intc)
+            self.degenerate_space = [[i] for i in range(self.n_modes)]
+            return
+
         super_symmetries = CC.symmetries.GetSymmetriesFromSPGLIB(spglib.get_symmetry(super_structure.get_ase_atoms()), False)
 
         # Get the symmetry matrix in the polarization space
