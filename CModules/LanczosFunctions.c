@@ -634,7 +634,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", index_Y(new_a, new_b, N_modes), new_c, tmp * mult_coeff * extra_count, new_a, new_b);
 				
 				extra_count = 1;
-				if (new_a == new_b) extra_count = 2;
+				if (new_a == new_c) extra_count = 2;
 				if (transpose == 0) mult_coeff = Z_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
 				else mult_coeff = X2_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
 				new_output[index_Y(new_a, new_c, N_modes)] += tmp * input_psi[new_b] * mult_coeff * extra_count;
@@ -647,7 +647,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 
 				extra_count = 1;
-				if (new_a == new_b) extra_count = 2;
+				if (new_b == new_c) extra_count = 2;
 				if (transpose == 0) mult_coeff = Z_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]);
 				else  mult_coeff = X2_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]);
 				new_output[index_Y(new_b, new_c, N_modes)] += tmp * input_psi[new_a] * mult_coeff * extra_count;
