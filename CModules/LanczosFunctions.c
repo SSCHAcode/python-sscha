@@ -619,8 +619,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 				// We start applying them on R to fill the Y values of the output
 				// This must take into account the transposition
-				extra_count = 1;
-				if (new_a == new_b) extra_count = 2;
+				extra_count = get_extra_count(new_a, new_b, transpose);
 				if (transpose == 0) mult_coeff = Z_coeff(w[new_a], n_w[new_a], w[new_b], n_w[new_b]);
 				else mult_coeff = X2_coeff(w[new_a], n_w[new_a], w[new_b], n_w[new_b]);
 				new_output[index_Y(new_a, new_b, N_modes)] += tmp * input_psi[new_c] * mult_coeff * extra_count;
@@ -633,8 +632,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				if (DEB)
 				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", index_Y(new_a, new_b, N_modes), new_c, tmp * mult_coeff * extra_count, new_a, new_b);
 				
-				extra_count = 1;
-				if (new_a == new_c) extra_count = 2;
+				extra_count = get_extra_count(new_a, new_c, transpose);
 				if (transpose == 0) mult_coeff = Z_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
 				else mult_coeff = X2_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]);
 				new_output[index_Y(new_a, new_c, N_modes)] += tmp * input_psi[new_b] * mult_coeff * extra_count;
@@ -646,8 +644,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d\n", index_Y(new_a, new_c, N_modes), new_b, tmp * mult_coeff*extra_count, new_a, new_c);
 
 
-				extra_count = 1;
-				if (new_b == new_c) extra_count = 2;
+				extra_count = get_extra_count(new_b, new_c, transpose);
 				if (transpose == 0) mult_coeff = Z_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]);
 				else  mult_coeff = X2_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]);
 				new_output[index_Y(new_b, new_c, N_modes)] += tmp * input_psi[new_a] * mult_coeff * extra_count;
@@ -1681,6 +1678,18 @@ int index_Y(int a, int b, int N) {
 	else ret += N*b - ((b - 1)*b) / 2 + (a - b);
 
 	return ret;
+}
+
+
+// returns the extra count
+double get_extra_count(int mode_a, int mode_b, int transpose) {
+	if (transpose == 0) {
+		if (mode_a == mode_b) return 2;
+		return 1;
+	}
+
+	if (mode_a == mode_b) return 1;
+	return 2;
 }
 
 

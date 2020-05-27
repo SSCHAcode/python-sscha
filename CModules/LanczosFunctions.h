@@ -195,6 +195,9 @@ double X_coeff(double w_a, double n_a, double w_b, double n_b, double w_c, doubl
 // The coefficient between on Y and RA
 double X1_coeff(double w_a, double n_a, double w_b, double n_b, double w_c, double n_c, double w_d, double n_d);
 
+// Get the extra count due to the double occurrence of a and b if the modes are different
+double get_extra_count(int mode_a, int mode_b, int transpose) ;
+
 
 /* 
  * Here the function that, given the modes, returns the corresponding
