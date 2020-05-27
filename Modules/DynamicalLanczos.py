@@ -102,6 +102,7 @@ class Lanczos:
         self.w = []
         self.pols = []
         self.n_modes = 0
+        self.ignore_harmonic = False 
         self.ignore_v3 = False
         self.ignore_v4 = False
         self.N = 0
@@ -596,6 +597,13 @@ class Lanczos:
                 It returns the application of the harmonic part of the L matrix
         """
 
+
+        # Prepare the free propagator on the positions
+        out_vect = np.zeros(np.shape(self.psi), dtype = TYPE_DP)
+
+        if self.ignore_harmonic:
+            return out_vect 
+
         # The elements where w_a and w_b are exchanged are dependent
         # So we must avoid including them
         i_a = np.tile(np.arange(self.n_modes), (self.n_modes,1)).ravel()
@@ -608,9 +616,6 @@ class Lanczos:
         w_b = self.w[new_i_b]
 
         N_w2 = len(w_a)
-
-        # Prepare the free propagator on the positions
-        out_vect = np.zeros(np.shape(self.psi), dtype = TYPE_DP)
 
         # Get the harmonic responce function
         out_vect[:self.n_modes] = (self.psi[:self.n_modes] * self.w) * self.w
