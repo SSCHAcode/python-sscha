@@ -1688,7 +1688,7 @@ double get_extra_count(int mode_a, int mode_b, int transpose) {
 		return 1;
 	}
 
-	if (mode_a == mode_b) return 1;
+	//if (mode_a == mode_b) return 1;
 	return 2;
 }
 
