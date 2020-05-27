@@ -609,6 +609,10 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				sym_coeff = symmetries[i_sym * N_modes * N_modes + a * N_modes + new_a] *
 			  	symmetries[i_sym * N_modes * N_modes + b * N_modes + new_b] *
 			  	symmetries[i_sym * N_modes * N_modes + c * N_modes + new_c];
+				
+
+				// Discard this symmetry if it does not contribute
+				if (fabs(sym_coeff) < 1e-6) continue;
 
 				if (DEB)
 				printf("IN_VEC_OUT_DYN: symfactor = %.2f | d3[%d, %d, %d] = %.6e\n", sym_coeff, a, b, c, -tmp / (N_eff));
