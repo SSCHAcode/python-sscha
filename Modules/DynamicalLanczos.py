@@ -2961,12 +2961,16 @@ def symmetrize_d3_muspace(d3, symmetries):
             The d3 tensor symmetrized
     """
 
+    print("Symmetrizing d3: SHAPE SYMMETRY:", symmetries.shape)
+
     new_d3 = np.zeros(np.shape(d3), dtype = np.double)
 
     N_sym, nmode, dumb = np.shape(symmetries)
 
     for i in range(N_sym):
         symmat = symmetries[i, :, :]
+        print("SYM {}:".format(i+1))
+        print(symmetries[i,:,:])
 
         ap = np.einsum("abc, lc ->abl", d3, symmat)
         ap = np.einsum("abc, lb ->alc", ap, symmat)
