@@ -436,8 +436,6 @@ class Ensemble:
         else:
             self.has_stress = False
             
-            # Allow the garbage collector to free the memory
-            del self.stresses
         
     def save(self, data_dir, population, use_alat = False):
         """
