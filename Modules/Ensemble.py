@@ -489,12 +489,6 @@ class Ensemble:
         self.current_dyn.save_qe("dyn_end_population%d_" % population)
 
         
-        # Check if the stresses must be saved
-        save_stress = False
-        if self.stresses != []:
-            #print self.stresses
-            save_stress = True
-            
         super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
             
         for i in xrange(self.N):
@@ -512,7 +506,7 @@ class Ensemble:
             np.savetxt("%s/u_population%d_%d.dat" % (data_dir, population, i+1), u_disp * A_TO_BOHR)
             
             # Save the stress tensors if any
-            if save_stress:
+            if self.has_stress:
                 np.savetxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1), self.stresses[i,:,:])
             
         
