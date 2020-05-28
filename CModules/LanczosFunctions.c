@@ -577,11 +577,12 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 		// This is the time consuming part!!!
 		// N_degeneracy is usually below 10, while N_configs can be hundreds of thounsands
-		double tmp = 0;
+		double tmp1 = 0;
+		double tmp;
 		
 		tmp_timing = clock();
 		for (i = 0; i < N_configs; ++i) {
-			tmp += X[N_configs*a + i] * X[N_configs*b + i] * Y[N_configs*c +i] * rho[i];
+			tmp1 += X[N_configs*a + i] * X[N_configs*b + i] * Y[N_configs*c +i] * rho[i];
 		}
 		d3_timing += clock() - tmp_timing;
 
@@ -615,11 +616,11 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				if (fabs(sym_coeff) < 1e-6) continue;
 
 				if (DEB)
-				printf("IN_VEC_OUT_DYN: symfactor = %.2f | d3[%d, %d, %d] = %.6e\n", sym_coeff, a, b, c, -tmp / (N_eff));
+				printf("IN_VEC_OUT_DYN: symfactor = %.2f | d3[%d, %d, %d] = %.6e\n", sym_coeff, a, b, c, -tmp1 / (N_eff));
 
 				// Here we must apply all the terms that contain d3
 				// Get the final d3 with the correct symmetry coefficient
-				tmp = -tmp * sym_coeff /  (6 * N_eff * N_sym_tmp);
+				tmp = -tmp1 * sym_coeff /  (6 * N_eff * N_sym_tmp);
 
 				// We start applying them on R to fill the Y values of the output
 				// This must take into account the transposition
@@ -686,7 +687,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				new_output[new_a] += tmp * input_psi[index_Y(new_b, new_c, N_modes)] * mult_coeff * extra_count;
 
 				if (DEB)
-				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d | T = %d\n", new_a, index_Y(new_b, new_c, N_modes), tmp * mult_coeff * extra_count, new_b, new_c, transpose);
+				printf("L_OP[ %d; %d] = %e | Y right modes = %d; %d | T = %d\n", new_a, index_Y(new_b, new_c, N_modes), tmp * mult_coeff * extra_count, new_b, new_c, transpose);
 
 
 
