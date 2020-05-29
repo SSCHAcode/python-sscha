@@ -558,6 +558,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 		int stop= 0;
 
 
+		if (N_degeneracy[a] * N_degeneracy[b] * N_degeneracy[c] == 1) {
 		if (DEB) printf("Element a=%d, b=%d, c=%d ... \n", a, b, c);
 	        for (i = 0; i < N_sym; ++i) {
 		  if (DEB) printf("%d) s_aa = %.2f, s_bb = %.2f, s_cc = %.2f\n", i,
@@ -572,6 +573,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 		  }
 		}
 		if (stop == 1) continue;
+		}
 		if (DEB)printf("I'm computing this element.\n");
 	
 
