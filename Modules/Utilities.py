@@ -138,7 +138,7 @@ def get_custom_functions_from_namelist(namelist, dyn):
         if mu_end < 0 or mu_end >= 3*nat:
             raise ValueError("Error, the modes specified for modelocking must be between %d and %d" % (1, 3*nat))
 
-        for iq in xrange(nq):
+        for iq in range(nq):
             w, p_v = dyn.DyagDinQ(iq)
             pols[:, :, iq] = p_v[:, mu_start : mu_end]
         
