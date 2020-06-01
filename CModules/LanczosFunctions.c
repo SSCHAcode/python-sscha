@@ -618,7 +618,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				// Discard this symmetry if it does not contribute
 				if (fabs(sym_coeff) < 1e-6) continue;
 
-				if (DEB)
+				if (DEB && i_sym == 2)
 				printf("IN_VEC_OUT_DYN: symfactor = %.6f | d3[%d, %d, %d] = %.6e | N_sym = %d | ID sym: %d | T = %d\n", sym_coeff, a, b, c, -d3_value / (N_eff), N_sym_tmp, i_sym, transpose);
 
 				// Here we must apply all the terms that contain d3
