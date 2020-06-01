@@ -2,6 +2,7 @@
 
 
 #define DEB 1
+#define DEB_L 0
 
 // The eigenvalues of the Covariance matrix
 double f_ups(double w, double T) {
@@ -549,7 +550,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 		b = (mpi_index/ N_modes) % N_modes;
 		a = (mpi_index/N_modes) / N_modes;
 
-		if (DEB) {
+		if (DEB_L) {
 			printf("RANK %d, index = %d (%d, %d). a = %d, b = %d, c = %d\n",
 				rank, mpi_index, start, stop, a, b, c);
 		}
@@ -559,12 +560,12 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 
 
 		if (N_degeneracy[a] * N_degeneracy[b] * N_degeneracy[c] == 1) {
-		if (DEB) printf("Element a=%d, b=%d, c=%d ... \n", a, b, c);
+		//if (DEB) printf("Element a=%d, b=%d, c=%d ... \n", a, b, c);
 	        for (i = 0; i < N_sym; ++i) {
-		  if (DEB) printf("%d) s_aa = %.2f, s_bb = %.2f, s_cc = %.2f\n", i,
+		  /*if (DEB) printf("%d) s_aa = %.2f, s_bb = %.2f, s_cc = %.2f\n", i,
 			 symmetries[i * N_modes*N_modes + a*N_modes + a],
 			 symmetries[i * N_modes*N_modes + b*N_modes + b],
-			 symmetries[i * N_modes*N_modes + c*N_modes + c]);
+			 symmetries[i * N_modes*N_modes + c*N_modes + c]);*/
 		  if (fabs(symmetries[i * N_modes*N_modes + a*N_modes + a] *
 			   symmetries[i * N_modes*N_modes + b*N_modes + b] *
 			   symmetries[i * N_modes*N_modes + c*N_modes + c] + 1) < __EPSILON__) {
@@ -574,7 +575,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 		}
 		if (stop == 1) continue;
 		}
-		if (DEB)printf("I'm computing this element.\n");
+		//if (DEB)printf("I'm computing this element.\n");
 	
 
 		// This is the time consuming part!!!
@@ -636,10 +637,10 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 					new_output[index_A(new_a, new_b, N_modes)] += tmp * input_psi[new_c] * Z1_coeff(w[new_a], n_w[new_a], w[new_b], n_w[new_b]) * extra_count;
 
 
-				if (DEB)
+				if (DEB_L)
 				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d | T = %d\n", index_Y(new_a, new_b, N_modes), new_c, tmp * mult_coeff * extra_count, new_a, new_b, transpose);
 				
-				if (DEB)
+				if (DEB_L)
 				printf("L_OP[ %d; %d] = %e | A modes = %d; %d | T = %d\n", index_A(new_a, new_b, N_modes), new_c, tmp  * Z1_coeff(w[new_a], n_w[new_a], w[new_b], n_w[new_b]) * extra_count, new_a, new_b, transpose);
 				
 				extra_count = get_extra_count(new_a, new_c, transpose);
@@ -650,10 +651,10 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				if (transpose == 0)
 					new_output[index_A(new_a, new_c, N_modes)] += tmp * input_psi[new_b] * Z1_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]) * extra_count;
 
-				if (DEB)
+				if (DEB_L)
 				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d | T = %d\n", index_Y(new_a, new_c, N_modes), new_b, tmp * mult_coeff*extra_count, new_a, new_c, transpose);
 
-				if (DEB)
+				if (DEB_L)
 				printf("L_OP[ %d; %d] = %e | A modes = %d; %d | T = %d\n", index_A(new_a, new_c, N_modes), new_b, tmp  * Z1_coeff(w[new_a], n_w[new_a], w[new_c], n_w[new_c]) * extra_count, new_a, new_c, transpose);
 
 
@@ -665,10 +666,10 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				if (transpose == 0)
 					new_output[index_A(new_b, new_c, N_modes)] += tmp * input_psi[new_a] * Z1_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]) * extra_count;
 
-				if (DEB)
+				if (DEB_L)
 				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d | T = %d\n", index_Y(new_b, new_c, N_modes), new_a, tmp * mult_coeff * extra_count, new_b, new_c, transpose);
 
-				if (DEB)
+				if (DEB_L)
 				printf("L_OP[ %d; %d] = %e | A modes = %d; %d | T = %d\n", index_A(new_b, new_c, N_modes), new_a, tmp * Z1_coeff(w[new_c], n_w[new_c], w[new_b], n_w[new_b]) * extra_count, new_b, new_c, transpose);
 
 				// We now apply on R to fill the A values of the output (Y2 is zero)
@@ -688,7 +689,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				else mult_coeff = Z_coeff(w[new_b], n_w[new_b], w[new_c], n_w[new_c]);
 				new_output[new_a] += tmp * input_psi[index_Y(new_b, new_c, N_modes)] * mult_coeff * extra_count;
 
-				if (DEB)
+				if (DEB_L)
 				printf("L_OP[ %d; %d] = %e | Y right modes = %d; %d | T = %d\n", new_a, index_Y(new_b, new_c, N_modes), tmp * mult_coeff * extra_count, new_b, new_c, transpose);
 
 
@@ -701,7 +702,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				new_output[new_b] += tmp * input_psi[index_Y(new_a, new_c, N_modes)] * mult_coeff * extra_count;
 
 
-				if (DEB)
+				if (DEB_L)
 				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d | T = %d\n", new_b, index_Y(new_a, new_c, N_modes), tmp * mult_coeff * extra_count, new_a, new_c, transpose);
 
 
@@ -712,7 +713,7 @@ void MPI_D3_FT(const double * X, const double * Y, const double * rho, const dou
 				else mult_coeff = Z_coeff(w[new_b], n_w[new_b], w[new_a], n_w[new_a]);
 				new_output[new_c] += tmp * input_psi[index_Y(new_b, new_a, N_modes)] * mult_coeff * extra_count;
 
-				if (DEB)
+				if (DEB_L)
 				printf("L_OP[ %d; %d] = %e | Y modes = %d; %d | T = %d\n", new_c, index_Y(new_a, new_b, N_modes), tmp * mult_coeff * extra_count, new_a, new_b, transpose);
 
 		      }
