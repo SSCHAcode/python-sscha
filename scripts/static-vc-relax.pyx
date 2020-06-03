@@ -58,7 +58,7 @@ def is_valid_file(parser, arg):
 # Prepare the parser for the command line
 parser = argparse.ArgumentParser(prog = PROG_NAME,
                                  description = INFO,
-                                 version = VERSION, formatter_class = argparse.RawTextHelpFormatter)
+                                 formatter_class = argparse.RawTextHelpFormatter)
 
 
 # Add the arguments
