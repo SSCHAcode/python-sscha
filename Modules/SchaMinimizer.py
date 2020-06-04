@@ -790,31 +790,36 @@ Maybe data_dir is missing from your input?"""
             raise IOError(s)
         
         # Symmetrize the starting dynamical matrix and apply the sum rule
-        if verbosity:
-            print("Symmetry initialization...")
-        qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
-        qe_sym.SetupQPoint(verbose = verbosity)
-
-        if self.use_spglib:
-            qe_sym.SetupFromSPGLIB()
-
-            import spglib
+        if not self.neglect_symmetries:
             if verbosity:
-                print("Symmetry group: ", spglib.get_spacegroup(self.dyn.structure.get_ase_atoms()))
-            
-            self.N_symmetries = qe_sym.QE_nsym
+                print("Symmetry initialization...")
+            qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+            qe_sym.SetupQPoint(verbose = verbosity)
 
-            # Symmetrize the dynamical matrix
-            self.dyn.SymmetrizeSupercell()
+            if self.use_spglib:
+                qe_sym.SetupFromSPGLIB()
+
+                import spglib
+                if verbosity:
+                    print("Symmetry group: ", spglib.get_spacegroup(self.dyn.structure.get_ase_atoms()))
+                
+                self.N_symmetries = qe_sym.QE_nsym
+
+                # Symmetrize the dynamical matrix
+                self.dyn.SymmetrizeSupercell()
+            else:
+                fcq = np.array(self.dyn.dynmats)
+                qe_sym.SymmetrizeFCQ(fcq, self.dyn.q_stars, asr = "custom")
+                for iq in range(len(self.dyn.q_tot)):
+                    self.dyn.dynmats[iq] = fcq[iq, :, :]
+                
+            # Save the number of symmetries
+            self.N_symmetries = qe_sym.QE_nsym
         else:
-            fcq = np.array(self.dyn.dynmats)
-            qe_sym.SymmetrizeFCQ(fcq, self.dyn.q_stars, asr = "custom")
-            for iq in range(len(self.dyn.q_tot)):
-                self.dyn.dynmats[iq] = fcq[iq, :, :]
-        
-        # Save the number of symmetries
-        self.N_symmetries = qe_sym.QE_nsym
-        
+            # Only apply the acoustic sum rule
+            CC.symmetries.CustomASR(self.dyn.dynmats[0])
+            self.N_symmetries = 1
+            
         if verbosity:
             print("Total number of symmetries: {}".format(self.N_symmetries))
             print("Check for the imaginary frequencies...")
