@@ -50,22 +50,9 @@ def main():
     minim.print_info()
 
     # Prepare the polarization vectors to define the subspace
-    # of modes in which to perform the minimization (or to lock)
-    # (This will be fixed in near future with a simpler method)
-    nat = dyn.structure.N_atoms
-    nmodes = FREE_MODE_END - FREE_MODE_START
-    nq = len(dyn.q_tot)
-    pols = np.zeros( (3*nat, nmodes, nq), dtype = np.complex128)
-    masses = dyn.structure.get_masses_array()
-    for iq in range(nq):
-        # Diagonalize the dynamical matrix
-        # and extract the modes for each q point
-        w, p = dyn.DyagDinQ(iq)
-        pols[:, :, iq] = p[:, FREE_MODE_START : FREE_MODE_END]
+    mode_lock = sscha.Utilities.ModeProjection(dyn)
+    mode_lock.SetupFreeModes(FREE_MODE_START, FREE_MODE_END)
     
-    # Prepare the constrain on the modes
-    mode_lock = sscha.Utilities.ModeProjection(pols, masses)
-
     # We configure also a custom function to save the frequencies
     # on a file
     save_freqs = sscha.Utilities.IOInfo()
