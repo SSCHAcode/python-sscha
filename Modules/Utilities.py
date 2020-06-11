@@ -191,7 +191,6 @@ def get_custom_functions_from_namelist(namelist, dyn):
     
     return None, None, cfp
         
-    
 
 
 class ModeProjection:
@@ -457,3 +456,24 @@ class IOInfo:
 
         if self.__save_each_step:
             self.Save()
+
+
+
+def get_fix_rotations_CFG(dyn):
+    """
+    FIX ROTATIONS
+    =============
+
+    This function returns a pointer to a function that allows to fix the rotational degrees of freedom.
+
+    It can be used when minimizing nanostructures or particles.
+    The dynamical matrix must be a gamma point matrix
+    """
+
+    assert len(dyn.q_tot) == 1, "Error, only Gamma calculations can fix the rotations."
+    assert np.max(np.abs(dyn.q_tot[0])) < 1e-5, "Error, the dynamical matrix must be at Gamma"
+
+    nat = dyn.structure.N_atoms 
+    # TODO: To be ended
+    
+    
