@@ -731,14 +731,12 @@ class SSCHA_Minimizer(object):
         SSCHA FREE ENERGY
         =================
         
-        Obtain the SSCHA free energy for the system.
-        This is done by integrating the free energy along the hamiltonians, starting
-        from current_dyn to the real system.
+        Obtain the SSCHA free energy per unit cell for the system. This is done through thermodynamic integration.
+        Note that for the SSCHA this integration is performed analytically, so evaluating this function
+        is almost immediate.
         
         The result is in Rydberg.
-        
-        NOTE: this method just recall the self.ensemble.get_free_energy function.
-        
+                
         .. math::
             
             \\mathcal F = \\mathcal F_0 + \\int_0^1 \\frac{d\\mathcal F_\\lambda}{d\\lambda} d\\lambda
