@@ -711,7 +711,7 @@ Error, the following stress files are missing from the ensemble:
         self.force_computed = np.zeros(self.N, dtype = bool)
 
 
-    def generate(self, N, evenodd = True, project_on_modes = None, compute_sscha_forces = True, get_q_vectors = False):
+    def generate(self, N, evenodd = True, project_on_modes = None):
         """
         GENERATE THE ENSEMBLE
         =====================
@@ -755,11 +755,6 @@ Error, the following stress files are missing from the ensemble:
             structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
 
         self.init_from_structures(structures)
-        
-        # Generate the q_start
-        if get_q_vectors:
-            self.q_start = CC.Manipulate.GetQ_vectors(self.structures, super_dyn)
-            self.current_q = self.q_start.copy()
         
         
     def unwrap_symmetries(self):
