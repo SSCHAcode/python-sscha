@@ -689,16 +689,14 @@ Error, the following stress files are missing from the ensemble:
         self.u_disps = np.zeros( (self.N, Nat_sc * 3), dtype = np.float64, order = "F")
         self.xats = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "C")
         for i, s in enumerate(self.structures):
-            if compute_sscha_forces:
-                energy, force  = self.dyn_0.get_energy_forces(s, supercell = self.supercell, 
-                                                            real_space_fc=super_dyn.dynmats[0])
-                
-                self.sscha_energies[i] = energy
-                self.sscha_forces[i,:,:] = force
-            
             # Get the displacements
-            self.u_disps[i, :] = s.get_displacement(super_struct).reshape((3* Nat_sc))
             self.xats[i, :, :] = s.coords
+        
+        new_super_dyn = self.current_dyn.GenerateSupercellDyn(self.current_dyn.GetSupercell())
+        self.u_disps[:,:] = np.reshape(self.xats - np.tile(new_super_dyn.structure.coords, (self.N, 1)), (self.N, 3 * Nat_sc)) 
+
+        self.sscha_energies[:], self.sscha_forces[:,:,:] = new_super_dyn.get_energy_forces(None, displacement = self.u_disps)
+
         
         self.rho = np.ones(self.N, dtype = np.float64)
         self.current_dyn = self.dyn_0.Copy()
