@@ -692,6 +692,10 @@ Error, the following stress files are missing from the ensemble:
             # Get the displacements
             self.xats[i, :, :] = s.coords
         
+        # TODO:
+        # Here it is useless to generate the supercell dynamical matrix, 
+        # it should be replaced by generating the unit cell structure, 
+        # But then the get_energy_forces method should provide the correct implementation.
         new_super_dyn = self.current_dyn.GenerateSupercellDyn(self.current_dyn.GetSupercell())
         self.u_disps[:,:] = np.reshape(self.xats - np.tile(new_super_dyn.structure.coords, (self.N, 1,1)), (self.N, 3 * Nat_sc), order = "C") 
 
