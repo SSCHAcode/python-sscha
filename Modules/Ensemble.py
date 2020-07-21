@@ -693,7 +693,7 @@ Error, the following stress files are missing from the ensemble:
             self.xats[i, :, :] = s.coords
         
         new_super_dyn = self.current_dyn.GenerateSupercellDyn(self.current_dyn.GetSupercell())
-        self.u_disps[:,:] = np.reshape(self.xats - np.tile(new_super_dyn.structure.coords, (self.N, 1)), (self.N, 3 * Nat_sc)) 
+        self.u_disps[:,:] = np.reshape(self.xats - np.tile(new_super_dyn.structure.coords, (self.N, 1,1)), (self.N, 3 * Nat_sc), order = "C") 
 
         self.sscha_energies[:], self.sscha_forces[:,:,:] = new_super_dyn.get_energy_forces(None, displacement = self.u_disps)
 
