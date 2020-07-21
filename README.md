@@ -24,7 +24,7 @@ So, what are you waiting? Download and install python-sscha, and start enjoing t
 ## Requirements
 
 The requirements of the python-sscha package are:
-1. python >= 2.7 and < 3
+1. python >= 2.7 
 2. numpy
 3. matplotlib
 3. Lapack
