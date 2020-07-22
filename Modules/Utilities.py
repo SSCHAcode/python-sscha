@@ -12,6 +12,8 @@ import cellconstructor as CC
 import cellconstructor.Phonons
 import numpy as np
 
+import pickle
+
 __UTILS_NAMESPACE__ = "utils"
 __UTILS_SAVEFREQ_FILENAME__ = "save_freq_filename"
 __UTILS_SAVERHO_FILENAME__ = "save_rho_filename"
@@ -477,3 +479,55 @@ def get_fix_rotations_CFG(dyn):
     # TODO: To be ended
     
     
+
+def save_binary(object, filename):
+    """
+    SAVE EVERYTHING
+    ===============
+
+    This method saves the whole status of a class (it may be the relax or even the minimizer)
+    So that it can be used for analyzing the results. 
+    It will recursivly contain all the data stored by the class, included the ensemble and the dynamical matrices.
+
+    The file will be in binary.
+
+    NOTE: There is no warranty that the fill will be readable when loaded with a different python version.
+
+    For this reason, if you want to store the ensemble, the save_bin from ensemble is strongly suggested.
+
+    This methods is just a wrapper for the python pickle utility.
+
+    Parameters
+    ----------
+        object : anything
+            The python object you want to save, it may even be a class. 
+        filename : string (path to file)
+            The filename on which you want to save the binary data.
+    """
+
+    pickle.dump(object, open(filename, "wb"))
+
+
+
+def load_binary(filename):
+    """
+    LOAD EVERYTHING
+    ===============
+
+    This method loads the whole status of a class (it may be the relax or even the minimizer)
+    So that it can be used for analyzing the results. 
+    It will recursivly contain all the data stored by the class, included the ensemble and the dynamical matrices.
+
+    It can read data generated with save_binary
+
+    NOTE: There is no warranty that the fill will be readable when loaded with a different python version.
+
+    This methods is just a wrapper for the python pickle utility.
+
+    Parameters
+    ----------
+        filename : string (path to file)
+            The filename you want to read
+    """
+
+    return pickle.load(open(filename, "rb"))

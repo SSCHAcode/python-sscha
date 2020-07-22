@@ -594,8 +594,6 @@ Error, the following stress files are missing from the ensemble:
         
         self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
         
-        
-        
     def load_bin(self, data_dir, population_id = 1, avoid_loading_dyn = False):
         """
         LOAD THE BINARY ENSEMBLE

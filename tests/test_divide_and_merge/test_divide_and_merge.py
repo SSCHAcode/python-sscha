@@ -3,6 +3,7 @@ import cellconstructor as CC
 import cellconstructor.Phonons
 
 import numpy as np
+import pickle
 
 import sscha, sscha.Ensemble
 import sys, os
@@ -82,7 +83,18 @@ def test_divide_and_merge():
     other2.merge(other_ensemble)
     other2.update_weights(dyn_end, T)
 
-    assert np.max(np.abs(other2.rho - all_rhos)) < __EPS__, "Error during merging the loaded ensemble"    
+    assert np.max(np.abs(other2.rho - all_rhos)) < __EPS__, "Error during merging the loaded ensemble"
+
+    # Try a pickle saving
+    fname = os.path.join("data", "prova")
+    pickle.dump(other2, open(fname, "wb"))
+    new_pickled = pickle.load( open(fname, "rb"))
+
+    # Check the dynamical matrix
+    assert np.max(np.abs(new_pickled.current_dyn.dynmats[0] - dyn_end.dynmats[0])) < __EPS__, "Error in loading after pickling save"
+
+                
+    
     
 
 if __name__ == "__main__":
