@@ -149,9 +149,10 @@ class Ensemble:
         # A flag that memorize if the ensemble has also the stresses
         self.has_stress = False
 
-
-	# Adding new quantity to speed up the minimization step
-	self.original_v=np.zeros(self.N)
+        # Adding new quantity to speed up the minimization step
+        self.original_v = np.zeros(self.N)
+	
+        
 
     def convert_units(self, new_units):
         """
@@ -326,8 +327,8 @@ class Ensemble:
         self.sscha_forces = np.zeros( (self.N, Nat_sc, 3), order = "F", dtype = np.float64)
         
         self.u_disps = np.zeros( (self.N, Nat_sc * 3), order = "F", dtype = np.float64)
-
-	self.original_v=np.zeros((self.N), dtype=np.float64)
+        
+        self.original_v = np.zeros( (self.N), dtype = np.float64)
         
         # Add a counter to check if all the stress tensors are present
         count_stress = 0 
@@ -490,7 +491,7 @@ class Ensemble:
             save_stress = True
             
         super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
-            
+        
         for i in xrange(self.N):
             # Save the forces
             np.savetxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1), self.forces[i,:,:] / A_TO_BOHR)
@@ -504,11 +505,11 @@ class Ensemble:
             # Save the stress tensors if any
             if save_stress:
                 np.savetxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1), self.stresses[i,:,:])
-            
         if save_sscha:
-	    np.savetxt("%s/sscha_energies_supercell_population%d.dat" % (data_dir, population), self.sscha_energies)
-	    for i in xrange(self.N):
-		np.savetxt("%s/sscha_forces_population%d_%d.dat" % (data_dir, population, i+1), self.sscha_forces[i,:,:]) 
+            np.savetxt("%s/sscha_energies_supercell_population%d.dat" % (data_dir, population), self.sscha_energies )
+            for i in xrange(self.N):
+                np.savetxt("%s/sscha_forces_population%d_%d.dat" % (data_dir, population, i+1), self.sscha_forces[i,:,:]) 
+        
 
     def save_bin(self, data_dir, population_id = 1,save_sscha=False):
 
@@ -549,9 +550,9 @@ class Ensemble:
         
         self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
 	
-	if save_sscha:
-		np.save("%s/sscha_energies_supercell_population%d.npy" % (data_dir, population_id), self.sscha_energies)
-        	np.save("%s/sscha_forces_pop%d.npy" % (data_dir,population_id), self.sscha_forces)
+        if save_sscha:
+            np.save("%s/sscha_energies_supercell_population%d.npy" % (data_dir, population_id), self.sscha_energies)
+            np.save("%s/sscha_forces_pop%d.npy" % (data_dir,population_id), self.sscha_forces)
         
         
     def load_bin(self, data_dir, population_id = 1, avoid_loading_dyn = False,load_sscha=False):
@@ -607,18 +608,18 @@ class Ensemble:
             self.structures[i].coords = self.xats[i,:,:]
             self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
         
-	if load_sscha:
-	    self.sscha_energies=np.load("%s/sscha_energies_supercell_population%d.npy" % (data_dir, population_id))
-	    self.sscha_forces=np.load("%s/sscha_forces_pop%d.npy" % (data_dir,population_id))
-	else:
-	    self.sscha_energies = np.zeros(self.N, dtype = np.float64)
+        if load_sscha:
+            self.sscha_energies=np.load("%s/sscha_energies_supercell_population%d.npy" % (data_dir, population_id))
+            self.sscha_forces=np.load("%s/sscha_forces_pop%d.npy" % (data_dir,population_id))
+        else:
+            self.sscha_energies = np.zeros(self.N, dtype = np.float64)
             self.sscha_forces = np.zeros( (self.N, Nat_sc, 3), order = "F", dtype = np.float64)
-	    for i in xrange(self.N):
-            	energy, force = self.dyn_0.get_energy_forces(self.structures[i], supercell = self.supercell, 
+            for i in xrange(self.N):
+                energy, force = self.dyn_0.get_energy_forces(self.structures[i], supercell = self.supercell, 
                                                          real_space_fc=super_fc)
             
-            	self.sscha_energies[i] = energy
-            	self.sscha_forces[i, :, :] = force
+                self.sscha_energies[i] = energy
+                self.sscha_forces[i, :, :] = force
 
 
         # Setup the initial weights
@@ -657,7 +658,7 @@ class Ensemble:
         Nat_sc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms
         self.structures = []
         super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
-	t1=time.time()
+        t1=time.time()
 	
 	#initialize the basic structures
         self.sscha_energies = np.zeros( ( self.N), dtype = np.float64)
@@ -668,32 +669,31 @@ class Ensemble:
         self.xats = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "C")
         self.u_disps = np.zeros( (self.N, Nat_sc * 3), dtype = np.float64, order = "F")
 
-	if fast:
-	    if evenodd:
-		structs, disps = super_dyn.ExtractRandomStructures(N/2,self.T0,fast=fast,project_on_vectors=project_on_modes)
-	    	self.u_disps[::2,:]=disps.transpose()
-	    	self.u_disps[1::2,:]=-disps.transpose()
+        if fast:
+            if evenodd:
+                structs, disps = super_dyn.ExtractRandomStructures(N/2,self.T0,fast=fast,project_on_vectors=project_on_modes)
+                self.u_disps[::2,:]=disps.transpose()
+                self.u_disps[1::2,:]=-disps.transpose()
 		
-		for i, s in enumerate(structs):
+                for i, s in enumerate(structs):
                     self.structures.append(s)
                     new_s = s.copy()
                     # Get the opposite displacement structure
-		    new_s.coords = super_dyn.structure.coords + self.u_disps[2*i+1,:].reshape(Nat_sc,3)
+                    new_s.coords = super_dyn.structure.coords + self.u_disps[2*i+1,:].reshape(Nat_sc,3)
                     self.structures.append(new_s)
             else:
                 self.structures,disps = super_dyn.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
-		self.u_disps=disps.transpose()
-	    t2=time.time()
-	    print ("Time elapsed to generate the structures:", t2 - t1, "s")
+                self.u_disps=disps.transpose()
+            t2=time.time()
+            print ("Time elapsed to generate the structures:", t2 - t1, "s")
 
         # Compute the sscha energy and forces
-	    t1=time.time()
-	    for i,s in enumerate(self.structures):
-	        self.xats[i,:,:] = s.coords	
-	    forces,self.sscha_energies =SCHAModules.harmonic.update(super_dyn.dynmats[0],self.u_disps,Nat_sc,self.N)
-	    self.sscha_forces=forces.reshape(self.N,Nat_sc,3)
-
-	else:
+            t1=time.time()
+            for i,s in enumerate(self.structures):
+                self.xats[i,:,:] = s.coords	
+            forces,self.sscha_energies =SCHAModules.harmonic.update(super_dyn.dynmats[0],self.u_disps,Nat_sc,self.N)
+            self.sscha_forces=forces.reshape(self.N,Nat_sc,3)
+        else:
             if evenodd:
                 structs = super_dyn.ExtractRandomStructures(N / 2, self.T0, project_on_vectors = project_on_modes)
                 for i, s in enumerate(structs):
@@ -704,10 +704,10 @@ class Ensemble:
                     self.structures.append(new_s)
             else:
                 self.structures = super_dyn.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
-	    t2=time.time()
-	    print ("Time elapsed to generate the structures:", t2 - t1, "s")
+            t2=time.time()
+            print ("Time elapsed to generate the structures:", t2 - t1, "s")
             
- 	    t1=time.time()
+            t1=time.time()
             # Compute the sscha energy and forces
             for i, s in enumerate(self.structures):
                 energy, force  = self.dyn_0.get_energy_forces(s, supercell = self.supercell, 
@@ -722,11 +722,11 @@ class Ensemble:
 	
 
         t2=time.time()
-	print ("Time elapsed to compute energy forces and to set disp and coords:", t2 - t1, "s")
+        print ("Time elapsed to compute energy forces and to set disp and coords:", t2 - t1, "s")
         self.rho = np.ones(self.N, dtype = np.float64)
         self.current_dyn = self.dyn_0.Copy()
         self.current_T = self.T0
-	self.original_v=np.zeros(self.N, dtype=np.float64)
+        self.original_v=np.zeros(self.N, dtype=np.float64)
         
         
         # Generate the q_start
@@ -830,17 +830,17 @@ class Ensemble:
 	#self.current_T=original_T    
         super_dyn= self.dyn_0.GenerateSupercellDyn(self.supercell)
         #w, pols = super_dyn.DyagDinQ(0)
-	Nat_sc = super_dyn.structure.N_atoms
-	disps=np.zeros(np.shape(self.u_disps), dtype=np.double)
+        Nat_sc = super_dyn.structure.N_atoms
+        disps=np.zeros(np.shape(self.u_disps), dtype=np.double)
 	
 	
-	for i in xrange(self.N):
-	    disps[i,:]=(self.xats[i,:,:]-super_dyn.structure.coords).reshape(3*Nat_sc)
+        for i in xrange(self.N):
+            disps[i,:]=(self.xats[i,:,:]-super_dyn.structure.coords).reshape(3*Nat_sc)
 
-	Ups=np.real(super_dyn.GetUpsilonMatrix(self.T0))
+        Ups=np.real(super_dyn.GetUpsilonMatrix(self.T0))
 	
-	for i in xrange(self.N):
-	    self.original_v[i] = disps[i, :].dot(Ups.dot(disps[i, :])) * __A_TO_BOHR__**2	
+        for i in xrange(self.N):
+            self.original_v[i] = disps[i, :].dot(Ups.dot(disps[i, :])) * __A_TO_BOHR__**2	
 
 
     def update_weights(self, new_dynamical_matrix, newT, update_q = False):
@@ -912,9 +912,9 @@ class Ensemble:
         
 
 	#super_fast
-	forces,self.sscha_energies =SCHAModules.harmonic.update(new_super_dyn.dynmats[0],self.u_disps,Nat_sc,self.N)
-	self.sscha_forces=forces.reshape(self.N,Nat_sc,3)
-	t4 = time.time()
+        forces,self.sscha_energies =SCHAModules.harmonic.update(new_super_dyn.dynmats[0],self.u_disps,Nat_sc,self.N)
+        self.sscha_forces=forces.reshape(self.N,Nat_sc,3)
+        t4 = time.time()
 
 
         if update_q:
@@ -959,9 +959,9 @@ class Ensemble:
             #v_old = old_disps[i, :].dot(ups_old.dot(old_disps[i, :])) * __A_TO_BOHR__**2
             #rho_tmp[i] *= np.exp(-0.5 * (v_new - v_old) )
 
-	for i in xrange(self.N):    
-	    v_new=self.u_disps[i,:].dot(ups_new.dot(self.u_disps[i,:]))* __A_TO_BOHR__**2
-	    rho_tmp[i] *= np.exp(-0.5* (v_new-self.original_v[i]))
+        for i in xrange(self.N):    
+            v_new=self.u_disps[i,:].dot(ups_new.dot(self.u_disps[i,:]))* __A_TO_BOHR__**2
+            rho_tmp[i] *= np.exp(-0.5* (v_new-self.original_v[i]))
 
         # Lets try to use this one
         self.rho = rho_tmp
@@ -1182,8 +1182,8 @@ class Ensemble:
         return free_energy
 
     def get_entropy(self):
-	"""
-	Obtain the entropy for the system.
+        """
+        Obtain the entropy for the system.
 	Done by taking minus the derivative of the Free energy with respect to the temperature.
 
 	The result is in Ry/K
@@ -1194,25 +1194,25 @@ class Ensemble:
 
         Where n_\mu is the bosonic occupation factor
 
-	"""
-	super_dyn=self.current_dyn.GenerateSupercellDyn(self.supercell)
+        """
+        super_dyn=self.current_dyn.GenerateSupercellDyn(self.supercell)
 
-	w, pols= super_dyn.DyagDinQ(0)
+        w, pols= super_dyn.DyagDinQ(0)
 
 	#Exclude translations
-	w = w[~CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())]
+        w = w[~CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())]
 
 	#Calculate the bosonic occupation factor
 
 	
 	
-	if self.current_T== 0:
-	    entropy = 0
-	else:
-	    n_bos = 1 / (np.exp(w * __RyToK__ / self.current_T) - 1) 
-	    entropy =  np.sum(- np.log(1- np.exp(-w * __RyToK__ / self.current_T))/__RyToK__ + w *n_bos /self.current_T)
+        if self.current_T== 0:
+            entropy = 0
+        else:
+            n_bos = 1 / (np.exp(w * __RyToK__ / self.current_T) - 1) 
+            entropy =  np.sum(- np.log(1- np.exp(-w * __RyToK__ / self.current_T))/__RyToK__ + w *n_bos /self.current_T)
 	
-	return entropy
+        return entropy
 
     def get_free_energy_interpolating(self, target_supercell, support_dyn_coarse = None, support_dyn_fine = None, error_on_imaginary_frequency = True, return_error = False):
         """
@@ -1524,24 +1524,7 @@ class Ensemble:
  #
     
     def get_covmat_from_ensemble(self):
-        """
-        GET THE COVARIANCE STOCASTICALLY
-        ================================
-        
-        This method is for testing, allows to use the ensemble to
-        evaluate the covariance matrix stochastically. It should be equal
-        to the matrix Upsilon^-1 that is obtained with the GetUpsilonMatrix method
-        from the Phonons package.
-        
-        .. math::
-            
-            \Upsilon^{-1}_{ab} = \\left< u_a u_b\\right>
-        
-        Results
-        -------
-            cov_mat : 3nat x 3nat, ndarray
-                A numpy matrix of the covariance matrix.
-        """
+ 
         
         # A C style matrix of double precision real values
         cov_mat = np.einsum("i, ij, ik", self.rho, self.u_disps, self.u_disps) / np.sum(self.rho)
@@ -1615,26 +1598,26 @@ class Ensemble:
         
 	## Introducing the possibility to reduce the error by coupling even-odd configuration
 
-	if even_odd:
+	#if even_odd:
 	    # Define the new symmetrized quantities
-	    reduced_N =self.N/2
-	    eo_abinit_stress=np.zeros((3,3,reduced_N))
-	    eo_forces=np.zeros((reduced_N,nat,3))
-	    eo_disps=np.zeros((reduced_N,nat,3))
-	    eo_rho=np.zeros(reduced_N)
+	#    reduced_N =self.N/2
+	#    eo_abinit_stress=np.zeros((3,3,reduced_N))
+	#    eo_forces=np.zeros((reduced_N,nat,3))
+	#    eo_disps=np.zeros((reduced_N,nat,3))
+	#    eo_rho=np.zeros(reduced_N)
 		
 	    # Calculate them		
-	    for i in range(reduced_N):
-                eo_abinit_stress[:,:,i]=(abinit_stress[:,:,2*i]+abinit_stress[:,:,2*i+1])/2
-		eo_forces[i,:,:]=(self.forces[2*i,:,:]-self.forces[2*i+1,:,:])/2
-		eo_disps[i,:,:]=u_disps[2*i,:,:]
-		eo_rho[i]=self.rho[2*i]
+	#    for i in range(reduced_N):
+        #        eo_abinit_stress[:,:,i]=(abinit_stress[:,:,2*i]+abinit_stress[:,:,2*i+1])/2
+	#	eo_forces[i,:,:]=(self.forces[2*i,:,:]-self.forces[2*i+1,:,:])/2
+	#	eo_disps[i,:,:]=u_disps[2*i,:,:]
+	#	eo_rho[i]=self.rho[2*i]
 	
-	    stress, err_stress = SCHAModules.get_stress_tensor(volume, eo_forces / __A_TO_BOHR__, eo_disps * __A_TO_BOHR__, 
-                                                           eo_abinit_stress, wr, er, self.current_T, eo_rho, "err_yesrho", 
-                                                           reduced_N, nat, len(wr))
-        else:
-            stress, err_stress = SCHAModules.get_stress_tensor(volume, self.forces / __A_TO_BOHR__, u_disps * __A_TO_BOHR__, 
+	#    stress, err_stress = SCHAModules.get_stress_tensor(volume, eo_forces / __A_TO_BOHR__, eo_disps * __A_TO_BOHR__, 
+                                 #                          eo_abinit_stress, wr, er, self.current_T, eo_rho, "err_yesrho", 
+                                  #                         reduced_N, nat, len(wr))
+        #else:
+        stress, err_stress = SCHAModules.get_stress_tensor(volume, self.forces / __A_TO_BOHR__, u_disps * __A_TO_BOHR__, 
                                                            abinit_stress, wr, er, self.current_T, self.rho, "err_yesrho", 
                                                            self.N, nat, len(wr))    
         
@@ -1693,10 +1676,10 @@ class Ensemble:
 
         # Symmetrize the stress tensor
         qe_sym = CC.symmetries.QE_Symmetry(self.current_dyn.structure)
-	if not use_spglib:
-	    qe_sym.SetupQPoint()
-	else:
-	    qe_sym.SetupFromSPGLIB()
+        if not use_spglib:
+            qe_sym.SetupQPoint()
+        else:
+            qe_sym.SetupFromSPGLIB()
         qe_sym.ApplySymmetryToMatrix(stress, err_stress)
         
         return stress, err_stress
@@ -2751,7 +2734,7 @@ class Ensemble:
             cart_odd_corr = np.einsum("ai,bj,ij -> ab", pols_sc, pols_sc, odd_corr)
             cart_odd_corr *= np.outer(np.sqrt(_m_),  np.sqrt(_m_))
 	
-	    if save_all:
+            if save_all:
                 np.save("odd_corr_%d.npy" % i_freq, cart_odd_corr)
 
             total_self_energy = cart_odd_corr 
@@ -2879,7 +2862,7 @@ class Ensemble:
         for i0 in xrange(N_rand / size):
             #i = i0 + size * rank
             #i=i0*rank+size or 
-	    i=i0+N_rand/size*rank
+            i=i0+N_rand/size*rank
             
             struct = structures[i]
             atms = struct.get_ase_atoms()
@@ -2952,50 +2935,50 @@ class Ensemble:
             
     
     def get_kinetic_energy(self, element=None):
-	"""
-	This function returns the kinetic energy per atom of the system in meV.
-	Keep in mind that this formula is correct only at the minimum of the free energy (and at the equilibrium volume??)
+        """
+        This function returns the kinetic energy per atom of the system in meV.
+        Keep in mind that this formula is correct only at the minimum of the free energy (and at the equilibrium volume??)
 
-	K= \frac{1}{2} \sum_{\mu s} \hbar \omega_mu (n_\mu +\frac{1}{2}) \sum_j \epsilon_\mu^{sj} \epsilon_\mu^{sj}
-	Parametes
-	----------	
-		element :
+        K= \frac{1}{2} \sum_{\mu s} \hbar \omega_mu (n_\mu +\frac{1}{2}) \sum_j \epsilon_\mu^{sj} \epsilon_\mu^{sj}
+        Parametes
+        ----------	
+              element :
 			Allows to isolate the kinetic energy of a single element        
 	
 
-	"""
- 	super_dyn=self.current_dyn.GenerateSupercellDyn(self.supercell)
-	nat_sc=super_dyn.structure.N_atoms
+        """
+        super_dyn=self.current_dyn.GenerateSupercellDyn(self.supercell)
+        nat_sc=super_dyn.structure.N_atoms
 
-	w, pols= super_dyn.DyagDinQ(0)
+        w, pols= super_dyn.DyagDinQ(0)
 	#Exclude translations
-	w = w[~CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())]
-	pols = pols[ :, ~CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array()) ]
-	n_modes=len(w)
+        w = w[~CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())]
+        pols = pols[ :, ~CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array()) ]
+        n_modes=len(w)
 	#Calculate the bosonic occupation factor
 
-	if self.current_T== 0:
-	    n_bos = 0
-	else:
-	    n_bos = 1 / (np.exp(w * __RyToK__ / self.current_T) - 1) 
+        if self.current_T== 0:
+            n_bos = 0
+        else:
+            n_bos = 1 / (np.exp(w * __RyToK__ / self.current_T) - 1) 
 
 	#Calculate the potential energy and reshape the polarization factor
-	pot_energy=(n_bos+0.5)*w*13605.698066
-	pol_vec=pols.reshape(nat_sc,3, n_modes)
-	kinetic_energy=0
+        pot_energy=(n_bos+0.5)*w*13605.698066
+        pol_vec=pols.reshape(nat_sc,3, n_modes)
+        kinetic_energy=0
 
-	if element is None:
-	    return np.sum(pot_energy)/(2*nat_sc)
-	else:
-	    masses=super_dyn.structure.get_masses_array()
-	    atom_symbol=super_dyn.structure.atoms
-	    for i in range(n_modes):
-		num_of_atoms= 0
-	        for j in range(nat_sc):
-	            if atom_symbol[j]==element:
-			num_of_atoms += 1
-			kinetic_energy += pot_energy[i]*np.sum(pol_vec[j,:,i]*np.conj(pol_vec[j,:,i]))/2
-	    return kinetic_energy/num_of_atoms		
+        if element is None:
+            return np.sum(pot_energy)/(2*nat_sc)
+        else:
+            masses=super_dyn.structure.get_masses_array()
+            atom_symbol=super_dyn.structure.atoms
+            for i in range(n_modes):
+                num_of_atoms= 0
+                for j in range(nat_sc):
+                    if atom_symbol[j]==element:
+                        num_of_atoms += 1
+                        kinetic_energy += pot_energy[i]*np.sum(pol_vec[j,:,i]*np.conj(pol_vec[j,:,i]))/2
+            return kinetic_energy/num_of_atoms		
 
 
         
