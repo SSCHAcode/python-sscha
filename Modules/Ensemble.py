@@ -260,7 +260,7 @@ class Ensemble:
         self.units = new_units
 
         
-    def load(self, data_dir, population, N, verbose = False, load_displacements = True, raise_error_on_not_found = True, load_noncomputed_ensemble = False):
+    def load(self, data_dir, population, N, verbose = False, load_displacements = True, raise_error_on_not_found = False, load_noncomputed_ensemble = False):
         """
         LOAD THE ENSEMBLE
         =================
@@ -746,7 +746,7 @@ Error, the following stress files are missing from the ensemble:
 
 
             for i, s in enumerate(structs):
-                self.structures.append(s)
+                structures.append(s)
                 new_s = s.copy()
                 # Get the opposite displacement structure
                 new_s.coords = super_struct.coords - new_s.get_displacement(super_struct)
@@ -2876,6 +2876,7 @@ DETAILS OF ERROR:
         N = np.sum(non_mask.astype(int))
         ens = Ensemble(self.dyn_0, self.T0, self.dyn_0.GetSupercell())
         ens.init_from_structures(structs) 
+        ens.update_weights(self.current_dyn, self.current_T)
 
         return ens
         
