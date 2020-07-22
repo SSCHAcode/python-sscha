@@ -1420,9 +1420,12 @@ def PerformRootStep(dyn_q, grad_q, step_size=1, root_representation = "sqrt", mi
             The updated dynamical matrix in q space
     """
     ALLOWED_REPRESENTATION = ["normal", "root4", "sqrt", "root2"]
+
+    # Avoid case sensitiveness
+    root_representation = root_representation.lower()
     
     if not root_representation in ALLOWED_REPRESENTATION:
-        raise ValueError("Error, root_representation is %s must be one of %s." % (root_representation,
+        raise ValueError("Error, root_representation is %s must be one of '%s'." % (root_representation,
                                                                                   ", ".join(ALLOWED_REPRESENTATION)))
     # Allow also for the usage of root2 instead of sqrt
     if root_representation == "root2":
@@ -1454,12 +1457,12 @@ def PerformRootStep(dyn_q, grad_q, step_size=1, root_representation = "sqrt", mi
                 eigvals[eigvals < 0] = 0.
             
             # The sqrt conversion
-            new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(eigvals), np.conj(eigvects), eigvects)
+            new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(eigvals), eigvects, np.conj(eigvects))
             new_grad[iq, :, :] = new_dyn[iq, :, :].dot(grad_q[iq, :, :]) + grad_q[iq, :, :].dot(new_dyn[iq, :, :])
             
             # If root4 another loop needed
             if root_representation == "root4":                
-                new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(np.sqrt(eigvals)), np.conj(eigvects), eigvects)
+                new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(np.sqrt(eigvals)), eigvects, np.conj(eigvects))
                 new_grad[iq, :, :] = new_dyn[iq, :, :].dot(new_grad[iq, :, :]) + new_grad[iq, :, :].dot(new_dyn[iq, :, :])
     
     # Perform the step
@@ -1467,7 +1470,7 @@ def PerformRootStep(dyn_q, grad_q, step_size=1, root_representation = "sqrt", mi
     if minimization_algorithm == "sdes":
         new_dyn -= new_grad * step_size
     else:
-        raise ValueError("Error, the given minimization_algorithm %s is not implemented." % minimization_algorithm)
+        raise ValueError("Error, the given minimization_algorithm '%s' is not implemented." % minimization_algorithm)
     
     
     if root_representation != "normal":

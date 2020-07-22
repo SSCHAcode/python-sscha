@@ -508,7 +508,6 @@ def save_binary(object, filename):
     pickle.dump(object, open(filename, "wb"))
 
 
-
 def load_binary(filename):
     """
     LOAD EVERYTHING
