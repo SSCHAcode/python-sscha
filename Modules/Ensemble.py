@@ -2835,6 +2835,46 @@ DETAILS OF ERROR:
         # Now update everything
         self.update_weights(self.current_dyn, self.current_T)
 
+
+    def split(self, split_mask):
+        """
+        SPLIT THE ENSEMBLE
+        ==================
+
+        This method will return an ensemble with only the configurations matched by the split_mask array.
+        NOTE: The original ensemble will remain untouched.
+
+        Parameters
+        ----------
+            split_mask : ndarray(size = self.N, dtype = bool)
+                A mask array. It must be of the same size of the number of configurations, 
+                and contain a True or False if you want that the corresponding configuration to be included in the
+                splitted ensemble
+        
+        Results
+        -------
+            splitted_ensemble : Ensemble()
+                An ensemble tath will contain only the configurations in the split mask.
+        """
+
+        structs = [self.structures[x] for x in np.arange(len(split_mask))[split_mask]]
+
+        N = np.sum(split_mask.astype(int))
+        ens = Ensemble(self.dyn_0, self.T0, self.dyn_0.GetSupercell())
+        ens.init_from_structures(structs) 
+        ens.force_computed[:] = self.force_computed[split_mask]
+        ens.stress_computed[:] = self.stress_computed[split_mask]
+        ens.energies[:] = self.energies[split_mask]
+        ens.forces[:, :, :] = self.forces[split_mask, :, :]
+        ens.has_stress = self.has_stress
+        if self.has_stress:
+            ens.stresses[:, :, :] = self.stresses[split_mask, :, :]
+
+        ens.update_weights(self.current_dyn, self.current_T)
+
+        return ens
+
+
     def remove_noncomputed(self):
         """
         Removed all the incomplete calculation from the ensemble.
@@ -2871,15 +2911,7 @@ DETAILS OF ERROR:
         if self.has_stress:
             non_mask = non_mask & (~self.stress_computed)
 
-        structs = [self.structures[x] for x in np.arange(len(non_mask))[non_mask]]
-
-        N = np.sum(non_mask.astype(int))
-        ens = Ensemble(self.dyn_0, self.T0, self.dyn_0.GetSupercell())
-        ens.init_from_structures(structs) 
-        ens.update_weights(self.current_dyn, self.current_T)
-
-        return ens
-        
+        return self.split(non_mask)
 
     def get_energy_forces(self, ase_calculator, compute_stress = True, stress_numerical = False, skip_computed = False):
         """
