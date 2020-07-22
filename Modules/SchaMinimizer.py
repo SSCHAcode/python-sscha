@@ -35,7 +35,7 @@ except:
 import cellconstructor as CC
 import cellconstructor.Methods
 import time
-
+import warnings
 import sys, os
 
 import sscha.Ensemble as Ensemble
@@ -872,7 +872,20 @@ Maybe data_dir is missing from your input?"""
         # For now check that if root representation is activated
         # The preconditioning must be deactivated
         if self.root_representation != "normal" and self.precond_dyn:
-            raise ValueError("Error, deactivate the preconditioning if a root_representation is used.")
+            WRN_MSG = """\n
+WARNING, the preconditioning is activated together with a root representation.
+         please note that the its best effective when root representation is not active.
+         At the same time, root representation works better when preconditioning is deactivated.
+         You can ignore this message if you decided to activate preconditioning on purpouses
+         (gradient calculation without preconditioning could be time demanding on big systems).
+         
+         In the case you want to use both preconditioning and root_representation, 
+         the best match should be with root_representation = 'sqrt' (you set '{}')\n""".format(self.root_representation)
+            print(WRN_MSG)
+            warnings.warn(WRN_MSG)
+
+
+            #raise ValueError("Error, deactivate the preconditioning if a root_representation is used.")
         
 #
 #        # Initialize the symmetry
