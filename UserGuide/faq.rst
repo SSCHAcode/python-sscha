@@ -33,6 +33,7 @@ How do I start a calculation if the Dynamical matrices have imaginary frequencie
     The previous script (that we can save into *script.py*) will generate the positive definite matrix ready for the sscha run. It may be executed with
 
     .. code-block:: console
+		    
        python script.py
 
   
@@ -78,12 +79,14 @@ The code stops saying it has found imaginary frequencies, how do I fix it?
     In the namelist input you activate this minimization with the following keywords inside the &inputscha namelist
 
     .. code-block:: fortran
+		    
        preconditioning = .false.
        root_representation = "root4"
 
     Or, in the python script, you setup the attributes of the sscha.SchaMinimizer.SSCHA_Minimizer class
 
     .. code-block:: python
+		    
        minim.preconditioning = False
        minim.root_representation = "root4"
 
@@ -91,16 +94,18 @@ The code stops saying it has found imaginary frequencies, how do I fix it?
      
 
     
-While the gradient on the atomic positions goes down, the gradient on the dynamical matrix is going up (or vice versa), what is happening?
+Why the gradient sometimes increases during a minimization?
     :raw-html:`<br />`
     Noting in principle assures that a gradient should always go down. It is possible at the beginning of the calculation when we are far from the solution that one of the gradients increases.
     However, when we get closer to the solution, indeed the gradient must decrease.
-    If this does not happen it could be due to the ensemble that has too less configurations. In this case, the good choice is to increase the number of effective sample size (the kong-liu ratio), in order to stop the minimization when the gradient start increasing, or to increase the number of configurations in the ensemble.
+    If this does not happen it could be due to the ensemble that has fewer configurations than necessary. In this case, the good choice is to increase the number of effective sample size (the kong-liu ratio), in order to stop the minimization when the gradient start increasing, or to increase the number of configurations in the ensemble.
+
+    In any case, what must decrease is the free energy. If you see that the gradient is increasing but the free energy decreases, then the minimization is correct. However, if both the gradient and the free energy are increasing, something is wrong. This could be due to a too big step size, then try to reduce the value of **lambda_a** and **lambda_w** (in the input file) or **min_step_dyn** and **min_step_struc** (in the python script). It could also be due to a wasted ensemble, in this case, check the value of the Kong-Liu effective sample size, if it is below or around 0.5, then try to increase the threshold at which stop the calculation, **kong_liu_ratio** (in the python script) or **N_random_eff** (in the input file), or increase the number of configurations for the next population.
 
 
 The gradients on my simulations are increasing a lot, why is this happening?
     :raw-html:`<br />`
-    See the previous question.
+    See the previous question. 
 
 
 How do I check if my calculations are well converged?
@@ -110,7 +115,9 @@ How do I check if my calculations are well converged?
     In these cases, you can look at the history of the frequencies in the last populations.
 
     If the code is provided with a &utils namespace, on which the code
-    ::
+
+    .. code-block:: console
+		    
        &utils
           save_freq_filename = "frequencies_popX.dat"
        &end
@@ -118,6 +125,7 @@ How do I check if my calculations are well converged?
     You can after the minimization use the plotting program to see the frequencies as they evolve during the minimizations:
 
     .. code-block:: console
+		    
        plot_frequencies_new.pyx frequencies_pop*.dat
 
        
@@ -129,6 +137,9 @@ How do I check if my calculations are well converged?
 What is the final error on the structure or the dynamical matrix of a SCHA minimization?
     :raw-html:`<br />`
     This is a difficult question. The best way to estimate the error is to generate a new ensemble with the same number of configuration at the end of the minimization and check how the final optimized solution changes with this new ensemble. This is also a good way to test if the solution is actually converged to the correct solution. The magnitude of the changes in the dynamical matrix's frequencies and structure is an accurate estimation on the stochastic error.
+
+    You can always split the ensemble in two and run two minimization with the two half of the ensembe to get a hint on the error on the structure or on the dynamical matrix.
+    To split the ensemble, refer to the *FAQ* about the error on the hessian matrix.
 
 
 How does the error over the gradients scale with the number of configurations?
@@ -150,7 +161,7 @@ I cannot remove the pressure anisotropy after relaxing the cell, what is happeni
     
 How may I run a calculation neglecting symmetries?
     :raw-html:`<br />`
-    You can tell the code to neglect symmetries with the neglect_symmetries = .true. flag.
+    You can tell the code to neglect symmetries with the :code:`neglect_symmetries = .true.` flag.
     In the python script this is done setting the attribute *neglect_symmetries* of sscha.SchaMinimizer.SSCHA_Minimizer to False.
 
 
@@ -169,9 +180,30 @@ What is the difference between the different kind of minimization (preconditioni
     Therefore the new dynamical matrix are constrained in a space that is positive definite. Moreover, it has been proved that :math:`\sqrt[4]{\Phi}`
     minimization is better conditioned than the original, and thus should reach the minimum faster.
 
-    Alternatively, a similar effect to the speedup in the minimization obtained with **root4** is possible if use the preconditioning (by setting **preconditioning** to True, the default choice). This way also the single minimization step runs faster, as it avoids passing in the root space of the dynamical matrix (but indeed, you can have imaginary frequencies).
+    Alternatively, a similar effect to the speedup in the minimization obtained with **root4** is possible if use the preconditioning (by setting **preconditioning** or **precond_dyn** to True in the input file or the python script, respectively). This way also the single minimization step runs faster, as it avoids passing in the root space of the dynamical matrix (but indeed, you can have imaginary frequencies).
 
-    The combination of preconditioning and root minimization is not allowed by the version 1.0 of the code.
+    Since the gradient computation is much slower (especially for system with more than 80 atoms in the supercell) without the preconditioning,
+    it is possible to combine the preconditioning with the root representation to have a faster gradient computation and to be garanteed that
+    the dynamical matrix is positive definite by construction at each step.
+    However, in this way the good condition number obtained by the preconditioning (or the root4 representation) is spoiled. For this reason, when using the preconditioning, avoid using **root4**, and chose instead **sqrt** as root_representation.
+
+    The default values are:
+
+    .. code-block:: console
+		    
+       &inputscha
+           root_representation = "normal"
+           preconditioning = .true.
+       &end
+
+    or in python
+    
+    .. code-block:: python
+		    
+       # The ensemble has been loaded as ens
+       minim = sscha.SchaMinimizer.SSCHA_Minimizer(ens)
+       minim.root_representation = "normal"
+       minim.precond_dyn = True
 
     
  
@@ -200,6 +232,7 @@ How do I lock a special atom in the minimization?
     Then it can be passed to the minimization engine as *custom_function_gradient*.
 
     .. code-block:: python
+		    
        LIST_OF_ATOMS_TO_FIX = [0, 2, 3]
        def fix_atoms(gradient_dyn, gradient_struct):
            # Fix the atoms in the list
@@ -223,6 +256,7 @@ How do I understand if I have to generate a new population or the minimization c
 How do I choose the appropriate value of Kong-Liu effective sample size or ratio?
     :raw-html:`<br />`
     The Kong-Liu (KL) effective sample size is an estimation on how good is the extracted set of configurations to describe the BO landscape around the current values of dynamical matrix and the centroid position. After the ensemble is generated, the KL sample size matches with the actual number of configurations, however, as the minimization goes, the KL sample size is reduced. The code stops when the KL sample size is below a certain threshold.
+    
     The default value of Kong-Liu threshold ratio is 0.5 (effective sample size = 0.5 the original number of configurations). This is a good and safe value for most situations. However, if you are very far from the minimum and the gradient is big, you can trust it even if it is very noisy. For this reason you can lower the Kong-Liu ratio to 0.2 or 0.1. However, notice that by construction the KL effective sample size is always bigger than 2. For this reason if you use 10 configurations, and you set a threshold ratio below 0.2, you will never reach the threshold, and your minimization will continue forever (going into a very bad regime where you are minimizing something that is completely random). On the other side, on some very complex system close to the minimum, it could be safe to increase the KL ratio even at 0.6.
 
 
@@ -230,12 +264,76 @@ How do I understand if the free energy hessian calculation is converged?
     :raw-html:`<br />`
     The free energy hessian requires much more configurations than the SCHA minimization. First of all, to run the free energy Hessian, the SSCHA minimization must end with a gradient that can be decreased indefinitively without decreasing the KL below 0.7 /0.8.
     Then you can estimate the error by repeating the hessian calculation with half of the ensemble and check how the frequencies of the hessian changes. This is also a good check for the final error on the frequencies.
+    
+    You can split your ensemble in two by using the split function.
+
+    .. code-block:: python
+
+       import sscha, sscha.Ensemble
+
+       # Load the dynamical matrix as dyn
+       # [...]
+       
+       # ens is the Ensemble() class correctly initialized.
+       # We can for example load it
+       # Assuming it is stored in 'data_dir' with population 1 and 1000 configurations
+       # We assume to have loaded the original dynamical matrix dyn and to know the generating temperature T
+       ens = sscha.Ensemble.Ensemble(dyn, T, dyn.GetSupercell())
+       ens.load("data_dir", population = 1, N = 1000)
+
+       # We create a mask that selects which configurations to take
+       first_half_mask = np.zeros(ens.N, dtype = bool)
+       first_half_mask[: ens.N // 2] = True
+
+       # We create also the mask for the second half
+       # by taking the not operation on the first_half_mask
+       second_half_mask = ~first_half_mask
+
+       # Now we split the ensemble
+       ens_first_half = ens.split(first_half_mask)
+       ens_second_half = ens.split(second_half_mask)
+
+       # We can save the two half ensembles as population 2 and 3.
+       ens_first_half.save("data_dir", population = 2)
+       ens_second_half.save("data_dir", population = 3)
+
+    This simple script will generate two ensembles inside :code:`data_dir` directory with population 2 and 3, each one containing the first
+    and the second half of the ensemble with population 1 respectively. You can perform then your calculation of the free energy hessian
+    with both the ensemble to estimate the error on the frequencies and the polarization vectors.
+       
 
 
 How can I add more configurations to an existing ensembe?
     :raw-html:`<br />`
-    TODO
+    You can use the split and merge functions of the Ensemble class.
+    First of all you generate a new ensemble, you compute the energy and force for that ensemble,
+    then you merge it inside another one.
 
+    .. code-block:: python
+
+       # Load the original ensemble (first population with 1000 configurations)
+       ens = sscha.Ensemble.Ensemble(dynmat, T, dynmat.GetSupercell())
+       ens.load("data_dir", population = 1, N = 1000)
+
+       # Generate a new ensemble with other 1000 configurations
+       new_ensemble = sscha.Ensemble.Ensemble(dynmat, T, dynmat.GetSupercell())
+       new_ensemble.generate(1000)
+
+       # Compute the energy and forces for the new ensemble
+       # For example in this case we assume to have initialized 'calc' as an ASE calculator.
+       # But you can also save it with a different population,
+       # manually compute energy and forces, and then load again the ensemble.
+       new_ensemble.get_energy_forces(calc)
+
+       # Merge the two ensembles
+       ens.merge(new_ensemble)
+
+       # Now ens contains the two ensembles. You can save it or directly use it for a SSCHA calculation
+       ens.save("data_dir", population = 2)
+
+    Indeed, to avoid mistakes, when merging the ensemble you must be carefull that the dynamical matrix and the temperature
+    used to generate both ensembles are the same.
+    
 
 How do I fix the random number generator seed to make a calculation reproducible?
     :raw-html:`<br />`
@@ -243,6 +341,7 @@ How do I fix the random number generator seed to make a calculation reproducible
     Since python uses numpy as random number generator, you can, at the beginning of the script that generates the ensemble, use the following:
 
     .. code-block:: python
+		    
        import numpy as np
 
        X = 0
