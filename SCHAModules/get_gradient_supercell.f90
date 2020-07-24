@@ -18,7 +18,7 @@
 subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_disp, eforces, &
      wr_sc, epols_sc, trans, T, mass, ityp_sc, log_err, grad, grad_err, preconditioned)
 
-
+  use omp_lib
   use stochastic
   
   implicit none

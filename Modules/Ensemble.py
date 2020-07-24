@@ -158,6 +158,10 @@ class Ensemble:
         # A flag for each configuration that check if it possess a force and a stress
         self.force_computed = None 
         self.stress_computed = None
+        
+        # Adding new quantity to speed up the minimization step
+        self.original_v = np.zeros(self.N)
+
 
     def convert_units(self, new_units):
         """
@@ -342,6 +346,8 @@ class Ensemble:
         self.force_computed = np.zeros( self.N, dtype = bool)
         self.stress_computed = np.zeros(self.N, dtype = bool)
         
+        self.original_v = np.zeros( (self.N), dtype = np.float64)
+        
         # Add a counter to check if all the stress tensors are present
         count_stress = 0 
         
@@ -414,7 +420,8 @@ Error, the file '{}' is missing from the ensemble
             
             # Setup the sscha energies and forces
             t1 = time.time()
-            energy, force = self.dyn_0.get_energy_forces(structure, supercell = self.supercell, real_space_fc=super_fc)
+            forces,self.sscha_energies = SCHAModules.harmonic.update(super_fc,self.u_disps,Nat_sc,self.N)
+	          self.sscha_forces = forces.reshape(self.N,Nat_sc,3)
             t2 = time.time()
             total_t_for_sscha_ef += t2 - t1
             
@@ -431,9 +438,6 @@ Error, the file '{}' is missing from the ensemble
 #            print "NORMAL = ", self.dyn_0.dynmats[0].dot(u_disp)
 #            print "INVERSE = ", self.dyn_0.dynmats[0].dot(-u_disp)
                 
-            
-            self.sscha_energies[i] = energy 
-            self.sscha_forces[i,:,:] = force
         
         if verbose:
             print( "[LOAD ENSEMBLE]: time elapsed for the cycle over the configurations:", time.time() - t_before_for)
@@ -486,7 +490,8 @@ Error, the following stress files are missing from the ensemble:
 
             
         
-    def save(self, data_dir, population, use_alat = False):
+
+    def save(self, data_dir, population, use_alat = False, save_sscha = False):
         """
         SAVE THE ENSEMBLE
         =================
@@ -539,7 +544,7 @@ Error, the following stress files are missing from the ensemble:
 
         
         super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
-            
+        
         for i in xrange(self.N):
             # Save the forces
             if self.force_computed[i]:
@@ -558,10 +563,16 @@ Error, the following stress files are missing from the ensemble:
             # Save the stress tensors if any
             if self.has_stress and self.stress_computed[i]:
                 np.savetxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1), self.stresses[i,:,:])
-            
+        
+        if save_sscha:
+            #Save SSCHA energies and forces
+            np.savetxt("%s/sscha_energies_supercell_population%d.dat" % (data_dir, population), self.sscha_energies )
+            for i in xrange(self.N):
+                np.savetxt("%s/sscha_forces_population%d_%d.dat" % (data_dir, population, i+1), self.sscha_forces[i,:,:]) 
         
 
-    def save_bin(self, data_dir, population_id = 1):
+    def save_bin(self, data_dir, population_id = 1, save_sscha = False):
+
         """
         FAST SAVE OF THE ENSEMBLE
         =========================
@@ -582,7 +593,12 @@ Error, the following stress files are missing from the ensemble:
         # Check if the data dir exists
         if not os.path.exists(data_dir):
             os.makedirs(data_dir)
+
         
+        # Remove the tailoring slash if any
+        if data_dir[-1] == "/":
+            data_dir = data_dir[:-1]
+
         np.save("%s/energies_pop%d.npy" % (data_dir, population_id), self.energies)
         np.save("%s/forces_pop%d.npy" % (data_dir, population_id), self.forces)
         
@@ -593,8 +609,14 @@ Error, the following stress files are missing from the ensemble:
             np.save("%s/stresses_pop%d.npy" % (data_dir, population_id), self.stresses)
         
         self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
+	
+        if save_sscha:
+            #Save SSCHA energies and forces
+            np.save("%s/sscha_energies_supercell_population%d.npy" % (data_dir, population_id), self.sscha_energies)
+            np.save("%s/sscha_forces_pop%d.npy" % (data_dir,population_id), self.sscha_forces)
         
-    def load_bin(self, data_dir, population_id = 1, avoid_loading_dyn = False):
+
+    def load_bin(self, data_dir, population_id = 1, avoid_loading_dyn = False, load_sscha = False):
         """
         LOAD THE BINARY ENSEMBLE
         ========================
@@ -617,7 +639,8 @@ Error, the following stress files are missing from the ensemble:
         
         # Load the number of configurations
         self.N = len(self.energies)
-        
+        self.original_v=np.zeros((self.N), dtype=np.float64)
+
         stress_path = "%s/stresses_pop%d.npy" % (data_dir, population_id)
         if os.path.exists(stress_path):
             self.stresses = np.load(stress_path)
@@ -635,8 +658,8 @@ Error, the following stress files are missing from the ensemble:
         super_fc = dyn_supercell.dynmats[0]
         Nat_sc = super_structure.N_atoms
         
-        self.sscha_energies = np.zeros(self.N, dtype = np.float64)
-        self.sscha_forces = np.zeros( (self.N, Nat_sc, 3), order = "F", dtype = np.float64)
+        #self.sscha_energies = np.zeros(self.N, dtype = np.float64)
+        #self.sscha_forces = np.zeros( (self.N, Nat_sc, 3), order = "F", dtype = np.float64)
         self.u_disps = np.zeros( (self.N, 3 * Nat_sc), order = "F", dtype = np.float64)
         
         # Build the structures
@@ -645,12 +668,15 @@ Error, the following stress files are missing from the ensemble:
             self.structures[i] = super_structure.copy()
             self.structures[i].coords = self.xats[i,:,:]
             self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
-            
-            energy, force = self.dyn_0.get_energy_forces(self.structures[i], supercell = self.supercell, 
-                                                         real_space_fc=super_fc)
-            
-            self.sscha_energies[i] = energy
-            self.sscha_forces[i, :, :] = force
+        
+        if load_sscha:
+            self.sscha_energies=np.load("%s/sscha_energies_supercell_population%d.npy" % (data_dir, population_id))
+            self.sscha_forces=np.load("%s/sscha_forces_pop%d.npy" % (data_dir,population_id))
+        else:
+            self.sscha_energies = np.zeros(self.N, dtype = np.float64)
+            self.sscha_forces = np.zeros( (self.N, Nat_sc, 3), order = "F", dtype = np.float64)
+            forces,self.sscha_energies = SCHAModules.harmonic.update(super_fc,self.u_disps,Nat_sc,self.N)
+	          self.sscha_forces = forces.reshape(self.N,Nat_sc,3)
 
 
         # Setup the initial weights
@@ -661,7 +687,7 @@ Error, the following stress files are missing from the ensemble:
         self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell, self.u_disps)
         self.current_q = self.q_start.copy()
 
-    def init_from_structures(self, structures):
+    def init_from_structures(self, structures, compute_disps = True):
         """
         Initialize the ensemble from the given list of structures
 
@@ -669,6 +695,8 @@ Error, the following stress files are missing from the ensemble:
         ----------
             structures : list of structures
                 The list of structures used to initialize the ensemble
+            compute_disps : bool
+                Activate it if you did not store the displacements before (slower) 
         """
 
         # Perform the standard initialization
@@ -681,6 +709,7 @@ Error, the following stress files are missing from the ensemble:
         self.sscha_energies = np.zeros( ( self.N), dtype = np.float64)
         self.sscha_forces = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "F")
         
+
         self.energies = np.zeros(self.N, dtype = np.float64)
         self.forces = np.zeros( (self.N, Nat_sc, 3), dtype = np.float64, order = "F")
         self.stresses = np.zeros( (self.N, 3, 3), dtype = np.float64, order = "F")
@@ -695,21 +724,23 @@ Error, the following stress files are missing from the ensemble:
         # it should be replaced by generating the unit cell structure, 
         # But then the get_energy_forces method should provide the correct implementation.
         new_super_dyn = self.current_dyn.GenerateSupercellDyn(self.current_dyn.GetSupercell())
-        self.u_disps[:,:] = np.reshape(self.xats - np.tile(new_super_dyn.structure.coords, (self.N, 1,1)), (self.N, 3 * Nat_sc), order = "C") 
+        if compute_disps :
+            self.u_disps[:,:] = np.reshape(self.xats - np.tile(new_super_dyn.structure.coords, (self.N, 1,1)), (self.N, 3 * Nat_sc), order = "C") 
 
-        self.sscha_energies[:], self.sscha_forces[:,:,:] = new_super_dyn.get_energy_forces(None, displacement = self.u_disps)
-
+        #self.sscha_energies[:], self.sscha_forces[:,:,:] = new_super_dyn.get_energy_forces(None, displacement = self.u_disps)
+        forces,self.sscha_energies = SCHAModules.harmonic.update(new_super_dyn.dynmats[0],self.u_disps,Nat_sc,self.N)
+	      self.sscha_forces = forces.reshape(self.N,Nat_sc,3)
         
         self.rho = np.ones(self.N, dtype = np.float64)
         self.current_dyn = self.dyn_0.Copy()
         self.current_T = self.T0
-
+        self.original_v = np.zeros(self.N, dtype=np.float64)
+        
         # Setup that both forces and stresses are not computed
         self.stress_computed = np.zeros(self.N, dtype = bool)
         self.force_computed = np.zeros(self.N, dtype = bool)
 
-
-    def generate(self, N, evenodd = True, project_on_modes = None):
+    def generate(self, N, evenodd = True, project_on_modes = None, fast = False):
         """
         GENERATE THE ENSEMBLE
         =====================
@@ -735,24 +766,64 @@ Error, the following stress files are missing from the ensemble:
         self.N = N
         Nat_sc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms
         self.structures = []
-        #super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
-        super_struct = self.dyn_0.structure.generate_supercell(self.dyn_0.GetSupercell())
+       
+        super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
+        #super_struct = self.dyn_0.structure.generate_supercell(self.dyn_0.GetSupercell())
+
+        t1=time.time()
 
         structures = []
-        if evenodd:
-            structs = self.dyn_0.ExtractRandomStructures(N // 2, self.T0, project_on_vectors = project_on_modes)
+        
+        if fast:
+            #initialize the basic structures
+            self.u_disps = np.zeros( (self.N, Nat_sc * 3), dtype = np.float64, order = "F")
+            if evenodd:
+                structs, disps = super_dyn.ExtractRandomStructures(N // 2, self.T0 ,fast = fast , project_on_vectors=project_on_modes)
+                self.u_disps[::2,:]=disps.transpose()
+                self.u_disps[1::2,:]=-disps.transpose()
+		
+                for i, s in enumerate(structs):
+                    structures.append(s)
+                    new_s = s.copy()
+                    # Get the opposite displacement structure
+                    new_s.coords = super_dyn.structure.coords + self.u_disps[2*i+1,:].reshape(Nat_sc,3)
+                    structures.append(new_s)
+            else:
+                structures,disps = super_dyn.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
+                self.u_disps=disps.transpose()
+            t2=time.time()
+            print ("Time elapsed to generate the structures:", t2 - t1, "s")
 
-
-            for i, s in enumerate(structs):
-                structures.append(s)
-                new_s = s.copy()
-                # Get the opposite displacement structure
-                new_s.coords = super_struct.coords - new_s.get_displacement(super_struct)
-                structures.append(new_s)
+        # Compute the sscha energy and forces
+            t1=time.time()
+            self.init_from_structures(structures, compute_disps = False)
         else:
-            structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
+            if evenodd:
+                structs = super_dyn.ExtractRandomStructures(N // 2, self.T0, project_on_vectors = project_on_modes)
+                
+                for i, s in enumerate(structs):
+                    structures.append(s)
+                    new_s = s.copy()
+                    # Get the opposite displacement structure
+                    new_s.coords = super_dyn.structure.coords - new_s.get_displacement(super_dyn.structure)
+                    structures.append(new_s)
+            else:
+                structures = super_dyn.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
+            t2=time.time()
+            print ("Time elapsed to generate the structures:", t2 - t1, "s")
+            t1=time.time()
+            self.init_from_structures(structures)
+            
+            
 
-        self.init_from_structures(structures)
+        t2=time.time()
+        print ("Time elapsed to compute energy forces and to set disp and coords:", t2 - t1, "s")
+ 
+        
+        
+        # Generate the q_start
+        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, super_dyn,self.u_disps)
+        self.current_q = self.q_start.copy()
         
         
     def unwrap_symmetries(self):
@@ -846,8 +917,24 @@ Error, the following stress files are missing from the ensemble:
         self.sscha_energies = sscha_energies_new
         self.sscha_forces = sscha_forces_new
                 
-        
-        
+    def original(self):
+
+	      #self.current_T=original_T    
+        super_dyn= self.dyn_0.GenerateSupercellDyn(self.supercell)
+        #w, pols = super_dyn.DyagDinQ(0)
+        Nat_sc = super_dyn.structure.N_atoms
+        disps = np.zeros(np.shape(self.u_disps), dtype=np.double)
+	
+	
+        for i in xrange(self.N):
+            disps[i,:]=(self.xats[i,:,:]-super_dyn.structure.coords).reshape(3*Nat_sc)
+
+        Ups=np.real(super_dyn.GetUpsilonMatrix(self.T0))
+	
+        for i in xrange(self.N):
+            self.original_v[i] = disps[i, :].dot(Ups.dot(disps[i, :])) * __A_TO_BOHR__**2	
+
+
     def update_weights(self, new_dynamical_matrix, newT, update_q = False):
         """
         IMPORTANCE SAMPLING
@@ -925,19 +1012,32 @@ DETAILS OF ERROR:
         
         # Get the new displacements in the supercell
         t3 = time.time()
-        old_disps = np.zeros(np.shape(self.u_disps), dtype = np.double)
+        #old_disps = np.zeros(np.shape(self.u_disps), dtype = np.double)
 
         self.u_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_structure.coords.ravel(), (self.N,1))
-        old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_dyn.structure.coords.ravel(), (self.N,1))
+        #old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_dyn.structure.coords.ravel(), (self.N,1))
 
         # for i in xrange(self.N):
         #     self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
             
-        #     old_disps[i,:] = (self.xats[i, :, :] - super_dyn.structure.coords).reshape( 3*Nat_sc )
-            
-        #     # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
-        self.sscha_energies[:], self.sscha_forces[:,:,:] = new_super_dyn.get_energy_forces(None, displacement = self.u_disps)
+
+        #old_disps[i,:] = (self.xats[i, :, :] - super_dyn.structure.coords).reshape( 3*Nat_sc )
+
+	      #calculate enegy and forces in fortran
+	      #self.sscha_energies[i]=SCHAModules.harmonic.get_harmonic_energy_from_fc(new_super_dyn.dynmats[0],self.u_disps[i,:])*__A_TO_BOHR__**2
+	      #self.sscha_forces[i,:,:]=(SCHAModules.harmonic.get_harmonic_force_from_fc(new_super_dyn.dynmats[0],self.u_disps[i,:],Nat_sc)).reshape(Nat_sc,3)*__A_TO_BOHR__**2            
+		
+	    
+
+        # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
+        #self.sscha_energies[i], self.sscha_forces[i, :,:] = new_super_dyn.get_energy_forces(self.structures[i], real_space_fc = new_super_dyn.dynmats[0], displacement = self.u_disps[i, :])
+        
+
+	      #super_fast
+        forces,self.sscha_energies =SCHAModules.harmonic.update(new_super_dyn.dynmats[0],self.u_disps,Nat_sc,self.N)
+        self.sscha_forces=forces.reshape(self.N,Nat_sc,3)
         t4 = time.time()
+
 
         if update_q:
             self.current_q = CC.Manipulate.GetQ_vectors(self.structures, new_super_dyn, self.u_disps) 
@@ -960,8 +1060,10 @@ DETAILS OF ERROR:
         
         # Get the covariance matrices of the ensemble
         ups_new = np.real(new_super_dyn.GetUpsilonMatrix(self.current_T))
-        ups_old = np.real(super_dyn.GetUpsilonMatrix(self.T0))
+        #ups_old = np.real(super_dyn.GetUpsilonMatrix(self.T0))
+	
 
+	
         # Get the normalization ratio
         #norm = np.sqrt(np.abs(np.linalg.det(ups_new) / np.linalg.det(ups_old))) 
         norm = np.prod( old_a / new_a)
@@ -974,10 +1076,15 @@ DETAILS OF ERROR:
         rho_tmp = np.ones( self.N, dtype = np.float64) * norm 
         if __DEBUG_RHO__:
             print("Norm factor:", norm)
-        for i in xrange(self.N):
-            v_new = self.u_disps[i, :].dot(ups_new.dot(self.u_disps[i, :])) * __A_TO_BOHR__**2
-            v_old = old_disps[i, :].dot(ups_old.dot(old_disps[i, :])) * __A_TO_BOHR__**2
-            rho_tmp[i] *= np.exp(-0.5 * (v_new - v_old) )
+        #for i in xrange(self.N):
+            #v_new = self.u_disps[i, :].dot(ups_new.dot(self.u_disps[i, :])) * __A_TO_BOHR__**2
+            #v_old = old_disps[i, :].dot(ups_old.dot(old_disps[i, :])) * __A_TO_BOHR__**2
+            #rho_tmp[i] *= np.exp(-0.5 * (v_new - v_old) )
+
+        for i in xrange(self.N):    
+            v_new=self.u_disps[i,:].dot(ups_new.dot(self.u_disps[i,:]))* __A_TO_BOHR__**2
+            rho_tmp[i] *= np.exp(-0.5* (v_new-self.original_v[i]))
+
         # Lets try to use this one
         self.rho = rho_tmp
 
@@ -1195,6 +1302,38 @@ DETAILS OF ERROR:
             return free_energy, error
         return free_energy
 
+    def get_entropy(self):
+        """
+        Obtain the entropy for the system.
+	Done by taking minus the derivative of the Free energy with respect to the temperature.
+
+	The result is in Ry/K
+
+	.. math ::
+
+		\\S = - \\frac{d F}{d T} = -k_B \\sum_\mu ln(1- e^{-\beta \hbar \omega_\mu}) + \sum_\mu \\frac{\hbar}{T} n_\mu \omega_\mu
+
+        Where n_\mu is the bosonic occupation factor
+
+        """
+        super_dyn=self.current_dyn.GenerateSupercellDyn(self.supercell)
+
+        w, pols= super_dyn.DyagDinQ(0)
+
+	#Exclude translations
+        w = w[~CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())]
+
+	#Calculate the bosonic occupation factor
+
+	
+	
+        if self.current_T== 0:
+            entropy = 0
+        else:
+            n_bos = 1 / (np.exp(w * __RyToK__ / self.current_T) - 1) 
+            entropy =  np.sum(- np.log(1- np.exp(-w * __RyToK__ / self.current_T))/__RyToK__ + w *n_bos /self.current_T)
+	
+        return entropy
 
     def get_free_energy_interpolating(self, target_supercell, support_dyn_coarse = None, support_dyn_fine = None, error_on_imaginary_frequency = True, return_error = False):
         """
@@ -1528,14 +1667,15 @@ DETAILS OF ERROR:
             cov_mat : 3nat x 3nat, ndarray
                 A numpy matrix of the covariance matrix.
         """
+
         
         # A C style matrix of double precision real values
         cov_mat = np.einsum("i, ij, ik", self.rho, self.u_disps, self.u_disps) / np.sum(self.rho)
         
         return cov_mat
     
-    
     def get_stress_tensor(self, offset_stress = None, add_centroid_contrib = False, use_spglib = False):
+
         """
         GET STRESS TENSOR
         =================
@@ -1599,6 +1739,7 @@ DETAILS OF ERROR:
         
         abinit_stress = np.einsum("abc -> cba", self.stresses, order = "F")
         
+
         stress, err_stress = SCHAModules.get_stress_tensor(volume, self.forces / __A_TO_BOHR__, u_disps * __A_TO_BOHR__, 
                                                            abinit_stress, wr, er, self.current_T, self.rho, "err_yesrho", 
                                                            self.N, nat, len(wr))    
@@ -2521,6 +2662,7 @@ DETAILS OF ERROR:
                     if not _SSCHA_ODD_:
                         raise ImportError("Error, sscha_HP_odd is required to use openmp, thid is deprecated. Pleas use get_free_energy_hessian instead.")
                     sscha_HP_odd.GetV3(X, Y, n_modes_sc, self.N, d3)
+
                     d3 *= self.N / N_eff
             else:
                 d3 = load_d3
@@ -2724,7 +2866,9 @@ DETAILS OF ERROR:
                 odd_corr = odd_corrs[i_freq]
             cart_odd_corr = np.einsum("ai,bj,ij -> ab", pols_sc, pols_sc, odd_corr)
             cart_odd_corr *= np.outer(np.sqrt(_m_),  np.sqrt(_m_))
-
+	
+            if save_all:
+                np.save("odd_corr_%d.npy" % i_freq, cart_odd_corr)
 
             total_self_energy = cart_odd_corr 
             if not return_only_correction:
@@ -2735,8 +2879,7 @@ DETAILS OF ERROR:
             if N_w >1:
                 total_self_energies.append(total_self_energy)
             
-            if save_all:
-                np.save("odd_corr_%d.npy" % i_freq, cart_odd_corr)
+            
         
         # Return the new dynamical matrix in the supercell
         if N_w > 1:
@@ -2948,11 +3091,9 @@ DETAILS OF ERROR:
             structures = comm.bcast(self.structures, root = 0)            
             nat3 = comm.bcast(self.current_dyn.structure.N_atoms* 3* np.prod(self.supercell), root = 0)
             N_rand = comm.bcast(self.N, root=0)
-            
             # Setup the label of the calculator
             ase_calculator = comm.bcast(ase_calculator, root = 0)
             ase_calculator.set_label("esp_%d" % rank) # Avoid overwriting the same file
-            
             compute_stress = comm.bcast(compute_stress, root = 0)
             
             # Check if the parallelization is correct        
@@ -2967,7 +3108,7 @@ DETAILS OF ERROR:
             N_rand = self.N
             
         # Only for the master
-        
+
         # Prepare the energy, forces and stress array
         energies = np.zeros( N_rand // size, dtype = np.float64)
         forces = np.zeros( ( N_rand // size) * nat3 , dtype = np.float64)
@@ -2981,11 +3122,13 @@ DETAILS OF ERROR:
             total_forces = np.empty( N_rand * nat3, dtype = np.float64)
             total_stress = np.empty( N_rand * 9, dtype = np.float64)
             
-
+	
         # If an MPI istance is running, split the calculation
-        for i0 in xrange(N_rand // size):
-            i = i0 + size * rank
 
+        for i0 in xrange(N_rand // size):
+            #i = i0 + size * rank
+            i= i0 + N_rand / size * rank
+            
             # Avoid performing this calculation if already done
             if skip_computed:
                 if self.force_computed[i]:
@@ -3010,6 +3153,7 @@ DETAILS OF ERROR:
             # Avoid for errors
             run = True
             count_fails = 0
+	    
             while run:
                 try:
                     energy = atms.get_total_energy() / Rydberg # eV => Ry
@@ -3018,8 +3162,8 @@ DETAILS OF ERROR:
                     print ("Rerun the job %d" % i)
                     count_fails += 1
                     if count_fails >= 5:
-                        run = False
-                        raise ValueError("Error in the ASE calculator for more than 5 times")
+                       run = False
+                       raise ValueError("Error in the ASE calculator for more than 5 times")
             
             # Get energy, forces (and stress)
             energy = atms.get_total_energy() / Rydberg # eV => Ry
@@ -3064,6 +3208,52 @@ DETAILS OF ERROR:
         else:
             self.has_stress = False
             
-            
-        
+    
+    def get_kinetic_energy(self, element=None):
+        """
+        This function returns the kinetic energy per atom of the system in meV.
+        Keep in mind that this formula is correct only at the minimum of the free energy (and at the equilibrium volume??)
+
+        K= \frac{1}{2} \sum_{\mu s} \hbar \omega_mu (n_\mu +\frac{1}{2}) \sum_j \epsilon_\mu^{sj} \epsilon_\mu^{sj}
+        Parametes
+        ----------	
+              element :
+			                Allows to isolate the kinetic energy of a single element        
+	
+
+        """
+        super_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
+        nat_sc = super_dyn.structure.N_atoms
+
+        w, pols = super_dyn.DyagDinQ(0)
+	      #Exclude translations
+        w = w[~CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())]
+        pols = pols[ :, ~CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array()) ]
+        n_modes = len(w)
+	      #Calculate the bosonic occupation factor
+
+        if self.current_T == 0:
+            n_bos = 0
+        else:
+            n_bos = 1 / (np.exp(w * __RyToK__ / self.current_T) - 1) 
+
+	      #Calculate the potential energy and reshape the polarization factor
+        pot_energy = (n_bos + 0.5) * w * 13605.698066
+        pol_vec = pols.reshape(nat_sc, 3, n_modes)
+        kinetic_energy = 0
+
+        if element is None:
+            return np.sum(pot_energy) / (2 * nat_sc)
+        else:
+            masses = super_dyn.structure.get_masses_array()
+            atom_symbol = super_dyn.structure.atoms
+            for i in range(n_modes):
+                num_of_atoms = 0
+                for j in range(nat_sc):
+                    if atom_symbol[j] == element:
+                        num_of_atoms += 1
+                        kinetic_energy += pot_energy[i] * np.sum(pol_vec[j,:,i] * np.conj(pol_vec[j,:,i])) / 2
+            return kinetic_energy / num_of_atoms		
+
+
         
