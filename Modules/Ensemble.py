@@ -412,11 +412,7 @@ Error, the file '{}' is missing from the ensemble
             t2 = time.time()
             total_t_for_loading += t2 - t1
             
-            # Setup the sscha energies and forces
-            t1 = time.time()
-            energy, force = self.dyn_0.get_energy_forces(structure, supercell = self.supercell, real_space_fc=super_fc)
-            t2 = time.time()
-            total_t_for_sscha_ef += t2 - t1
+           
             
 #            print "Loading: config %d:" % i
 #            for j in range(structure.N_atoms):
@@ -432,8 +428,6 @@ Error, the file '{}' is missing from the ensemble
 #            print "INVERSE = ", self.dyn_0.dynmats[0].dot(-u_disp)
                 
             
-            self.sscha_energies[i] = energy 
-            self.sscha_forces[i,:,:] = force
         
         if verbose:
             print( "[LOAD ENSEMBLE]: time elapsed for the cycle over the configurations:", time.time() - t_before_for)
@@ -444,6 +438,10 @@ Error, the file '{}' is missing from the ensemble
         t2 = time.time()
         total_t_for_sscha_ef += t2 - t1
         self.energies = total_energies[:N]
+
+        # Compute the SSCHA energies and forces
+        self.sscha_energies[:], self.sscha_forces[:,:,:] = self.dyn_0.GenerateSupercellDyn(self.supercell).get_energy_forces(None, displacement = self.u_disps)
+
         
         # Setup the initial weight
         self.rho = np.ones(self.N, dtype = np.float64)
@@ -697,7 +695,7 @@ Error, the following stress files are missing from the ensemble:
         new_super_dyn = self.current_dyn.GenerateSupercellDyn(self.current_dyn.GetSupercell())
         self.u_disps[:,:] = np.reshape(self.xats - np.tile(new_super_dyn.structure.coords, (self.N, 1,1)), (self.N, 3 * Nat_sc), order = "C") 
 
-        self.sscha_energies[:], self.sscha_forces[:,:,:] = new_super_dyn.get_energy_forces(None, displacement = self.u_disps)
+        self.sscha_energies[:], self.sscha_forces[:,:,:] = self.dyn_0.get_energy_forces(None, displacement = self.u_disps)
 
         
         self.rho = np.ones(self.N, dtype = np.float64)
