@@ -627,10 +627,9 @@ Error, the following stress files are missing from the ensemble:
         if not avoid_loading_dyn:
             self.dyn_0 = CC.Phonons.Phonons("%s/dyn_gen_pop%d_" % (data_dir, population_id), self.dyn_0.nqirr)
             self.current_dyn = self.dyn_0.Copy()
+            self.supercell = self.dyn_0.GetSupercell()
             
-        dyn_supercell = self.dyn_0.GenerateSupercellDyn(self.supercell)
-        super_structure = dyn_supercell.structure
-        super_fc = dyn_supercell.dynmats[0]
+        super_structure = self.dyn_0.structure.generate_supercell(self.supercell)
         Nat_sc = super_structure.N_atoms
         
         self.sscha_energies = np.zeros(self.N, dtype = np.float64)
@@ -644,20 +643,12 @@ Error, the following stress files are missing from the ensemble:
             self.structures[i].coords = self.xats[i,:,:]
             self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
             
-            energy, force = self.dyn_0.get_energy_forces(self.structures[i], supercell = self.supercell, 
-                                                         real_space_fc=super_fc)
             
-            self.sscha_energies[i] = energy
-            self.sscha_forces[i, :, :] = force
-
+        self.sscha_energies[:], self.sscha_forces[:,:,:] = self.dyn_0.get_energy_forces(None, displacement = self.u_disps)
 
         # Setup the initial weights
         self.rho = np.ones(self.N, dtype = np.float64)
         
-        
-        # Initialize the q_start
-        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell, self.u_disps)
-        self.current_q = self.q_start.copy()
 
     def init_from_structures(self, structures):
         """
