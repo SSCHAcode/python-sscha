@@ -26,11 +26,11 @@ ens.unwrap_symmetries()
 
 # Compute the odd correction
 t1 = time.time()
-new_dyn_supercell = ens.get_odd_correction(use_omp=False,save_all=True)
+new_dyn_supercell = ens.get_odd_correction()
 t2 = time.time()
 
 #other_new_dyn = ens.get_odd_correction(store_v3 = False, progress = True)
-other_new_dyn = ens.get_odd_correction(include_v4 = True, progress = True, v4_conv_thr = 1e-8,use_omp=False)
+other_new_dyn = ens.get_odd_correction(include_v4 = True, progress = True, v4_conv_thr = 1e-8)
 t3 = time.time()
 
 # Copy the matrix into the Phonons class
@@ -44,15 +44,13 @@ dyn2.Symmetrize()
 
 # Save the dynamical matrix with the odd3 corrections
 dyn.save_qe("dyn_plus_odd_new")
-#dyn2.save_qe("v4_dyn")
 
 odd = dyn.Copy()
-odd.dynmats[0] = np.load("odd_corr_0.npy")
+odd.dynmats[0] = np.load("odd_corr.npy")
 odd.save_qe("odd_new_nosym")
 odd.Symmetrize()
 odd.save_qe("odd_new_sym")
 
-wo,wp=odd.DyagDinQ(0)
 
 print "Elapsed time to compute odd3:", t2 - t1, "s"
 print "Elapsed time to compute odd3 without storing it:", t3- t2, "s"
@@ -66,4 +64,4 @@ print
 w1,p = dyn.DyagDinQ(0)
 w2,p = dyn2.DyagDinQ(0)
 print "    %10s  |%10s  |%10s" % ("SCHA", "ODD3 v1", "ODD3 v2")
-print "\n".join(["%2d) %10.4f  |%10.4f  |%10.4f | %10.4f  cm-1" % (i+1, w[i] * RyCm, w1[i] * RyCm, w2[i] * RyCm, wo[i] *RyCm) for i in range(len(w))])
+print "\n".join(["%2d) %10.4f  |%10.4f  |%10.4f  cm-1" % (i+1, w[i] * RyCm, w1[i] * RyCm, w2[i] * RyCm) for i in range(len(w))])

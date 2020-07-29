@@ -332,7 +332,7 @@ class SSCHA(object):
     def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
                  ensemble_loc = ".", start_pop = 1, stress_numerical = False,
-                 cell_relax_algorithm = "sd", fix_volume = False,print_stress=False,save_sscha=False):
+                 cell_relax_algorithm = "sd", fix_volume = False):
         """
         VARIABLE CELL RELAX
         ====================
@@ -460,7 +460,7 @@ class SSCHA(object):
             # Generate the ensemble
             self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
             if pop != start_pop or not restart_from_ens:
-                self.minim.ensemble.generate(self.N_configs,fast=True)
+                self.minim.ensemble.generate(self.N_configs)
             
                 # Compute energies and forces
                 self.minim.ensemble.compute_ensemble(self.calc, True, stress_numerical,
@@ -468,7 +468,7 @@ class SSCHA(object):
                 #self.minim.ensemble.get_energy_forces(self.calc, True, stress_numerical = stress_numerical)
             
                 if ensemble_loc is not None and self.save_ensemble:
-                    self.minim.ensemble.save_bin(ensemble_loc, pop,save_sscha)
+                    self.minim.ensemble.save_bin(ensemble_loc, pop)
             
             self.minim.population = pop
             self.minim.init(delete_previous_data = False)
@@ -479,9 +479,6 @@ class SSCHA(object):
         
             
             self.minim.finalize()
-
-	    if print_stress:
-		self.minim.print_stress("stress_%d" % pop)
             
             # Get the stress tensor [ev/A^3]
             stress_tensor, stress_err = self.minim.get_stress_tensor() 
