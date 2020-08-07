@@ -3019,7 +3019,8 @@ DETAILS OF ERROR:
                     count_fails += 1
                     if count_fails >= 5:
                         run = False
-                        raise ValueError("Error in the ASE calculator for more than 5 times")
+                        sys.stderr.write("Error in the ASE calculator for more than 5 times\n")
+                        raise
             
             # Get energy, forces (and stress)
             energy = atms.get_total_energy() / Rydberg # eV => Ry
