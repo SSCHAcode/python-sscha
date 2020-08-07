@@ -646,11 +646,13 @@ Error, the following stress files are missing from the ensemble:
             self.structures[i].coords = self.xats[i,:,:]
             self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
             
-            energy, force = self.dyn_0.get_energy_forces(self.structures[i], supercell = self.supercell, 
-                                                         real_space_fc=super_fc)
+            #energy, force = self.dyn_0.get_energy_forces(self.structures[i], supercell = self.supercell, 
+            #                                             real_space_fc=super_fc)
             
-            self.sscha_energies[i] = energy
-            self.sscha_forces[i, :, :] = force
+            #self.sscha_energies[i] = energy
+            #self.sscha_forces[i, :, :] = force
+
+        self.sscha_energies[:], self.sscha_forces[:,:,:] = dyn_supercell.get_energy_forces(None, displacement = self.u_disps)
 
 
         # Setup the initial weights
