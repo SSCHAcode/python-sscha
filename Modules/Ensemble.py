@@ -96,7 +96,7 @@ SUPPORTED_UNITS = [UNITS_DEFAULT, UNITS_HARTREE]
 class Ensemble:
     __debug_index__ = 0
     
-    def __init__(self, dyn0, T0, supercell = (1,1,1)):
+    def __init__(self, dyn0, T0, supercell = None):
         """
         PREPARE THE ENSEMBLE
         ====================
@@ -112,7 +112,7 @@ class Ensemble:
             T0 : float
                 The temperature used to generate the ensemble.
             supercell: optional, list of int
-                The supercell dimension
+                The supercell dimension. If not provided, it will be determined by dyn0
         """
         
         # N is the number of element in the ensemble
@@ -140,7 +140,18 @@ class Ensemble:
         
         # Supercell size
         self.supercell = np.ones(3, dtype = np.intc)
-        self.supercell[:] = supercell
+
+        if supercell is not None:
+            self.supercell[:] = supercell
+            
+            # Check if there are inconsistencies
+            for i in range(3):
+                if self.supercell[i] != dyn0.GetSupercell()[i]:
+                    raise ValueError("""Error, you specified a supercell of {},
+    while from the dynamical matrix provided I expect a supercell of {}
+""".format(self.supercell, dyn0.GetSupercell()))
+        else:
+            self.supercell[:] = dyn0.GetSupercell()
         
         # How many atoms in the supercell
         Nsc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms 
