@@ -241,6 +241,12 @@ class SSCHA_Minimizer(object):
             super(SSCHA_Minimizer, self).__setattr__(name, value)
         
         
+    def set_ensemble(ensemble):
+        """Provide an ensemble to the minimizer object"""
+
+        self.ensemble = ensemble 
+        if self.dyn is None:
+            self.dyn = self.ensemble.current_dyn.Copy()
         
     def minimization_step(self, custom_function_gradient = None):
         """
