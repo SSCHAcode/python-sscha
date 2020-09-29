@@ -164,7 +164,7 @@ class Ensemble:
         self.u_disps = np.zeros( (self.N, Nsc * 3))
         
         # A flag that memorize if the ensemble has also the stresses
-        self.has_stress = False
+        self.has_stress = True
 
         # A flag for each configuration that check if it possess a force and a stress
         self.force_computed = None 
@@ -2781,6 +2781,9 @@ DETAILS OF ERROR:
         # Check if not all the calculation needs to be done
         n_calcs = np.sum( self.force_computed.astype(int))
         computing_ensemble = self
+
+        if compute_stress:
+            self.has_stress = True
 
         # Check wheter compute the whole ensemble, or just a small part
         should_i_merge = False 
