@@ -10,7 +10,7 @@
 ! by the change of the unit cell given by the stress step.
 !
 ! This is not the recommended way to do it (you can do everything automatically)
-! But it can be very easy if you came from the sscha.x fortran code.
+! But usefull if you want to control manually each submission
 !
 !
 ! In this example we setup a new namelist: 'relax'.
@@ -53,6 +53,9 @@
 	! you can specify a directory:
 	! ensemble_datadir = 'data'
 	! Note: the ensemble will be saved in binary data.
+	!       they can be loaded in python with the load_bin function
+	!       of the Ensemble class.
+	!       Please refer to the python API for more details.
 &end
 
 	
@@ -111,7 +114,7 @@
     ! becomes lower than the given threshold the minimization is stopped,
     ! and you should re-generate a new ensemble.
     ! Usually in the begining you can chose 0.1-0.3 the original ensemble,
-    ! and raise it to 0.4 or 0.5 when you are close to convergence.
+    ! and raise it to 0.5 or 0.6 when you are close to convergence.
     n_random_eff = 500
     
     ! This flag is used by the old code to make it seek for the pressures
@@ -147,10 +150,10 @@
     root_representation = "normal"
 
     ! Preconditioning allows for a very fast minimization!
-    ! Note that it is much faster than the fortran code
-    ! (it is implemented in a more intelligent way)
+    ! Note: preconditioning can be used only if root_representation = "normal"
     preconditioning = .true.
 
     ! The maximum number of steps after which the code is automatically stopped
+    ! Here we use it just for example, in real calculation it is convenient not to stop the code manually (just omit or comment this keyword)
     max_ka= 20
 /

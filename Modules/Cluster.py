@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 import sys, os
 import subprocess
 import threading
@@ -38,6 +39,7 @@ __CLUSTER_ACCOUNT__ = "account"
 __CLUSTER_BINARY__ = "binary_path"
 __CLUSTER_MPICMD__ = "mpicmd"
 __CLUSTER_ATTEMPTS__ = "reconnect_attempts"
+__CLUSTER_PORT__ = "port"
 
 
 __CLUSTER_TERMINAL__ = "shell"
@@ -71,6 +73,7 @@ __CLUSTER_TIMEOUT__ = "timeout"
 __CLUSTER_JOBNUMBER__ = "job_numbers"
 __CLUSTER_NPARALLEL__ = "n_together"
 
+
 __CLUSTER_WORKDIR__ = "workdir"
 
 
@@ -89,76 +92,10 @@ __CLUSTER_KEYS__ = [__CLUSTER_NAMELIST__, __CLUSTER_TEMPLATE__, __CLUSTER_HOST__
                     __CLUSTER_LOCALWD__, __CLUSTER_VACCOUNT__, __CLUSTER_UACCOUNT__, __CLUSTER_SSHCMD__,
                     __CLUSTER_SCPCMD__, __CLUSTER_WORKDIR__, __CLUSTER_TIMEOUT__, 
                     __CLUSTER_JOBNUMBER__, __CLUSTER_NPARALLEL__, __CLUSTER_NPOOLS__,
-                    __CLUSTER_ATTEMPTS__]
+                    __CLUSTER_ATTEMPTS__, __CLUSTER_PORT__]
 
 
-class Cluster:
-    
-    # The host name for the connection
-    hostname=""
-    pwd=""
-    sshcmd="ssh"
-    workdir=r""
-    submit_command="sbatch --wait"
-    submit_name="SBATCH"
-    terminal="#!/bin/bash"
-    v_nodes="-N "
-    use_nodes = True
-    v_cpu="-n "
-    use_cpu = True
-    v_account="-A "
-    use_account = True
-    v_time="--time="
-    use_time = True
-    v_memory="--mem="
-    use_memory = False
-    v_partition="--partition="
-    use_partition= False
-    timeout = 1000
-    use_timeout = False
-    
-    job_number = 1
-    n_together_def = 1
-    use_multiple_submission = False
-    
-    # This is a set of lines to be runned before the calculation
-    # It can be used to load the needed modules in the cluster
-    load_modules=""
-    
-    # Setup the number of cpu, nodes and pools for the calculation
-    n_nodes = 1
-    n_cpu = 1
-    n_pool = 1
-    
-    # This is the default label, change it if you are going to submit
-    # two different calculations in the same working directory
-    label = "ESP_"
-    
-    # This is the maximum number of resubmissions after the expected one
-    # from the batch size. It can be use to resubmit the failed jobs.
-    max_recalc = 10
-    connection_attempts = 1
-    
-    # This is the time string. Faster job will be the less in the queue,
-    time="00:02:00" # 2minutes
-    
-    # The ram required for the calculation
-    ram="10000Mb" # 10Gb
-    
-    # The default partition in which to submit calculations
-    partition_name = ""
-    
-    # Still unused
-    prefix_name = "prefix" # Variable in the calculator for differentiating the calculations
-    
-    # This directory is used to work with clusters.
-    local_workdir = "cluster_work/"
-    
-    # The batch size is the maximum number of job to be submitted together.
-    # The new jobs will be submitted only after a batch is compleated
-    # Useful if the cluster has a limit for the maximum number of jobs allowed.
-    batch_size = 1000
-    
+class Cluster(object):
     
     def __init__(self, hostname=None, pwd=None, extra_options="", workdir = "",
                  account_name = "", partition_name = "", binary="pw.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo",
@@ -195,6 +132,12 @@ class Cluster:
         """
         
         self.hostname = hostname
+        self.pwd = pwd
+
+        self.sshcmd = "ssh"
+        self.sshcmd = "ssh " + extra_options
+        self.scpcmd = "scp " + extra_options.replace("-p", "-P")
+
         if not pwd is None:
             self.pwd = pwd
             res = os.system("sshpass > /dev/null")
@@ -215,6 +158,104 @@ class Cluster:
             
         self.binary = binary
         self.mpi_cmd = mpi_cmd
+
+        self.workdir=r""
+        self.submit_command="sbatch --wait"
+        self.submit_name="SBATCH"
+        self.terminal="#!/bin/bash"
+        self.v_nodes="-N "
+        self.use_nodes = True
+        self.v_cpu="-n "
+        self.use_cpu = True
+        self.v_account="-A "
+        self.use_account = True
+        self.v_time="--time="
+        self.use_time = True
+        self.v_memory="--mem="
+        self.use_memory = False
+        self.v_partition="--partition="
+        self.use_partition= False
+        self.timeout = 1000
+        self.use_timeout = False
+
+        # This is the number of configurations to be computed for each jub submitted
+        # This times the self.batch_size is the total amount of configurations submitted toghether
+        self.job_number = 1
+        self.n_together_def = 1
+        self.use_multiple_submission = False
+
+
+        # This is a set of lines to be runned before the calculation
+        # It can be used to load the needed modules in the cluster
+        self.load_modules=""
+        
+        # Setup the number of cpu, nodes and pools for the calculation
+        self.n_nodes = 1
+        self.n_cpu = 1
+        self.n_pool = 1
+        
+        # This is the default label, change it if you are going to submit
+        # two different calculations in the same working directory
+        self.label = "ESP_"
+        
+        # This is the maximum number of resubmissions after the expected one
+        # from the batch size. It can be use to resubmit the failed jobs.
+        self.max_recalc = 10
+        self.connection_attempts = 1
+        
+        # This is the time string. Faster job will be the less in the queue,
+        self.time="00:02:00" # 2minutes
+        
+        # The ram required for the calculation
+        self.ram="10000Mb" # 10Gb
+        
+        # The default partition in which to submit calculations
+        self.partition_name = ""
+        
+        # Still unused
+        self.prefix_name = "prefix" # Variable in the calculator for differentiating the calculations
+        
+        # This directory is used to work with clusters.
+        self.local_workdir = "cluster_work/"
+        
+        # The batch size is the maximum number of job to be submitted together.
+        # The new jobs will be submitted only after a batch is compleated
+        # Useful if the cluster has a limit for the maximum number of jobs allowed.
+        self.batch_size = 1000
+
+
+        # Allow to setup additional custom extra parameters
+        self.custom_params = {}
+
+        # Fix the attributes
+
+        # Setup the attribute control
+        self.__total_attributes__ = [item for item in self.__dict__.keys()]
+        self.fixed_attributes = True # This must be the last attribute to be setted
+
+
+    def __setattr__(self, name, value):
+        """
+        This method is used to set an attribute.
+        It will raise an exception if the attribute does not exists (with a suggestion of similar entries)
+        """
+
+        
+        if "fixed_attributes" in self.__dict__:
+            if name in self.__total_attributes__:
+                super(Cluster, self).__setattr__(name, value)
+            elif self.fixed_attributes:
+                similar_objects = str( difflib.get_close_matches(name, self.__total_attributes__))
+                ERROR_MSG = """
+        Error, the attribute '{}' is not a member of '{}'.
+        Suggested similar attributes: {} ?
+        """.format(name, type(self).__name__,  similar_objects)
+
+                raise AttributeError(ERROR_MSG)
+        else:
+            super(Cluster, self).__setattr__(name, value)
+        
+        
         
     def ExecuteCMD(self, cmd, raise_error = True, return_output = False):
         """
@@ -249,6 +290,11 @@ class Cluster:
             # Subprocess opening
             p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell = True)
             output, err = p.communicate()
+            if not isinstance(output, str):
+                try:
+                    output = str(output.decode("utf-8"))
+                except:
+                    pass
             output = output.strip()
             status = p.wait()
             if not err is None:
@@ -270,6 +316,20 @@ class Cluster:
             return success, output
         return success
             
+
+    def set_timeout(self, timeout):
+        """
+        Set a timeout time for each single calculation.
+        This is very usefull as sometimes the calculations gets stucked after some times on clusters.
+
+        Parameters
+        ----------
+            timeout: int
+                The timeout in seconds after which a single calculation is killed.
+        """
+
+        self.use_timeout = True
+        self.timeout = timeout
         
         
             
@@ -392,8 +452,8 @@ class Cluster:
             
             #cp_res = os.system(cmd + " > /dev/null")
             if not cp_res:
-                print "Error while executing:", cmd
-                print "Return code:", cp_res
+                print ("Error while executing:", cmd)
+                print ("Return code:", cp_res)
                 sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
                 continue
             
@@ -437,6 +497,10 @@ class Cluster:
             submission += "#%s %s%s\n" % (self.submit_name, self.v_memory, self.ram)
         if self.use_partition:
             submission += "#%s %s%s\n" % (self.submit_name, self.v_partition, self.partition_name)
+
+        # Append the additional parameters
+        for add_parameter in self.custom_params:
+            submission += "#{} --{}={}\n".format(self.submit_name, add_parameter, self.custom_params[add_parameter])
         
         # Add the set -x option
         submission += "set -x\n"
@@ -453,15 +517,15 @@ class Cluster:
         
         # Copy the submission script
         sub_fpath = "%s/%s.sh" % (self.local_workdir, label + "_" + str(indices[0]))
-        f = file(sub_fpath, "w")
+        f = open(sub_fpath, "w")
         f.write(submission)
         f.close()
         cmd = self.scpcmd + " %s %s:%s" % (sub_fpath, self.hostname, self.workdir)
         cp_res = self.ExecuteCMD(cmd, False)
         #cp_res = os.system(cmd  + " > /dev/null")
         if not cp_res:
-            print "Error while executing:", cmd
-            print "Return code:", cp_res
+            print ("Error while executing:", cmd)
+            print ("Return code:", cp_res)
             sys.stderr.write(cmd + ": exit with code " + str(cp_res))
             return results#[None] * N_structs
         
@@ -539,6 +603,11 @@ class Cluster:
             submission += "#%s %s%s\n" % (self.submit_name, self.v_memory, self.ram)
         if self.use_partition:
             submission += "#%s %s%s\n" % (self.submit_name, self.v_partition, self.partition_name)
+
+
+        # Append the additional parameters
+        for add_parameter in self.custom_params:
+            submission += "#{} --{}={}\n".format(self.submit_name, add_parameter, self.custom_params[add_parameter])
         
         # Add the loading of the modules
         submission += self.load_modules + "\n"
@@ -564,7 +633,7 @@ class Cluster:
 #            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
 #        
         # Copy the input files into the target directory
-        f = file("%s/%s.sh" % (self.local_workdir, label), "w")
+        f = open("%s/%s.sh" % (self.local_workdir, label), "w")
         f.write(submission)
         f.close()
         cmd = self.scpcmd + " %s/%s.sh %s:%s" % (self.local_workdir, label, self.hostname, self.workdir)
@@ -599,8 +668,8 @@ class Cluster:
         cp_res = self.ExecuteCMD(cmd, False)
         #cp_res = os.system(cmd)
         if not cp_res:
-            print "Error while executing:", cmd
-            print "Return code:", cp_res
+            print ("Error while executing:", cmd)
+            print ("Return code:", cp_res)
             sys.stderr.write(cmd + ": exit with code " + str(cp_res))
             return
             
@@ -639,9 +708,9 @@ class Cluster:
         # Check if there is an unknown key
         for k in keys:
             if not k in __CLUSTER_KEYS__:
-                print "Error with the key:", k
+                print ("Error with the key:", k)
                 s = "Did you mean something like:" + str( difflib.get_close_matches(k, __CLUSTER_KEYS__))
-                print s
+                print (s)
                 raise IOError("Error in cluster namespace: key '" + k +"' not recognized.\n" + s)
         
         # First of all, check if a template is present
@@ -649,14 +718,14 @@ class Cluster:
             # Check if the environment variable has been defined
             fname = c_info[__CLUSTER_TEMPLATE__]
             if os.path.exists(fname):
-                print "Reading cluster info from:", os.path.abspath(fname)
+                print ("Reading cluster info from:", os.path.abspath(fname))
                 self.setup_from_namelist(CC.Methods.read_namelist(fname))
             elif __TEMPLATE_ENV__ in os.environ.keys():
                 if os.path.exists(os.environ[__TEMPLATE_ENV__]):
                     newfname = os.environ[__TEMPLATE_ENV__] + "/" + fname
-                    print "Reading cluster info from:", os.path.abspath(newfname)
+                    print ("Reading cluster info from:", os.path.abspath(newfname))
                     if not os.path.exists(newfname):
-                        print "Error, Environ variable", __TEMPLATE_ENV__, "exists, but no file", fname, "found."
+                        print ("Error, Environ variable", __TEMPLATE_ENV__, "exists, but no file", fname, "found.")
                         raise IOError("Error while reading the cluster template.")
                     
                     self.setup_from_namelist(CC.Methods.read_namelist(newfname))
@@ -693,6 +762,12 @@ class Cluster:
             
             self.sshcmd = "sshpass -p '" + self.pwd + "' " + self.sshcmd
             self.scpcmd = "sshpass -p '" + self.pwd + "' " + self.scpcmd
+
+        # Add the port
+        if __CLUSTER_PORT__ in keys:
+            # Check if the password has been setup
+            self.sshcmd += " -p {:.0f}".format(c_info[__CLUSTER_PORT__])
+            self.scpcmd += " -P {:.0f}".format(c_info[__CLUSTER_PORT__])
             
         if __CLUSTER_ACCOUNT__ in keys:
             self.account_name = c_info[__CLUSTER_ACCOUNT__]
@@ -707,17 +782,17 @@ class Cluster:
             self.use_multiple_submission = True
             self.job_number = int(c_info[__CLUSTER_JOBNUMBER__])
             if self.job_number < 1:
-                print "Error, the number of job per batch must be >= 1"
+                print ("Error, the number of job per batch must be >= 1")
                 raise ValueError("Error in the %s input variable." % __CLUSTER_JOBNUMBER__)
         
         if __CLUSTER_NPARALLEL__ in keys:
             self.n_together_def = int(c_info[__CLUSTER_NPARALLEL__])
             
             if self.n_together_def < 1:
-                print "Error, the number of parallel jobs must be >= 1"
+                print ("Error, the number of parallel jobs must be >= 1")
                 raise ValueError("Error in the %s input variable." % __CLUSTER_NPARALLEL__)
             if self.n_together_def > self.job_number:
-                print "Error, the number of parallel runs must be <= than the number of runs per job"
+                print ("Error, the number of parallel runs must be <= than the number of runs per job")
                 raise ValueError("Error, check the cluster keys %s and %s" % (__CLUSTER_NPARALLEL__, __CLUSTER_JOBNUMBER__))
             
             
@@ -784,7 +859,7 @@ class Cluster:
                 raise IOError("Error, the provided script path %s does not exists." % script_path)
             
             # Read the script and store the contnet
-            f = file(script_path, "r")
+            f = open(script_path, "r")
             self.load_modules = f.read()
             f.close()
         
@@ -803,16 +878,17 @@ class Cluster:
             
         
         if __CLUSTER_BINARY__ in keys:
-            print "Binary before parsing:"
-            print c_info[__CLUSTER_BINARY__]
+            print ("Binary before parsing:")
+            print (c_info[__CLUSTER_BINARY__])
             self.binary = self.parse_string(c_info[__CLUSTER_BINARY__])
-            print "Cluster binary setted to:"
-            print self.binary
+            print ("Cluster binary setted to:")
+            print (self.binary)
             
         # If all the cluster has been setted, setup the working directory
         if __CLUSTER_WORKDIR__ in keys:
             self.workdir = c_info[__CLUSTER_WORKDIR__]
             self.setup_workdir()
+
             
     def setup_workdir(self, verbose = True):
         """
@@ -883,7 +959,7 @@ class Cluster:
 #            print "Error, status:", status
 #            raise ValueError("Error, while connecting with the server.")
         
-        return output
+        return str(output)
             
     def compute_ensemble_batch(self, ensemble, ase_calc, get_stress = True, timeout=None):
         """
@@ -958,7 +1034,7 @@ class Cluster:
             
             count = 0
             # Submit in parallel
-            jobs = [false_id[i : i + self.job_number] for i in xrange(0, len(false_id), self.job_number)]
+            jobs = [false_id[i : i + self.job_number] for i in range(0, len(false_id), self.job_number)]
             
             for job in jobs:
                 # Submit only the batch size
@@ -975,7 +1051,7 @@ class Cluster:
             
             recalc += 1
             if recalc > num_batch_offset + self.max_recalc:
-                print "Expected batch ordinary resubmissions:", num_batch_offset
+                print ("Expected batch ordinary resubmissions:", num_batch_offset)
                 raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
                 break
             
@@ -1062,9 +1138,7 @@ class Cluster:
             
             recalc += 1
             if recalc > num_batch_offset + self.max_recalc:
-                print "Expected batch ordinary resubmissions:", num_batch_offset
+                print ("Expected batch ordinary resubmissions:", num_batch_offset)
                 raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
                 break
             
-            
-        

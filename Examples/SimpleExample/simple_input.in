@@ -32,7 +32,7 @@
     ! or perform the minimization. This flag is not used by python (probably it will in future).
     ! "minim" - start the minimization loading the ensemble from data_dir
     ! "scfin" - generate a new ensemble in the data_dir
-    !type_cal = "minim"
+    type_cal = "minim"
 
     ! The dimension of the ensemble
     n_random = 1000
@@ -104,8 +104,8 @@
     ! leading to neagive frequencies, it is wise in the beginning to decrease it.
     ! lambda_a : step for the force constant matrix
     ! lambda_w : step for the structure
-    lambda_a = 1
-    lambda_w = 1
+    lambda_a = 0.5
+    lambda_w = 0.5
     
     ! The root representation is a trick to increase the speed of the minimization
     ! And to avoid the imaginary frequency error (the force-constant matrix is constrained
@@ -127,7 +127,7 @@
     ! is not minimized (ignored by the python code).
     ! Note, you can always freeze the structure (or dynamical matrix) minimization
     ! by setting the step to 0 (lambda_a or lambda_w)
-    minim_struc = .true.
+    minim_struc = .false.
 
     ! We can choose to use spglib for symmetrization (the default one is Quantum ESPRESSO)
     ! It is more effective in detecting symmetries
@@ -142,9 +142,10 @@
 
     ! The old code uses line minimization (activated after warm_up_steps)
     ! The new python code will complain
-    !warm_up_steps = 10000    
+    warm_up_steps = 10000
+    print_debug = .true.
 
     ! The maximum number of steps after which the code is automatically stopped
-    max_ka= 20
+    max_ka= 80
 /
 

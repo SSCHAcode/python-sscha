@@ -6,6 +6,7 @@ The function are classified as:
 CGF : custom_gradient_function
 
 """
+from __future__ import print_function
 import difflib
 import cellconstructor as CC
 import cellconstructor.Phonons
@@ -65,9 +66,9 @@ def get_custom_functions_from_namelist(namelist, dyn):
     # Check for unknown keys
     for k in keys:
         if not k in __ALLOWED_KEYS__:
-            print "Error with the key:", k
+            print ("Error with the key:", k)
             s =  "Did you mean something like:" + str( difflib.get_close_matches(k, __ALLOWED_KEYS__))
-            print s
+            print (s)
             raise IOError("Error in "+__UTILS_NAMESPACE__+" namespace: key '" + k +"' not recognized.\n" + s)
     
     
@@ -82,10 +83,10 @@ def get_custom_functions_from_namelist(namelist, dyn):
     
     def cfp(minim):
         if use_io:
-            print "SAVING"
+            print ("SAVING")
             return io_info.CFP_SaveAll(minim)
         else:
-            print "NOT SAVING"
+            print ("NOT SAVING")
         
     # Setup the mode projection
     locking = False
@@ -137,7 +138,7 @@ def get_custom_functions_from_namelist(namelist, dyn):
         if mu_end < 0 or mu_end >= 3*nat:
             raise ValueError("Error, the modes specified for modelocking must be between %d and %d" % (1, 3*nat))
 
-        for iq in xrange(nq):
+        for iq in range(nq):
             w, p_v = dyn.DyagDinQ(iq)
             pols[:, :, iq] = p_v[:, mu_start : mu_end]
         
@@ -224,7 +225,7 @@ class ModeProjection:
             raise ValueError("Error, note that the pols argument must have 3 indices: 3*nat, nmodes and iq")
         
         self.pols = pols.copy()  
-        self.nat = np.shape(self.pols)[0] / 3
+        self.nat = np.shape(self.pols)[0] // 3
         self.nmodes = np.shape(self.pols)[1]
         self.nq = np.shape(self.pols)[2]
         

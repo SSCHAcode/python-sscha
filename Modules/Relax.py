@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 
 """
 This module performs the relax over more
@@ -40,10 +41,7 @@ __ALLOWED_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__, __RELAX_MAX_POP__,
                     __RELAX_FIXVOLUME__, __RELAX_TARGET_PRESSURE__,
                     __RELAX_BULK_MODULUS__, __RELAX_GENERATE_FIRST_ENSEMBLE__]
 
-class SSCHA:
-    bulk_modulus = 100
-    target_pressure = 0
-    fix_volume = False
+class SSCHA(object):
     
     def __init__(self, minimizer = None, ase_calculator=None, N_configs=1, max_pop = 20, 
                  save_ensemble = False, cluster = None):
@@ -70,11 +68,10 @@ class SSCHA:
                 will be runned in the provided cluster.
         """
         
-        new_minim = minimizer
-        if minimizer is None:
-            new_minim = sscha.SchaMinimizer.SSCHA_Minimizer()
-        
-        self.minim = new_minim
+        if minimizer == None:
+            self.minim = sscha.SchaMinimizer.SSCHA_Minimizer()
+        else:
+            self.minim = minimizer
 
         self.calc = ase_calculator
         self.N_configs = N_configs
@@ -93,28 +90,38 @@ class SSCHA:
         self.__cfpost__ = None
         self.__cfg__ = None
 
-    def setup_from_dynamical_matrix(self, dynmat, T = 0):
+        # The variable cell attributes
+        self.bulk_modulus = 15
+        self.target_pressure = 0
+        self.fix_volume = False
+
+
+        # Setup the attribute control
+        self.__total_attributes__ = [item for item in self.__dict__.keys()]
+        self.fixed_attributes = True # This must be the last attribute to be setted
+
+    def __setattr__(self, name, value):
         """
-        SETUP THE RELAXER FOR THE RUN
-        =============================
-
-        With this function it is possible to setup the ensemble
-        and the minimizer directly from the dynamical matrix, without
-        the need of a different approach.
-
-        Parameters
-        ----------
-            dynmat : Phonons()
-                The dynamical matrix
-            T : float
-                The temperature
+        This method is used to set an attribute.
+        It will raise an exception if the attribute does not exists (with a suggestion of similar entries)
         """
 
-        self.minim.dyn = dynmat.Copy()
+        
+        if "fixed_attributes" in self.__dict__:
+            if name in self.__total_attributes__:
+                super(SSCHA, self).__setattr__(name, value)
+            elif self.fixed_attributes:
+                similar_objects = str( difflib.get_close_matches(name, self.__total_attributes__))
+                ERROR_MSG = """
+        Error, the attribute '{}' is not a member of '{}'.
+        Suggested similar attributes: {} ?
+        """.format(name, type(self).__name__,  similar_objects)
 
-        # Prepare the ensemble
-        self.minim.ensemble = sscha.Ensemble.Ensemble(dynmat, T, dynmat.GetSupercell())
-
+                raise AttributeError(ERROR_MSG)
+        else:
+            super(SSCHA, self).__setattr__(name, value)
+        
+        
         
     def setup_from_namelist(self, namelist):
         """
@@ -185,9 +192,9 @@ class SSCHA:
         # Check the allowed keys
         for k in keys: 
             if not k in __ALLOWED_KEYS__:
-                print "Error with the key:", k
+                print ("Error with the key:", k)
                 s = "Did you mean something like:" + str( difflib.get_close_matches(k, __ALLOWED_KEYS__))
-                print s
+                print (s)
                 raise IOError("Error in calculator namespace: key '" + k +"' not recognized.\n" + s)
         
         # Check for mandatory keys
@@ -201,8 +208,8 @@ class SSCHA:
         if __RELAX_TYPE__ in keys:
             rtype = c_info[__RELAX_TYPE__]
             if not rtype in __ALLOWED_RELAX_TYPES__:
-                print "Unknown relaxation option:", rtype
-                print "Did you mean:", difflib.get_close_matches(rtype, __ALLOWED_RELAX_TYPES__)
+                print ("Unknown relaxation option:", rtype)
+                print ("Did you mean:", difflib.get_close_matches(rtype, __ALLOWED_RELAX_TYPES__))
                 raise ValueError("Error with key %s" % __RELAX_TYPE__)
         
             # Setup custom functions
@@ -235,7 +242,7 @@ class SSCHA:
         
         
     def relax(self, restart_from_ens = False, get_stress = False,
-              ensemble_loc = ".", start_pop = 1):
+              ensemble_loc = None, start_pop = None):
         """
         COSTANT VOLUME RELAX
         ====================
@@ -254,11 +261,12 @@ class SSCHA:
                 cost, as it will be computed for each ab-initio configuration (it may be not available
                 with some ase calculator)
             ensemble_loc : string
-                Where the ensemble of each population is saved on the disk. You can specify None
-                if you do not want to save the ensemble (useful to avoid disk I/O for force fields)
+                Where the ensemble of each population is saved on the disk. If none, it will
+                use the content of self.data_dir. If also self.data_dir is None, 
+                the ensemble will not not be saved (useful to avoid disk I/O for force fields)
             start_pop : int, optional
                 The starting index for the population, used only for saving the ensemble and the dynamical 
-                matrix.
+                matrix. If None, the content of self.start_pop will be used.
             
         Returns
         -------
@@ -266,7 +274,13 @@ class SSCHA:
                 True if the minimization converged, False if the maximum number of 
                 populations has been reached.
         """
+
+        if ensemble_loc is None:
+            ensemble_loc = self.data_dir
         
+        if start_pop is None:
+            start_pop = self.start_pop
+
         pop = start_pop
                 
         running = True
@@ -286,10 +300,8 @@ class SSCHA:
                     self.minim.ensemble.save_bin(ensemble_loc, pop)
             
             self.minim.population = pop
-            self.minim.init()
+            self.minim.init(delete_previous_data = False)
 
-            self.minim.print_info()
-        
             self.minim.run(custom_function_pre = self.__cfpre__,
                            custom_function_post = self.__cfpost__,
                            custom_function_gradient = self.__cfg__)
@@ -298,11 +310,11 @@ class SSCHA:
             self.minim.finalize()
             
             # Perform the symmetrization
-            print "Checking the symmetries of the dynamical matrix:"
+            print ("Checking the symmetries of the dynamical matrix:")
             qe_sym = CC.symmetries.QE_Symmetry(self.minim.dyn.structure)
             qe_sym.SetupQPoint(verbose = True)
             
-            print "Forcing the symmetries in the dynamical matrix."
+            print ("Forcing the symmetries in the dynamical matrix.")
             fcq = np.array(self.minim.dyn.dynmats, dtype = np.complex128)
             qe_sym.SymmetrizeFCQ(fcq, self.minim.dyn.q_stars, asr = "custom")
             for iq,q in enumerate(self.minim.dyn.q_tot):
@@ -447,8 +459,8 @@ class SSCHA:
             if kind_minimizer == "RPSD":
                 # Compute the static bulk modulus
                 sbm = GetStaticBulkModulus(self.minim.dyn.structure, self.calc)
-                print "BM:"
-                print sbm
+                print ("BM:")
+                print (sbm)
                 BFGS = sscha.Optimizer.SD_PREC_UC(self.minim.dyn.structure.unit_cell, sbm)
 
             # Generate the ensemble
@@ -465,7 +477,7 @@ class SSCHA:
                     self.minim.ensemble.save_bin(ensemble_loc, pop)
             
             self.minim.population = pop
-            self.minim.init()
+            self.minim.init(delete_previous_data = False)
         
             self.minim.run(custom_function_pre = self.__cfpre__,
                            custom_function_post = self.__cfpost__,
@@ -489,28 +501,52 @@ class SSCHA:
             helmoltz = self.minim.get_free_energy() * sscha.SchaMinimizer.__RyToev__
             gibbs = helmoltz + target_press_evA3 * Vol - self.minim.eq_energy
             
-            
+            # Prepare a mark to underline which quantity is actually minimized by the
+            # Variable relaxation algorithm if the helmoltz free energy (in case of fixed volume)
+            # Or the Gibbs free energy (in case of fixed pressure)
+            mark_helmoltz = ""
+            mark_gibbs = ""
+            if fix_volume:
+                mark_helmoltz = "<--"
+            else:
+                mark_helmoltz = "<--"
+
             # Print the enthalpic contribution
-            print ""
-            print " ENTHALPIC CONTRIBUTION "
-            print " ====================== "
-            print ""
-            print "  P = %.4f GPa    V = %.4f A^3" % (target_press , Vol)
-            print ""
-            print "  P V = %.8e eV " % (target_press_evA3 * Vol)
-            print ""
-            print " Helmoltz Free energy = %.8e eV " % helmoltz,
-            if fix_volume:
-                print "  <-- "
-            else:
-                print ""
-            print " Gibbs Free energy = %.8e eV " % gibbs,
-            if fix_volume:
-                print ""
-            else:
-                print "  <-- "
-            print " (Zero energy = %.8e eV) " % self.minim.eq_energy
-            print ""
+            message = """
+ ====================== 
+ ENTHALPIC CONTRIBUTION 
+ ====================== 
+
+ P = {:.4f} GPa   V = {:.4f} A^3
+
+ P V = {:.8e} eV
+
+ Helmoltz Free energy = {:.8e} eV {}
+ Gibbs Free energy = {:.8e} eV {}
+ Zero energy = {:.8e} eV
+
+ """.format(target_press , Vol,target_press_evA3 * Vol, helmoltz, mark_helmoltz, gibbs, mark_gibbs, self.minim.eq_energy)
+            print(message)
+            # print " ====================== "
+            # print " ENTHALPIC CONTRIBUTION "
+            # print " ====================== "
+            # print ""
+            # print "  P = %.4f GPa    V = %.4f A^3" % (target_press , Vol)
+            # print ""
+            # print "  P V = %.8e eV " % (target_press_evA3 * Vol)
+            # print ""
+            # print " Helmoltz Free energy = %.8e eV " % helmoltz,
+            # if fix_volume:
+            #     print "  <-- "
+            # else:
+            #     print ""
+            # print " Gibbs Free energy = %.8e eV " % gibbs,
+            # if fix_volume:
+            #     print ""
+            # else:
+            #     print "  <-- "
+            # print " (Zero energy = %.8e eV) " % self.minim.eq_energy
+            # print ""
         
             # Perform the cell step
             cell_gradient = (stress_tensor - I *target_press_evA3)
@@ -523,17 +559,17 @@ class SSCHA:
             #self.minim.dyn.structure.change_unit_cell(new_uc)
             
 
-            print " New unit cell:"
-            print " v1 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[0,0], new_uc[0,1], new_uc[0,2])
-            print " v2 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[1,0], new_uc[1,1], new_uc[1,2])
-            print " v3 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[2,0], new_uc[2,1], new_uc[2,2])
+            print (" New unit cell:")
+            print (" v1 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[0,0], new_uc[0,1], new_uc[0,2]))
+            print (" v2 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[1,0], new_uc[1,1], new_uc[1,2]))
+            print (" v3 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[2,0], new_uc[2,1], new_uc[2,2]))
             
-            print ""
-            print "Check the symmetries in the new cell:"
+            print ()
+            print ("Check the symmetries in the new cell:")
             qe_sym = CC.symmetries.QE_Symmetry(self.minim.dyn.structure)
             qe_sym.SetupQPoint(verbose = True)
             
-            print "Forcing the symmetries in the dynamical matrix."
+            print ("Forcing the symmetries in the dynamical matrix.")
             fcq = np.array(self.minim.dyn.dynmats, dtype = np.complex128)
             qe_sym.SymmetrizeFCQ(fcq, self.minim.dyn.q_stars, asr = "custom")
             for iq,q in enumerate(self.minim.dyn.q_tot):
