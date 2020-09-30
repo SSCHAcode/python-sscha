@@ -38,7 +38,7 @@ import cellconstructor.Methods
 import cellconstructor.Manipulate
 import cellconstructor.Settings
 
-import Parallel
+import sscha.Parallel as Parallel
 
 
 import SCHAModules
