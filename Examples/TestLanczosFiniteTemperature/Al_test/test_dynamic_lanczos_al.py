@@ -36,7 +36,7 @@ def compute_difference_sections(psi1, psi2, n_modes):
 def test_dynamic_lanczos_al():
     # Change to the local directory
 
-    dyn = CC.Phonons.Phonons("../Al_222_", 4)
+    dyn = CC.Phonons.Phonons("Al_222_", 4)
     ens = sscha.Ensemble.Ensemble(dyn, 300, dyn.GetSupercell())
 
     ens.generate(1000)
