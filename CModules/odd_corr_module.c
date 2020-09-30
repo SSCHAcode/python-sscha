@@ -51,7 +51,7 @@ static struct PyModuleDef sscha_hp_odd = {
   odd_engine
 };
 
-PyMODINIT_FUNC PyInit_initsscha_HP_odd(void) {
+PyMODINIT_FUNC PyInit_sscha_HP_odd(void) {
   return PyModule_Create(&sscha_hp_odd);
 }
 #endif
