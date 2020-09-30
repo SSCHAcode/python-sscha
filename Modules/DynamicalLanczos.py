@@ -19,12 +19,12 @@ import cellconstructor as CC
 import cellconstructor.Phonons
 import cellconstructor.symmetries
 
-import Ensemble
+import sscha.Ensemble as Ensemble
 import sscha_HP_odd
 
 # Override the print function to print in parallel only from the master
-import Parallel
-from Parallel import pprint as print
+import sscha.Parallel as Parallel
+from sscha.Parallel import pprint as print
 
 # Define a generic type for the double precision.
 TYPE_DP = np.double
