@@ -939,10 +939,6 @@ Maybe data_dir is missing from your input?"""
                 impose some constraint on the minimization.
         """
 
-        # Check if everything is initialized
-        if not self.is_initialized:
-            print("Attention: The ensemble results uninitialized, try to run the init function before.")
-            raise ValueError("Error, the dynamical matrix or the ensemble are not properly initialized.")
         
         # Eliminate the convergence flag
         self.__converged__ = False
