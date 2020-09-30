@@ -38,7 +38,6 @@ def compute_max_intensity(psi1, n_modes):
     end_A = start_A + (n_modes * (n_modes + 1)) // 2
 
     assert end_A == len(psi1)
-    assert end_A == len(psi2)
 
 
     diff_R = np.max(np.abs(psi1[:start_Y]))
