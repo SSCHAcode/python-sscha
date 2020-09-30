@@ -11,12 +11,12 @@ import time
 __PYPAR__ = False 
 __MPI4PY__ = False
 try: 
-    import pypar
-    __PYPAR__ = True  
+    import mpi4py, mpi4py.MPI
+    __MPI4PY__ = True
 except:
     try:
-        import mpi4py, mpi4py.MPI
-        __MPI4PY__ = True
+        import pypar
+        __PYPAR__ = True  
     except:
         pass
 
