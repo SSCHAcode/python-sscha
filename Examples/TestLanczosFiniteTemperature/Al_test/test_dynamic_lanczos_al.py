@@ -47,7 +47,7 @@ def test_dynamic_lanczos_al():
     lanczos.ignore_v4 = True
     lanczos.ignore_harmonic = True
     lanczos.ignore_v3 = False
-    lanczos.prepare_symmetrization(no_sym = False)
+    lanczos.prepare_symmetrization(no_sym = True)
 
     # Print the symmetrization info
     for i in range(lanczos.n_modes):
