@@ -1110,6 +1110,10 @@ static PyObject * GetV4(PyObject * self, PyObject * args) {
     }
   }
 
+#ifdef _PYTHON2
   return PyInt_FromLong(n_tot);
+#else
+  return PyLong_FromLong(n_tot);
+#endif
 }
 //#endif 
