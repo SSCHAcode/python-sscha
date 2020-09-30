@@ -52,7 +52,7 @@ static struct PyModuleDef sscha_hp_odd = {
 };
 
 PyMODINIT_FUNC PyInit_initsscha_HP_odd(void) {
-  return PyModuleCreate(&sscha_hp_odd);
+  return PyModule_Create(&sscha_hp_odd);
 }
 #endif
 
