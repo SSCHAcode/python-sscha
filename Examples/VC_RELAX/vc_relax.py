@@ -26,7 +26,7 @@ freq_saving = sscha.Utilities.IOInfo()
 freq_saving.SetupSaving("Total_freqs.dat")
 
 # Prepare the Relax
-ensemble = sscha.Ensemble.Ensemble(dynmat, 0)
+ensemble = sscha.Ensemble.Ensemble(dynmat, 0, dynmat.GetSupercell())
 minim = sscha.SchaMinimizer.SSCHA_Minimizer(ensemble)
 
 # Setup a small step (we are using few configurations)

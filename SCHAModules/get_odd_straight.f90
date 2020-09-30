@@ -30,6 +30,7 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
   real :: t1, t2
   logical, parameter :: debug = .false.
 
+
   ! Get integers
 
   !nat_sc = size(er(:,1,1))

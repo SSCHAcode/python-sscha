@@ -265,6 +265,7 @@ class SSCHA_Minimizer(object):
         else:
             qe_sym.SetupQPoint(verbose = False)
             self.N_symmetries = qe_sym.QE_nsym
+
         
         
         # Get the gradient of the free-energy respect to the dynamical matrix
@@ -629,8 +630,8 @@ class SSCHA_Minimizer(object):
 
         
         if __SCHA_PRINTSTRESS__ in keys:
-            if not __SCHA_FILDYN__ in keys:
-                raise ValueError("Error, please specify a dynamical matrix.")
+            #if not __SCHA_FILDYN__ in keys:
+            #    raise ValueError("Error, please specify a dynamical matrix.")
             self.ensemble.has_stress = True
         
     def print_info(self):
@@ -937,6 +938,11 @@ Maybe data_dir is missing from your input?"""
                 It is called after the two gradients have been computed, and it is used to 
                 impose some constraint on the minimization.
         """
+
+        # Check if everything is initialized
+        if not self.is_initialized:
+            print("Attention: The ensemble results uninitialized, try to run the init function before.")
+            raise ValueError("Error, the dynamical matrix or the ensemble are not properly initialized.")
         
         # Eliminate the convergence flag
         self.__converged__ = False
@@ -1363,6 +1369,7 @@ Maybe data_dir is missing from your input?"""
         
         
         return self.ensemble.get_stress_tensor(self.stress_offset, use_spglib= self.use_spglib)
+
     
 
 def get_root_dyn(dyn_fc, root_representation):

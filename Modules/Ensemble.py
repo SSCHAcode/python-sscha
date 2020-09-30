@@ -38,8 +38,11 @@ import cellconstructor.Methods
 import cellconstructor.Manipulate
 import cellconstructor.Settings
 
+import Parallel
+
 
 import SCHAModules
+import sscha_HP_odd
 
 _SSCHA_ODD_ = False 
 try:
@@ -63,6 +66,11 @@ try:
 except: 
     __SPGLIB__ = False
     
+__ASE__ = True 
+try:
+    import ase, ase.io
+except:
+    __ASE__ = False
 
 # The small value considered zero
 __EPSILON__ =  1e-6
@@ -435,7 +443,107 @@ class Ensemble:
             self.has_stress = True
         else:
             self.has_stress = False
+
+    def load_from_calculator_output(self, directory, out_ext = ".pwo"):
+        """
+        LOAD THE ENSEMBLE FROM A CALCULATION
+        ====================================
+
+        This subroutine allows to directly load the ensemble from the output files
+        of a calculation. This works and has been tested for quantum espresso,
+        however in principle any output file from an ase supported format 
+        should be readed.
+
+        NOTE: This subroutine requires ASE to be correctly installed.
+
+        Parameters
+        ----------
+            directory : string
+                Path to the directory that contains the output of the calculations
+            out_ext : string
+                The extension of the files that will be readed.
+        """
+
+        assert __ASE__, "ASE library required to load from the calculator output file."
+
+        # Get all the output file
+        output_files = ["{}/{}".format(directory, x) for x in os.listdir(directory) if x.endswith(out_ext)]
+
+        self.N = len(output_files)
+        nat_sc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms
+
+        self.forces = np.zeros( (self.N, nat_sc, 3), order = "F", dtype = np.float64)
+        self.xats = np.zeros( (self.N, nat_sc, 3), order = "C", dtype = np.float64)
+
+        self.stresses = np.zeros( (self.N, 3,3), order = "F", dtype = np.float64)
+        
+        self.sscha_energies = np.zeros(self.N, dtype = np.float64)
+        self.energies = np.zeros(self.N, dtype = np.float64)
+        self.sscha_forces = np.zeros( (self.N, nat_sc, 3), order = "F", dtype = np.float64)
+        
+        self.u_disps = np.zeros( (self.N, nat_sc * 3), order = "F", dtype = np.float64)
+        
+        # Add a counter to check if all the stress tensors are present
+        count_stress = 0 
+        
+        # Superstructure
+        dyn_supercell = self.dyn_0.GenerateSupercellDyn(self.supercell)
+        super_structure = dyn_supercell.structure
+        super_fc = dyn_supercell.dynmats[0]
+
+        self.structures = []
+
+        for i, outf in enumerate(output_files):
+            ase_struct = ase.io.read(outf)
+
+            # Get the structure
+            structure = CC.Structure.Structure()
+            structure.generate_from_ase_atoms(ase_struct)
+
+            self.xats[i, :, :] = structure.coords
+            self.structures.append(structure)
+
+            # Get the displacement [ANGSTROM]
+            self.u_disps[i,:] = structure.get_displacement(super_structure).reshape( 3 * nat_sc)
+
+            # Get the energy
+            energy = ase_struct.get_potential_energy()
+            energy /= Rydberg
+            self.energies[i] = energy
+
+            # Get the forces [eV/A -> Ry/A]
+            forces = ase_struct.get_forces() / Rydberg 
+            self.forces[i, :, :] = forces
+
+            # Get the stress if any
+            try:
+                stress = ase_struct.get_stress(voigt=False)
+                # eV/A^3 -> Ry/bohr^3
+                stress /= Rydberg / Bohr**3
+                count_stress += 1
+                self.stresses[i, :, :] = stress
+            except:
+                pass
+
+            # Get the sscha energy and forces            
+            energy, force = self.dyn_0.get_energy_forces(structure, supercell = self.supercell, real_space_fc=super_fc)
+
+            self.sscha_energies[i] = energy 
+            self.sscha_forces[i,:,:] = force
+
+        self.rho = np.ones(self.N, dtype = np.float64)
+
+        t1 = time.time()
+        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell, self.u_disps)
+        t2 = time.time()
+        self.current_q = self.q_start.copy()
+
+        if count_stress == self.N:
+            self.has_stress = True
+        else:
+            self.has_stress = False
             
+
         
     def save(self, data_dir, population, use_alat = False):
         """
@@ -533,16 +641,18 @@ class Ensemble:
         if not os.path.exists(data_dir):
             os.makedirs(data_dir)
         
-        np.save("%s/energies_pop%d.npy" % (data_dir, population_id), self.energies)
-        np.save("%s/forces_pop%d.npy" % (data_dir, population_id), self.forces)
-        
-        # Save the structures
-        np.save("%s/xats_pop%d.npy" % (data_dir, population_id), self.xats)
-        
-        if self.has_stress:
-            np.save("%s/stresses_pop%d.npy" % (data_dir, population_id), self.stresses)
-        
-        self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
+
+        if Parallel.am_i_the_master():
+            np.save("%s/energies_pop%d.npy" % (data_dir, population_id), self.energies)
+            np.save("%s/forces_pop%d.npy" % (data_dir, population_id), self.forces)
+            
+            # Save the structures
+            np.save("%s/xats_pop%d.npy" % (data_dir, population_id), self.xats)
+            
+            if self.has_stress:
+                np.save("%s/stresses_pop%d.npy" % (data_dir, population_id), self.stresses)
+            
+            self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
         
         
         
@@ -614,7 +724,9 @@ class Ensemble:
         self.current_q = self.q_start.copy()
 
         
+
     def generate(self, N, evenodd = True, project_on_modes = None, compute_sscha_forces = True, get_q_vectors = False):
+
         """
         GENERATE THE ENSEMBLE
         =====================
@@ -647,6 +759,7 @@ class Ensemble:
             structs = self.dyn_0.ExtractRandomStructures(N // 2, self.T0, project_on_vectors = project_on_modes)
 
 
+
             for i, s in enumerate(structs):
                 self.structures.append(s)
                 new_s = s.copy()
@@ -655,6 +768,7 @@ class Ensemble:
                 self.structures.append(new_s)
         else:
             self.structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
+
 
             
         # Compute the sscha energy and forces
@@ -875,6 +989,7 @@ DETAILS OF ERROR:
             
         #     # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
         self.sscha_energies[:], self.sscha_forces[:,:,:] = new_super_dyn.get_energy_forces(None, displacement = self.u_disps)
+
         t4 = time.time()
 
         if update_q:
@@ -1045,7 +1160,7 @@ DETAILS OF ERROR:
 
         Parameters
         ----------
-            - get_errors : bool
+            - get_error : bool
                 If true the error is also returned (as get_free_energy).
             - in_unit_cell : bool, optional
                 If True (default True) the mean force is averaged on all the atoms in the supercell,
@@ -1474,6 +1589,7 @@ DETAILS OF ERROR:
     
     
     def get_stress_tensor(self, offset_stress = None, add_centroid_contrib = False, use_spglib = False):
+
         """
         GET STRESS TENSOR
         =================
@@ -1494,6 +1610,7 @@ DETAILS OF ERROR:
                 the system is relaxed.
             use_spglib : bool
                 If true use the spglib library to perform the symmetrization
+
         
         Results
         -------
@@ -1599,6 +1716,7 @@ DETAILS OF ERROR:
             qe_sym.SetupQPoint()
         else:
             qe_sym.SetupFromSPGLIB()
+
         qe_sym.ApplySymmetryToMatrix(stress, err_stress)
         
         return stress, err_stress
@@ -1835,7 +1953,69 @@ DETAILS OF ERROR:
 #         #TODO: apply symmetries
             
 #         return df_dfc, err_df_dfc
-    
+
+
+    def get_d3_muspace(self):
+        r"""
+        GET V3 IN MODE SPACE
+        ====================
+
+        This subroutine gets the d3 directly in the space of the modes.
+
+        ..math::
+
+            D^{(3)}_{abc} = \sum_{xyz} \frac{\Phi^{(3)}_{xyz} e_a^x e_b^y e_c^z}{\sqrt{m_x m_y m_z}}
+
+
+        """
+
+        # Be shure to have the correct units
+        self.convert_units(UNITS_DEFAULT)
+
+        supersturct = self.current_dyn.structure.generate_supercell(self.supercell)
+
+        # Convert from A to Bohr the space 
+        u_disps = self.u_disps * __A_TO_BOHR__
+        n_rand, n_modes = np.shape(u_disps)
+        forces = (self.forces - self.sscha_forces).reshape(self.N, n_modes)  / __A_TO_BOHR__ 
+
+        Ups = self.current_dyn.GetUpsilonMatrix(self.current_T)
+        v_disp = u_disps.dot(Ups)
+
+        # pass in the polarization space
+        w, pols = self.current_dyn.DiagonalizeSupercell()
+
+        # Discard translations
+        trans = CC.Methods.get_translations(pols, supersturct.get_masses_array())
+        pols = pols[:, ~trans]
+
+        m = np.tile(supersturct.get_masses_array(), (3,1)).T.ravel()
+
+        pol_vec = np.einsum("ab, a->ab", pols, 1 / np.sqrt(m))
+
+        v_mode = v_disp.dot(pol_vec)
+        f_mode = forces.dot(pol_vec)
+
+        # Now compute the d3 as <vvf>
+        N_eff = np.sum(self.rho)
+        f_mode = np.einsum("ia, i->ia", f_mode, self.rho)
+        d3_noperm = np.einsum("ia,ib,ic->abc", v_mode, v_mode, f_mode)
+        d3_noperm /= -N_eff # there is a minus
+
+        # Apply the permuatations
+        d3 = d3_noperm.copy()
+        d3 += np.einsum("abc->acb", d3_noperm)
+        d3 += np.einsum("abc->bac", d3_noperm)
+        d3 += np.einsum("abc->bca", d3_noperm)
+        d3 += np.einsum("abc->cab", d3_noperm)
+        d3 += np.einsum("abc->cba", d3_noperm)
+        d3 /= 6
+
+        # TODO: symmetrize
+
+        return d3
+
+
     def get_v3_realspace(self):
         """
         This is a testing function that computes the V3 matrix in real space:
@@ -2456,8 +2636,10 @@ DETAILS OF ERROR:
                 else:
                     # Lets call the C code with openMP support
                     # to compute the d3 faster
+
                     if not _SSCHA_ODD_:
                         raise ImportError("Error, sscha_HP_odd is required to use openmp, thid is deprecated. Pleas use get_free_energy_hessian instead.")
+
                     sscha_HP_odd.GetV3(X, Y, n_modes_sc, self.N, d3)
                     d3 *= self.N / N_eff
             else:
