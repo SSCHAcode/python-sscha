@@ -111,7 +111,7 @@ def test_dynamic_lanczos_al():
     diff = np.max(diff_v)
     print("Direct difference is {}".format(diff))
     diff_R, diff_Y, diff_A = compute_difference_sections(new_psi, new_psi_2, lanczos.n_modes)
-    max_R, max_Y, max_A = compute_max_intensity(new_psi, Lanczos.n_modes)
+    max_R, max_Y, max_A = compute_max_intensity(new_psi, lanczos.n_modes)
     print("    R diff:", diff_R, " | R max:", max_R)
     print("    Y diff:", diff_Y, " | Y max:", max_Y)
     print("    A diff:", diff_A, " | A max:", max_A)
@@ -125,7 +125,7 @@ def test_dynamic_lanczos_al():
 
     print("Adjoint difference is {}".format(diff))
     diff_R, diff_Y, diff_A = compute_difference_sections(new_psi_t, new_psi_t2, lanczos.n_modes)
-    max_R, max_Y, max_A = compute_max_intensity(new_psi_t, Lanczos.n_modes)
+    max_R, max_Y, max_A = compute_max_intensity(new_psi_t, lanczos.n_modes)
     print("    R diff:", diff_R, " | R max:", max_R)
     print("    Y diff:", diff_Y, " | Y max:", max_Y)
     print("    A diff:", diff_A, " | A max:", max_A)
