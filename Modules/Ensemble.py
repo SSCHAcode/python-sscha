@@ -2818,7 +2818,7 @@ DETAILS OF ERROR:
 
         self.N += other.N 
         self.forces = np.concatenate( (self.forces, other.forces), axis = 0)
-        self.stresses = np.concatenate( (self.forces, other.forces), axis = 0)
+        self.stresses = np.concatenate( (self.stresses, other.stresses), axis = 0)
         self.structures += other.structures
         self.u_disps = np.concatenate((self.u_disps, other.u_disps), axis = 0)
         self.xats = np.concatenate((self.xats, other.xats), axis = 0)
