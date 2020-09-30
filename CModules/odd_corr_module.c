@@ -1,4 +1,10 @@
+
+#ifdef _PYTHON2
 #include <python2.7/Python.h>
+#else
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+#endif
 #include <numpy/arrayobject.h>
 #include <stdio.h>
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -32,9 +38,23 @@ static PyMethodDef odd_engine[] = {
 
 
 // Module initialization
+#ifdef _PYTHON2
 PyMODINIT_FUNC initsscha_HP_odd(void) {
     (void) Py_InitModule("sscha_HP_odd", odd_engine);
 }
+#else
+static struct PyModuleDef sscha_hp_odd = {
+  PyModuleDef_HEAD_INIT, 
+  "sscha_HP_odd", 
+  NULL, 
+  -1, 
+  odd_engine
+};
+
+PyMODINIT_FUNC PyInit_initsscha_HP_odd(void) {
+  return PyModuleCreate(&sscha_hp_odd);
+}
+#endif
 
 // --------------------------------------------------------
 /*

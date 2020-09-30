@@ -36,6 +36,11 @@ if parallel:
         mpi_link_args    = os.popen("%s -show" % mpicc).read().strip().split(' ')[1:]
         extra_flags_c += ["-D_MPI"]
 
+# Check if it is python2 or 3
+if sys.version_info[0] < 3:
+        print("Running on python 2, added the flag -D_PYTHON2")
+        extra_flags_c += ["-D_PYTHON2"]
+
 
 # Compile the fortran SCHA modules
 SCHAModules = Extension(name = "SCHAModules", 
