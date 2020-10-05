@@ -6,7 +6,7 @@ Frequently Asked Questions (FAQs)
 
 How do I start a calculation if the Dynamical matrices have imaginary frequencies?
     :raw-html:`<br />`
-    A good starting point for a sscha minimization are the dynamical matrix obtained from a harmonic calculation. However, they can have imaginary frequencies. This may be related to both instabilities (the structure is a saddle-point of the Born-Oppenheimer energy landscape) or to a not well-converged choice of the parameters for computing the harmonic frequencies.
+    A good starting point for a sscha minimization are the dynamical matrices obtained from a harmonic calculation. However, they can have imaginary frequencies. This may be related to both instabilities (the structure is a saddle-point of the Born-Oppenheimer energy landscape) or to a not well-converged choice of the parameters for computing the harmonic frequencies.
     In both cases, it is very easy to get a new dynamical matrix that is positive definite and can be used as a starting point. An example is made in Turorial on H3S.
     Assuming your not positive definite dynamical matrix is in Quantum Espresso format "harm1" ... "harmN" (with N the number of irreducible q points), you can generate a positive definite dynamical matrix "positive1" ... "positiveN" with the following python script that uses CellConstructor.
 
@@ -36,13 +36,34 @@ How do I start a calculation if the Dynamical matrices have imaginary frequencie
 		    
        python script.py
 
+
+
+I computed the harmonic phonons with ASE, can I use them to initialize the SSCHA algorithm?
+    :raw-html:`<br />`
+    Yes. You only need a CellConstructor Phonon class. Luckily, the CellConstructor Phonons class can read the ASE Phonons class. 
+    
+    .. code-block:: python
+    	
+    	import cellconstructor as CC, cellconstructor.Phonons
+    	import ase, ase.phonons
+    	
+    	# [...] Here we load the ase phonons previously computed
+    	ph = ase.phonons.Phonons(...)
+    	
+    	# We convert ph into cellconstructor format
+    	dyn = CC.Phonons.get_dyn_from_ase_phonons(ph)
+    	dyn.save_qe("dynmat")
+    	
+    This will save the ase phonons in the quantum espresso format, that is the one readed by default by CellConstructor. Alternatively, you can directly use dyn in your SSCHA input script after reading it from ase.
+     
   
 
 What are the reasonable values for the steps (lambda_a, lambda_w, min_step_dyn, and min_step_struc)?
     :raw-html:`<br />`
     The code minimizes using a Newton method: preconditioned gradient descend. Thanks to an analytical evaluation of the Hessian matrix, the step is rescaled so that the theoretical best step is close to 1.
-    In other words: **one is theoretically the best (and the default) choice for the steps**. However, the SSCHA is a stochastic algorithm, therefore, if the ensemble is too small, or the gradient is very big, this step could bring you outside the region in which the ensemble is describing well the physics very soon.
-    Since SSCHA can exploit the reweighting, and the most computationally expensive part of the algorithm is the computation of forces and energies, it is often much better using a small step (smaller than the optimal one). **Good values of the steps are usually around 0.01 and 0.1**. Rule of thumbs: the minimization should not end because it went outside the stochastic regime before that at least 10 steps have been made. This will depend on the system, the number of configurations, and how far from the correct solution you are.
+    In other words: **1 is, theoretically, the best (and the default) choice for the steps**. However, the SSCHA is a stochastic algorithm, therefore, if the ensemble is too small (few configurations), or the gradient is very big, the first step could bring the minimization outside the region in which the ensemble is describing well the physics. If the minimization goes outside the stochastic criterium, the saved dynamical matrices are the last good one. This means that if the minimization exit the good stochastic region in 1 step, it will not proceed further and print in output the starting dynamical matrices. For this reason, often is much better chose a smaller step, to avoid to exit the minimization too soon. 
+    Since SSCHA can exploit the reweighting, and the most computationally expensive part of the algorithm is the computation of forces and energies, it is often much better using a step smaller than the optimal one. **Good values of the steps are usually around 0.01 and 0.1**. Rule of thumbs: the minimization should not end because it went outside the stochastic regime before that at least 10 steps have been made. The step to achieve this result depends on the number of configurations and how far from the correct solution you are.
+    To set the steps, you have to provide the following variables:
 
     **lambda_w** is the step in the atomic positions (stand-alone program input).
     
@@ -62,13 +83,13 @@ In a variable cell optimization, what is a reasonable value for the bulk modulus
 
     Usual values are between 10 GPa and 100 GPa for a system at ambient conditions. Diamond has a bulk modulus of about 500 GPa. High-pressure hydrates have a bulk modulus of around 300 GPa as well.
 
-    If you have no idea on the bulk modulus, you can easily compute them by doing two static *ab initio* calculations at very close volumes (by varying the cell size), and then computing the differences between the pressure:
+    If you have no idea on the magnitue of the bulk modulus of your system, you can compute it by doing two static *ab initio* calculations at very close volumes (by varying the cell size), and then computing the differences between the pressure:
 
     .. math::
 
        B = - \Omega \frac{dP}{d\Omega}
 
-    where :math:`\Omega` is the unit-cell volume and :math:`P` is the pressure (in GPa).
+    where :math:`B` is the bulk modulus, :math:`\Omega` is the unit-cell volume and :math:`P` is the pressure (in GPa).
 
 
 The code stops saying it has found imaginary frequencies, how do I fix it?
@@ -296,7 +317,7 @@ How do I understand if the free energy hessian calculation is converged?
        ens_first_half.save("data_dir", population = 2)
        ens_second_half.save("data_dir", population = 3)
 
-    This simple script will generate two ensembles inside :code:`data_dir` directory with population 2 and 3, each one containing the first and the second half of the ensemble with population 1 respectively. You can perform then your calculation of the free energy Hessian with both the ensemble to estimate the error on the frequencies and the polarization vectors.
+    This simple script will generate two ensembles inside :code:`data_dir` directory with population 2 and 3, each one containing the first and the second half of the ensemble with population 1 respectively. You can perform then your calculation of the free energy Hessian with both ensembles to estimate the error on the frequencies and the polarization vectors.
        
 
 
@@ -344,4 +365,4 @@ How do I fix the random number generator seed to make a calculation reproducible
        X = 0
        np.random.seed(seed = X)
 
-    where :code:`X` is the integer used as a seed. By default, if not specified, it is initialized with None that it is equivalent to initializing with the current local time.
+    where :code:`X` is the integer used as a seed. By default, if not specified, it is initialized with None that it is equivalent to initializing it with the current local time.
