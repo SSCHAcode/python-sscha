@@ -97,13 +97,13 @@ This can be achieved by specifying the environment variables on which setup.py r
 
 1. CC (C compiler)
 2. FC (Fortran compiler)
-3. LD_SHARED (linking)
+3. LDSHARED (linking)
 
 If we want to use a custom compiler in /path/to/fcompiler we may run the setup as:
 
 .. code-block:: console
 
-   FC=/path/to/fcompiler LD_SHARED=/path/to/fcompiler python setup.py install
+   FC=/path/to/fcompiler LDSHARED=/path/to/fcompiler python setup.py install
 
 
 
