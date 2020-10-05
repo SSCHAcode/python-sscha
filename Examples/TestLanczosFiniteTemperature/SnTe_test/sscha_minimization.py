@@ -38,14 +38,20 @@ sscha_dyn.Symmetrize()
 print("Generate the ensemble...")
 ens = sscha.Ensemble.Ensemble(sscha_dyn, 250, sscha_dyn.GetSupercell())
 minim = sscha.SchaMinimizer.SSCHA_Minimizer(ens)
-minim.min_step_dyn = 0.001
-minim.root_representation = "root4"
+minim.min_step_dyn = 0.01
+minim.root_representation = "root2"
+#minim.precond_dyn = False
 minim.min_step_struc = 0.1
 
 # Perform the automatic relaxation
 print("Prepare relaxation...")
-relax = sscha.Relax.SSCHA(minim, ff_calculator, N_configs = 10000)
+relax = sscha.Relax.SSCHA(minim, ff_calculator, N_configs = 10000, max_pop = 3)
 print("Start the relaxation...")
+relax.relax()
+
+print("New relaxation")
+relax.max_pop = 12
+relax.minim.min_step_dyn = 0.8
 relax.relax()
 
 print("Saving results in ensemble (population 1) and SnTe_sscha")
