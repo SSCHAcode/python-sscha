@@ -271,6 +271,7 @@ class SSCHA_Minimizer(object):
         else:
             qe_sym.SetupQPoint(verbose = False)
             self.N_symmetries = qe_sym.QE_nsym
+
         
         
         # Get the gradient of the free-energy respect to the dynamical matrix
@@ -415,8 +416,8 @@ class SSCHA_Minimizer(object):
 
         
         # Store the gradient in the minimization
-        self.__gc__.append(np.real(np.einsum("abc,acb", dyn_grad, dyn_grad)))
-        self.__gc_err__.append(np.real(np.einsum("abc, acb", err, err)))
+        self.__gc__.append(np.real(np.einsum("abc,acb", dyn_grad, np.conj(dyn_grad))))
+        self.__gc_err__.append(np.real(np.einsum("abc, acb", err, np.conj(err))))
             
         # Perform the step for the dynamical matrix respecting the root representation
         new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
@@ -635,8 +636,8 @@ class SSCHA_Minimizer(object):
 
         
         if __SCHA_PRINTSTRESS__ in keys:
-            if not __SCHA_FILDYN__ in keys:
-                raise ValueError("Error, please specify a dynamical matrix.")
+            #if not __SCHA_FILDYN__ in keys:
+            #    raise ValueError("Error, please specify a dynamical matrix.")
             self.ensemble.has_stress = True
         
     def print_info(self):
@@ -737,14 +738,12 @@ class SSCHA_Minimizer(object):
         SSCHA FREE ENERGY
         =================
         
-        Obtain the SSCHA free energy for the system.
-        This is done by integrating the free energy along the hamiltonians, starting
-        from current_dyn to the real system.
+        Obtain the SSCHA free energy per unit cell for the system. This is done through thermodynamic integration.
+        Note that for the SSCHA this integration is performed analytically, so evaluating this function
+        is almost immediate.
         
         The result is in Rydberg.
-        
-        NOTE: this method just recall the self.ensemble.get_free_energy function.
-        
+                
         .. math::
             
             \\mathcal F = \\mathcal F_0 + \\int_0^1 \\frac{d\\mathcal F_\\lambda}{d\\lambda} d\\lambda
@@ -958,6 +957,7 @@ WARNING, the preconditioning is activated together with a root representation.
                 It is called after the two gradients have been computed, and it is used to 
                 impose some constraint on the minimization.
         """
+
         
         # Eliminate the convergence flag
         self.__converged__ = False
@@ -1384,6 +1384,7 @@ WARNING, the preconditioning is activated together with a root representation.
         
         
         return self.ensemble.get_stress_tensor(self.stress_offset, use_spglib= self.use_spglib)
+
     
 
 def get_root_dyn(dyn_fc, root_representation):

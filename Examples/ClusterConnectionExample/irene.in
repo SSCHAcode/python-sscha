@@ -46,8 +46,6 @@
 	! We can specify the submission strategy
 	! This means 10 calculations per jub submitted
 	job_numbers = 10
-	
-	! How many jobs are in parallel on the same node?
 	n_together = 1
 	timeout=6 ! Max number of second per single job
 &end

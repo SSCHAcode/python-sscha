@@ -90,7 +90,6 @@ class SSCHA(object):
         self.__cfpost__ = None
         self.__cfg__ = None
 
-
         # The variable cell attributes
         self.bulk_modulus = 15
         self.target_pressure = 0
@@ -243,7 +242,7 @@ class SSCHA(object):
         
         
     def relax(self, restart_from_ens = False, get_stress = False,
-              ensemble_loc = ".", start_pop = 1):
+              ensemble_loc = None, start_pop = None):
         """
         COSTANT VOLUME RELAX
         ====================
@@ -262,11 +261,12 @@ class SSCHA(object):
                 cost, as it will be computed for each ab-initio configuration (it may be not available
                 with some ase calculator)
             ensemble_loc : string
-                Where the ensemble of each population is saved on the disk. You can specify None
-                if you do not want to save the ensemble (useful to avoid disk I/O for force fields)
+                Where the ensemble of each population is saved on the disk. If none, it will
+                use the content of self.data_dir. If also self.data_dir is None, 
+                the ensemble will not not be saved (useful to avoid disk I/O for force fields)
             start_pop : int, optional
                 The starting index for the population, used only for saving the ensemble and the dynamical 
-                matrix.
+                matrix. If None, the content of self.start_pop will be used.
             
         Returns
         -------
@@ -274,7 +274,13 @@ class SSCHA(object):
                 True if the minimization converged, False if the maximum number of 
                 populations has been reached.
         """
+
+        if ensemble_loc is None:
+            ensemble_loc = self.data_dir
         
+        if start_pop is None:
+            start_pop = self.start_pop
+
         pop = start_pop
                 
         running = True
@@ -424,7 +430,7 @@ class SSCHA(object):
         
         
 
-        if static_bulk_modulus is not "recalc":
+        if static_bulk_modulus == "recalc":
             # Rescale the static bulk modulus in eV / A^3
             static_bulk_modulus /= sscha.SchaMinimizer.__evA3_to_GPa__ 
 

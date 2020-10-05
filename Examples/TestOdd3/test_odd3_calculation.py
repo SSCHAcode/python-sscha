@@ -19,19 +19,22 @@ w,p = dyn.DyagDinQ(0)
 
 # Load the ensemble
 ens = sscha.Ensemble.Ensemble(dyn, 0)
-ens.load("../ensemble_data_test", 2, 1000)
+ens.load("../ensemble_data_test", 2, 10)
 
 # Unwrap the ensemble
-ens.unwrap_symmetries()
+#ens.unwrap_symmetries()
 
 # Compute the odd correction
 t1 = time.time()
-new_dyn_supercell = ens.get_odd_correction()
+new_dyn_supercell = ens.get_odd_correction(use_omp = False)
 t2 = time.time()
 
 #other_new_dyn = ens.get_odd_correction(store_v3 = False, progress = True)
-other_new_dyn = ens.get_odd_correction(include_v4 = True, progress = True, v4_conv_thr = 1e-8)
+other_new_dyn = ens.get_odd_correction(use_omp = True)
 t3 = time.time()
+
+fortran_last_dyn = ens.get_free_energy_hessian()
+t4 = time.time()
 
 # Copy the matrix into the Phonons class
 dyn.dynmats[0] = new_dyn_supercell
@@ -41,19 +44,22 @@ dyn2.dynmats[0] = other_new_dyn
 # Perform the symmetrization
 dyn.Symmetrize()
 dyn2.Symmetrize()
+#fortran_last_dyn.Symmetrize()
 
 # Save the dynamical matrix with the odd3 corrections
 dyn.save_qe("dyn_plus_odd_new")
+fortran_last_dyn.save_qe("dyn_plus_odd_fort2py")
 
-odd = dyn.Copy()
-odd.dynmats[0] = np.load("odd_corr.npy")
-odd.save_qe("odd_new_nosym")
-odd.Symmetrize()
-odd.save_qe("odd_new_sym")
+# odd = dyn.Copy()
+# odd.dynmats[0] = np.load("odd_corr.npy")
+# odd.save_qe("odd_new_nosym")
+# odd.Symmetrize()
+# odd.save_qe("odd_new_sym") 
 
 
-print "Elapsed time to compute odd3:", t2 - t1, "s"
-print "Elapsed time to compute odd3 without storing it:", t3- t2, "s"
+print "Elapsed time to compute odd3 with einsum:", t2 - t1, "s"
+print "Elapsed time to compute odd3 with openmp:", t3- t2, "s"
+print "Elapsed time to compute odd3 with fortran:", t4-t3, "s"
 print "Difference between the result of storing and not storing it:"
 print np.sqrt(np.sum( (new_dyn_supercell - other_new_dyn)**2))
 print ""
@@ -63,5 +69,6 @@ print
 # Get the phonon frequencies and print them
 w1,p = dyn.DyagDinQ(0)
 w2,p = dyn2.DyagDinQ(0)
-print "    %10s  |%10s  |%10s" % ("SCHA", "ODD3 v1", "ODD3 v2")
-print "\n".join(["%2d) %10.4f  |%10.4f  |%10.4f  cm-1" % (i+1, w[i] * RyCm, w1[i] * RyCm, w2[i] * RyCm) for i in range(len(w))])
+w3,p = fortran_last_dyn.DyagDinQ(0)
+print "    %10s  |%10s  |%10s | %10s" % ("SCHA", "ODD3 v1", "ODD3 v2", "ODD3 v3")
+print "\n".join(["%2d) %10.4f  |%10.4f  |%10.4f | %10.4f  cm-1" % (i+1, w[i] * RyCm, w1[i] * RyCm, w2[i] * RyCm,w3[i] * RyCm) for i in range(len(w))])
