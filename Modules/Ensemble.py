@@ -104,7 +104,7 @@ SUPPORTED_UNITS = [UNITS_DEFAULT, UNITS_HARTREE]
 class Ensemble:
     __debug_index__ = 0
     
-    def __init__(self, dyn0, T0, supercell = (1,1,1)):
+    def __init__(self, dyn0, T0, supercell = None):
         """
         PREPARE THE ENSEMBLE
         ====================
@@ -120,7 +120,7 @@ class Ensemble:
             T0 : float
                 The temperature used to generate the ensemble.
             supercell: optional, list of int
-                The supercell dimension
+                The supercell dimension. If not provided, it will be determined by dyn0
         """
         
         # N is the number of element in the ensemble
@@ -148,7 +148,18 @@ class Ensemble:
         
         # Supercell size
         self.supercell = np.ones(3, dtype = np.intc)
-        self.supercell[:] = supercell
+
+        if supercell is not None:
+            self.supercell[:] = supercell
+            
+            # Check if there are inconsistencies
+            for i in range(3):
+                if self.supercell[i] != dyn0.GetSupercell()[i]:
+                    raise ValueError("""Error, you specified a supercell of {},
+    while from the dynamical matrix provided I expect a supercell of {}
+""".format(self.supercell, dyn0.GetSupercell()))
+        else:
+            self.supercell[:] = dyn0.GetSupercell()
         
         # How many atoms in the supercell
         Nsc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms 
@@ -161,7 +172,11 @@ class Ensemble:
         self.u_disps = np.zeros( (self.N, Nsc * 3))
         
         # A flag that memorize if the ensemble has also the stresses
-        self.has_stress = False
+        self.has_stress = True
+
+        # A flag for each configuration that check if it possess a force and a stress
+        self.force_computed = None 
+        self.stress_computed = None
 
     def convert_units(self, new_units):
         """
@@ -264,7 +279,7 @@ class Ensemble:
         self.units = new_units
 
         
-    def load(self, data_dir, population, N, verbose = False, load_displacements = True):
+    def load(self, data_dir, population, N, verbose = False, load_displacements = True, raise_error_on_not_found = False, load_noncomputed_ensemble = False):
         """
         LOAD THE ENSEMBLE
         =================
@@ -310,6 +325,11 @@ class Ensemble:
             load_displacement: bool
                 If true the structures are loaded from the u_populationX_Y.dat files,
                 otherwise they are loaded from the scf_populationX_Y.dat files.
+            raise_error_on_not_found : bool
+                If true, raises an error if one force file is missing
+            load_noncomputed_ensemble: bool
+                If True, it allows for loading an ensemble where some of the configurations forces and stresses are missing.
+                Note that it must be compleated before running a SCHA minimization
         """
         A_TO_BOHR = 1.889725989
         
@@ -336,6 +356,10 @@ class Ensemble:
         self.sscha_forces = np.zeros( (self.N, Nat_sc, 3), order = "F", dtype = np.float64)
         
         self.u_disps = np.zeros( (self.N, Nat_sc * 3), order = "F", dtype = np.float64)
+
+        # Initialize the computation of energy and forces
+        self.force_computed = np.zeros( self.N, dtype = bool)
+        self.stress_computed = np.zeros(self.N, dtype = bool)
         
         # Add a counter to check if all the stress tensors are present
         count_stress = 0 
@@ -381,20 +405,33 @@ class Ensemble:
             
             # Load forces (Forces are in Ry/bohr, convert them in Ry /A)
             t1 = time.time()
-            self.forces[i,:,:] = np.loadtxt(os.path.join(data_dir, "forces_population%d_%d.dat" % (population, i+1))) * A_TO_BOHR
+            force_path = os.path.join(data_dir, "forces_population%d_%d.dat" % (population, i+1))
+
+            if os.path.exists(force_path):
+                self.forces[i,:,:] = np.loadtxt(force_path) * A_TO_BOHR
+                self.force_computed[i] = True
+            else:
+                if raise_error_on_not_found:
+                    ERROR_MSG = """
+Error, the file '{}' is missing from the ensemble
+       data_dir = '{}'
+       please, check better your data.
+""".format(force_path, data_dir)
+                    print(ERROR_MSG)
+                    raise IOError(ERROR_MSG)
+                else:
+                    self.force_computed[i] = False
             
             # Load stress
             if os.path.exists(os.path.join(data_dir, "pressures_population%d_%d.dat" % (population, i+1))):
                 self.stresses[i,:,:] =  np.loadtxt(os.path.join(data_dir, "pressures_population%d_%d.dat" % (population, i+1)))
-                count_stress += 1
+                self.stress_computed[i] = True
+            else:
+                self.stress_computed[i] = False
             t2 = time.time()
             total_t_for_loading += t2 - t1
             
-            # Setup the sscha energies and forces
-            t1 = time.time()
-            energy, force = self.dyn_0.get_energy_forces(structure, supercell = self.supercell, real_space_fc=super_fc)
-            t2 = time.time()
-            total_t_for_sscha_ef += t2 - t1
+           
             
 #            print "Loading: config %d:" % i
 #            for j in range(structure.N_atoms):
@@ -410,8 +447,6 @@ class Ensemble:
 #            print "INVERSE = ", self.dyn_0.dynmats[0].dot(-u_disp)
                 
             
-            self.sscha_energies[i] = energy 
-            self.sscha_forces[i,:,:] = force
         
         if verbose:
             print( "[LOAD ENSEMBLE]: time elapsed for the cycle over the configurations:", time.time() - t_before_for)
@@ -422,6 +457,10 @@ class Ensemble:
         t2 = time.time()
         total_t_for_sscha_ef += t2 - t1
         self.energies = total_energies[:N]
+
+        # Compute the SSCHA energies and forces
+        self.sscha_energies[:], self.sscha_forces[:,:,:] = self.dyn_0.GenerateSupercellDyn(self.supercell).get_energy_forces(None, displacement = self.u_disps)
+
         
         # Setup the initial weight
         self.rho = np.ones(self.N, dtype = np.float64)
@@ -438,11 +477,29 @@ class Ensemble:
             print( "[LOAD ENSEMBLE]: time elapsed while loading with numpy:", total_t_for_loading)
             print( "[LOAD ENSEMBLE]: time elapsed for computing sscha energy and forces:", total_t_for_sscha_ef)
         
-        # If all the stress tensors have been found, set the stress flag
-        if count_stress == self.N:
+
+        p_count = np.sum(self.stress_computed.astype(int))
+        if p_count > 0:
             self.has_stress = True
         else:
             self.has_stress = False
+
+        # Check if the forces and stresses are present
+        if not load_noncomputed_ensemble:
+            if np.sum(self.force_computed.astype(int)) != self.N:
+                ERROR_MSG = """
+Error, the following force files are missing from the ensemble:
+{}""".format(np.arange(self.N)[~self.force_computed])
+                print(ERROR_MSG)
+                raise IOError(ERROR_MSG)
+            
+            if p_count > 0 and p_count != self.N:
+                ERROR_MSG = """
+Error, the following stress files are missing from the ensemble:
+{}""".format(np.arange(self.N)[~self.stress_computed])
+                print(ERROR_MSG)
+                raise IOError(ERROR_MSG)
+
 
     def load_from_calculator_output(self, directory, out_ext = ".pwo"):
         """
@@ -543,6 +600,7 @@ class Ensemble:
         else:
             self.has_stress = False
             
+            
 
         
     def save(self, data_dir, population, use_alat = False):
@@ -601,7 +659,8 @@ class Ensemble:
             
         for i in xrange(self.N):
             # Save the forces
-            np.savetxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1), self.forces[i,:,:] / A_TO_BOHR)
+            if self.force_computed[i]:
+                np.savetxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1), self.forces[i,:,:] / A_TO_BOHR)
             
             # Save the configurations
             struct = self.structures[i]
@@ -614,7 +673,7 @@ class Ensemble:
             np.savetxt("%s/u_population%d_%d.dat" % (data_dir, population, i+1), u_disp * A_TO_BOHR)
             
             # Save the stress tensors if any
-            if self.has_stress:
+            if self.has_stress and self.stress_computed[i]:
                 np.savetxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1), self.stresses[i,:,:])
             
         
@@ -654,8 +713,6 @@ class Ensemble:
             
             self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
         
-        
-        
     def load_bin(self, data_dir, population_id = 1, avoid_loading_dyn = False):
         """
         LOAD THE BINARY ENSEMBLE
@@ -691,10 +748,9 @@ class Ensemble:
         if not avoid_loading_dyn:
             self.dyn_0 = CC.Phonons.Phonons("%s/dyn_gen_pop%d_" % (data_dir, population_id), self.dyn_0.nqirr)
             self.current_dyn = self.dyn_0.Copy()
+            self.supercell = self.dyn_0.GetSupercell()
             
-        dyn_supercell = self.dyn_0.GenerateSupercellDyn(self.supercell)
-        super_structure = dyn_supercell.structure
-        super_fc = dyn_supercell.dynmats[0]
+        super_structure = self.dyn_0.structure.generate_supercell(self.supercell)
         Nat_sc = super_structure.N_atoms
         
         self.sscha_energies = np.zeros(self.N, dtype = np.float64)
@@ -708,25 +764,62 @@ class Ensemble:
             self.structures[i].coords = self.xats[i,:,:]
             self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
             
-            energy, force = self.dyn_0.get_energy_forces(self.structures[i], supercell = self.supercell, 
-                                                         real_space_fc=super_fc)
             
-            self.sscha_energies[i] = energy
-            self.sscha_forces[i, :, :] = force
-
+        self.sscha_energies[:], self.sscha_forces[:,:,:] = self.dyn_0.get_energy_forces(None, displacement = self.u_disps)
 
         # Setup the initial weights
         self.rho = np.ones(self.N, dtype = np.float64)
         
+
+    def init_from_structures(self, structures):
+        """
+        Initialize the ensemble from the given list of structures
+
+        Parameters
+        ----------
+            structures : list of structures
+                The list of structures used to initialize the ensemble
+        """
+
+        # Perform the standard initialization
+
+        self.N = len(structures)
+        Nat_sc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms
+
+        self.structures = [x for x in structures]
+
+        self.sscha_energies = np.zeros( ( self.N), dtype = np.float64)
+        self.sscha_forces = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "F")
         
-        # Initialize the q_start
-        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell, self.u_disps)
-        self.current_q = self.q_start.copy()
+        self.energies = np.zeros(self.N, dtype = np.float64)
+        self.forces = np.zeros( (self.N, Nat_sc, 3), dtype = np.float64, order = "F")
+        self.stresses = np.zeros( (self.N, 3, 3), dtype = np.float64, order = "F")
+        self.u_disps = np.zeros( (self.N, Nat_sc * 3), dtype = np.float64, order = "F")
+        self.xats = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "C")
+        for i, s in enumerate(self.structures):
+            # Get the displacements
+            self.xats[i, :, :] = s.coords
+        
+        # TODO:
+        # Here it is useless to generate the supercell dynamical matrix, 
+        # it should be replaced by generating the unit cell structure, 
+        # But then the get_energy_forces method should provide the correct implementation.
+        new_super_dyn = self.current_dyn.GenerateSupercellDyn(self.current_dyn.GetSupercell())
+        self.u_disps[:,:] = np.reshape(self.xats - np.tile(new_super_dyn.structure.coords, (self.N, 1,1)), (self.N, 3 * Nat_sc), order = "C") 
+
+        self.sscha_energies[:], self.sscha_forces[:,:,:] = self.dyn_0.get_energy_forces(None, displacement = self.u_disps)
 
         
+        self.rho = np.ones(self.N, dtype = np.float64)
+        self.current_dyn = self.dyn_0.Copy()
+        self.current_T = self.T0
 
-    def generate(self, N, evenodd = True, project_on_modes = None, compute_sscha_forces = True, get_q_vectors = False):
+        # Setup that both forces and stresses are not computed
+        self.stress_computed = np.zeros(self.N, dtype = bool)
+        self.force_computed = np.zeros(self.N, dtype = bool)
 
+
+    def generate(self, N, evenodd = True, project_on_modes = None):
         """
         GENERATE THE ENSEMBLE
         =====================
@@ -755,56 +848,22 @@ class Ensemble:
         #super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
         super_struct = self.dyn_0.structure.generate_supercell(self.dyn_0.GetSupercell())
 
+        structures = []
         if evenodd:
             structs = self.dyn_0.ExtractRandomStructures(N // 2, self.T0, project_on_vectors = project_on_modes)
 
 
 
             for i, s in enumerate(structs):
-                self.structures.append(s)
+                structures.append(s)
                 new_s = s.copy()
                 # Get the opposite displacement structure
                 new_s.coords = super_struct.coords - new_s.get_displacement(super_struct)
-                self.structures.append(new_s)
+                structures.append(new_s)
         else:
-            self.structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
+            structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
 
-
-            
-        # Compute the sscha energy and forces
-        if compute_sscha_forces or get_q_vectors:
-            super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
-
-        if compute_sscha_forces:
-            self.sscha_energies = np.zeros( ( self.N), dtype = np.float64)
-            self.sscha_forces = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "F")
-
-        self.energies = np.zeros(self.N, dtype = np.float64)
-        self.forces = np.zeros( (self.N, Nat_sc, 3), dtype = np.float64, order = "F")
-        self.stresses = np.zeros( (self.N, 3, 3), dtype = np.float64, order = "F")
-        self.u_disps = np.zeros( (self.N, Nat_sc * 3), dtype = np.float64, order = "F")
-        self.xats = np.zeros((self.N, Nat_sc, 3), dtype = np.float64, order = "C")
-        for i, s in enumerate(self.structures):
-            if compute_sscha_forces:
-                energy, force  = self.dyn_0.get_energy_forces(s, supercell = self.supercell, 
-                                                            real_space_fc=super_dyn.dynmats[0])
-                
-                self.sscha_energies[i] = energy
-                self.sscha_forces[i,:,:] = force
-            
-            # Get the displacements
-            self.u_disps[i, :] = s.get_displacement(super_struct).reshape((3* Nat_sc))
-            self.xats[i, :, :] = s.coords
-        
-        self.rho = np.ones(self.N, dtype = np.float64)
-        self.current_dyn = self.dyn_0.Copy()
-        self.current_T = self.T0
-        
-        
-        # Generate the q_start
-        if get_q_vectors:
-            self.q_start = CC.Manipulate.GetQ_vectors(self.structures, super_dyn)
-            self.current_q = self.q_start.copy()
+        self.init_from_structures(structures)
         
         
     def unwrap_symmetries(self):
@@ -2898,12 +2957,143 @@ DETAILS OF ERROR:
         if stress_numerical and is_cluster:
             raise ValueError("Error, stress_numerical is not implemented with clusters")
     
-        if is_cluster:
-            cluster.compute_ensemble(self, calculator, compute_stress)
-        else:
-            self.get_energy_forces(calculator, compute_stress, stress_numerical)
+        # Check if not all the calculation needs to be done
+        n_calcs = np.sum( self.force_computed.astype(int))
+        computing_ensemble = self
 
-    def get_energy_forces(self, ase_calculator, compute_stress = True, stress_numerical = False):
+        if compute_stress:
+            self.has_stress = True
+
+        # Check wheter compute the whole ensemble, or just a small part
+        should_i_merge = False 
+        if n_calcs != self.N:
+            should_i_merge = True
+            computing_ensemble = self.get_noncomputed()
+            self.remove_noncomputed() 
+
+        if is_cluster:
+            cluster.compute_ensemble(computing_ensemble, calculator, compute_stress)
+        else:
+            computing_ensemble.get_energy_forces(calculator, compute_stress, stress_numerical)
+        
+        if should_i_merge:
+            # Remove the noncomputed ensemble from here, and merge 
+            self.merge(computing_ensemble)
+
+
+    def merge(self, other):
+        """
+        MERGE TWO ENSEMBLES
+        ===================
+
+        This function will merge two ensembles together. 
+        
+        Parameters
+        ----------
+            other : Ensemble()
+                Another ensemble to be merge with. It must be generated by the same dynamical matrix
+                as this one, otherwise wired things will happen.
+        """
+
+        self.N += other.N 
+        self.forces = np.concatenate( (self.forces, other.forces), axis = 0)
+        self.stresses = np.concatenate( (self.stresses, other.stresses), axis = 0)
+        self.structures += other.structures
+        self.u_disps = np.concatenate((self.u_disps, other.u_disps), axis = 0)
+        self.xats = np.concatenate((self.xats, other.xats), axis = 0)
+        self.energies = np.concatenate( (self.energies, other.energies))
+
+        self.stress_computed = np.concatenate( (self.stress_computed, other.stress_computed))
+        self.force_computed = np.concatenate( (self.force_computed, other.force_computed))
+
+
+        self.sscha_forces = np.concatenate( (self.sscha_forces, other.sscha_forces), axis = 0)
+        self.sscha_energies = np.concatenate( (self.sscha_energies, other.sscha_energies))
+
+        self.rho = np.concatenate( (self.rho, other.rho))
+
+        # Now update everything
+        self.update_weights(self.current_dyn, self.current_T)
+
+
+    def split(self, split_mask):
+        """
+        SPLIT THE ENSEMBLE
+        ==================
+
+        This method will return an ensemble with only the configurations matched by the split_mask array.
+        NOTE: The original ensemble will remain untouched.
+
+        Parameters
+        ----------
+            split_mask : ndarray(size = self.N, dtype = bool)
+                A mask array. It must be of the same size of the number of configurations, 
+                and contain a True or False if you want that the corresponding configuration to be included in the
+                splitted ensemble
+        
+        Results
+        -------
+            splitted_ensemble : Ensemble()
+                An ensemble tath will contain only the configurations in the split mask.
+        """
+
+        structs = [self.structures[x] for x in np.arange(len(split_mask))[split_mask]]
+
+        N = np.sum(split_mask.astype(int))
+        ens = Ensemble(self.dyn_0, self.T0, self.dyn_0.GetSupercell())
+        ens.init_from_structures(structs) 
+        ens.force_computed[:] = self.force_computed[split_mask]
+        ens.stress_computed[:] = self.stress_computed[split_mask]
+        ens.energies[:] = self.energies[split_mask]
+        ens.forces[:, :, :] = self.forces[split_mask, :, :]
+        ens.has_stress = self.has_stress
+        if self.has_stress:
+            ens.stresses[:, :, :] = self.stresses[split_mask, :, :]
+
+        ens.update_weights(self.current_dyn, self.current_T)
+
+        return ens
+
+
+    def remove_noncomputed(self):
+        """
+        Removed all the incomplete calculation from the ensemble.
+        It may be used to run a minimization even if the ensemble was not completely calculated.
+        """
+
+        good_mask = self.force_computed
+        if self.has_stress:
+            good_mask = good_mask & self.stress_computed
+
+        self.N = np.sum( good_mask.astype(int))
+        self.forces = self.forces[good_mask, :, :]    
+        self.sscha_forces = self.sscha_forces[good_mask, :, :]    
+        self.stresses = self.stresses[good_mask, :, :]      
+        self.energies = self.energies[good_mask]
+        self.sscha_energies = self.sscha_energies[good_mask]
+        self.xats = self.xats[good_mask, :, :]
+        self.u_disps = self.u_disps[good_mask, :]
+
+        self.structures = [self.structures[x] for x in np.arange(len(good_mask))[good_mask]]
+
+        self.rho = self.rho[good_mask]
+
+        # Check everything and update the weights
+        self.update_weights(self.current_dyn, self.current_T)
+
+    def get_noncomputed(self):
+        """
+        Get another ensemble with only the non computed configurations.
+        This may be used to resubmit only the non computed values
+        """
+
+        non_mask = ~self.force_computed
+        if self.has_stress:
+            non_mask = non_mask & (~self.stress_computed)
+
+        return self.split(non_mask)
+
+    def get_energy_forces(self, ase_calculator, compute_stress = True, stress_numerical = False, skip_computed = False):
         """
         GET ENERGY AND FORCES FOR THE CURRENT ENSEMBLE
         ==============================================
@@ -2924,6 +3114,9 @@ DETAILS OF ERROR:
             stress_numerical : bool
                 If the calculator does not support stress, it can be computed numerically
                 by doing finite differences.
+            skip_computed : bool
+                If true the configurations already computed will be skipped. 
+                Usefull if the calculation crashed for some reason.
             
         """
         
@@ -2974,6 +3167,15 @@ DETAILS OF ERROR:
         # If an MPI istance is running, split the calculation
         for i0 in xrange(N_rand // size):
             i = i0 + size * rank
+
+            # Avoid performing this calculation if already done
+            if skip_computed:
+                if self.force_computed[i]:
+                    if compute_stress:
+                        if self.stress_computed[i]:
+                            continue
+                    else:
+                        continue
             
             
             struct = structures[i]
@@ -2999,7 +3201,8 @@ DETAILS OF ERROR:
                     count_fails += 1
                     if count_fails >= 5:
                         run = False
-                        raise ValueError("Error in the ASE calculator for more than 5 times")
+                        sys.stderr.write("Error in the ASE calculator for more than 5 times\n")
+                        raise
             
             # Get energy, forces (and stress)
             energy = atms.get_total_energy() / Rydberg # eV => Ry
@@ -3013,6 +3216,7 @@ DETAILS OF ERROR:
             # Copy into the ensemble array
             energies[i0] = energy
             forces[nat3*i0 : nat3*i0 + nat3] = forces_.reshape( nat3 )
+            
             
 
             
@@ -3034,10 +3238,12 @@ DETAILS OF ERROR:
         
         # Reshape the arrays
         self.forces[:, :, :] = np.reshape(total_forces, (N_rand, self.current_dyn.structure.N_atoms*np.prod(self.supercell), 3), order = "C")
-        
+        self.force_computed[:] = True
+
         if compute_stress:
             self.stresses[:,:,:] = np.reshape(total_stress, (N_rand, 3, 3), order = "C")
             self.has_stress = True
+            self.stress_computed[:] = True
         else:
             self.has_stress = False
             
