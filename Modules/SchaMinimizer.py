@@ -35,7 +35,7 @@ except:
 import cellconstructor as CC
 import cellconstructor.Methods
 import time
-
+import warnings
 import sys, os
 
 import sscha.Ensemble as Ensemble
@@ -241,6 +241,12 @@ class SSCHA_Minimizer(object):
             super(SSCHA_Minimizer, self).__setattr__(name, value)
         
         
+    def set_ensemble(ensemble):
+        """Provide an ensemble to the minimizer object"""
+
+        self.ensemble = ensemble 
+        if self.dyn is None:
+            self.dyn = self.ensemble.current_dyn.Copy()
         
     def minimization_step(self, custom_function_gradient = None):
         """
@@ -401,7 +407,7 @@ class SSCHA_Minimizer(object):
 
             # Prepare the gradient imposing the constraints
             if custom_function_gradient is not None:
-                custom_function_gradient(dyn_grad, np.zeros(self.dyn.structure.N_atoms, 3)) 
+                custom_function_gradient(dyn_grad, np.zeros((self.dyn.structure.N_atoms, 3))) 
              
             # Append the gradient modulus to the minimization info
             self.__gw__.append(0)
@@ -871,7 +877,20 @@ Maybe data_dir is missing from your input?"""
         # For now check that if root representation is activated
         # The preconditioning must be deactivated
         if self.root_representation != "normal" and self.precond_dyn:
-            raise ValueError("Error, deactivate the preconditioning if a root_representation is used.")
+            WRN_MSG = """\n
+WARNING, the preconditioning is activated together with a root representation.
+         please note that the its best effective when root representation is not active.
+         At the same time, root representation works better when preconditioning is deactivated.
+         You can ignore this message if you decided to activate preconditioning on purpouses
+         (gradient calculation without preconditioning could be time demanding on big systems).
+         
+         In the case you want to use both preconditioning and root_representation, 
+         the best match should be with root_representation = 'sqrt' (you set '{}')\n""".format(self.root_representation)
+            print(WRN_MSG)
+            warnings.warn(WRN_MSG)
+
+
+            #raise ValueError("Error, deactivate the preconditioning if a root_representation is used.")
         
 #
 #        # Initialize the symmetry
@@ -1421,9 +1440,12 @@ def PerformRootStep(dyn_q, grad_q, step_size=1, root_representation = "sqrt", mi
             The updated dynamical matrix in q space
     """
     ALLOWED_REPRESENTATION = ["normal", "root4", "sqrt", "root2"]
+
+    # Avoid case sensitiveness
+    root_representation = root_representation.lower()
     
     if not root_representation in ALLOWED_REPRESENTATION:
-        raise ValueError("Error, root_representation is %s must be one of %s." % (root_representation,
+        raise ValueError("Error, root_representation is %s must be one of '%s'." % (root_representation,
                                                                                   ", ".join(ALLOWED_REPRESENTATION)))
     # Allow also for the usage of root2 instead of sqrt
     if root_representation == "root2":
@@ -1455,12 +1477,12 @@ def PerformRootStep(dyn_q, grad_q, step_size=1, root_representation = "sqrt", mi
                 eigvals[eigvals < 0] = 0.
             
             # The sqrt conversion
-            new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(eigvals), np.conj(eigvects), eigvects)
+            new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(eigvals), eigvects, np.conj(eigvects))
             new_grad[iq, :, :] = new_dyn[iq, :, :].dot(grad_q[iq, :, :]) + grad_q[iq, :, :].dot(new_dyn[iq, :, :])
             
             # If root4 another loop needed
             if root_representation == "root4":                
-                new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(np.sqrt(eigvals)), np.conj(eigvects), eigvects)
+                new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(np.sqrt(eigvals)), eigvects, np.conj(eigvects))
                 new_grad[iq, :, :] = new_dyn[iq, :, :].dot(new_grad[iq, :, :]) + new_grad[iq, :, :].dot(new_dyn[iq, :, :])
     
     # Perform the step
@@ -1468,7 +1490,7 @@ def PerformRootStep(dyn_q, grad_q, step_size=1, root_representation = "sqrt", mi
     if minimization_algorithm == "sdes":
         new_dyn -= new_grad * step_size
     else:
-        raise ValueError("Error, the given minimization_algorithm %s is not implemented." % minimization_algorithm)
+        raise ValueError("Error, the given minimization_algorithm '%s' is not implemented." % minimization_algorithm)
     
     
     if root_representation != "normal":

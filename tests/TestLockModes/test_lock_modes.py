@@ -38,19 +38,11 @@ def test_lock_the_modes():
 
     # Setup the constraint on the modes
     N_VIBRONS = 4
-    NQ = len(dyn.q_tot) # Note that it is 1 in this case, but it needs to be specified anyway
-    NAT = dyn.structure.N_atoms
-
-    # Create the polarization vectors array in q space
-    pols_constraint = np.zeros( (3*NAT, N_VIBRONS, NQ), dtype = np.complex128, order = "F")
-    for iq in range(NQ):
-        w, pols = dyn.DyagDinQ(iq)
-        pols_constraint[:, :, iq] = pols[:, -N_VIBRONS:] # We pick the 3 last for each q point
-
-    w_start, pstart = dyn.DiagonalizeSupercell()
 
     # Here we setup the constraint
-    mode_cons = sscha.Utilities.ModeProjection(pols_constraint, dyn.structure.get_masses_array())
+    mode_cons = sscha.Utilities.ModeProjection(dyn)
+    mode_cons.SetupFreeModes(dyn.structure.N_atoms - N_VIBRONS,
+                             dyn.structure.N_atoms)
 
     # We setup also an I/O utility to save the frequencies as a function of the minimization.
     # In this way we are able to see if it is minimizing only the selected vibrons
@@ -65,6 +57,8 @@ def test_lock_the_modes():
     minim.meaningful_factor = MEANINGFUL
 
     minim.init(True)
+
+    w_start, p_start = dyn.DiagonalizeSupercell()
 
     # The constraint must be specified when the run method is called
     #minim.run()
