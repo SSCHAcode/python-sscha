@@ -275,7 +275,7 @@ class Lanczos:
         INITIALIZE THE CALCULATION
         ==========================
 
-        Perform everithing needed to initialize the calculation
+        Perform everithing needed to initialize the calculation.
         """
         self.prepare_symmetrization()
         self.initialized = True

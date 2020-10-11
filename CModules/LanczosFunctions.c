@@ -1,8 +1,8 @@
 #include "LanczosFunctions.h"
 
 
-#define DEB 1
-#define DEB_L 1
+#define DEB 0
+#define DEB_L 0
 
 // These are used for debugging
 #define X_VAL 1534

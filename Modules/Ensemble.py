@@ -2498,7 +2498,7 @@ DETAILS OF ERROR:
         dyn_hessian = self.current_dyn.Copy()
         for iq in range(len(self.current_dyn.q_tot)):
             if get_full_hessian:
-                dyn_hessian.dynmats[iq] += dynq_odd[iq, :, :] 
+                dyn_hessian.dynmats[iq] = dynq_odd[iq, :, :] + self.current_dyn.dynmats[iq]
             else:
                 dyn_hessian.dynmats[iq] = dynq_odd[iq, :, :] 
 
