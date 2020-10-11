@@ -10,6 +10,8 @@
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include "LanczosFunctions.h"
 
+#define DEB 0
+
 #ifdef _MPI
 #include <mpi.h>
 #endif
@@ -259,18 +261,19 @@ static PyObject *ApplyV3_FT(PyObject * self, PyObject * args) {
   int counter= 0;
   int N_symmetries;
 
-  printf("Degenerate space in C:\n");
-  for (i = 0; i < N_modes;++i) {
-    good_deg_space[i] = (int*) malloc(sizeof(int) * n_deg[i]);
-      printf("Mode %d -> ", i);
-    for (j = 0; j < n_deg[i]; ++j) {
-      good_deg_space[i][j] = ((int*) PyArray_DATA(npy_deg_space))[counter++];
-      printf(" %d ", good_deg_space[i][j]);
+  if (DEB) {
+    printf("Degenerate space in C:\n");
+    for (i = 0; i < N_modes;++i) {
+      good_deg_space[i] = (int*) malloc(sizeof(int) * n_deg[i]);
+        printf("Mode %d -> ", i);
+      for (j = 0; j < n_deg[i]; ++j) {
+        good_deg_space[i][j] = ((int*) PyArray_DATA(npy_deg_space))[counter++];
+        printf(" %d ", good_deg_space[i][j]);
+      }
+      printf("\n");
     }
-    printf("\n");
+    fflush(stdout);
   }
-  fflush(stdout);
-
   N_symmetries = PyArray_DIM(npy_symmetries, 0);
 
 

@@ -60,7 +60,7 @@ def test_dynamic_lanczos_snte(verbose = False):
     n_modes = len(w)
     N_ITERS = 50
 
-    for i, w_i in enumerate(n_modes):
+    for i, w_i in enumerate(w):
         # Setup the perturbation along the mode
         lanczos.reset()
         lanczos.prepare_perturbation(pols[:,i])
@@ -73,7 +73,7 @@ def test_dynamic_lanczos_snte(verbose = False):
                 os.makedirs(save_dir)
 
         # Run the Lanczos calculation
-        lanczos.run_FT(N_ITRERS, save_dir, verbose)
+        lanczos.run_FT(N_ITERS, save_dir, verbose)
 
         # Get the green function
         g_w = lanczos.get_green_function_continued_fraction([0], use_terminator = False)[0]
