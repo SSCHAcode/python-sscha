@@ -921,6 +921,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
                                 psi = self.psi,
                                 a_coeffs = self.a_coeffs,
                                 b_coeffs = self.b_coeffs,
+                                c_coeffs = self.c_coeffs,
                                 krilov_basis = self.krilov_basis,
                                 arnoldi_matrix = self.arnoldi_matrix,
                                 reverse = self.reverse_L,
@@ -965,6 +966,8 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         self.psi = data["psi"]
         self.a_coeffs = data["a_coeffs"]
         self.b_coeffs = data["b_coeffs"]
+        if "c_coeffs" in data:
+            self.c_coeffs = data["c_coeffs"]
         self.krilov_basis = data["krilov_basis"]
         self.arnoldi_matrix = data["arnoldi_matrix"]
 

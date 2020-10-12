@@ -76,10 +76,10 @@ def test_dynamic_lanczos_snte(verbose = False):
         lanczos.run_FT(N_ITERS, save_dir, verbose)
 
         # Get the green function
-        g_w = lanczos.get_green_function_continued_fraction([0], use_terminator = False)[0]
+        g_w = lanczos.get_green_function_continued_fraction(np.array([0]), use_terminator = False)[0]
         w_lanc = np.sign(g_w) / np.sqrt(np.abs(g_w))
         
-        assert np.abs(w_lanc - w_i) * CC.Units.RY_TO_CM < 10, "Error, frequencies {} do not match (B: {} cm-1| L: {} cm-1)".format(i, w_lanc* CC.Units.RY_TO_CM, w_i * CC.Units.RY_TO_CM)
+        assert np.abs(w_lanc - w_i) * CC.Units.RY_TO_CM < 10, "Error, frequencies {} do not match (L: {} cm-1| B: {} cm-1)".format(i, w_lanc* CC.Units.RY_TO_CM, w_i * CC.Units.RY_TO_CM)
     
     
 
