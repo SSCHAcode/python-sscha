@@ -2179,7 +2179,8 @@ Max number of iterations: {}
                     new_q -= coeff1 * self.basis_P[j]
                     new_p -= coeff2 * self.basis_Q[j]
 
-                    print("REP {} COEFF {}: scalar: {}".format(k_orth+1, j, coeff1))
+
+                    #print("REP {} COEFF {}: scalar: {}".format(k_orth+1, j, coeff1))
 
                     ortho_q += np.abs(coeff1)
                     ortho_p += np.abs(ortho_p)
