@@ -39,6 +39,7 @@ import warnings
 import sys, os
 
 import sscha.Ensemble as Ensemble
+from sscha.Parallel import pprint as print
 
 # Rydberg to cm-1 and meV conversion factor
 __RyToCm__  = 109691.40235

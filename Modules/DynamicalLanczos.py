@@ -1261,7 +1261,7 @@ Max number of iterations: {}
                 norm = np.sqrt(new_vect.dot(new_vect))
 
                 if verbose:
-                    print("Vector norm after GS number {}: {:16.8e}".format(k_orth, norm))
+                    print("Vector norm after GS number {}: {:16.8e}".format(k_orth+1, norm))
 
                 # Check the normalization (If zero the algorithm converged)
                 if norm < __EPSILON__:
@@ -1671,15 +1671,17 @@ Max number of iterations: {}
         
         spectral = np.zeros(len(w_array), dtype = np.complex128)
 
+
         kb = np.array(self.krilov_basis)
         if np.shape(kb)[0] > Na:
             kb = kb[:-1,:]
         print ("Shape check: eigvects = {}, kb = {}".format( np.shape(eigvects), np.shape(kb)))
         new_eigv = np.einsum("ab, ac->cb", eigvects, kb)
+        # TODO: Update for Lanczos biconjugate
 
         for j in range(Na):
             eig_v = new_eigv[:self.n_modes, j]
-            matrix_element = eig_v.dot(eig_v)
+            matrix_element = np.conj(eig_v).dot(eig_v)
             spectral[:] += matrix_element / (eigvals[j]  - w_array**2 +2j*w_array*smearing)
 
         return -np.imag(spectral)
@@ -2139,12 +2141,12 @@ Max number of iterations: {}
             self.a_coeffs.append(a_coeff)
             if np.abs(b_coeff) < __EPSILON__ or next_converged:
                 if verbose:
-                    print("Converged (b coefficient is 0)")
+                    print("Converged (b coefficient is {}, |b| < {})".format(b_coeff, __EPSILON__))
                 converged = True
                 break 
             if np.abs(c_coeff) < __EPSILON__ or next_converged:
                 if verbose:
-                    print("Converged (c coefficient is 0)")
+                    print("Converged (c coefficient is {}, |c| < {})".format(c_coeff, __EPSILON__))
                 converged = True
                 break
 
@@ -2160,6 +2162,12 @@ Max number of iterations: {}
             converged = False
             new_q = psi_q.copy()
             new_p = psi_p.copy()
+
+            if verbose:
+                norm_q = np.sqrt(new_q.dot(new_q))
+                norm_p = np.sqrt(new_p.dot(new_p))
+                print("Norm of q = {} and p = {} before Gram-Schmidt".format(norm_q, norm_p))
+
             for k_orth in range(N_REP_ORTH):
                 ortho_q = 0
                 ortho_p = 0
@@ -2171,7 +2179,7 @@ Max number of iterations: {}
                     new_q -= coeff1 * self.basis_P[j]
                     new_p -= coeff2 * self.basis_Q[j]
 
-                    print("REP {} COEFF {}: scalar: {}".format(k_orth, j, coeff1))
+                    print("REP {} COEFF {}: scalar: {}".format(k_orth+1, j, coeff1))
 
                     ortho_q += np.abs(coeff1)
                     ortho_p += np.abs(ortho_p)
@@ -2179,7 +2187,7 @@ Max number of iterations: {}
                 # Add the new vector to the Krilov Basis
                 normq = np.sqrt(new_q.dot(new_q))
                 if verbose:
-                    print("Vector norm after GS number {}: {:16.8e}".format(k_orth, normq))
+                    print("Vector norm (q) after GS number {}: {:16.8e}".format(k_orth+1, normq))
 
                 # Check the normalization (If zero the algorithm converged)
                 if normq < __EPSILON__:
@@ -2193,9 +2201,11 @@ Max number of iterations: {}
 
                 # Normalize the p with respect to the scalar product with q
                 normp = new_p.dot(new_q)
+                if verbose:
+                    print("Vector norm (p biconjugate) after GS number {}: {:16.8e}".format(k_orth, normp))
 
                 # Check the normalization (If zero the algorithm converged)
-                if normp < __EPSILON__:
+                if np.abs(normp) < __EPSILON__:
                     next_converged = True
                     if verbose:
                         print("Obtained a linear dependent P vector.")

@@ -39,6 +39,8 @@ import cellconstructor.Manipulate
 import cellconstructor.Settings
 
 import sscha.Parallel as Parallel
+from sscha.Parallel import pprint as print
+
 
 
 import SCHAModules

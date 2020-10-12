@@ -20,6 +20,9 @@ import ase, ase.io
 import cellconstructor as CC
 import cellconstructor.Methods
 
+from sscha.Parallel import pprint as print
+
+
 # SETUP THE CODATA 2006, To match the QE definition of Rydberg
 try:
     units = ase.units.create_units("2006")
