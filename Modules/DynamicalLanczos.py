@@ -28,7 +28,7 @@ from sscha.Parallel import pprint as print
 
 # Define a generic type for the double precision.
 TYPE_DP = np.double
-__EPSILON__ = 1e-8
+__EPSILON__ = 1e-12
 N_REP_ORTH = 1
 
 try:
