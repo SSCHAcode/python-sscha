@@ -28,11 +28,15 @@ ff_calculator.p3 = 0.036475
 ff_calculator.p4 = -0.022
 ff_calculator.p4x = -0.014
 
-TMIN = 150
-TMAX = 250
-DT = 10
+T = 170
+#TMIN = 150
+#TMAX = 250
+#DT = 10
 
-N_CONFIGS = 10000
+NMIN = 40000
+NMAX = 200000
+DN = 40000
+
 
 def simulate(T, n_confs):
     dir_name = "T_{}_N_{}".format(T, n_confs)
@@ -78,9 +82,10 @@ def simulate(T, n_confs):
 
 
 if __name__ == "__main__":
-    T = TMIN
-    while T <= TMAX:
-        print("Simulating T = {} | N = {}".format(T, N_CONFIGS))
-        simulate(T, N_CONFIGS)
-        T += DT
+
+    N = NMIN
+    while N <= NMAX:
+        print("Simulating T = {} | N = {}".format(T, N))
+        simulate(T, N)
+        N += DN
     

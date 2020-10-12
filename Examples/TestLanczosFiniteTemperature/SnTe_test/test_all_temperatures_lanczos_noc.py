@@ -81,7 +81,7 @@ def get_lanczos(T, N_CONF, verbose):
     lanczos.get_full_L_operator_FT()
     
     # Run the lanczos
-    N_ITERS = 1000
+    N_ITERS = 30
 
     # Setup the perturbation along the lowest energy mode
     lanczos.prepare_perturbation(pols[:,0])

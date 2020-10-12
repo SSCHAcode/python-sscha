@@ -270,14 +270,20 @@ class Lanczos:
         self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
 
 
-    def init(self):
+    def init(self, use_symmetries = True):
         """
         INITIALIZE THE CALCULATION
         ==========================
 
         Perform everithing needed to initialize the calculation.
+
+        Parameters
+        ----------
+            use_symmetries : bool
+                if False (default True) symmetries are neglected.
+    
         """
-        self.prepare_symmetrization()
+        self.prepare_symmetrization(no_sym = not use_symmetries)
         self.initialized = True
 
 
