@@ -68,7 +68,7 @@ MODE_SLOW_SERIAL = 0
 
 
 class Lanczos:
-    def __init__(self, ensemble = None, mode = 1, unwrap_ensemble = True):
+    def __init__(self, ensemble = None, mode = 1, unwrap_symmetries = True):
         """
         INITIALIZE THE LANCZOS
         ======================
@@ -86,7 +86,7 @@ class Lanczos:
                       Use this just for testing
                    1) Fast C serial code
                    2) Fast C parallel (MPI)
-            unwrap_ensemble : bool
+            unwrap_symmetries : bool
                 If true (default), the ensemble is unwrapped to respect the symmetries.
                 This requires SPGLIB installed.
 
@@ -207,33 +207,21 @@ class Lanczos:
         u *= np.tile(np.sqrt(self.m), (N, 1)) 
         f /= np.tile(np.sqrt(self.m), (N, 1)) 
 
-            
-
-
-
         # Get the info about the ensemble
         self.N = N
         self.rho = rho
         self.N_eff = np.sum(self.rho)
 
-
-
+        self.u_tilde = u
+        self.f_tilde = f
 
         self.X = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
-        self.u_tilde = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
-        #self.X[:,:] = np.einsum("a,ia, ab->ib", np.sqrt(self.m), u, self.pols) / Ensemble.Bohr
-
         self.Y = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
-        #self.Y[:,:] = np.einsum("a,ia, ab->ib", 1/np.sqrt(self.m), f, self.pols) * Ensemble.Bohr
 
-        ups_mat = self.dyn.GetUpsilonMatrix(self.T)
-        v_vec = u.dot(ups_mat)
+        # Convert in the polarization space
+        self.X[:, :] = self.pols.T.dot(self.u_tilde)
+        self.Y[:, :] = self.pols.T.dot(self.f_tilde)
 
-        # Convert in the polarization basis
-        pol_mat = np.einsum("ab, a->ab", self.pols, 1 / np.sqrt(self.m))
-        self.X[:,:] = v_vec.dot(pol_mat)
-        self.u_tilde = 
-        self.Y[:,:] = f.dot(pol_mat)
 
         # Prepare the variable used for the working
         len_psi = self.n_modes
@@ -717,6 +705,64 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
 
         return out_vect
+
+    def get_Y1(self):
+        """
+        Get the perturbation on the Y matrix from the psi vector
+        """
+        start_Y = self.n_modes
+        start_A = self.n_modes +  (self.n_modes * (self.n_modes + 1)) // 2
+
+        Y_all = self.psi[start_Y : start_A]
+
+        Y1 = np.zeros( (self.n_modes, self.n_modes), dtype = np.double)
+        start = 0
+        next = self.n_modes
+        for i in range(self.n_modes):
+            Y1[i, i:] = Y_all[start : next]
+            start = next 
+            next = start + self.n_modes - i - 1 
+
+            # Fill symmetric
+            Y1[i, :i] = Y1[:i, i]
+
+        return  Y1
+
+
+    def apply_anharmonic_FT(self):
+        """
+        APPLY ANHARMONIC EVOLUTION
+        ==========================
+
+        This term involves the anharmonic evolution:
+        This calculates self-consistently the evolution from the vector
+        """
+
+        Y1 = self.get_Y1()
+        R1 = self.psi[: self.n_modes]
+
+        weights = np.zeros(self.N, dtype = np.double)
+
+        # Get the weights of the perturbation (psi vector)
+        sscha_HP_odd.GetWeights(self.X, self.w, R1, Y1, self.T, weights)
+
+        # Get the averages on the perturbed ensemble
+        w_is = np.tile(self.rho, (self.n_modes, 1)).T
+        w_1 = np.tile(weights, (self.n_modes, 1)).T
+
+        # The force average
+        f_pert_av = np.sum(self.Y * w_is * w_1, axis = 0) / self.N_eff
+
+        # Get the Upsilon vector
+        Y_mu = 2 * self.w
+        if (self.T > __EPSILON__):
+            n = 1 / ( np.exp(self.w * 157887.32400374097 / T) - 1)
+            Y_mu /= 2*n + 1
+
+        Ups_dot_u = np.einsum("ab, b -> ab", self.X, Y_mu)
+
+        # The force constant average
+        d2v_pert_av = np.sum(Ups_dot_u * )
 
     def apply_L2(self):
         """

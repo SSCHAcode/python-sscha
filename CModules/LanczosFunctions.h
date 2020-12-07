@@ -177,6 +177,34 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 
 
 /*
+ * Here the function for the self-consistent applicaiton of the Lanczos Matrix
+ */
+
+void get_weights(const double * X, const double * w, const double * R1, const double * Y1, double T, int n_modes, int n_configs, double * weights);
+
+/*
+ * The following function computes the second derivative of the potential with respect to the perturbed ensemble.
+ * The perturbation enters in the weights passed to this function, that are computed with the subroutine get_weights.
+ *
+ * Parameters
+ * ----------
+ *   X : Array (n_configs, n_modes)
+ * 	     The displacements in the polarization basis
+ *   Y : Array (n_configs, n_modes)
+ * 	     The forces in the polarization basis
+ * 	 w : Array (n_modes)
+ * 	     The frequencies [Ry]
+ *   weights : Array(n_configs)
+ * 	     The weights computed with get_weights
+ *   w_is : Array(n_configs)
+ * 	     The weights that comes from the importance sampling.
+ *   T : double	
+ *       The temperature of the calculation.
+ */
+double get_d2v_dR2_pert(double * X, double * Y, double *w, double * weights, double * w_is, double T, int n_modes, int n_configs, double * d2v_dR2) ;
+
+
+/*
  * Here we define some working methods that are usefull to be
  * called outside. They take the frequency and the occupation number
  */
@@ -197,6 +225,7 @@ double X1_coeff(double w_a, double n_a, double w_b, double n_b, double w_c, doub
 
 // Get the extra count due to the double occurrence of a and b if the modes are different
 double get_extra_count(int mode_a, int mode_b, int transpose) ;
+
 
 
 /* 

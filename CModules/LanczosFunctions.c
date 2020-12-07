@@ -1693,6 +1693,56 @@ void MPI_ApplyD4ToDyn(const double * X, const double * Y, const double * rho, co
 }
 
 
+// Get weights for the self-consistent application of the anharmonic Lanczos matrix
+void get_weights(const double * X, const double * w, const double * R1, const double * Y1, double T, int n_modes, int n_configs, double * weights) {
+
+	int i;
+	int mu, nu;
+	// TODO: Parallelize
+	for (i = 0; i < n_configs; ++i) {
+		// Compute the contribution of Y1
+		weights[i] = 0;
+		for (mu = 0; mu < n_modes; ++mu) {
+			for (nu = 0; nu < n_modes; ++nu) {
+				weights[i] -= X[i * n_modes +  mu] * X[i * n_modes+  nu] * Y1[mu * n_modes +  nu] / 2;
+			}
+		}
+
+		// Compute the contribution of R1
+		for (mu = 0; mu < n_modes; ++mu) {
+			weights[i] += f_ups(w[mu], T) * R1[mu] * X[i * n_modes + mu];
+		}
+	}
+}
+
+
+double get_d2v_dR2_pert(double * X, double * Y, double *w, double * weights, double * w_is, double T, int n_modes, int n_configs, double * d2v_dR2) {
+	int i, mu, nu;
+
+	double N_eff = 0;
+	double u_mu = 0;
+
+	// TODO: Parallelize
+	for (i = 0; i < n_configs; ++i) {
+		N_eff += w_is[i];
+
+		for (mu = 0; mu < n_modes; ++mu) {
+			u_mu = f_ups(w[mu], T) * X[i * n_modes +  mu];
+			for (nu = 0; nu < n_modes; ++nu) {
+				d2v_dR2[mu * n_modes + nu] -= u_mu * Y[i * n_modes + nu] * weights[i] * w_is[i];
+			}
+		}	
+	}
+
+	// Apply the normalization
+	for (mu = 0; mu < n_modes; ++mu) {
+		for (nu = 0; nu < n_modes; ++nu) {
+			d2v_dR2[mu * n_modes, nu] /= N_eff;
+		}
+	}
+}
+
+
 // The working functions
 double Z_coeff(double w_a, double n_a, double w_b, double n_b) {
 	return -2 * ((2*n_a + 1)*w_b + (2*n_b + 1)*w_a) / ((2*n_a + 1) * (2*n_b + 1));

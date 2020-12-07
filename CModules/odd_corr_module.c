@@ -25,6 +25,7 @@ static PyObject *ApplyV3ToVector(PyObject * self, PyObject * args);
 static PyObject *ApplyV4ToDyn(PyObject * self, PyObject * args);
 static PyObject *ApplyV3_FT(PyObject * self, PyObject * args);
 static PyObject *ApplyV4_FT(PyObject * self, PyObject * args);
+static PyObject *GetWeights(PyObject * self, PyObject * args);
 
 
 static PyMethodDef odd_engine[] = {
@@ -35,6 +36,7 @@ static PyMethodDef odd_engine[] = {
     {"ApplyV4ToDyn", ApplyV4ToDyn, METH_VARARGS, "Apply the v3 to a given dynamical matrix"},
     {"ApplyV3_FT", ApplyV3_FT, METH_VARARGS, "Apply the full v3 at finite temperature"},
     {"ApplyV4_FT", ApplyV4_FT, METH_VARARGS, "Apply the full v4 at finite temperature"},
+    {"GetWeights", GetWeights, METH_VARARGS, "Get the self-consistent weights for the L application"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -296,6 +298,105 @@ static PyObject *ApplyV3_FT(PyObject * self, PyObject * args) {
   return Py_None;
 }
 
+static PyObject *GetWeights(PyObject * self, PyObject * args) {
+  PyArrayObject * npy_X, *npy_omega, *npy_R1, *npy_Y1, *npy_weights;
+  double * X; 
+  double *w;
+  double * R1;
+  double *Y1;
+  double * weights;
+  int N_configs;
+  int N_modes;
+  double T;
+
+  int index_mode = 0, index_config = 1;
+
+  // Parse the python arguments
+  if (!PyArg_ParseTuple(args, "OOOOdO", &npy_X, &npy_omega, &npy_R1, &npy_Y1, &T, &npy_weights))
+    return NULL;
+  
+  // Check the array memory setting
+  if (npy_X->flags & NPY_ARRAY_F_CONTIGUOUS) {
+    index_mode = 1;
+    index_config = 0;
+  }
+  
+
+  // Get the dimension of the arrays
+  N_modes = PyArray_DIM(npy_X, index_mode);
+  N_configs = PyArray_DIM(npy_X, index_config);
+
+  if (N_modes != PyArray_DIM(npy_omega,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "N_modes from X is %d, while len(w) = %d\n", N_modes, PyArray_DIM(npy_omega, 0));
+    exit(EXIT_FAILURE);
+  }
+
+  // Retrive the pointer to the data from the python object
+  X = (double*) PyArray_DATA(npy_X);
+  R1 = (double*) PyArray_DATA(npy_R1);
+  Y1 = (double*) PyArray_DATA(npy_Y1);
+  w = (double*) PyArray_DATA(npy_omega);
+
+  weights = (double*) PyArray_DATA(npy_weights);
+
+  get_weights(X, w, R1, Y1, T, n_modes, n_configs, weights);
+
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
+static PyObject *Get_D2DR2_PertV(PyObject * self, PyObject * args) {
+  PyArrayObject * npy_X, *npy_Y, *npy_omega, *npy_rho, *npy_weights, *npy_d2vdr2;
+  double * X; 
+  double * Y;
+  double *w;
+  double * rho;
+  double * weights;
+  double * d2vdr2;
+  int N_configs;
+  int N_modes;
+  double T;
+
+  int index_mode = 0, index_config = 1;
+
+  // Parse the python arguments
+  if (!PyArg_ParseTuple(args, "OOOOOdO", &npy_X,  &npy_Y, &npy_omega, &npy_rho, &npy_weights, &T, &npy_d2vdr2))
+    return NULL;
+  
+  // Check the array memory setting
+  if (npy_X->flags & NPY_ARRAY_F_CONTIGUOUS) {
+    index_mode = 1;
+    index_config = 0;
+  }
+  
+
+  // Get the dimension of the arrays
+  N_modes = PyArray_DIM(npy_X, index_mode);
+  N_configs = PyArray_DIM(npy_X, index_config);
+
+  if (N_modes != PyArray_DIM(npy_omega,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "N_modes from X is %d, while len(w) = %d\n", N_modes, PyArray_DIM(npy_omega, 0));
+    exit(EXIT_FAILURE);
+  }
+
+  // Retrive the pointer to the data from the python object
+  X = (double*) PyArray_DATA(npy_X);
+  Y = (double*) PyArray_DATA(npy_Y);
+  rho = (double*) PyArray_DATA(npy_rho);
+  w = (double*) PyArray_DATA(npy_omega);
+  weights = (double*) PyArray_DATA(npy_weights);
+  d2vdr2 = (double*) PyArray_DATA(npy_d2vdr2);
+
+  // Apply the method
+  get_d2v_dR2_pert(X, Y, w, weights, rho, T, n_modes, n_configs, d2v_dR2);
+
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
 
 static PyObject *ApplyV4_FT(PyObject * self, PyObject * args) {
   PyArrayObject * npy_X, *npy_Y, *npy_rho, *npy_omega, *npy_input, *npy_output, *npy_symmetries, *npy_n_deg, *npy_deg_space;
