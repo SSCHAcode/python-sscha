@@ -68,7 +68,7 @@ MODE_SLOW_SERIAL = 0
 
 
 class Lanczos:
-    def __init__(self, ensemble = None, mode = 1):
+    def __init__(self, ensemble = None, mode = 1, unwrap_ensemble = True):
         """
         INITIALIZE THE LANCZOS
         ======================
@@ -86,6 +86,9 @@ class Lanczos:
                       Use this just for testing
                    1) Fast C serial code
                    2) Fast C parallel (MPI)
+            unwrap_ensemble : bool
+                If true (default), the ensemble is unwrapped to respect the symmetries.
+                This requires SPGLIB installed.
 
         """
 
@@ -180,21 +183,44 @@ class Lanczos:
         self.ignore_v3 = False
         self.ignore_v4 = False
 
-        # Get the info about the ensemble
-        self.N = ensemble.N 
-        self.rho = ensemble.rho.copy() 
-        self.N_eff = np.sum(self.rho)
-
-        u = ensemble.u_disps / Ensemble.Bohr
+        N = ensemble.N
+        rho = ensemble.rho.copy() 
+        u = ensemble.u_disps  / Ensemble.Bohr
         f = ensemble.forces.reshape(self.N, 3 * self.nat).copy()
         f -= ensemble.sscha_forces.reshape(self.N, 3 * self.nat)
+        
         # Subtract also the average force to clean more the stochastic noise
-        av_force = ensemble.get_average_forces(get_error = False).ravel()
-        new_av_force = np.tile(av_force, (n_cell, 1)).ravel()
-        f -= np.tile(new_av_force, (self.N, 1)) 
+        #av_force = ensemble.get_average_forces(get_error = False).ravel()
+        #new_av_force = np.tile(av_force, (n_cell, 1)).ravel()
+        
+        #f -= np.tile(new_av_force, (self.N, 1)) 
         f *= Ensemble.Bohr
 
+        if unwrap_symmetries:
+            u, f, rho = ensemble.get_unwrapped_ensemble()
+            N = len(rho)
+
+            u /= Ensemble.Bohr
+            f *= Ensemble.Bohr
+
+        # Perform the mass rescale to get the tilde variables
+        u *= np.tile(np.sqrt(self.m), (N, 1)) 
+        f /= np.tile(np.sqrt(self.m), (N, 1)) 
+
+            
+
+
+
+        # Get the info about the ensemble
+        self.N = N
+        self.rho = rho
+        self.N_eff = np.sum(self.rho)
+
+
+
+
         self.X = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
+        self.u_tilde = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
         #self.X[:,:] = np.einsum("a,ia, ab->ib", np.sqrt(self.m), u, self.pols) / Ensemble.Bohr
 
         self.Y = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
@@ -206,6 +232,7 @@ class Lanczos:
         # Convert in the polarization basis
         pol_mat = np.einsum("ab, a->ab", self.pols, 1 / np.sqrt(self.m))
         self.X[:,:] = v_vec.dot(pol_mat)
+        self.u_tilde = 
         self.Y[:,:] = f.dot(pol_mat)
 
         # Prepare the variable used for the working
