@@ -2475,9 +2475,9 @@ def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn,  symmetries, n_degeneracies, de
 
     n_modes = len(w)
 
-    transp = 0
-    if transpose:
-        transp = 1
+    #transp = 0
+    #if transpose:
+    #    transp = 1
 
     output_vector = np.zeros(n_modes, dtype = TYPE_DP)
     #print( "Apply to dyn, nmodes:", n_modes, "shape:", np.shape(output_vector))
@@ -2502,7 +2502,7 @@ def FastApplyD3ToDyn(X, Y, rho, w, T, input_dyn,  symmetries, n_degeneracies, de
             j_mode = 0
     
 
-    sscha_HP_odd.ApplyV3ToDyn(X, Y, rho, w, T, input_dyn, output_vector, mode, symmetries, n_degeneracies, deg_space_new, transp)
+    sscha_HP_odd.ApplyV3ToDyn(X, Y, rho, w, T, input_dyn, output_vector, mode, symmetries, n_degeneracies, deg_space_new)
     return output_vector
 
 
