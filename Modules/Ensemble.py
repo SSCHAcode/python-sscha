@@ -887,7 +887,9 @@ Error, the following stress files are missing from the ensemble:
             u_disps : ndarray(size = (n_configs * n_syms, 3*nat), dtype = np.double)
                 The displacements of atomic configurations with respect to the average positions
             forces : ndarray(size = (n_configs * n_syms, 3*nat), dtype = np.double)
-                The forces that acts on each configuration (subtracted by the SSCHA if requested)
+                The forces that acts on each configuration (subtracted by the SSCHA if requested).
+                Note, the array has the same rank of u_disps, but not of the original self.forces 
+                (we reshape from (3, nat_sc) -> 3 * nat_sc the atomic coordinates)
             weights : ndarray(size = n_configs * n_syms, dytpe = no.double)
                 The weights of the configurations
         """
@@ -910,8 +912,13 @@ Error, the following stress files are missing from the ensemble:
         n_syms = len(cc_syms)
         nat_sc = super_structure.N_atoms
         new_N = n_syms * self.N
+
+        cc_sym_array = np.zeros( (n_syms, 3, 3), dtype = np.intc)
+        for i in range(n_syms):
+            cc_sym_array[i, :, :] = cc_syms[i][:3, :3] 
         
         # Get the IRT atoms
+        t0 = time.time()
         irts = np.zeros( (n_syms, nat_sc), dtype = int)
         for i in range(n_syms):
             irts[i, :] = CC.symmetries.GetIRT(super_structure, cc_syms[i]) + 1 # Py -> Fortran indexing
@@ -919,41 +926,46 @@ Error, the following stress files are missing from the ensemble:
 
 
         old_udisps = np.zeros( self.u_disps.shape, dtype = np.double)
-        old_forces = np.zeros( self.forces.shape, dtype = np.double)
+        old_forces = np.zeros( self.u_disps.shape, dtype = np.double)
         new_udisps = np.zeros( (new_N, 3 * nat_sc), dtype = np.double)
         new_forces = np.zeros( (new_N, 3 * nat_sc), dtype = np.double)
 
         # Convert to crystal coordinates
         t1 = time.time()
+        if verbose:
+            print("Time to get equivalent atoms by symmetries: {} s".format(t1 - t0))
+
         for i in range(self.N):
-            v = self.u_disps[i, :].reshape((nat_sc, 3))
-            old_udisps[i, :] = CC.Methods.cart_to_cryst(super_structure.unit_cell, v).ravel()
+            v = self.u_disps[i, :].reshape((nat_sc, 3)).copy()
+            old_udisps[i, :] = CC.Methods.cart_to_cryst(super_structure.unit_cell, v).reshape(nat_sc * 3)
 
 
-            v = self.forces[i, :].reshape((nat_sc, 3))
+            v = self.forces[i, :, :].copy()
             if subtract_sscha:
-                v -= self.sscha_forces[i, :].reshape((nat_sc, 3))
+                v -= self.sscha_forces[i, :, :]
 
-            old_forces[i, :] = CC.Methods.cart_to_cryst(super_structure.unit_cell, v).ravel()
+
+            old_forces[i, :] = CC.Methods.cart_to_cryst(super_structure.unit_cell, v).reshape(nat_sc * 3)
         t2 = time.time()
 
         if verbose:
             print("Time to convert everything to crystal coordinates: {} s".format(t2 - t1))
 
-        # Unwrap the ensemble
-        new_udisps[:,:] = SCHAMethods.unwrap_ensemble(old_udisps, cc_syms[:3, :3].astype(int), irts, nat_sc, n_syms)
-        new_forces[:,:] = SCHAMethods.unwrap_ensemble(old_forces, cc_syms[:3, :3].astype(int), irts, nat_sc, n_syms)
 
+        # Unwrap the ensemble
+        new_udisps[:,:] = SCHAModules.unwrap_ensemble(old_udisps, cc_sym_array, irts, self.N, nat_sc, n_syms)
+        new_forces[:,:] = SCHAModules.unwrap_ensemble(old_forces, cc_sym_array, irts, self.N, nat_sc, n_syms)
 
         t3 = time.time()
         if verbose:
             print("Time to unwrap the ensemble: {} s".format(t3 - t2))
 
         # Convert to cartesian coordinates once more
-        v = new_udisps.reshape((new_N, nat_sc, 3))
+        v = new_udisps.reshape((new_N * nat_sc, 3)).copy()
         new_udisps = CC.Methods.cryst_to_cart(super_structure.unit_cell, v).reshape((new_N, 3 * nat_sc))
 
-        v = new_forces.reshape((new_N, nat_sc, 3))
+
+        v = new_forces.reshape((new_N * nat_sc, 3)).copy()
         new_forces = CC.Methods.cryst_to_cart(super_structure.unit_cell, v).reshape((new_N, 3*nat_sc))
 
         t4 = time.time()
@@ -968,7 +980,7 @@ Error, the following stress files are missing from the ensemble:
         if verbose:
             print("Time to unwrap the weights: {} s".format(t5 - t4))
 
-            print("    overall time of get_unwrapped_ensemble: {} s".format(t5- t1))
+            print("    overall time of get_unwrapped_ensemble: {} s".format(t5- t0))
 
         return new_udisps, new_forces, weights
 
@@ -1026,7 +1038,7 @@ Error, the following stress files are missing from the ensemble:
         
         t1 = time.time()
         for x in range(self.N):
-            print ("Config %d" % x)
+            #print ("Config %d" % x)
             for i in range(n_syms):
 
                 index = n_syms * x + i

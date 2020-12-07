@@ -65,7 +65,7 @@ SCHAModules = Extension(name = "SCHAModules",
                                    "SCHAModules/get_odd_straight.f90",
                                    "SCHAModules/get_cmat.f90",
                                    "SCHAModules/get_v4.f90",
-                                   "SCHAModules/unwrap_ensemble.f90"
+                                   "SCHAModules/unwrap_ensemble.f90",
                                    "SCHAModules/get_odd_straight_with_v4.f90"],
                         libraries = LIBRARIES,
                         extra_f90_compile_args = EXTRA_F90_FLAGS,
