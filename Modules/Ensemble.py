@@ -692,8 +692,115 @@ class Ensemble:
             self.q_start = CC.Manipulate.GetQ_vectors(self.structures, super_dyn)
             self.current_q = self.q_start.copy()
         
+    def get_unwrapped_ensemble(self, subtract_sscha = True, verbose = True):
+        """
+        This subroutine gets the displacements, forces and stochastic weights of the ensemble
+        unwrapping with the symmetries: for each configuraiton, we add all other configurations equivalent by simmetries
         
-    def unwrap_symmetries(self):
+        NOTE: it works only if SPGLIB is installed
+
+        Parameter
+        ---------
+            subtract_sscha : bool
+                If true (default), instead of the forces, the method returns the forces subtracted by the
+                SCHA forces.
+            verbose : bool
+                If true, the method prints into stdout the timing.
+
+        Returns
+        -------
+            u_disps : ndarray(size = (n_configs * n_syms, 3*nat), dtype = np.double)
+                The displacements of atomic configurations with respect to the average positions
+            forces : ndarray(size = (n_configs * n_syms, 3*nat), dtype = np.double)
+                The forces that acts on each configuration (subtracted by the SSCHA if requested)
+            weights : ndarray(size = n_configs * n_syms, dytpe = no.double)
+                The weights of the configurations
+        """
+
+        # First of all, we need to get the symmetries
+
+        # Get the symmetries
+        if not __SPGLIB__:
+            raise ImportError("Error, get_unwrapped_ensemble mehtod requires spglib")
+
+        # Get the symmetries from spglib
+        super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
+        spglib_syms = spglib.get_symmetry(super_structure.get_ase_atoms())
+        
+        # Convert them into the cellconstructor format
+        cc_syms = CC.symmetries.GetSymmetriesFromSPGLIB(spglib_syms, False)
+        
+        print("N syms:", len(cc_syms))
+        
+        n_syms = len(cc_syms)
+        nat_sc = super_structure.N_atoms
+        new_N = n_syms * self.N
+        
+        # Get the IRT atoms
+        irts = np.zeros( (n_syms, nat_sc), dtype = int)
+        for i in range(n_syms):
+            irts[i, :] = CC.symmetries.GetIRT(super_structure, cc_syms[i]) + 1 # Py -> Fortran indexing
+
+
+
+        old_udisps = np.zeros( self.u_disps.shape, dtype = np.double)
+        old_forces = np.zeros( self.forces.shape, dtype = np.double)
+        new_udisps = np.zeros( (new_N, 3 * nat_sc), dtype = np.double)
+        new_forces = np.zeros( (new_N, 3 * nat_sc), dtype = np.double)
+
+        # Convert to crystal coordinates
+        t1 = time.time()
+        for i in range(self.N):
+            v = self.u_disps[i, :].reshape((nat_sc, 3))
+            old_udisps[i, :] = CC.Methods.cart_to_cryst(super_structure.unit_cell, v).ravel()
+
+
+            v = self.forces[i, :].reshape((nat_sc, 3))
+            if subtract_sscha:
+                v -= self.sscha_forces[i, :].reshape((nat_sc, 3))
+
+            old_forces[i, :] = CC.Methods.cart_to_cryst(super_structure.unit_cell, v).ravel()
+        t2 = time.time()
+
+        if verbose:
+            print("Time to convert everything to crystal coordinates: {} s".format(t2 - t1))
+
+        # Unwrap the ensemble
+        new_udisps[:,:] = SCHAMethods.unwrap_ensemble(old_udisps, cc_syms[:3, :3].astype(int), irts, nat_sc, n_syms)
+        new_forces[:,:] = SCHAMethods.unwrap_ensemble(old_forces, cc_syms[:3, :3].astype(int), irts, nat_sc, n_syms)
+
+
+        t3 = time.time()
+        if verbose:
+            print("Time to unwrap the ensemble: {} s".format(t3 - t2))
+
+        # Convert to cartesian coordinates once more
+        v = new_udisps.reshape((new_N, nat_sc, 3))
+        new_udisps = CC.Methods.cryst_to_cart(super_structure.unit_cell, v).reshape((new_N, 3 * nat_sc))
+
+        v = new_forces.reshape((new_N, nat_sc, 3))
+        new_forces = CC.Methods.cryst_to_cart(super_structure.unit_cell, v).reshape((new_N, 3*nat_sc))
+
+        t4 = time.time()
+        if verbose:
+            print("Time to convert back to cartesian: {} s".format(t4 - t3))
+
+        weights = np.zeros( (new_N), dtype = np.double)
+        for i in range(self.N):
+            weights[n_syms * i : n_syms * (i + 1)] = self.rho[i]
+        t5 = time.time()
+
+        if verbose:
+            print("Time to unwrap the weights: {} s".format(t5 - t4))
+
+            print("    overall time of get_unwrapped_ensemble: {} s".format(t5- t1))
+
+        return new_udisps, new_forces, weights
+
+
+
+        
+    def _unwrap_symmetries_(self):
         """
         UNWRAP THE ENSEMBLE
         ===================
