@@ -26,6 +26,7 @@ static PyObject *ApplyV4ToDyn(PyObject * self, PyObject * args);
 static PyObject *ApplyV3_FT(PyObject * self, PyObject * args);
 static PyObject *ApplyV4_FT(PyObject * self, PyObject * args);
 static PyObject *GetWeights(PyObject * self, PyObject * args);
+static PyObject *Get_D2DR2_PertV(PyObject * self, PyObject * args);
 
 
 static PyMethodDef odd_engine[] = {
@@ -37,6 +38,7 @@ static PyMethodDef odd_engine[] = {
     {"ApplyV3_FT", ApplyV3_FT, METH_VARARGS, "Apply the full v3 at finite temperature"},
     {"ApplyV4_FT", ApplyV4_FT, METH_VARARGS, "Apply the full v4 at finite temperature"},
     {"GetWeights", GetWeights, METH_VARARGS, "Get the self-consistent weights for the L application"},
+    {"Get_D2DR2_PertV", Get_D2DR2_PertV, METH_VARARGS, "Get the d2V_dr2 matrix averaged on the perturbed ensemble"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -340,7 +342,7 @@ static PyObject *GetWeights(PyObject * self, PyObject * args) {
 
   weights = (double*) PyArray_DATA(npy_weights);
 
-  get_weights(X, w, R1, Y1, T, n_modes, n_configs, weights);
+  get_weights(X, w, R1, Y1, T, N_modes, N_configs, weights);
 
 
   Py_INCREF(Py_None);
@@ -391,7 +393,7 @@ static PyObject *Get_D2DR2_PertV(PyObject * self, PyObject * args) {
   d2vdr2 = (double*) PyArray_DATA(npy_d2vdr2);
 
   // Apply the method
-  get_d2v_dR2_pert(X, Y, w, weights, rho, T, n_modes, n_configs, d2v_dR2);
+  get_d2v_dR2_pert(X, Y, w, weights, rho, T, N_modes, N_configs, d2vdr2);
 
 
   Py_INCREF(Py_None);

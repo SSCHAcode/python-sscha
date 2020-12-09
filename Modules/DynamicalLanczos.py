@@ -753,16 +753,42 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         # The force average
         f_pert_av = np.sum(self.Y * w_is * w_1, axis = 0) / self.N_eff
 
-        # Get the Upsilon vector
-        Y_mu = 2 * self.w
-        if (self.T > __EPSILON__):
-            n = 1 / ( np.exp(self.w * 157887.32400374097 / T) - 1)
-            Y_mu /= 2*n + 1
+        d2v_pert_av = np.zeros((self.n_modes, self.n_modes), dtype = np.double, order = "C")
+        sscha_HP_odd.Get_D2DR2_PertV(self.X, self.Y, self.w, self.rho, weights, self.T, d2v_pert_av)
 
-        Ups_dot_u = np.einsum("ab, b -> ab", self.X, Y_mu)
 
-        # The force constant average
-        d2v_pert_av = np.sum(Ups_dot_u * )
+        # Get the final vector
+        final_psi = np.zeros(self.psi.shape, dtype = np.double)
+        final_psi[:self.n_modes] = f_pert_av
+
+        # Create the multiplicative matrices for the rest of the anharmonicity
+        n_mu = 0
+        if self.T > __EPSILON__:
+            n_mu = 1.0 / ( np.exp(self.w * 157887.32400374097 / self.T) - 1.0)
+        Y_w = 2 * self.w / (2 * n_mu + 1)
+        ReA_w = 2 * self.w * n_mu * (n_mu + 1) / (2*n_mu + 1)
+
+        # Get the perturbation on Y and Re A
+        pert_Y = np.einsum("ab, a ->ab", d2v_pert_av, Y_w)
+        pert_Y += np.einsum("ab, b -> ab", d2v_pert_av, Y_w)
+
+        pert_RA = np.einsum("ab, a ->ab", d2v_pert_av, ReA_w)
+        pert_RA += np.einsum("ab, b -> ab", d2v_pert_av, ReA_w)
+
+        # Now get the perturbation on the vector
+        current = self.n_modes
+        for i in range(self.n_modes):
+            final_psi[current : current + self.n_modes - i] = pert_Y[i, i:]
+            current = current + self.n_modes - i
+
+        # Now process the RA
+        for i in range(self.n_modes):
+            final_psi[current : current + self.n_modes - i] = pert_RA[i, i:]
+            current = current + self.n_modes - i
+
+        return final_psi
+
+
 
     def apply_L2(self):
         """
@@ -882,7 +908,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         return simple_output
 
-    def apply_full_L(self, target=None, force_t_0 = False, force_FT = False, transpose = False):
+    def apply_full_L(self, target=None, force_t_0 = False, force_FT = False, transpose = False, fast_lanczos = True):
         """
         APPLY THE L 
         ===========
@@ -904,6 +930,9 @@ This may be caused by the Lanczos initialized at the wrong temperature.
                 If True the finite temperature method is forced even if T = 0.
                 The results should be good, use it for testing.
                 NOTE: only one between force_t_0 and force_FT should be true
+            fast_lanczos : bool
+                If true this method applies the L2 and L3 using the self-consistent way.
+                This is much quicker, but needs to be tested
 
         """
 
@@ -932,16 +961,23 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         else:
             output = self.apply_L1_FT(transpose)
         t2 = timer()
-        if (force_t_0 or self.T < __EPSILON__) and not force_FT:
-            output += self.apply_L2()
+
+        # Apply the quck_lanczos
+        if fast_lanczos:
+            output += self.apply_anharmonic_FT()
+            t3 = timer()
+            t4 = t3
         else:
-            output += self.apply_L2_FT(transpose)
-        t3 = timer()
-        if (force_t_0 or self.T < __EPSILON__) and not force_FT:
-            output += self.apply_L3()
-        else:
-            output += self.apply_L3_FT(transpose)
-        t4 = timer()
+            if (force_t_0 or self.T < __EPSILON__) and not force_FT:
+                output += self.apply_L2()
+            else:
+                output += self.apply_L2_FT(transpose)
+            t3 = timer()
+            if (force_t_0 or self.T < __EPSILON__) and not force_FT:
+                output += self.apply_L3()
+            else:
+                output += self.apply_L3_FT(transpose)
+            t4 = timer()
 
         print("Time to apply L1: {}".format(t2 - t1))
         print("Time to apply L2: {}".format(t3-t2))
