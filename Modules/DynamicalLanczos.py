@@ -133,6 +133,11 @@ class Lanczos:
         self.initialized = False
         self.perturbation_modulus = 1
         self.q_vectors = None # The q vectors of each mode
+        self.dyn = None
+        self.uci_structure = None
+        self.super_structure = None
+        self.qe_sym = None
+        self.L_linop = None
 
         # Perform a bare initialization if the ensemble is not provided
         if ensemble is None:
@@ -255,7 +260,33 @@ class Lanczos:
         # fasten the convergence of low energy modes
         self.reverse_L = False
         self.shift_value = 0
-        self.symmetrize = False
+
+
+        # Setup the attribute control
+        self.__total_attributes__ = [item for item in self.__dict__.keys()]
+        self.fixed_attributes = True # This must be the last attribute to be setted
+
+
+    def __setattr__(self, name, value):
+        """
+        This method is used to set an attribute.
+        It will raise an exception if the attribute does not exists (with a suggestion of similar entries)
+        """
+        
+        if "fixed_attributes" in self.__dict__:
+            if name in self.__total_attributes__:
+                super(Lanczos, self).__setattr__(name, value)
+            elif self.fixed_attributes:
+                similar_objects = str( difflib.get_close_matches(name, self.__total_attributes__))
+                ERROR_MSG = """
+        Error, the attribute '{}' is not a member of '{}'.
+        Suggested similar attributes: {} ?
+        """.format(name, type(self).__name__,  similar_objects)
+
+                raise AttributeError(ERROR_MSG)
+        else:
+            super(Lanczos, self).__setattr__(name, value)
+        
 
 
     def reset(self):
@@ -765,11 +796,13 @@ This may be caused by the Lanczos initialized at the wrong temperature.
             transpose : bool
                 If True, the transpose of L is computed.
         """
+        #print("Starting with psi:", self.psi)
 
         Y1 = self.get_Y1()
         R1 = self.psi[: self.n_modes]
 
         weights = np.zeros(self.N, dtype = np.double)
+
 
         # Create the multiplicative matrices for the rest of the anharmonicity
         n_mu = 0
@@ -784,12 +817,12 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
             # The equation is
             # Y^(1)_new = 2 Ya Yb^2 Y^(1) + 2 Yb Ya^2 Y^(1)
-            coeff_Y = np.einsum("a, b, b- > ab", Y_w, Y_w, Y_w)
-            coeff_Y += np.einsum("a, a, b- > ab", Y_w, Y_w, Y_w)
+            coeff_Y = np.einsum("a, b, b -> ab", Y_w, Y_w, Y_w)
+            coeff_Y += np.einsum("a, a, b -> ab", Y_w, Y_w, Y_w)
             coeff_Y *= 2
 
-            coeff_RA = np.einsum("a, b, b- > ab", Y_w, ReA_w, Y_w)
-            coeff_RA += np.einsum("a, a, b- > ab", Y_w, ReA_w, Y_w)
+            coeff_RA = np.einsum("a, b, b -> ab", Y_w, ReA_w, Y_w)
+            coeff_RA += np.einsum("a, a, b -> ab", Y_w, ReA_w, Y_w)
             coeff_RA += 2
 
             # Get the new perturbation
@@ -799,16 +832,30 @@ This may be caused by the Lanczos initialized at the wrong temperature.
             Y1 = Y1_new
 
 
+        #print("X:", self.X)
+        #print("w:", self.w)
+        #print ("R1:", R1)
+        #print("Y1:", Y1)
+        #print("T:", self.T)
+
 
         # Get the weights of the perturbation (psi vector)
         sscha_HP_odd.GetWeights(self.X, self.w, R1, Y1, self.T, weights)
+
+        #print("Weights:", weights)
 
         # Get the averages on the perturbed ensemble
         w_is = np.tile(self.rho, (self.n_modes, 1)).T
         w_1 = np.tile(weights, (self.n_modes, 1)).T
 
+        #print("rho shape:", np.shape(self.rho))
+        #print("Shape w_is:", np.shape(w_is))
+
         # The force average
-        f_pert_av = np.sum(self.Y * w_is * w_1, axis = 0) / self.N_eff
+        avg_numbers = self.Y * w_is *  w_1 #np.einsum("ia, i, i -> ia", self.Y, w_is, w_1)
+        #print("Shape Y:", np.shape(avg_numbers))
+        f_pert_av = np.sum(avg_numbers, axis = 0) / self.N_eff
+        #print("Shape F:", np.shape(f_pert_av))
 
         d2v_pert_av = np.zeros((self.n_modes, self.n_modes), dtype = np.double, order = "C")
         sscha_HP_odd.Get_D2DR2_PertV(self.X, self.Y, self.w, self.rho, weights, self.T, d2v_pert_av)
@@ -841,6 +888,8 @@ This may be caused by the Lanczos initialized at the wrong temperature.
             final_psi[current : current + self.n_modes - i] = pert_RA[i, i:]
             current = current + self.n_modes - i
 
+
+        #print("Output:", final_psi)
         return final_psi
 
 
@@ -2294,6 +2343,16 @@ Max number of iterations: {}
 
             # Get the a coefficient
             a_coeff = psi_p.dot(L_q)
+
+            # Check if something whent wrong
+            if np.isnan(a_coeff):
+                ERR_MSG = """
+Invalid value encountered during the Lanczos.
+Check if you have correctly initialized the algorithm.
+This may happen if the SCHA matrix has imaginary or zero frequencies,
+or if the acoustic sum rule is not satisfied.
+"""
+                raise ValueError(ERR_MSG)    
 
             # Get the two residual vectors
             rk = L_q - a_coeff * psi_q 

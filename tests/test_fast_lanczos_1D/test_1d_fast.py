@@ -4,10 +4,16 @@ from __future__ import division
 import sscha, sscha.DynamicalLanczos
 import numpy as np
 
+import scipy
+import scipy.optimize
+
+
+import matplotlib.pyplot as plt
+
 def sscha_1d(func, x, m = 1, return_res = False):
     # Get the sscha value
     #_xreal_ = random.normal(0, 1, size = 5000)
-    _xreal_ = linspace(-5, 5, 10000)
+    _xreal_ = np.linspace(-5, 5, 10000)
     def complete_sscha(phi):
         if phi < 0:
             return 1000000 + phi**2
@@ -16,7 +22,7 @@ def sscha_1d(func, x, m = 1, return_res = False):
         dx_ = _x_[1]- _x_[0]
         
         #pot_energy = sum(func(_x_)) / 5000
-        pot_energy = sum( func(_x_) * exp(-(_x_ - x)**2 / (2*phi**2))) *dx_ / sqrt(2*pi*phi**2)
+        pot_energy = np.sum( func(_x_) * np.exp(-(_x_ - x)**2 / (2*phi**2))) *dx_ / np.sqrt(2*np.pi*phi**2)
         
         return kin_energy + pot_energy
     
@@ -28,13 +34,13 @@ def sscha_1d(func, x, m = 1, return_res = False):
     return  complete_sscha(res.x[0])
 
 def sscha_rho(_x_, x0, phi0):
-    return exp(-(_x_ - x0)**2 / (2*phi0**2))/ sqrt(2*pi*phi0**2)
+    return np.exp(-(_x_ - x0)**2 / (2*phi0**2))/ np.sqrt(2*np.pi*phi0**2)
 
 def sscha_w(m, phi0):
     return 1 / (2*m * phi0**2)
 
 def sscha_full(func, x0 = 1, phi0 = 1, m = 1):
-    _xreal_ = linspace(-5, 5, 10000)
+    _xreal_ = np.linspace(-5, 5, 10000)
     def complete_sscha(params):
         x, phi = params
         if phi < 0:
@@ -45,7 +51,7 @@ def sscha_full(func, x0 = 1, phi0 = 1, m = 1):
         
         #pot_energy = sum(func(_x_)) / 5000
         rho = sscha_rho(_x_, x, phi)
-        pot_energy = sum( func(_x_) * rho) * dx_
+        pot_energy = np.sum( func(_x_) * rho) * dx_
         
         return kin_energy + pot_energy
     
@@ -178,7 +184,7 @@ def DynamicalSSCHA(func,w_array, x0, phi0, _x_, full_spectral = False, m = 1, sm
     
 
 
-def test_lanczos_1d():
+def test_lanczos_1d(plot = False):
     """
     This is the proper testing function.
     Here we are going to apply the SSCHA in the one dimensional BO energy landscape.
@@ -195,10 +201,11 @@ def test_lanczos_1d():
     # Initialize the lanczos algorithm
     lanc = sscha.DynamicalLanczos.Lanczos()
 
-
     # Initliaize the lanczos from a 1D problem
-    lanc.w = np.zeros([1], dtype = np.double)
+    lanc.w = np.zeros(1, dtype = np.double)
     lanc.w[0] = w
+    lanc.n_modes = 1
+    lanc.pols = np.ones((1,1), dtype = np.double)
     lanc.m = np.array([np.double(1)])
 
     # get the N random configuration
@@ -206,13 +213,42 @@ def test_lanczos_1d():
     N_RANDOM = 1000
     u_ensemble = np.double(np.random.normal(x_c, phi, size = (N_RANDOM, 1)))
     f = bo_force(u_ensemble) - sscha_force(u_ensemble, x_c, phi, m = 1)
-    lanc.rho = np.ones(u_ensemble.shape, dtype = np.double)
+    lanc.rho = np.ones(N_RANDOM, dtype = np.double)
     lanc.N = N_RANDOM
+    lanc.N_eff = N_RANDOM
     lanc.X = u_ensemble
     lanc.Y = f
-
+    lanc.psi = np.zeros(3, dtype = np.double)
 
     # Set the temperature
     lanc.T = 0
 
-    
+    # Prepare the 1D phonon green function
+    lanc.prepare_perturbation(np.ones(1, dtype = np.double), masses_exp = 0)
+
+    # Fake the algorithm with a false initialization
+    lanc.initialized = True
+
+     # Prepare the L as a linear operator (Prepare the possibility to transpose the matrix)
+    def L_transp(psi):
+        return lanc.apply_full_L(psi, transpose= True, force_FT = True)
+    def L_direct(psi):
+        return lanc.apply_full_L(psi, transpose= False, force_FT = True)
+    lanc.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(lanc.psi), len(lanc.psi)), matvec = L_direct, rmatvec = L_transp, dtype = np.double)
+
+
+    # Compute the Lanczos algorithm (biconjugate)
+    lanc.run_FT(10)
+
+    # Get the green function
+    w_array = np.linspace(0, 10, 1000)
+    gf = lanc.get_green_function_continued_fraction(w_array, smearing = 0.1, use_terminator = False)
+
+    if plot:
+        plt.plot(w_array, -np.imag(gf))
+        plt.tight_layout()
+        plt.show()
+
+
+if __name__ == "__main__":
+    test_lanczos_1d(plot = True)
