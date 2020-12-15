@@ -729,19 +729,76 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         return  Y1
 
 
-    def apply_anharmonic_FT(self):
+    def get_ReA1(self):
+        """
+        Get the perturbation on the ReA matrix from the psi vector
+        """
+        start_A = self.n_modes +  (self.n_modes * (self.n_modes + 1)) // 2
+
+        ReA_all = self.psi[start_A:]
+
+        ReA1 = np.zeros( (self.n_modes, self.n_modes), dtype = np.double)
+        start = 0
+        next = self.n_modes
+        for i in range(self.n_modes):
+            ReA1[i, i:] = ReA_all[start : next]
+            start = next 
+            next = start + self.n_modes - i - 1 
+
+            # Fill symmetric
+            ReA1[i, :i] = ReA1[:i, i]
+
+        return  ReA1
+
+
+    def apply_anharmonic_FT(self, transpose = False):
         """
         APPLY ANHARMONIC EVOLUTION
         ==========================
 
         This term involves the anharmonic evolution:
-        This calculates self-consistently the evolution from the vector
+        This calculates self-consistently the evolution from the vector.
+
+
+        Parameters
+        ----------
+            transpose : bool
+                If True, the transpose of L is computed.
         """
 
         Y1 = self.get_Y1()
         R1 = self.psi[: self.n_modes]
 
         weights = np.zeros(self.N, dtype = np.double)
+
+        # Create the multiplicative matrices for the rest of the anharmonicity
+        n_mu = 0
+        if self.T > __EPSILON__:
+            n_mu = 1.0 / ( np.exp(self.w * 157887.32400374097 / self.T) - 1.0)
+        Y_w = 2 * self.w / (2 * n_mu + 1)
+        ReA_w = 2 * self.w * n_mu * (n_mu + 1) / (2*n_mu + 1)
+
+        # Check if we must compute the transpose
+        if transpose:
+            ReA1 = self.get_ReA1()
+
+            # The equation is
+            # Y^(1)_new = 2 Ya Yb^2 Y^(1) + 2 Yb Ya^2 Y^(1)
+            coeff_Y = np.einsum("a, b, b- > ab", Y_w, Y_w, Y_w)
+            coeff_Y += np.einsum("a, a, b- > ab", Y_w, Y_w, Y_w)
+            coeff_Y *= 2
+
+            coeff_RA = np.einsum("a, b, b- > ab", Y_w, ReA_w, Y_w)
+            coeff_RA += np.einsum("a, a, b- > ab", Y_w, ReA_w, Y_w)
+            coeff_RA += 2
+
+            # Get the new perturbation
+            Y1_new = Y1 * coeff_Y + ReA1 * coeff_RA
+
+            # Override the old perturbation
+            Y1 = Y1_new
+
+
 
         # Get the weights of the perturbation (psi vector)
         sscha_HP_odd.GetWeights(self.X, self.w, R1, Y1, self.T, weights)
@@ -761,19 +818,17 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         final_psi = np.zeros(self.psi.shape, dtype = np.double)
         final_psi[:self.n_modes] = f_pert_av
 
-        # Create the multiplicative matrices for the rest of the anharmonicity
-        n_mu = 0
-        if self.T > __EPSILON__:
-            n_mu = 1.0 / ( np.exp(self.w * 157887.32400374097 / self.T) - 1.0)
-        Y_w = 2 * self.w / (2 * n_mu + 1)
-        ReA_w = 2 * self.w * n_mu * (n_mu + 1) / (2*n_mu + 1)
+        if not transpose:
+            # Get the perturbation on Y and Re A
+            pert_Y = np.einsum("ab, a ->ab", d2v_pert_av, Y_w)
+            pert_Y += np.einsum("ab, b -> ab", d2v_pert_av, Y_w)
 
-        # Get the perturbation on Y and Re A
-        pert_Y = np.einsum("ab, a ->ab", d2v_pert_av, Y_w)
-        pert_Y += np.einsum("ab, b -> ab", d2v_pert_av, Y_w)
-
-        pert_RA = np.einsum("ab, a ->ab", d2v_pert_av, ReA_w)
-        pert_RA += np.einsum("ab, b -> ab", d2v_pert_av, ReA_w)
+            pert_RA = np.einsum("ab, a ->ab", d2v_pert_av, ReA_w)
+            pert_RA += np.einsum("ab, b -> ab", d2v_pert_av, ReA_w)
+        else:
+            Y_inv = 1 / Y_w
+            pert_Y = 0.5 * np.einsum("a, ab, b -> ab", Y_inv, d2v_pert_av, Y_inv)
+            pert_RA = np.zeros(pert_Y.shape, dtype = np.double)
 
         # Now get the perturbation on the vector
         current = self.n_modes
@@ -964,7 +1019,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         # Apply the quck_lanczos
         if fast_lanczos:
-            output += self.apply_anharmonic_FT()
+            output += self.apply_anharmonic_FT(transpose)
             t3 = timer()
             t4 = t3
         else:
