@@ -10,6 +10,8 @@ import scipy.optimize
 
 import matplotlib.pyplot as plt
 
+
+
 def sscha_1d(func, x, m = 1, return_res = False):
     # Get the sscha value
     #_xreal_ = random.normal(0, 1, size = 5000)
@@ -211,8 +213,9 @@ def test_lanczos_1d(plot = False):
     # get the N random configuration
     # for the Lanczos application
     N_RANDOM = 1000
-    u_ensemble = np.double(np.random.normal(x_c, phi, size = (N_RANDOM, 1)))
-    f = bo_force(u_ensemble) - sscha_force(u_ensemble, x_c, phi, m = 1)
+    x_ensemble = np.double(np.random.normal(x_c, phi, size = (N_RANDOM, 1)))
+    f = bo_force(x_ensemble) - sscha_force(x_ensemble, x_c, phi, m = 1)
+    u_ensemble = x_ensemble - x_c
     lanc.rho = np.ones(N_RANDOM, dtype = np.double)
     lanc.N = N_RANDOM
     lanc.N_eff = N_RANDOM

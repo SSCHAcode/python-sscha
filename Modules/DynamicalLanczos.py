@@ -782,7 +782,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         return  ReA1
 
 
-    def apply_anharmonic_FT(self, transpose = False):
+    def apply_anharmonic_FT(self, transpose = False, test_weights = True):
         """
         APPLY ANHARMONIC EVOLUTION
         ==========================
@@ -795,6 +795,9 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         ----------
             transpose : bool
                 If True, the transpose of L is computed.
+            test_weights : bool
+                If True, the weights are tested against those computed with finite differences
+                It is time consuming, activate only for debugging
         """
         #print("Starting with psi:", self.psi)
 
@@ -841,6 +844,25 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         # Get the weights of the perturbation (psi vector)
         sscha_HP_odd.GetWeights(self.X, self.w, R1, Y1, self.T, weights)
+
+        if test_weights:
+            other_weights = get_weights_finite_differences(self.X, self.w, self.T, R1, Y1)
+
+            # Compare the weights
+            disp = np.max(np.abs(weights - other_weights))
+
+            if disp >= 1e-3:
+                print("Displacements:")
+                print(self.X)
+
+                print("Weights with C:")
+                print(weights)
+
+                print()
+                print("Weights by finite differences:")
+                print(other_weights)
+
+            assert disp < 1e-3, "Error, the weights computed with the C did not pass the test"
 
         #print("Weights:", weights)
 
@@ -3227,3 +3249,72 @@ def symmetrize_d3_muspace(d3, symmetries):
     
     new_d3 /= N_sym
     return new_d3
+
+
+def get_weights_finite_differences(u_tilde, w, T, R1, Y1):
+    """
+    Computes the weights of the configurations using a finite difference
+    approach.
+    This is time consuiming, use it for testing purpouses.
+
+    Parameters
+    ----------
+        u_tilde : ndarray(size = (N_random, n_modes))
+            The displacement in the polarization space (mass rescaled)
+        w : ndarray(n_modes)
+            the SCHA frequencies
+        T : float
+            Temperature
+        R1 : ndarray(size = n_modes)
+            The perturbation on the centroid positions
+        Y1 : ndarray(size = (n_modes, n_modes), symmetric)
+            The perturbation on the Y matrix
+
+    Returns
+    -------
+        weights : ndarray(size = N_random)
+            The weights that correspond to this perturbation
+    """
+    n_conf, n_modes = u_tilde.shape
+
+    # get the Y matrix
+    Y_mu = 2 * w 
+
+    if T > __EPSILON__:
+        n = 1. / ( np.exp(w * 157887.32400374097 / T) - 1)
+        Y_mu /= (2 * n + 1)
+
+    Y = np.diag(Y_mu) 
+
+    lambda_small = 1e-5
+
+    #print("DISP R:", R1)
+    #print("DISP Y:", Y1)
+
+    new_Y = Y + Y1 * lambda_small
+    new_u_tilde = u_tilde - np.tile(R1 * lambda_small, (n_conf, 1))
+
+    # Get the weights before and after the perturbation
+    w_old = np.zeros(n_conf, dtype = np.double) 
+    w_new = np.zeros(n_conf, dtype = np.double) 
+
+    for i in range(n_conf):
+        w_old[i] = np.exp(-.5 * u_tilde[i, :].dot(Y.dot(u_tilde[i, :])))
+        w_new[i] = np.exp(-.5 * new_u_tilde[i, :].dot(new_Y.dot(new_u_tilde[i, :])))
+        
+    w_old *= np.sqrt(np.linalg.det(Y / (2 * np.pi))) 
+    w_new *= np.sqrt(np.linalg.det(new_Y / (2 * np.pi)))
+
+    # Test normalization
+    #print("Normalization old:", np.sum(w_old) / n_conf)
+    #print("Normalization new:", np.sum(w_new) / n_conf)
+
+    xc = np.sum(u_tilde) / n_conf
+    #print("Avg:", xc)
+    Y_num = np.sum( (u_tilde - xc)**2) / n_conf
+    #print("Y from ens:", Y_num, " (from w = {})".format(np.linalg.inv(Y)))
+
+    # Get the derivative with respect to the parameter
+    weights = (w_new/w_old - 1) / lambda_small
+
+    return weights
