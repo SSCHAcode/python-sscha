@@ -234,10 +234,13 @@ class ModeProjection:
         self.nq = len(dyn.q_tot)
 
         # Get the polarization vectors for each q point
-        self.pols = np.zeros( (3*self.nat, self.nmodes, self.nq), dtype = np.complex128)
+        self.pols = np.zeros( (3*self.nat, self.nmodes, self.nq), dtype = np.complex128, order = "F")
         for iq in range(self.nq):
             w, p = dyn.DyagDinQ(iq)
             self.pols[:, :, iq] = p 
+
+            # Check normalization of p
+            assert np.max(np.abs(np.conj(p.T).dot(p) - np.eye(self.nmodes))) < 1e-6, "Error, for some reason vectors are not normalized"
 
         self.masses = dyn.structure.get_masses_array()
         
@@ -246,6 +249,12 @@ class ModeProjection:
         self.projector = np.zeros( (self.nq, 3*self.nat, 3*self.nat), dtype = np.complex128)
         self.projectorH = np.zeros( (self.nq, 3*self.nat, 3*self.nat), dtype = np.complex128)
         self.proj_vec = np.zeros( (3*self.nat, 3*self.nat), dtype = np.float64)
+
+        self.mu_start = 0#index_mode_start 
+        self.mu_end = 0#index_mode_end
+
+
+        self.testing = False
 
         self.initialized = False
 
@@ -261,6 +270,9 @@ class ModeProjection:
         """
         self.initialized = True
 
+        self.mu_start = index_mode_start 
+        self.mu_end = index_mode_end
+
         # Generate the array for the masses aligned as the polarization vector
         _m_ = np.tile(self.masses, (3, 1)).ravel(order = "F")
         _msq_ = np.sqrt(_m_)
@@ -268,15 +280,15 @@ class ModeProjection:
         # Setup the projector on the dynamical matrix
         for iq in range(self.nq):
             for mu in range(index_mode_start, index_mode_end):
-                pvec = self.pols[:, mu, iq]
-                pvec /= pvec.dot(pvec) # Normalization
+                pvec = self.pols[:, mu, iq].copy()
+                #pvec /= pvec.dot(pvec) # Normalization
                 self.projector[iq, :, :] += np.outer(pvec / _msq_, np.conj(pvec) * _msq_ )
                 self.projectorH[iq, :, :] += np.outer(pvec*_msq_, np.conj(pvec) / _msq_)
                 
         # Prepare the projector on the structure
         for mu in range(index_mode_start, index_mode_end):
             pvec = np.real(self.pols[:, mu, 0])
-            pvec /= pvec.dot(pvec)
+            #pvec /= pvec.dot(pvec)
             self.proj_vec[:,:] += np.outer(pvec, pvec)
                 
 
@@ -302,10 +314,42 @@ class ModeProjection:
         struct_grad_new = self.proj_vec.dot(struct_grad.ravel())
         struct_grad = struct_grad_new.reshape((self.nat, 3))
 
+        _m_ = np.tile(self.masses, (3, 1)).T.ravel()
+
         # Do the same for the matrix
         for iq in range(self.nq):
+
+            # remove the masses from the gradient
+            grad_nomass = dyn_grad[iq, :, :] / np.sqrt( np.outer(_m_, _m_))
+
+            # Transfer in polarization space
+            grad_polbasis = np.conj(self.pols[:,:, iq]).T.dot( grad_nomass.dot(self.pols[:,:,iq]))
+
+            # Fix the modes
+            projected_grad = np.zeros(grad_polbasis.shape, dtype = np.complex128)
+            #print("MU START:", self.mu_start, "MU END:", self.mu_end)
+            projected_grad[self.mu_start:self.mu_end, self.mu_start:self.mu_end] = grad_polbasis[self.mu_start:self.mu_end, self.mu_start:self.mu_end] 
+
+            # Go back in cartesian coordinates
+            projected_grad_cart = self.pols[:,:, iq].dot(projected_grad.dot(np.conj(self.pols[:,:,iq]).T))
+
+            # Put the masses again and overwrite the gradient
+            new_dyngrad = projected_grad_cart * np.sqrt( np.outer(_m_, _m_))
+
+            # Check if the grad increased 
+            if self.testing:
+                norm_old = np.sum(np.abs(dyn_grad[iq, :, :])**2)
+                norm_new = np.sum(np.abs(new_dyngrad)**2) 
+
+                if norm_new > norm_old:
+                    print("Error on q = {}".format(iq))
+                    print("Old norm: {} | New norm: {}".format(norm_old, norm_new)) 
+                
+                assert norm_new < norm_old
+
+            dyn_grad[iq, :, :] = new_dyngrad
                     
-            dyn_grad[iq, :, :] = self.projectorH[iq, :, :].dot(dyn_grad[iq, :, :].dot(self.projector[iq, :, :]))
+            #dyn_grad[iq, :, :] = self.projectorH[iq, :, :].dot(dyn_grad[iq, :, :].dot(self.projector[iq, :, :]))
             # Lets check if the matrix satisfy the sum rule
             #print "DIAG:", np.linalg.eigvalsh(dyn_grad[iq, :, :])
             

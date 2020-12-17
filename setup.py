@@ -93,7 +93,7 @@ setup( name = "python-sscha",
        package_dir = {"sscha": "Modules"},
        install_requires = ["numpy", "ase", "scipy", "cellconstructor", "lapack", "blas"],
        ext_modules = [SCHAModules, odd_HP],
-       scripts = ["scripts/sscha", "scripts/cluster_check.x", "scripts/plot_frequencies.pyx",
+       scripts = ["scripts/sscha", "scripts/cluster_check.x", "scripts/plot_frequencies.py",
                   "scripts/static-vc-relax.pyx", "scripts/read_incomplete_ensemble.py",
                   "scripts/plot_lanczos_convergence.py"],
        license = "GPLv3"

@@ -41,8 +41,9 @@ def test_lock_the_modes():
 
     # Here we setup the constraint
     mode_cons = sscha.Utilities.ModeProjection(dyn)
-    mode_cons.SetupFreeModes(dyn.structure.N_atoms - N_VIBRONS,
-                             dyn.structure.N_atoms)
+    mode_cons.testing = True # In this way, we turn on testing condition when applying the constrains, this may help spotting problems
+    mode_cons.SetupFreeModes(3*dyn.structure.N_atoms - N_VIBRONS,
+                             3*dyn.structure.N_atoms)
 
     # We setup also an I/O utility to save the frequencies as a function of the minimization.
     # In this way we are able to see if it is minimizing only the selected vibrons

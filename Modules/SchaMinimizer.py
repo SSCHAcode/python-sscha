@@ -241,7 +241,7 @@ class SSCHA_Minimizer(object):
             super(SSCHA_Minimizer, self).__setattr__(name, value)
         
         
-    def set_ensemble(ensemble):
+    def set_ensemble(self, ensemble):
         """Provide an ensemble to the minimizer object"""
 
         self.ensemble = ensemble 
