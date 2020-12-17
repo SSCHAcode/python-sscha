@@ -93,6 +93,40 @@ The code stops saying it has found imaginary frequencies, how do I fix it?
     The optimal step size for the root_representation may be different than the other one.
      
 
+How do I plot the frequencies of the dynamical matrix during the optimization?
+    :raw-html:`<br />`
+    To check if the SSCHA is converging, you should plot the dynamical matrix's frequencies during the minimization.
+    In particular, you should look if, between different populations, the evolution of each frequency is consistent. If it seems that frequencies are evolving randomly from a population to the next one, you should increase the number of configurations, otherwise, you can keep the number fixed.
+
+    The code can print the frequencies at each step.
+    If you run the code with an input script, you should provide in the &utils tag the filename for the frequencies:
+
+    .. code-block:: fortran
+       &utils
+           save_frequencies = "freqs.dat"
+       &utils
+
+    You can use the same function from the python script by calling a custom function that saves the frequencies after each optimization step. The Utilities module of the SSCHA offers this function:
+
+    .. code-block:: python
+		    
+       IO_freq = sscha.Utilities.IOInfo()
+       IO_freq.SetupSaving("freqs.dat")
+
+       # Initialize the minimizer as minim [...]
+       minim.run(custom_function_post = IO_freq.CFP_SaveFrequencies)
+
+    The code here is providing the SSCHA code a function (IO_freq.CFP_SaveFrequencies) that is called after each minimization step. This function saves all the frequencies of the current dynamical matrix in the file specified by IO_freq.SetupSaving("freqs.dat").
+
+    To plot the results, the SSCHA offers an executable script, installed together with the code. Just run:
+
+    .. code-block:: console
+
+       plot_frequencies.py freqs.dat
+
+    And the code will plot all the frequencies. You can also pass more than one file. In this case, the frequencies are concatenated.Plotting the frequencies of the dynamical matrix is a very good way to check if the algorithm is converging correctly.
+
+
     
 Why the gradient sometimes increases during a minimization?
     :raw-html:`<br />`
@@ -102,6 +136,9 @@ Why the gradient sometimes increases during a minimization?
 
     In any case, what must decrease is free energy. If you see that the gradient is increasing but the free energy decreases, then the minimization is correct. However, if both the gradient and free energy are increasing, something is wrong. This could be due to a step size too big, then try to reduce the value of **lambda_a** and **lambda_w** (in the input file) or **min_step_dyn** and **min_step_struc** (in the python script). It could also be due to a wasted ensemble, in this case, check the value of the Kong-Liu effective sample size, if it is below or around 0.5, then try to increase the threshold at which stop the calculation, **kong_liu_ratio** (in the python script) or **N_random_eff** (in the input file), or increase the number of configurations for the next population.
 
+
+    
+    
 
 The gradients on my simulations are increasing a lot, why is this happening?
     :raw-html:`<br />`
