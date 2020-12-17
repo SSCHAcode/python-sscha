@@ -45,11 +45,11 @@ import SCHAModules
 import sscha_HP_odd
 
 _SSCHA_ODD_ = False 
-try:
-    import sscha_HP_odd
-    _SSCHA_ODD_ = True
-except:
-    _SSCHA_ODD_ = False 
+#try:
+#    import sscha_HP_odd
+#    _SSCHA_ODD_ = True
+#except:
+#    _SSCHA_ODD_ = False 
 
 
 # Try to load the parallel library if any

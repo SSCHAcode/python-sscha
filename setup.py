@@ -9,6 +9,9 @@ extra_link_args_c = ["-fopenmp"]
 mpi_compile_args = []
 mpi_link_args = []
 
+# If true, do not check for parallel
+avoid_parallel_test = True 
+
 # Get the MPI from environmental variables
 parallel = False 
 if "MPICC" in  os.environ:
@@ -74,12 +77,12 @@ SCHAModules = Extension(name = "SCHAModules",
 
 
 # Setup the HP performance module
-odd_HP = Extension(name = "sscha_HP_odd",
-                   sources= ["CModules/odd_corr_module.c", "CModules/LanczosFunctions.c"],
-                   include_dirs=[numpy.get_include()],
-                   extra_compile_args= extra_flags_c + mpi_compile_args,
-                   extra_link_args = mpi_link_args + extra_link_args_c
-                   )
+#odd_HP = Extension(name = "sscha_HP_odd",
+#                   sources= ["CModules/odd_corr_module.c", "CModules/LanczosFunctions.c"],
+#                   include_dirs=[numpy.get_include()],
+#                   extra_compile_args= extra_flags_c + mpi_compile_args,
+#                   extra_link_args = mpi_link_args + extra_link_args_c
+#                   )
 
 
 
@@ -92,14 +95,14 @@ setup( name = "python-sscha",
        packages = ["sscha"],
        package_dir = {"sscha": "Modules"},
        install_requires = ["numpy", "ase", "scipy", "cellconstructor", "lapack", "blas"],
-       ext_modules = [SCHAModules, odd_HP],
+       ext_modules = [SCHAModules], # odd_HP
        scripts = ["scripts/sscha", "scripts/cluster_check.x", "scripts/plot_frequencies.py",
                   "scripts/static-vc-relax.pyx", "scripts/read_incomplete_ensemble.py",
                   "scripts/plot_lanczos_convergence.py"],
        license = "GPLv3"
        )
                                                                                                                                                           
-if not python_parallel and not parallel:                                                                                                                      
+if not python_parallel and not parallel and not avoid_parallel_test:                                                                                                                      
         print()                                                                                                                                               
         print("======= WARNING =======")                                                                                                                      
         print("Nor python parallel neither MPI compiler found.")                                                                                              
@@ -110,7 +113,7 @@ if not python_parallel and not parallel:
         print("Note: clean the build directory if you whish to recompile the code.")                                                                          
         print("=======================")                                                                                                                      
         print()                                                                                                                                               
-elif not parallel:
+elif not parallel and not avoid_parallel_test:
         print()
         print("======= WARNING =======")
         print("No MPI compiler found, please specify MPICC environmental variable")
@@ -119,7 +122,7 @@ elif not parallel:
         print("Note: clean the build directory if you whish to recompile the code.")
         print("=======================")
         print()
-elif not python_parallel:
+elif not python_parallel and not avoid_parallel_test:
         print()
         print("======= WARNING =======")
         print("No Python MPI library found")
@@ -132,7 +135,7 @@ elif not python_parallel:
         print("      (No need to reinstall python-sscha)")
         print("=======================")
         print()
-else:
+elif not avoid_parallel_test:
         print()
         print(" PARALLEL ENVIRONMENT DETECTED CORRECTLY ")
         print()
