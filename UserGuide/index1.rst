@@ -14,6 +14,7 @@ PYTHON-SSCHA USER GUIDE
    intro
    install
    start
+   advanced
    faq
    apireference
 
