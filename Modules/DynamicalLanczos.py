@@ -848,10 +848,19 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         if test_weights:
             other_weights = get_weights_finite_differences(self.X, self.w, self.T, R1, Y1)
 
-            # Compare the weights
-            disp = np.max(np.abs(weights - other_weights))
+            # There is a constant factor that should come from the normalization
+            # But this does not depend on the configuration
+            shift = weights - other_weights 
 
-            if disp >= 1e-3:
+            # Remove the constant shift coming from renormalization
+            # 1/2 Tr (Y^-1 * Y^{(1)})
+            shift -= shift[0] 
+
+            # Compare the weights
+            disp = np.max(np.abs(shift))
+            dispersion = np.std(weights)
+
+            if disp / dispersion >= 1e-3:
                 print("Displacements:")
                 print(self.X)
 
@@ -862,7 +871,23 @@ This may be caused by the Lanczos initialized at the wrong temperature.
                 print("Weights by finite differences:")
                 print(other_weights)
 
-            assert disp < 1e-3, "Error, the weights computed with the C did not pass the test"
+                print()
+                print("Shifts:")
+                print(weights - other_weights)
+                
+                print()
+                print("Discrepancies (max = {}):".format(np.max(np.abs(shift))))
+                i_value = np.argmax(np.abs(shift))
+                print(shift)
+                print("I value of max: {}".format(i_value))
+
+                print("")
+                print("sigma = {}".format(dispersion))
+                print("Weights[{}] = {}".format(i_value, weights[i_value]))
+                print("OtherWeights[{}] = {}".format(i_value, other_weights[i_value]))
+
+
+            assert disp / dispersion < 1e-3, "Error, the weights computed with the C did not pass the test"
 
         #print("Weights:", weights)
 
@@ -877,10 +902,19 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         avg_numbers = self.Y * w_is *  w_1 #np.einsum("ia, i, i -> ia", self.Y, w_is, w_1)
         #print("Shape Y:", np.shape(avg_numbers))
         f_pert_av = np.sum(avg_numbers, axis = 0) / self.N_eff
+
+
         #print("Shape F:", np.shape(f_pert_av))
 
         d2v_pert_av = np.zeros((self.n_modes, self.n_modes), dtype = np.double, order = "C")
         sscha_HP_odd.Get_D2DR2_PertV(self.X, self.Y, self.w, self.rho, weights, self.T, d2v_pert_av)
+
+
+        print("Perturbation:")
+        print(self.psi)
+        print("<f> pert = {}".format(f_pert_av))
+        print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
+        print()
 
 
         # Get the final vector
@@ -3286,7 +3320,7 @@ def get_weights_finite_differences(u_tilde, w, T, R1, Y1):
 
     Y = np.diag(Y_mu) 
 
-    lambda_small = 1e-5
+    lambda_small = 1e-7
 
     #print("DISP R:", R1)
     #print("DISP Y:", Y1)

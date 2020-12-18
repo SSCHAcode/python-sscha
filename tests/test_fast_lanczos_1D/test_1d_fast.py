@@ -75,7 +75,65 @@ def bo_func(x):
 
 def bo_force(x):
     new_x = x
-    return 12*new_x**3 - 6*new_x + 3 / 2. * new_x**2
+    f = 12*new_x**3 - 6*new_x + 3 / 2. * new_x**2
+    return -f
+
+def bo_curvature(x):
+    new_x = x
+    return 36*new_x**2 - 6 + 3 * new_x
+
+
+def get_pert_force_potential(x0, phi0, pert_x0, pert_Y):
+    """
+    Compute numerically the derivative of the average force and curvature of the BO
+    by applying finite differences.
+    """
+    _x_ = np.linspace(-10, 10, 10000)
+    dx = _x_[1] - _x_[0]
+
+    PHI  = sscha_w(1, phi0) ** 2
+
+    f_av = np.sum( (bo_force(_x_) - sscha_force(_x_, x0, phi0))  * sscha_rho(_x_, x0, phi0)) * dx
+    c_av = np.sum( (bo_curvature(_x_) - PHI) * sscha_rho(_x_, x0, phi0)) * dx
+
+    dphi = -phi0**3 * pert_Y / 2
+
+    delta = 0.001
+
+    # Check if the force both are zero?
+    print("SSCHA GRADIENTS:")
+    print("<f> = {}".format(f_av))
+    print("<d^2v/dr^2 - Phi> = {}".format(c_av))
+
+    new_x0 = x0 + pert_x0 * delta
+    new_phi = phi0 + dphi * delta
+    PHI_new =  sscha_w(1, new_phi)**2
+
+    f_av_new = np.sum( (bo_force(_x_) - sscha_force(_x_, x0, phi0)) * sscha_rho(_x_, new_x0, new_phi)) * dx
+    c_av_new = np.sum( (bo_curvature(_x_) - PHI) * sscha_rho(_x_, new_x0, new_phi)) * dx
+
+
+    # Get the derivative 
+    new_f = (f_av_new - f_av) / delta   
+    new_curv = (c_av_new - c_av) / delta
+
+
+    # Recompute everything with a monte carlo algorithm
+    N = 50000
+    random_x = np.random.normal(loc = x0, scale = phi0, size = N)
+    weights = (sscha_rho(random_x, new_x0, new_phi) / sscha_rho(random_x, x0, phi0) - 1) / delta 
+    f_pert_new  = np.sum(weights * (bo_force(random_x) - sscha_force(random_x, x0, phi0))) / N
+    f_pert_new_noscha  = np.sum(weights * (bo_force(random_x))) / N
+    c_pert_new  = np.sum(weights * (bo_curvature(random_x) - PHI))/ N 
+
+    print("With monte carlo we get:")
+    print("<f> pert = {}".format(f_pert_new))
+    print("<f> pert = {} | noscha".format(f_pert_new_noscha))
+    print("<d2v/dr2> pert = {}".format(c_pert_new))
+
+
+
+    return new_f, new_curv
 
 
 # This is the exact solution of the Lanczos algorithm (analytical in 1D) at T = 0
@@ -164,7 +222,7 @@ def DynamicalSSCHA(func,w_array, x0, phi0, _x_, full_spectral = False, m = 1, sm
     
     
     # Dyagonalize the matrix
-    eigvals, eigvects = linalg.eigh(Lanczos_mat)
+    eigvals, eigvects = np.linalg.eigh(Lanczos_mat)
     
     print("spectral poles: ", np.sqrt(eigvals))
     print("Eigvect 0:", eigvects[:,0])
@@ -212,7 +270,7 @@ def test_lanczos_1d(plot = False):
 
     # get the N random configuration
     # for the Lanczos application
-    N_RANDOM = 1000
+    N_RANDOM = 100000
     x_ensemble = np.double(np.random.normal(x_c, phi, size = (N_RANDOM, 1)))
     f = bo_force(x_ensemble) - sscha_force(x_ensemble, x_c, phi, m = 1)
     u_ensemble = x_ensemble - x_c
@@ -241,7 +299,16 @@ def test_lanczos_1d(plot = False):
 
 
     # Compute the Lanczos algorithm (biconjugate)
+    f1, c1 = get_pert_force_potential(x_c, phi, 0, -1)
+
+
+    print("Standard perturbation:")
+    print("<f> pert = {}".format(f1))
+    print("<d2v/dr2> pert = {}".format(c1))
+    print()
     lanc.run_FT(10)
+
+
 
     # Get the green function
     w_array = np.linspace(0, 10, 1000)
@@ -249,6 +316,8 @@ def test_lanczos_1d(plot = False):
 
     if plot:
         plt.plot(w_array, -np.imag(gf))
+        ax = plt.gca()
+        ax.vlines( sscha_w(1, phi), 0, np.max(-np.imag(gf)), ls = "--", color = "k")
         plt.tight_layout()
         plt.show()
 
