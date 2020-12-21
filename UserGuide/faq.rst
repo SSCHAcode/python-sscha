@@ -102,6 +102,7 @@ How do I plot the frequencies of the dynamical matrix during the optimization?
     If you run the code with an input script, you should provide in the &utils tag the filename for the frequencies:
 
     .. code-block:: fortran
+
        &utils
            save_frequencies = "freqs.dat"
        &utils
