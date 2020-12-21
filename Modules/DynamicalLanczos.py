@@ -919,7 +919,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         # Get the final vector
         final_psi = np.zeros(self.psi.shape, dtype = np.double)
-        final_psi[:self.n_modes] = f_pert_av
+        final_psi[:self.n_modes] =  f_pert_av
 
         if not transpose:
             # Get the perturbation on Y and Re A
@@ -946,7 +946,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
 
         #print("Output:", final_psi)
-        return final_psi
+        return -final_psi
 
 
 
@@ -1068,7 +1068,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         return simple_output
 
-    def apply_full_L(self, target=None, force_t_0 = False, force_FT = False, transpose = False, fast_lanczos = True):
+    def apply_full_L(self, target=None, force_t_0 = False, force_FT = True, transpose = False, fast_lanczos = True):
         """
         APPLY THE L 
         ===========

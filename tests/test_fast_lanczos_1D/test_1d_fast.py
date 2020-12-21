@@ -82,6 +82,67 @@ def bo_curvature(x):
     new_x = x
     return 36*new_x**2 - 6 + 3 * new_x
 
+def bo_third_deriv(x):
+    new_x = x
+    return 72*new_x + 3
+
+
+def get_d3_d4(x0, phi0):
+    """
+    Compute the d3 and d4 to compare between the exact Lanczos and the face lanczos application
+    """
+    
+    d4 = 72
+    d3 = 72 * x0 + 3
+
+    return d3, d4
+
+
+def get_numerical_d3_d4(x0, phi0):
+    N_Random = 100000
+
+    x_pos = np.random.normal(loc= x0, scale = phi0, size = N_Random) 
+    u = x_pos - x0
+    f = bo_force(x_pos) 
+    f_scha = sscha_force(x_pos, x0, phi0) 
+
+    w = sscha_w(1, phi0)
+
+    Y = 2*w
+
+    d3 = -Y**2 *  np.sum(u * u* (f - f_scha)) / N_Random
+    d4 = -Y**3 * np.sum(u* u* u* (f - f_scha)) / N_Random
+
+
+    return d3, d4
+
+
+
+def get_L_matrix(x0, phi0):
+    """
+    Get the Lanczos L matrix
+    """
+
+    L = np.zeros((3,3), dtype = np.double)
+
+    d3, d4 = get_d3_d4(x0, phi0)
+    w = sscha_w(1, phi0)
+
+    L[1,1] = - d4 / (2 * w) - 2*w**2
+    L[1,2] = -4 * w**2 
+    L[1,0] = 4*w*d3 
+    L[0,1] = d3 / (8 * w**2)
+    L[0,0] = -w**2
+
+    return -L
+
+
+def apply_L(x0, phi0, psi_vector, transpose = False):
+    L = get_L_matrix(x0, phi0)
+    if transpose:
+        L = L.T
+    return L.dot(psi_vector)
+
 
 def get_pert_force_potential(x0, phi0, pert_x0, pert_Y):
     """
@@ -306,6 +367,47 @@ def test_lanczos_1d(plot = False):
     print("<f> pert = {}".format(f1))
     print("<d2v/dr2> pert = {}".format(c1))
     print()
+
+    # Compare the application on psi
+    lanc.psi = np.zeros(3, dtype = np.double)
+    lanc.psi[0] = 1 
+
+    L_anal_psi = apply_L(x_c, phi, lanc.psi)
+    lanc.apply_full_L(force_FT= True) 
+
+
+    print()
+    print("TEST L APPLICATION")
+    print("------------------")
+    print()
+    print("Application exact:")
+    print(L_anal_psi)
+    print("Application Direct:")
+    print(lanc.psi)
+    print()
+    print("Test d3 and d4:")
+    d3, d4 = get_d3_d4(x_c, phi)
+    d3_num, d4_num = get_numerical_d3_d4(x_c, phi)
+    print("D3 anal: {} | numeric: {}".format(d3, d3_num))
+    print("D4 anal: {} | numeric: {}".format(d4, d4_num))
+
+    print()
+    print()
+    print("TRANSPOSED")
+    # Compare the application on psi
+    lanc.psi = np.zeros(3, dtype = np.double)
+    lanc.psi[0] = 1 
+
+    L_anal_psi = apply_L(x_c, phi, lanc.psi, transpose = True)
+    lanc.apply_full_L(force_FT= True, transpose = True) 
+
+    print("Application exact:")
+    print(L_anal_psi)
+    print("Application Direct:")
+    print(lanc.psi)
+    print()
+
+
     lanc.run_FT(10)
 
 
