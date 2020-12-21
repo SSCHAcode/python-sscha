@@ -1264,10 +1264,131 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
 
 
-    def run_conjugate_gradient(self, eigval = 0, n_iters = 100, thr = 1e-5, verbose = True, guess_x = None):
+    def run_biconjugate_gradient(self, verbose = True, tol = 1e-5, maxiter = 1000, save_g = None, save_each = 1):
+        """
+        STATIC RESPONSE
+        ===============
+
+        Get the static response inverting the green function.
+        This is performed by exploiting the bi-conjugate gradient algorithm.
+
+        Parameters
+        ----------
+            verbose : bool
+                If true, print the status of the algorithm in standard output
+            tol : float
+                Tollerance of the biconjugate gradient algorithm 
+            maxiter: int
+                The maximum number of iterations for the biconjugate gradient.
+            save_g: string
+                Path to the file on which save the green function. 
+                It is saved after a number of steps specified by save_each.
+            save_each: int
+                Determines after how many steps to save the green function.
+
+        Results
+        -------
+            G_inv: ndarray(size = (n_modes, n_modes))
+                This is the mass-rescaled free energy Hessian.
+                Its eigenvalues are the static frequencies, that determine the structure stability.
+        """
+
+        G_one_phonon = np.zeros( (self.n_modes, self.n_modes), dtype = np.double)
+
+        if verbose:
+            print()
+            print("====================")
+            print("BICONJUGATE GRADIENT")
+            print("====================")
+            print()
+            print("We compute the static response with the")
+            print("Biconjugate gradient algorithm.")
+            print()
+
+        
+        # Check if the symmetries has been initialized
+        if not self.initialized:
+            self.prepare_symmetrization()
+
+        for i in range(self.n_modes):
+            if verbose:
+                # Print the status
+                print()
+                print()
+                print("NEW STEP")
+                print("--------")
+                print()
+                print("i = {} / {}".format(i + 1, self.n_modes))
+                print()
+            
+            # Setup the known vector
+            self.psi = np.zeros(self.psi.shape, dtype = type(self.psi[0]))
+            self.psi[i] = 1
+
+            x_old = self.psi.copy()
+            j = np.zeros(1, dtype = np.intc)
+            def callback(xk, x_old = x_old, j = j):
+                if verbose:
+                    disp = sum( (xk - x_old)**2)
+                    print("BCG STEP {} | solution changed by {} (tol = {})".format(j[0], disp, tol))
+                    j[0] += 1
+                    x_old[:] = xk
+                
+            t1 = time.time()
+            res, info = scipy.sparse.linalg.bicgstab(self.L_linop, self.psi, self.psi, tol = tol, maxiter = maxiter, callback=callback)
+            t2 = time.time()
+
+            if  verbose:
+                print()
+                print("Time to solve the linear system: {} s".format(t2 - t1))
+                print()
+
+            # Check if the minimization converged
+            assert info >= 0, "Error on input for the biconjugate gradient algorithm."
+
+            if info > 0:
+                print("The biconjugate gradient (step {}) algorithm did not converge after {} iterations.".format(i+1, maxiter))
+                print("Try to either reduce the tollerance or increase the number of iteriations")
+                print()
+            else:
+                print("The biconjugate gradient converged after {} iterations.".format(j[0]))
+            
+
+            G_one_phonon[i, :] = res[:self.n_modes]
+            if i % save_each == 0:
+                if save_g is not None:
+                    np.save(save_g, G_one_phonon)
+            
+        
+        if verbose:
+            print()
+            print(" ================================== ")
+            print(" THE BICONJUGATE GRADIENT CONVERGED ")
+            print(" ================================== ")
+            print()
+            print()
+
+            
+        if save_g is not None:
+            np.save(save_g, G_one_phonon)
+
+        # Check the hermitianeity
+        disp = np.max(np.abs(G_one_phonon - G_one_phonon.T))
+        assert disp < 1e-5, "Error, the resulting one-phonon Green function is not Hermitian."
+
+        # Force hermitianity
+        G = 0.5 * (G_one_phonon + G_one_phonon.T)
+        
+        # Invert the green function to get the Hessian Matrix (mass-rescaled)
+        G_inv = np.linalg.inv(G) 
+
+        return G_inv
+
+
+    def _run_conjugate_gradient(self, eigval = 0, n_iters = 100, thr = 1e-5, verbose = True, guess_x = None):
         r"""
-        RUN THE CONJUGATE GRADIENT
-        ==========================
+        RUN THE CONJUGATE GRADIENT (WORK METHOD)
+        ========================================
 
         The conjugate gradient is a very fast algorithm 
         that allows to compute the (in principle) exact green function. 

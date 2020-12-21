@@ -416,6 +416,13 @@ def test_lanczos_1d(plot = False):
     w_array = np.linspace(0, 10, 1000)
     gf = lanc.get_green_function_continued_fraction(w_array, smearing = 0.1, use_terminator = False)
 
+
+    # Check the static with the biconjugate gradient
+    static_hessian = lanc.run_biconjugate_gradient()
+
+    print("Hessian frequency: {}".format(static_hessian))
+    print("Inverse dynamical green function: {}".format(np.real(1 / gf[0])))
+
     if plot:
         plt.plot(w_array, -np.imag(gf))
         ax = plt.gca()
