@@ -27,6 +27,7 @@ static PyObject *ApplyV3_FT(PyObject * self, PyObject * args);
 static PyObject *ApplyV4_FT(PyObject * self, PyObject * args);
 static PyObject *GetWeights(PyObject * self, PyObject * args);
 static PyObject *Get_D2DR2_PertV(PyObject * self, PyObject * args);
+static PyObject *Get_Pertrub_Averages(PyObject * self, PyObject * args);
 
 
 static PyMethodDef odd_engine[] = {
@@ -39,6 +40,7 @@ static PyMethodDef odd_engine[] = {
     {"ApplyV4_FT", ApplyV4_FT, METH_VARARGS, "Apply the full v4 at finite temperature"},
     {"GetWeights", GetWeights, METH_VARARGS, "Get the self-consistent weights for the L application"},
     {"Get_D2DR2_PertV", Get_D2DR2_PertV, METH_VARARGS, "Get the d2V_dr2 matrix averaged on the perturbed ensemble"},
+    {"GetPerturbAverage", Get_Pertrub_Averages, METH_VARARGS, "Get the average forces and second derivative of the potential from a perturbed ensemble"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -311,7 +313,7 @@ static PyObject *GetWeights(PyObject * self, PyObject * args) {
   int N_modes;
   double T;
 
-  int index_mode = 0, index_config = 1;
+  int index_mode = 1, index_config = 0;
 
   // Parse the python arguments
   if (!PyArg_ParseTuple(args, "OOOOdO", &npy_X, &npy_omega, &npy_R1, &npy_Y1, &T, &npy_weights))
@@ -319,8 +321,8 @@ static PyObject *GetWeights(PyObject * self, PyObject * args) {
   
   // Check the array memory setting
   if (npy_X->flags & NPY_ARRAY_F_CONTIGUOUS) {
-    index_mode = 1;
-    index_config = 0;
+    index_mode = 0;
+    index_config = 1;
   }
   
 
@@ -330,7 +332,7 @@ static PyObject *GetWeights(PyObject * self, PyObject * args) {
 
   if (N_modes != PyArray_DIM(npy_omega,0)) {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
-    fprintf(stderr, "N_modes from X is %d, while len(w) = %d\n", N_modes, PyArray_DIM(npy_omega, 0));
+    fprintf(stderr, "N_modes from X is %d (index = %d), while len(w) = %d\n", N_modes, index_mode, PyArray_DIM(npy_omega, 0));
     exit(EXIT_FAILURE);
   }
 
@@ -361,7 +363,7 @@ static PyObject *Get_D2DR2_PertV(PyObject * self, PyObject * args) {
   int N_modes;
   double T;
 
-  int index_mode = 0, index_config = 1;
+  int index_mode = 1, index_config = 0;
 
   // Parse the python arguments
   if (!PyArg_ParseTuple(args, "OOOOOdO", &npy_X,  &npy_Y, &npy_omega, &npy_rho, &npy_weights, &T, &npy_d2vdr2))
@@ -369,8 +371,8 @@ static PyObject *Get_D2DR2_PertV(PyObject * self, PyObject * args) {
   
   // Check the array memory setting
   if (npy_X->flags & NPY_ARRAY_F_CONTIGUOUS) {
-    index_mode = 1;
-    index_config = 0;
+    index_mode = 0;
+    index_config = 1;
   }
   
 
@@ -394,6 +396,85 @@ static PyObject *Get_D2DR2_PertV(PyObject * self, PyObject * args) {
 
   // Apply the method
   get_d2v_dR2_pert(X, Y, w, weights, rho, T, N_modes, N_configs, d2vdr2);
+
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
+
+static PyObject * Get_Pertrub_Averages(PyObject * self, PyObject * args) {
+  PyArrayObject * npy_X, *npy_Y, *npy_omega, *npy_rho, *npy_R1, *npy_Y1, *npy_force, *npy_d2vdr2;
+  double * X; 
+  double * Y;
+  double * R1, *Y1;
+  double * force;
+  double *w;
+  double * rho;
+  double * weights;
+  double * d2vdr2;
+  int N_configs;
+  int N_modes;
+  int apply_D4;
+
+  double T;
+
+  int index_mode = 1, index_config = 0;
+
+  // Parse the python arguments
+  if (!PyArg_ParseTuple(args, "OOOOOOdiOO", &npy_X,  &npy_Y, &npy_omega, &npy_rho, &npy_R1, &npy_Y1, &T, &apply_D4, &npy_force, &npy_d2vdr2))
+    return NULL;
+  
+  // Check the array memory setting
+  if (npy_X->flags & NPY_ARRAY_F_CONTIGUOUS) {
+    index_mode = 0;
+    index_config = 1;
+  }
+  
+
+  // Get the dimension of the arrays
+  N_modes = PyArray_DIM(npy_X, index_mode);
+  N_configs = PyArray_DIM(npy_X, index_config);
+
+  if (N_modes != PyArray_DIM(npy_omega,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "N_modes from X is %d, while len(w) = %d\n", N_modes, PyArray_DIM(npy_omega, 0));
+    exit(EXIT_FAILURE);
+  }
+
+  // Check the value of apply D4
+  if (apply_D4 != 0 || apply_D4 != 1) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__, __LINE__);
+    fprintf(stderr, "   the apply_D4 value passed must be either 0 or 1.\n");
+    fprintf(stderr, "   apply_D4 = %d\n", apply_D4);
+    exit(EXIT_FAILURE);
+  }
+
+  // Retrive the pointer to the data from the python object
+  X = (double*) PyArray_DATA(npy_X);
+  Y = (double*) PyArray_DATA(npy_Y);
+  rho = (double*) PyArray_DATA(npy_rho);
+  w = (double*) PyArray_DATA(npy_omega);
+  force = (double*) PyArray_DATA(npy_force);
+  d2vdr2 = (double*) PyArray_DATA(npy_d2vdr2);
+
+  R1 = (double*) PyArray_DATA(npy_R1);
+  Y1 = (double*) PyArray_DATA(npy_Y1);
+
+  
+  // Employ the Y1 to get the average force (D3)
+  get_f_average_from_Y_pert(X, Y, w, Y1, T, N_modes, N_configs, rho, force);
+
+  // Employ the R1 to get the average of the second derivative of the potential (D3)
+  get_d2v_dR2_from_R_pert(X, Y, w, R1, T, N_modes, N_configs, rho, d2vdr2);
+
+  // Employ Y1 to get the average of the second derivative of the potential (D4)
+  if (apply_D4) {
+    // TODO
+    fprintf(stderr, "Warning (file %s, line %d):\n", __FILE__, __LINE__);
+    fprintf(stderr, "   apply_D4 = True, but the method is not implemented.");
+    fprintf(stderr, "   skipping D4 calculation");
+  }
 
 
   Py_INCREF(Py_None);

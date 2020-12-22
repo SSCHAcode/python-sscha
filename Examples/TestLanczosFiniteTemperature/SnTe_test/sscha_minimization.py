@@ -28,13 +28,13 @@ ff_calculator.p3 = 0.036475
 ff_calculator.p4 = -0.022
 ff_calculator.p4x = -0.014
 
-T = 170
+T = 0
 #TMIN = 150
 #TMAX = 250
 #DT = 10
 
 NMIN = 40000
-NMAX = 200000
+NMAX = 40000
 DN = 40000
 
 

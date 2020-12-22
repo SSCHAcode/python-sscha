@@ -204,6 +204,18 @@ void get_weights(const double * X, const double * w, const double * R1, const do
 double get_d2v_dR2_pert(double * X, double * Y, double *w, double * weights, double * w_is, double T, int n_modes, int n_configs, double * d2v_dR2) ;
 
 
+
+/*
+ * The following function applies the fast Lanczos (sparse matrix).
+ * This exploits the permutation symmetry, and only apply the effect of the D3
+ */
+void get_f_average_from_Y_pert(const double * X, const double * Y, const double * w, const double * Y1, double T, int n_modes, int n_configs, const double * w_is, double * f_average);
+
+
+// The same as the previous, but on the second derivative of the potential
+void get_d2v_dR2_from_R_pert(const double * X, const double * Y, const double * w, const double * R1, double T, int n_modes, int n_configs, double * w_is, double * d2v_dR2);
+
+
 /*
  * Here we define some working methods that are usefull to be
  * called outside. They take the frequency and the occupation number

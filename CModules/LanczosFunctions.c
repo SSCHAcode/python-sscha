@@ -8,13 +8,23 @@
 #define X_VAL 1534
 #define Y_VAL 36
 
-// The eigenvalues of the Covariance matrix
+// The eigenvalues of the inverse Covariance matrix
 double f_ups(double w, double T) {
     double n_w = 0;
     if (T > 0) {
         n_w = 1 / ( exp(w * RY_TO_K / T) - 1);
     }
-    return 2 *w / (1 + n_w);
+    return 2 *w / (1 + 2* n_w);
+}
+
+
+// The eigenvalues of the Covariance matrix
+double f_psi(double w, double T) {
+    double n_w = 0;
+    if (T > 0) {
+        n_w = 1 / ( exp(w * RY_TO_K / T) - 1);
+    }
+    return (1 + 2* n_w) / (2 * w);
 }
 
 
@@ -1716,6 +1726,124 @@ void get_weights(const double * X, const double * w, const double * R1, const do
 }
 
 
+void get_f_average_from_Y_pert(const double * X, const double * Y, const double * w, const double * Y1, double T, int n_modes, int n_configs, const double * w_is, double * f_average) {
+	int i, mu, nu;
+
+	double weight;
+	double N_eff = 0;
+	double u_mu, u_nu, f_mu, f_nu;
+
+	// Clean up the force
+	for(mu = 0; mu < n_modes; ++i) {
+		f_average[mu] = 0;
+	}
+
+
+	for (i = 0; i < n_configs; ++i) {
+		N_eff += w_is[i];
+
+		// Compute the standard weight Y1
+		weight = 0;
+		for (mu = 0; mu < n_modes; ++mu) {
+			for (nu = 0; nu < n_modes; ++nu) {
+				weight -= X[i * n_modes +  mu] * X[i * n_modes+  nu] * Y1[mu * n_modes +  nu] / 2;
+			}
+		}
+
+
+		// Get the average of the potential
+		for (mu = 0; mu < n_modes; ++mu) {
+			f_average[mu] += w_is[i] * weight * Y[i * n_modes + mu] / 3;
+		}
+
+		// Get the permutated average
+		weight = 0;
+		for (mu = 0; mu < n_modes; ++mu) {
+			f_mu = f_psi(w[mu], T) * Y[i * n_modes + mu];
+			for (nu = 0; nu < n_modes; ++nu) {
+				f_nu = f_psi(w[nu], T) * Y[i * n_modes + nu];
+				weight -= X[i * n_modes +  mu] * f_nu * Y1[mu * n_modes +  nu] / 4;
+				weight -= X[i * n_modes +  nu] * f_mu * Y1[mu * n_modes +  nu] / 4;
+			}
+		}
+
+
+		// Get the average of the potential
+		for (mu = 0; mu < n_modes; ++mu) {
+			u_mu = f_ups(w[mu], T) * X[i*n_modes + mu];
+			f_average[mu] += w_is[i] * weight * u_mu * 2 / 3; // Since we have 2 permutations here, this count twice
+		}
+	}
+
+
+	// Apply the normalization
+	for (mu = 0; mu < n_modes; ++mu) {
+		f_average[mu] /= N_eff;
+	}
+}
+
+
+void get_d2v_dR2_from_R_pert(const double * X, const double * Y, const double * w, const double * R1, double T, int n_modes, int n_configs, double * w_is, double * d2v_dR2) {
+	int i, mu, nu;
+
+	double weight;
+	double N_eff = 0;
+	double u_mu, u_nu;
+
+
+	// Reset the starting value of d2v_dR2
+	for (mu = 0; mu < n_modes; ++mu) {
+		for (nu = 0; nu < n_modes; ++nu) {
+			d2v_dR2[mu * n_modes + nu] = 0;
+		}
+	}
+
+	for (i = 0; i < n_configs; ++i) {
+		weight = 0;
+		N_eff += w_is[i];
+
+		// Compute the standard weight
+		for (mu = 0; mu < n_modes; ++mu) {
+			weight += f_ups(w[mu], T) * R1[mu] * X[i * n_modes + mu];
+		}
+
+		// Compute the d2V_dR2
+		for (mu = 0; mu < n_modes; ++mu) {
+			u_mu = f_ups(w[mu], T) * X[i * n_modes +  mu];
+			for (nu = 0; nu < n_modes; ++nu) {
+				d2v_dR2[mu * n_modes + nu] -= u_mu * Y[i * n_modes + nu] * weight * w_is[i] / 3;
+				d2v_dR2[nu * n_modes + mu] -= u_mu * Y[i * n_modes + nu] * weight * w_is[i] / 3; 
+			}
+		}	
+
+		// Apply permutation symmetry exchanging the weights
+		weight = 0;
+
+		// Compute the weight permuting f with the displacement
+		for (mu = 0; mu < n_modes; ++mu) {
+			weight +=  R1[mu] * Y[i * n_modes + mu];
+		}
+
+		// Compute the d2V_dR2 permuting f with the displacement
+		for (mu = 0; mu < n_modes; ++mu) {
+			u_mu = f_ups(w[mu], T) * X[i * n_modes +  mu];
+			for (nu = 0; nu < n_modes; ++nu) {
+				u_nu =  f_ups(w[nu], T) * X[i * n_modes +  nu];
+				d2v_dR2[mu * n_modes + nu] -= u_mu * u_nu * weight * w_is[i] / 3;
+			}
+		}	
+	}
+
+
+	// Apply the normalization
+	for (mu = 0; mu < n_modes; ++mu) {
+		for (nu = 0; nu < n_modes; ++nu) {
+			d2v_dR2[mu * n_modes + nu] /= N_eff;
+		}
+	}
+}
+
+
 double get_d2v_dR2_pert(double * X, double * Y, double *w, double * weights, double * w_is, double T, int n_modes, int n_configs, double * d2v_dR2) {
 	int i, mu, nu;
 
@@ -1729,7 +1857,8 @@ double get_d2v_dR2_pert(double * X, double * Y, double *w, double * weights, dou
 		for (mu = 0; mu < n_modes; ++mu) {
 			u_mu = f_ups(w[mu], T) * X[i * n_modes +  mu];
 			for (nu = 0; nu < n_modes; ++nu) {
-				d2v_dR2[mu * n_modes + nu] -= u_mu * Y[i * n_modes + nu] * weights[i] * w_is[i];
+				d2v_dR2[mu * n_modes + nu] -= u_mu * Y[i * n_modes + nu] * weights[i] * w_is[i] / 2;
+				d2v_dR2[nu * n_modes + mu] -= u_mu * Y[i * n_modes + nu] * weights[i] * w_is[i] / 2;
 			}
 		}	
 	}
@@ -1737,7 +1866,7 @@ double get_d2v_dR2_pert(double * X, double * Y, double *w, double * weights, dou
 	// Apply the normalization
 	for (mu = 0; mu < n_modes; ++mu) {
 		for (nu = 0; nu < n_modes; ++nu) {
-			d2v_dR2[mu * n_modes, nu] /= N_eff;
+			d2v_dR2[mu * n_modes + nu] /= N_eff;
 		}
 	}
 }

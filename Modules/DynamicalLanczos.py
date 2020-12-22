@@ -8,6 +8,7 @@ of a particular perturbation.
 
 import sys, os
 import time
+import warnings, difflib
 import numpy as np
 
 from timeit import default_timer as timer
@@ -59,7 +60,7 @@ def f_ups(w, T):
     n_w = 0
     if T > 0:
         n_w = 1 / (np.exp(w * __RyToK__ / T) - 1)
-    return 2*w / (1 + n_w)
+    return 2*w / (1 + 2 *n_w)
 
 # Modes for the calculation
 MODE_FAST_MPI = 2
@@ -96,8 +97,8 @@ class Lanczos:
 
         # Define the order
         order = "C"
-        if self.mode >= 1:
-            order = "F"
+        #if self.mode >= 1:
+        #    order = "F"
     
         self.T = 0
         self.nat = 0
@@ -185,10 +186,11 @@ class Lanczos:
 
 
         # Ignore v3 or v4. You can set them for testing
+        # This is no longer implemented in the fast Lanczos
         self.ignore_v3 = False
         self.ignore_v4 = False
 
-        N = ensemble.N
+        self.N = ensemble.N
         rho = ensemble.rho.copy() 
         u = ensemble.u_disps  / Ensemble.Bohr
         f = ensemble.forces.reshape(self.N, 3 * self.nat).copy()
@@ -203,17 +205,16 @@ class Lanczos:
 
         if unwrap_symmetries:
             u, f, rho = ensemble.get_unwrapped_ensemble()
-            N = len(rho)
+            self.N = len(rho)
 
             u /= Ensemble.Bohr
             f *= Ensemble.Bohr
 
         # Perform the mass rescale to get the tilde variables
-        u *= np.tile(np.sqrt(self.m), (N, 1)) 
-        f /= np.tile(np.sqrt(self.m), (N, 1)) 
+        u *= np.tile(np.sqrt(self.m), (self.N, 1)) 
+        f /= np.tile(np.sqrt(self.m), (self.N, 1)) 
 
         # Get the info about the ensemble
-        self.N = N
         self.rho = rho
         self.N_eff = np.sum(self.rho)
 
@@ -224,18 +225,18 @@ class Lanczos:
         self.Y = np.zeros((self.N, self.n_modes), order = order, dtype = TYPE_DP)
 
         # Convert in the polarization space
-        self.X[:, :] = self.pols.T.dot(self.u_tilde)
-        self.Y[:, :] = self.pols.T.dot(self.f_tilde)
+        self.X[:, :] = self.u_tilde.dot(self.pols) #.T.dot(self.u_tilde)
+        self.Y[:, :] = self.f_tilde.dot(self.pols) #self.pols.T.dot(self.f_tilde)
 
 
         # Prepare the variable used for the working
         len_psi = self.n_modes
-        if self.T < __EPSILON__:
-            len_psi += self.n_modes**2
-        else:
-            len_psi += self.n_modes * (self.n_modes + 1)
-            print("N MODES:", self.n_modes)
-            print("LEN PSI:", len_psi)
+        #if self.T < __EPSILON__:
+        #    len_psi += self.n_modes**2
+        #else:
+        len_psi += self.n_modes * (self.n_modes + 1)
+        #print("N MODES:", self.n_modes)
+        #print("LEN PSI:", len_psi)
 
         self.psi = np.zeros(len_psi, dtype = TYPE_DP)
 
@@ -286,6 +287,9 @@ class Lanczos:
                 raise AttributeError(ERROR_MSG)
         else:
             super(Lanczos, self).__setattr__(name, value)
+
+            if "ignore_v" in name:
+                warnings.warn("Setting {} is deprecated. It will always be True.".format(name), DeprecationWarning)
         
 
 
@@ -316,7 +320,7 @@ class Lanczos:
         self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
 
 
-    def init(self, use_symmetries = True):
+    def init(self, use_symmetries = False):
         """
         INITIALIZE THE CALCULATION
         ==========================
@@ -333,7 +337,7 @@ class Lanczos:
         self.initialized = True
 
 
-    def prepare_symmetrization(self, no_sym = False):
+    def prepare_symmetrization(self, no_sym = True):
         """
         PREPARE THE SYMMETRIZATION
         ==========================
@@ -349,58 +353,61 @@ class Lanczos:
 
         self.initialized = True
 
-        # Generate the dynamical matrix in the supercell
-        super_structure = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
-        w, pols = self.dyn.DiagonalizeSupercell()
+        # All the rest is deprecated in the Fast Lanczos implementation
+        # As the symmetrization is performed by unwrapping the ensemble
 
-        # Get the symmetries of the super structure
-        if not __SPGLIB__ and not no_sym:
-            raise ImportError("Error, spglib module required to perform symmetrization in a supercell. Otherwise, use no_sym")
+        # # Generate the dynamical matrix in the supercell
+        # super_structure = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
+        # w, pols = self.dyn.DiagonalizeSupercell()
+
+        # # Get the symmetries of the super structure
+        # if not __SPGLIB__ and not no_sym:
+        #     raise ImportError("Error, spglib module required to perform symmetrization in a supercell. Otherwise, use no_sym")
         
-        # Neglect the symmetries
-        if no_sym:
-            self.symmetries = np.zeros( (1, self.n_modes, self.n_modes), dtype = TYPE_DP)
-            self.symmetries[0, :, :] = np.eye(self.n_modes)
-            self.N_degeneracy = np.ones(self.n_modes, dtype = np.intc)
-            self.degenerate_space = [[i] for i in range(self.n_modes)]
-            return
+        # # Neglect the symmetries
+        # if no_sym:
+        #     self.symmetries = np.zeros( (1, self.n_modes, self.n_modes), dtype = TYPE_DP)
+        #     self.symmetries[0, :, :] = np.eye(self.n_modes)
+        #     self.N_degeneracy = np.ones(self.n_modes, dtype = np.intc)
+        #     self.degenerate_space = [[i] for i in range(self.n_modes)]
+        #     return
 
-        super_symmetries = CC.symmetries.GetSymmetriesFromSPGLIB(spglib.get_symmetry(super_structure.get_ase_atoms()), False)
+        # super_symmetries = CC.symmetries.GetSymmetriesFromSPGLIB(spglib.get_symmetry(super_structure.get_ase_atoms()), False)
 
-        # Get the symmetry matrix in the polarization space
-        # Translations are needed, as this method needs a complete basis.
-        pol_symmetries = CC.symmetries.GetSymmetriesOnModes(super_symmetries, super_structure, pols)
+        # # Get the symmetry matrix in the polarization space
+        # # Translations are needed, as this method needs a complete basis.
+        # pol_symmetries = CC.symmetries.GetSymmetriesOnModes(super_symmetries, super_structure, pols)
 
-        Ns, dumb, dump = np.shape(pol_symmetries)
+        # Ns, dumb, dump = np.shape(pol_symmetries)
         
-        # Now we can pull out the translations
-        trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
-        self.symmetries = np.zeros( (Ns, self.n_modes, self.n_modes), dtype = TYPE_DP)
-        ptmp = pol_symmetries[:, :,  ~trans_mask] 
-        self.symmetries[:,:,:] = ptmp[:, ~trans_mask, :]
+        # # Now we can pull out the translations
+        # trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
+        # self.symmetries = np.zeros( (Ns, self.n_modes, self.n_modes), dtype = TYPE_DP)
+        # ptmp = pol_symmetries[:, :,  ~trans_mask] 
+        # self.symmetries[:,:,:] = ptmp[:, ~trans_mask, :]
 
-        # Get the degeneracy
-        w = w[~trans_mask]
-        N_deg = np.ones(len(w), dtype = np.intc)
-        start_deg = -1
-        deg_space = [ [x] for x in range(self.n_modes)]
-        for i in range(1, len(w)):
-            if np.abs(w[i-1] - w[i]) < __EPSILON__ :
-                N_deg[i] = N_deg[i-1] + 1
+        # # Get the degeneracy
+        # w = w[~trans_mask]
+        # N_deg = np.ones(len(w), dtype = np.intc)
+        # start_deg = -1
+        # deg_space = [ [x] for x in range(self.n_modes)]
+        # for i in range(1, len(w)):
+        #     if np.abs(w[i-1] - w[i]) < __EPSILON__ :
+        #         N_deg[i] = N_deg[i-1] + 1
 
-                if start_deg == -1:
-                    start_deg = i - 1
+        #         if start_deg == -1:
+        #             start_deg = i - 1
 
-                for j in range(start_deg, i):
-                    N_deg[j] = N_deg[i]
-                    deg_space[j].append(i)
-                    deg_space[i].append(j)
-            else:
-                start_deg = -1
+        #         for j in range(start_deg, i):
+        #             N_deg[j] = N_deg[i]
+        #             deg_space[j].append(i)
+        #             deg_space[i].append(j)
+        #     else:
+        #         start_deg = -1
 
 
-        self.N_degeneracy = N_deg
-        self.degenerate_space = deg_space
+        # self.N_degeneracy = N_deg
+        # self.degenerate_space = deg_space
 
     def prepare_raman(self, pol_vec_in= np.array([1,0,0]), pol_vec_out = np.array([1,0,0])):
         """
@@ -517,6 +524,23 @@ class Lanczos:
 
         if self.symmetrize:
             self.symmetrize_psi()
+
+    def prepare_mode(self, index):
+        """
+        Prepare the perturbation on a single phonon mode.
+        This is usefull to get the single mode contribution to the overall spectral function.
+
+        Parameters
+        ----------
+            index : int
+                The index of the mode in the supercell. Starting from 0 (lowest frequency, excluding acoustic modes at Gamma) 
+        """
+
+        self.psi[:] = 0
+        self.psi[index] = 1 
+        self.perturbation_modulus = 1
+
+
 
     def get_vector_dyn_from_psi(self):
         """
@@ -854,15 +878,15 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
             # Remove the constant shift coming from renormalization
             # 1/2 Tr (Y^-1 * Y^{(1)})
-            shift -= shift[0] 
+            shift -= np.mean(shift) 
 
             # Compare the weights
             disp = np.max(np.abs(shift))
             dispersion = np.std(weights)
 
             if disp / dispersion >= 1e-3:
-                print("Displacements:")
-                print(self.X)
+                print("Perturbation:")
+                print(self.psi)
 
                 print("Weights with C:")
                 print(weights)
@@ -876,7 +900,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
                 print(weights - other_weights)
                 
                 print()
-                print("Discrepancies (max = {}):".format(np.max(np.abs(shift))))
+                print("Discrepancies (max = {}):".format(disp))
                 i_value = np.argmax(np.abs(shift))
                 print(shift)
                 print("I value of max: {}".format(i_value))
@@ -910,8 +934,6 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         sscha_HP_odd.Get_D2DR2_PertV(self.X, self.Y, self.w, self.rho, weights, self.T, d2v_pert_av)
 
 
-        print("Perturbation:")
-        print(self.psi)
         print("<f> pert = {}".format(f_pert_av))
         print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
         print()
@@ -2245,7 +2267,7 @@ Max number of iterations: {}
         return L_operator
 
 
-    def get_full_L_operator_FT(self, verbose = False, debug_d3 = None):
+    def get_full_L_operator_FT(self, verbose = False, debug_d3 = None, symmetrize = True):
         """
         GET THE FULL L OPERATOR (FINITE TEMPERATURE)
         ============================================
@@ -2343,7 +2365,9 @@ Max number of iterations: {}
             if not debug_d3 is None:
                 d3 = debug_d3
             else:
-                d3_noperm = np.einsum("ia,ib,ic->abc", self.X, self.X, Y_weighted)
+                X_ups = np.einsum("ia, a -> ia", self.X, f_ups(self.w, self.T))
+
+                d3_noperm = np.einsum("ia,ib,ic->abc", X_ups, X_ups, Y_weighted)
                 d3_noperm /= -N_eff 
 
                 # Apply the permuatations
@@ -2359,12 +2383,13 @@ Max number of iterations: {}
                     np.save("d3_modes_nosym.npy", d3)
 
                 # Perform the standard symmetrization
-                d3 = symmetrize_d3_muspace(d3, self.symmetries)
+                if symmetrize:
+                    d3 = symmetrize_d3_muspace(d3, self.symmetries)
 
-                if verbose:
-                    np.save("d3_modes_sym.npy", d3)
-                    np.save("symmetries_modes.npy", self.symmetries)
-            
+                    if verbose:
+                        np.save("d3_modes_sym.npy", d3)
+                        np.save("symmetries_modes.npy", self.symmetries)
+                
 
             # Reshape the d3
             d3_small_space = np.zeros((N_w2, self.n_modes), dtype = np.double)
@@ -2439,6 +2464,20 @@ Max number of iterations: {}
         # Check if the symmetries has been initialized
         if not self.initialized:
             self.prepare_symmetrization()
+
+        # Check if the psi vector is prepared
+        ERROR_MSG = """
+Error, you must initialize a perturbation to start the Lanczos.
+Use prepare_raman/ir or prepare_perturbation before calling the run method.
+"""
+        if self.psi is None:
+            print(ERROR_MSG)
+            raise ValueError(ERROR_MSG)
+
+        psi_norm = np.sum(self.psi**2)
+        if np.isnan(psi_norm) or psi_norm == 0:
+            print(ERROR_MSG)
+            raise ValueError(ERROR_MSG)
 
         # Get the current step
         i_step = len(self.a_coeffs)
@@ -3441,13 +3480,25 @@ def get_weights_finite_differences(u_tilde, w, T, R1, Y1):
 
     Y = np.diag(Y_mu) 
 
-    lambda_small = 1e-7
+    lambda_small = 1e-9
+
+    R1_norm = np.sum(R1**2)
+    Y1_norm = np.sum(Y1**2)
+
+    norm = np.sqrt(R1_norm + Y1_norm)
+
+    print("Normalization: {}".format(norm))
+    
+    R1_direction = R1 / norm
+    Y1_direction = Y1 / norm
+
+
 
     #print("DISP R:", R1)
     #print("DISP Y:", Y1)
 
-    new_Y = Y + Y1 * lambda_small
-    new_u_tilde = u_tilde - np.tile(R1 * lambda_small, (n_conf, 1))
+    new_Y = Y + Y1_direction * lambda_small
+    new_u_tilde = u_tilde - np.tile(R1_direction * lambda_small, (n_conf, 1))
 
     # Get the weights before and after the perturbation
     w_old = np.zeros(n_conf, dtype = np.double) 
@@ -3470,6 +3521,6 @@ def get_weights_finite_differences(u_tilde, w, T, R1, Y1):
     #print("Y from ens:", Y_num, " (from w = {})".format(np.linalg.inv(Y)))
 
     # Get the derivative with respect to the parameter
-    weights = (w_new/w_old - 1) / lambda_small
+    weights = (w_new/w_old - 1) / lambda_small * norm 
 
     return weights

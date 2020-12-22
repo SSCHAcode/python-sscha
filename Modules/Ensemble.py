@@ -742,6 +742,7 @@ Error, the following stress files are missing from the ensemble:
         stress_path = "%s/stresses_pop%d.npy" % (data_dir, population_id)
         if os.path.exists(stress_path):
             self.stresses = np.load(stress_path)
+            self.stress_computed = np.ones(self.N, dtype = bool)
             self.has_stress = True
         else:
             self.has_stress = False
@@ -757,6 +758,7 @@ Error, the following stress files are missing from the ensemble:
         
         self.sscha_energies = np.zeros(self.N, dtype = np.float64)
         self.sscha_forces = np.zeros( (self.N, Nat_sc, 3), order = "F", dtype = np.float64)
+        self.force_computed = np.ones(self.N, dtype = bool)
         self.u_disps = np.zeros( (self.N, 3 * Nat_sc), order = "F", dtype = np.float64)
         
         # Build the structures
@@ -3214,7 +3216,7 @@ DETAILS OF ERROR:
 
         return self.split(non_mask)
 
-    def get_energy_forces(self, ase_calculator, compute_stress = True, stress_numerical = False, skip_computed = False):
+    def get_energy_forces(self, ase_calculator, compute_stress = True, stress_numerical = False, skip_computed = False, verbose = False):
         """
         GET ENERGY AND FORCES FOR THE CURRENT ENSEMBLE
         ==============================================
@@ -3307,7 +3309,7 @@ DETAILS OF ERROR:
 
 
             # Print the status
-            if rank == 0:
+            if rank == 0 and verbose:
                 print ("Computing configuration %d / %d" % (i0+1, N_rand / size))
             
             # Avoid for errors
