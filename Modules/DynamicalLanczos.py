@@ -761,6 +761,101 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         return out_vect
 
+
+    def apply_L1_inverse_FT(self, transpose = False):
+        """
+        APPLY THE INVERSE L1 AT FINITE TEMPERATURE
+        ==========================================
+
+        This method allows for preconditioning, as L1 is a diagonal application
+
+        Results
+        -------
+            out_vect : ndarray(shape(self.psi))
+                It returns the application of the harmonic part of the inverse L matrix
+        """
+
+
+        # Prepare the free propagator on the positions
+        out_vect = np.zeros(np.shape(self.psi), dtype = TYPE_DP)
+
+        if self.ignore_harmonic:
+            return out_vect 
+
+        # The elements where w_a and w_b are exchanged are dependent
+        # So we must avoid including them
+        i_a = np.tile(np.arange(self.n_modes), (self.n_modes,1)).ravel()
+        i_b = np.tile(np.arange(self.n_modes), (self.n_modes,1)).T.ravel()
+
+        new_i_a = np.array([i_a[i] for i in range(len(i_a)) if i_a[i] >= i_b[i]])
+        new_i_b = np.array([i_b[i] for i in range(len(i_a)) if i_a[i] >= i_b[i]])
+        
+        w_a = self.w[new_i_a]
+        w_b = self.w[new_i_b]
+
+        N_w2 = len(w_a)
+
+        # Get the harmonic responce function
+        out_vect[:self.n_modes] = (self.psi[:self.n_modes] / self.w) / self.w
+
+
+        n_a = np.zeros(np.shape(w_a), dtype = TYPE_DP)
+        n_b = np.zeros(np.shape(w_a), dtype = TYPE_DP)
+        if self.T > 0:
+            n_a = 1 / (np.exp( w_a / np.double(CC.Units.K_B * self.T)) - 1)
+            n_b = 1 / (np.exp( w_b / np.double(CC.Units.K_B * self.T)) - 1)
+
+
+        # Apply the non interacting X operator
+        start_Y = self.n_modes
+        start_A = self.n_modes + N_w2
+
+        print("start_Y: {} | start_A: {} | end_A: {} | len_psi: {}".format(start_Y, start_A, start_A + N_w2, len(self.psi)))
+
+        ERR_MSG ="""
+ERROR,
+The initial vector for the Lanczos algorithm has a wrong dimension. 
+This may be caused by the Lanczos initialized at the wrong temperature.
+"""
+        assert len(self.psi) == start_A + N_w2, ERR_MSG
+
+        # Get the free two-phonon propagator
+        X_ab_NI = -w_a**2 - w_b**2 - (2*w_a *w_b) /( (2*n_a + 1) * (2*n_b + 1))
+        Y_ab_NI = - (8 * w_a * w_b) / ( (2*n_a + 1) * (2*n_b + 1))
+        X1_ab_NI = - (2*n_a*n_b + n_a + n_b) * (2*n_a*n_b + n_a + n_b + 1)*(2 * w_a * w_b) / ( (2*n_a + 1) * (2*n_b + 1))
+        Y1_ab_NI = - w_a**2 - w_b**2 + (2*w_a *w_b) /( (2*n_a + 1) * (2*n_b + 1))
+
+        # Invert the propagator
+        den = X_ab_NI * Y1_ab_NI - X1_ab_NI * Y_ab_NI
+        X_new = -Y1_ab_NI / den
+        Y_new = Y_ab_NI / den
+        X1_new = X1_ab_NI / den 
+        Y1_new = - X_ab_NI / den
+
+        out_vect[start_Y: start_A] = X_new * self.psi[start_Y: start_A]
+        if not transpose:
+            out_vect[start_Y : start_A] += Y_new * self.psi[start_A: ]
+        else:
+            out_vect[start_A:] += Y_new * self.psi[start_Y : start_A]
+
+        #L_operator[start_Y : start_A, start_A:] = - np.diag(Y_ab_NI) * extra_count
+        #L_operator[start_Y + np.arange(self.n_modes**2), start_A + exchange_frequencies] -=  Y_ab_NI / 2
+
+
+        if not transpose:
+            out_vect[start_A:] += X1_new * self.psi[start_Y: start_A]
+        else:
+            out_vect[start_Y: start_A] += X1_new * self.psi[start_A:]
+        #L_operator[start_A:, start_Y : start_A] = - np.diag(X1_ab_NI) / 1 * extra_count
+        #L_operator[start_A + np.arange(self.n_modes**2), start_Y + exchange_frequencies] -= X1_ab_NI / 2
+
+        out_vect[start_A:] += Y1_new * self.psi[start_A:]
+        #L_operator[start_A:, start_A:] = -np.diag(Y1_ab_NI) / 1 * extra_count
+        #L_operator[start_A + np.arange(self.n_modes**2),  start_A + exchange_frequencies] -= Y1_ab_NI / 2
+
+
+        return out_vect
+
     def get_Y1(self):
         """
         Get the perturbation on the Y matrix from the psi vector
