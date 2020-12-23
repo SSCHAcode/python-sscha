@@ -27,7 +27,7 @@ static PyObject *ApplyV3_FT(PyObject * self, PyObject * args);
 static PyObject *ApplyV4_FT(PyObject * self, PyObject * args);
 static PyObject *GetWeights(PyObject * self, PyObject * args);
 static PyObject *Get_D2DR2_PertV(PyObject * self, PyObject * args);
-static PyObject *Get_Pertrub_Averages(PyObject * self, PyObject * args);
+static PyObject *Get_Perturb_Averages(PyObject * self, PyObject * args);
 
 
 static PyMethodDef odd_engine[] = {
@@ -40,7 +40,7 @@ static PyMethodDef odd_engine[] = {
     {"ApplyV4_FT", ApplyV4_FT, METH_VARARGS, "Apply the full v4 at finite temperature"},
     {"GetWeights", GetWeights, METH_VARARGS, "Get the self-consistent weights for the L application"},
     {"Get_D2DR2_PertV", Get_D2DR2_PertV, METH_VARARGS, "Get the d2V_dr2 matrix averaged on the perturbed ensemble"},
-    {"GetPerturbAverage", Get_Pertrub_Averages, METH_VARARGS, "Get the average forces and second derivative of the potential from a perturbed ensemble"},
+    {"GetPerturbAverage", Get_Perturb_Averages, METH_VARARGS, "Get the average forces and second derivative of the potential from a perturbed ensemble"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -403,7 +403,7 @@ static PyObject *Get_D2DR2_PertV(PyObject * self, PyObject * args) {
 }
 
 
-static PyObject * Get_Pertrub_Averages(PyObject * self, PyObject * args) {
+static PyObject * Get_Perturb_Averages(PyObject * self, PyObject * args) {
   PyArrayObject * npy_X, *npy_Y, *npy_omega, *npy_rho, *npy_R1, *npy_Y1, *npy_force, *npy_d2vdr2;
   double * X; 
   double * Y;
@@ -443,7 +443,7 @@ static PyObject * Get_Pertrub_Averages(PyObject * self, PyObject * args) {
   }
 
   // Check the value of apply D4
-  if (apply_D4 != 0 || apply_D4 != 1) {
+  if (apply_D4 != 0 && apply_D4 != 1) {
     fprintf(stderr, "Error in file %s, line %d:\n", __FILE__, __LINE__);
     fprintf(stderr, "   the apply_D4 value passed must be either 0 or 1.\n");
     fprintf(stderr, "   apply_D4 = %d\n", apply_D4);
@@ -463,17 +463,20 @@ static PyObject * Get_Pertrub_Averages(PyObject * self, PyObject * args) {
 
   
   // Employ the Y1 to get the average force (D3)
+  printf("Getting f av...\n");
+  fflush(stdout);
   get_f_average_from_Y_pert(X, Y, w, Y1, T, N_modes, N_configs, rho, force);
 
   // Employ the R1 to get the average of the second derivative of the potential (D3)
+  printf("Getting d2v_dr2 av...\n");
+  fflush(stdout);
   get_d2v_dR2_from_R_pert(X, Y, w, R1, T, N_modes, N_configs, rho, d2vdr2);
 
   // Employ Y1 to get the average of the second derivative of the potential (D4)
   if (apply_D4) {
-    // TODO
-    fprintf(stderr, "Warning (file %s, line %d):\n", __FILE__, __LINE__);
-    fprintf(stderr, "   apply_D4 = True, but the method is not implemented.");
-    fprintf(stderr, "   skipping D4 calculation");
+    printf("Getting d2v_dr2 av from d4...\n");
+    fflush(stdout);
+    get_d2v_dR2_from_Y_pert(X, Y, w, Y1, T, N_modes, N_configs, rho, d2vdr2);
   }
 
 

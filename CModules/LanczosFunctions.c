@@ -1734,7 +1734,7 @@ void get_f_average_from_Y_pert(const double * X, const double * Y, const double 
 	double u_mu, u_nu, f_mu, f_nu;
 
 	// Clean up the force
-	for(mu = 0; mu < n_modes; ++i) {
+	for(mu = 0; mu < n_modes; ++mu) {
 		f_average[mu] = 0;
 	}
 
@@ -1841,6 +1841,71 @@ void get_d2v_dR2_from_R_pert(const double * X, const double * Y, const double * 
 			d2v_dR2[mu * n_modes + nu] /= N_eff;
 		}
 	}
+}
+
+// D4 contribution
+double get_d2v_dR2_from_Y_pert(const double * X, const double * Y, const double * w, const double * Y1, double T, int n_modes, int n_configs, double * w_is, double * d2v_dR2_out) {
+	int i, mu, nu;
+
+	double weight;
+	double N_eff = 0;
+	double u_mu, u_nu, f_mu, f_nu;
+
+	double * d2v_dR2 = (double*) calloc(sizeof(double), n_modes * n_modes);
+
+
+	for (i = 0; i < n_configs; ++i) {
+		weight = 0;
+		N_eff += w_is[i];
+
+		// First the standard weight
+		for (mu = 0; mu < n_modes; ++mu) {
+			for(nu = 0; nu < n_modes; ++nu) {
+				weight -= X[i * n_modes + mu] * X[i * n_modes+  nu] * Y1[mu * n_modes + nu] / 2;
+			}
+		}
+
+		// Now the first part of the potential
+		for (mu = 0; mu < n_modes; ++mu) {
+			u_mu = f_ups(w[mu], T) * X[i * n_modes + mu];
+			for(nu = 0; nu < n_modes; ++nu) {
+				d2v_dR2[mu * n_modes + nu] -= Y[i * n_modes + nu] * u_mu * weight * w_is[i] / 4; // Permutation symmetry
+				d2v_dR2[nu * n_modes + mu] -= Y[i * n_modes + nu] * u_mu * weight * w_is[i] / 4; // Permutation symmetry
+			}
+		}
+
+
+		weight = 0;
+		// First the permutated weight
+		for (mu = 0; mu < n_modes; ++mu) {
+			f_mu = f_psi(w[mu], T) * Y[i * n_modes + mu];
+			for(nu = 0; nu < n_modes; ++nu) {
+				f_nu = f_psi(w[nu], T) * Y[i * n_modes + nu];
+				weight -= f_mu * X[i * n_modes + nu] * Y1[mu * n_modes + nu] / 4;
+				weight -= f_nu * X[i * n_modes + mu] * Y1[mu * n_modes + nu] / 4;
+			}
+		}
+
+		// Now the first part of the potential
+		for (mu = 0; mu < n_modes; ++mu) {
+			u_mu = f_ups(w[mu], T) * X[i * n_modes + mu];
+			for(nu = 0; nu < n_modes; ++nu) {
+				u_nu = f_ups(w[nu], T) * X[i*n_modes + nu];
+				d2v_dR2[mu * n_modes + nu] -= u_nu * u_mu * weight * w_is[i] / 2; // Permutation symmetry
+			}
+		}
+	}
+
+
+	// Apply the normalization and write the output
+	for (mu = 0; mu < n_modes; ++mu) {
+		for (nu = 0; nu < n_modes; ++nu) {
+			d2v_dR2_out[mu * n_modes + nu] += d2v_dR2[mu * n_modes + nu] / N_eff;
+		}
+	}
+
+	// Free the allocated memory
+	free(d2v_dR2);
 }
 
 

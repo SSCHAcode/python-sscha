@@ -806,7 +806,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         return  ReA1
 
 
-    def apply_anharmonic_FT(self, transpose = False, test_weights = True):
+    def apply_anharmonic_FT(self, transpose = False, test_weights = True, use_old_version = False):
         """
         APPLY ANHARMONIC EVOLUTION
         ==========================
@@ -822,6 +822,9 @@ This may be caused by the Lanczos initialized at the wrong temperature.
             test_weights : bool
                 If True, the weights are tested against those computed with finite differences
                 It is time consuming, activate only for debugging
+            use_old_version: bool
+                If true, it employes an old version of the subroutine that does not satisfy the permutation symmetry.
+                Use this option only for testing purpouses.
         """
         #print("Starting with psi:", self.psi)
 
@@ -865,78 +868,95 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         #print("Y1:", Y1)
         #print("T:", self.T)
 
-
-        # Get the weights of the perturbation (psi vector)
-        sscha_HP_odd.GetWeights(self.X, self.w, R1, Y1, self.T, weights)
-
-        if test_weights:
-            other_weights = get_weights_finite_differences(self.X, self.w, self.T, R1, Y1)
-
-            # There is a constant factor that should come from the normalization
-            # But this does not depend on the configuration
-            shift = weights - other_weights 
-
-            # Remove the constant shift coming from renormalization
-            # 1/2 Tr (Y^-1 * Y^{(1)})
-            shift -= np.mean(shift) 
-
-            # Compare the weights
-            disp = np.max(np.abs(shift))
-            dispersion = np.std(weights)
-
-            if disp / dispersion >= 1e-3:
-                print("Perturbation:")
-                print(self.psi)
-
-                print("Weights with C:")
-                print(weights)
-
-                print()
-                print("Weights by finite differences:")
-                print(other_weights)
-
-                print()
-                print("Shifts:")
-                print(weights - other_weights)
-                
-                print()
-                print("Discrepancies (max = {}):".format(disp))
-                i_value = np.argmax(np.abs(shift))
-                print(shift)
-                print("I value of max: {}".format(i_value))
-
-                print("")
-                print("sigma = {}".format(dispersion))
-                print("Weights[{}] = {}".format(i_value, weights[i_value]))
-                print("OtherWeights[{}] = {}".format(i_value, other_weights[i_value]))
-
-
-            assert disp / dispersion < 1e-3, "Error, the weights computed with the C did not pass the test"
-
-        #print("Weights:", weights)
-
-        # Get the averages on the perturbed ensemble
-        w_is = np.tile(self.rho, (self.n_modes, 1)).T
-        w_1 = np.tile(weights, (self.n_modes, 1)).T
-
-        #print("rho shape:", np.shape(self.rho))
-        #print("Shape w_is:", np.shape(w_is))
-
-        # The force average
-        avg_numbers = self.Y * w_is *  w_1 #np.einsum("ia, i, i -> ia", self.Y, w_is, w_1)
-        #print("Shape Y:", np.shape(avg_numbers))
-        f_pert_av = np.sum(avg_numbers, axis = 0) / self.N_eff
-
-
-        #print("Shape F:", np.shape(f_pert_av))
-
+        # Compute the average SSCHA force and potential
+        f_pert_av = np.zeros(self.n_modes, dtype = np.double)
         d2v_pert_av = np.zeros((self.n_modes, self.n_modes), dtype = np.double, order = "C")
-        sscha_HP_odd.Get_D2DR2_PertV(self.X, self.Y, self.w, self.rho, weights, self.T, d2v_pert_av)
 
+        # Check if you need to compute the fourth order
+        apply_d4 = 1
+        if self.ignore_v4:
+            apply_d4 = 0
+
+        # Compute the perturbed averages (the time consuming part is HERE)
+        print("Entering in get pert...")
+        sscha_HP_odd.GetPerturbAverage(self.X, self.Y, self.w, self.rho, R1, Y1, self.T, apply_d4, f_pert_av, d2v_pert_av)
+        print("Out get pert")
 
         print("<f> pert = {}".format(f_pert_av))
         print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
         print()
+
+        # Compute the average with the old version
+        if use_old_version:
+            # Get the weights of the perturbation (psi vector)
+            sscha_HP_odd.GetWeights(self.X, self.w, R1, Y1, self.T, weights)
+
+            if test_weights:
+                other_weights = get_weights_finite_differences(self.X, self.w, self.T, R1, Y1)
+
+                # There is a constant factor that should come from the normalization
+                # But this does not depend on the configuration
+                shift = weights - other_weights 
+
+                # Remove the constant shift coming from renormalization
+                # 1/2 Tr (Y^-1 * Y^{(1)})
+                shift -= np.mean(shift) 
+
+                # Compare the weights
+                disp = np.max(np.abs(shift))
+                dispersion = np.std(weights)
+
+                if disp / dispersion >= 1e-3:
+                    print("Perturbation:")
+                    print(self.psi)
+
+                    print("Weights with C:")
+                    print(weights)
+
+                    print()
+                    print("Weights by finite differences:")
+                    print(other_weights)
+
+                    print()
+                    print("Shifts:")
+                    print(weights - other_weights)
+                    
+                    print()
+                    print("Discrepancies (max = {}):".format(disp))
+                    i_value = np.argmax(np.abs(shift))
+                    print(shift)
+                    print("I value of max: {}".format(i_value))
+
+                    print("")
+                    print("sigma = {}".format(dispersion))
+                    print("Weights[{}] = {}".format(i_value, weights[i_value]))
+                    print("OtherWeights[{}] = {}".format(i_value, other_weights[i_value]))
+
+
+                assert disp / dispersion < 1e-3, "Error, the weights computed with the C did not pass the test"
+
+            #print("Weights:", weights)
+
+            # Get the averages on the perturbed ensemble
+            w_is = np.tile(self.rho, (self.n_modes, 1)).T
+            w_1 = np.tile(weights, (self.n_modes, 1)).T
+
+            #print("rho shape:", np.shape(self.rho))
+            #print("Shape w_is:", np.shape(w_is))
+
+            # The force average
+            avg_numbers = self.Y * w_is *  w_1 #np.einsum("ia, i, i -> ia", self.Y, w_is, w_1)
+            #print("Shape Y:", np.shape(avg_numbers))
+            f_pert_av = np.sum(avg_numbers, axis = 0) / self.N_eff
+
+
+            #print("Shape F:", np.shape(f_pert_av))
+            sscha_HP_odd.Get_D2DR2_PertV(self.X, self.Y, self.w, self.rho, weights, self.T, d2v_pert_av)
+
+
+            print("<f> pert = {}".format(f_pert_av))
+            print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
+            print()
 
 
         # Get the final vector

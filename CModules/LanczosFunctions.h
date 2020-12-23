@@ -208,12 +208,21 @@ double get_d2v_dR2_pert(double * X, double * Y, double *w, double * weights, dou
 /*
  * The following function applies the fast Lanczos (sparse matrix).
  * This exploits the permutation symmetry, and only apply the effect of the D3
+ * This subroutine reset the value of <f>
  */
 void get_f_average_from_Y_pert(const double * X, const double * Y, const double * w, const double * Y1, double T, int n_modes, int n_configs, const double * w_is, double * f_average);
 
 
 // The same as the previous, but on the second derivative of the potential
+// This function reset the value of <d2v/dr2>
 void get_d2v_dR2_from_R_pert(const double * X, const double * Y, const double * w, const double * R1, double T, int n_modes, int n_configs, double * w_is, double * d2v_dR2);
+
+
+// The same as the previous, but computes the second derivative with the perturbation on Y1
+// This includes the D4.
+// Differently from the previous two subroutintes, this one does not reset the <d2v/dr2>,
+// But adds the result on the top of it.
+double get_d2v_dR2_from_Y_pert(const double * X, const double * Y, const double * w, const double * Y1, double T, int n_modes, int n_configs, double * w_is, double * d2v_dR2);
 
 
 /*
