@@ -139,6 +139,7 @@ class Lanczos:
         self.super_structure = None
         self.qe_sym = None
         self.L_linop = None
+        self.M_linop = None
 
         # Perform a bare initialization if the ensemble is not provided
         if ensemble is None:
@@ -244,6 +245,12 @@ class Lanczos:
         def L_transp(psi):
             return self.apply_full_L(psi, transpose= True)
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, rmatvec = L_transp, dtype = TYPE_DP)
+
+        # Define the preconditioner
+        def M_transp(psi):
+            return self.apply_L1_inverse_FT(psi, transpose = True)
+        self.M_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_L1_inverse_FT, rmatvec = M_transp, dtype = TYPE_DP)
+
 
         # Prepare the solution of the Lanczos algorithm
         self.eigvals = None
@@ -713,8 +720,8 @@ class Lanczos:
         n_a = np.zeros(np.shape(w_a), dtype = TYPE_DP)
         n_b = np.zeros(np.shape(w_a), dtype = TYPE_DP)
         if self.T > 0:
-            n_a = 1 / (np.exp( w_a / np.double(CC.Units.K_B * self.T)) - 1)
-            n_b = 1 / (np.exp( w_b / np.double(CC.Units.K_B * self.T)) - 1)
+            n_a = 1 / (np.exp( w_a / np.double(self.T / __RyToK__)) - 1)
+            n_b = 1 / (np.exp( w_b / np.double(self.T / __RyToK__)) - 1)
 
 
         # Apply the non interacting X operator
@@ -762,7 +769,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         return out_vect
 
 
-    def apply_L1_inverse_FT(self, transpose = False):
+    def apply_L1_inverse_FT(self, psi, transpose = False):
         """
         APPLY THE INVERSE L1 AT FINITE TEMPERATURE
         ==========================================
@@ -796,28 +803,27 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         N_w2 = len(w_a)
 
         # Get the harmonic responce function
-        out_vect[:self.n_modes] = (self.psi[:self.n_modes] / self.w) / self.w
+        out_vect[:self.n_modes] = (psi[:self.n_modes] / self.w) / self.w
 
 
         n_a = np.zeros(np.shape(w_a), dtype = TYPE_DP)
         n_b = np.zeros(np.shape(w_a), dtype = TYPE_DP)
         if self.T > 0:
-            n_a = 1 / (np.exp( w_a / np.double(CC.Units.K_B * self.T)) - 1)
-            n_b = 1 / (np.exp( w_b / np.double(CC.Units.K_B * self.T)) - 1)
+            n_a = 1 / (np.exp( w_a / np.double(self.T /__RyToK__)) - 1)
+            n_b = 1 / (np.exp( w_b / np.double(self.T / __RyToK__)) - 1)
 
 
         # Apply the non interacting X operator
         start_Y = self.n_modes
         start_A = self.n_modes + N_w2
 
-        print("start_Y: {} | start_A: {} | end_A: {} | len_psi: {}".format(start_Y, start_A, start_A + N_w2, len(self.psi)))
 
         ERR_MSG ="""
 ERROR,
 The initial vector for the Lanczos algorithm has a wrong dimension. 
 This may be caused by the Lanczos initialized at the wrong temperature.
 """
-        assert len(self.psi) == start_A + N_w2, ERR_MSG
+        assert len(psi) == start_A + N_w2, ERR_MSG
 
         # Get the free two-phonon propagator
         X_ab_NI = -w_a**2 - w_b**2 - (2*w_a *w_b) /( (2*n_a + 1) * (2*n_b + 1))
@@ -832,24 +838,33 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         X1_new = X1_ab_NI / den 
         Y1_new = - X_ab_NI / den
 
-        out_vect[start_Y: start_A] = X_new * self.psi[start_Y: start_A]
+        # Deal with degeneracies in the T = 0K case
+        # Degenerasies come from the redundance of ReA fluctuations (the non pure states) at T = 0K
+        if self.T < __EPSILON__:
+            deg_mask = np.abs(w_a - w_b) < 1e-8
+            X_new[deg_mask] = - 1 / X_ab_NI[deg_mask]
+            Y_new[deg_mask] = 0
+            X1_new[deg_mask] = 0
+            Y1_new[deg_mask] = 0
+
+        out_vect[start_Y: start_A] = X_new * psi[start_Y: start_A]
         if not transpose:
-            out_vect[start_Y : start_A] += Y_new * self.psi[start_A: ]
+            out_vect[start_Y : start_A] += Y_new * psi[start_A: ]
         else:
-            out_vect[start_A:] += Y_new * self.psi[start_Y : start_A]
+            out_vect[start_A:] += Y_new * psi[start_Y : start_A]
 
         #L_operator[start_Y : start_A, start_A:] = - np.diag(Y_ab_NI) * extra_count
         #L_operator[start_Y + np.arange(self.n_modes**2), start_A + exchange_frequencies] -=  Y_ab_NI / 2
 
 
         if not transpose:
-            out_vect[start_A:] += X1_new * self.psi[start_Y: start_A]
+            out_vect[start_A:] += X1_new * psi[start_Y: start_A]
         else:
-            out_vect[start_Y: start_A] += X1_new * self.psi[start_A:]
+            out_vect[start_Y: start_A] += X1_new * psi[start_A:]
         #L_operator[start_A:, start_Y : start_A] = - np.diag(X1_ab_NI) / 1 * extra_count
         #L_operator[start_A + np.arange(self.n_modes**2), start_Y + exchange_frequencies] -= X1_ab_NI / 2
 
-        out_vect[start_A:] += Y1_new * self.psi[start_A:]
+        out_vect[start_A:] += Y1_new * psi[start_A:]
         #L_operator[start_A:, start_A:] = -np.diag(Y1_ab_NI) / 1 * extra_count
         #L_operator[start_A + np.arange(self.n_modes**2),  start_A + exchange_frequencies] -= Y1_ab_NI / 2
 
