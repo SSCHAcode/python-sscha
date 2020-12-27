@@ -33,7 +33,7 @@ In many Linux distributions like ubuntu they can be installed as
 Note that this specific command may change in time. 
 
 
-Together with these mandatory requirements (otherwise, the code will not compile correctly or raise an exception at the startup), we
+Together with these mandatory requirements, we
 strongly recommend installing also the following libraries:
 1. Atomic Simulation Environment (ASE)
 2. SPGLIB
@@ -41,12 +41,19 @@ strongly recommend installing also the following libraries:
 If these packages are available, they will enable the automatic cluster/local calculation of forces (ASE) and the symmetry recognition in the supercell (SPGLIB).
 
 
-To install all the python dependencies (and recommended) automatically, you may just run:
+To install all the python dependencies (and recommended) automatically, you may just run (python3 only):
 
 .. code-block:: console
    
    pip install -r requirements.txt
 
+If, instead, you are using python2, run
+
+.. code-block:: console
+
+   pip install -r requirements2.txt
+
+The difference between python3 and python2 is in the ASE installation; ASE dropped the python2 support starting from 3.17, therefore, if you use python2, yon need to tell pip to install the version 3.16.
 
 
 
@@ -69,8 +76,8 @@ Pip will check for requirements automatically and install them. This method only
 Installation from source
 ------------------------
 
-Once all the dependences of the codes are satisfied, you can unzip the source code downloaded from the website.
-Then run, inside the directory that contains the setup.py script, the following command:
+Once all the dependences of the codes are satisfied, you can unzip the source code downloaded from the website or the Git page.
+Then, inside the directory that contains the setup.py script, run the following command:
 
 .. code-block:: console
 
@@ -83,12 +90,15 @@ As for the pip installation, you may append the --user option to install the pac
 Install with Intel FORTRAN compiler
 -----------------------------------
 
-The setup.py script works automatically with the GNU FORTRAN compiler. However, due to some differences in linking lapack,
+The setup.py script works automatically with the GNU FORTRAN compiler (gfortran). However, due to some differences in linking lapack,
 to use the intel compiler you need to edit a bit the setup.py script:
 
 In this case, you need to delete the lapack linking from the
 setup.py and include the -mkl as linker option.
-Note that you must force to use the same liker compiler as the one used for the compilation. 
+Note that you must force to use the same liker compiler as the one used for the compilation.
+
+You can force the setup.py to use a particular compiler or linker manually setting the following environment variables:
+
 
 Install with a specific compiler path
 -------------------------------------
