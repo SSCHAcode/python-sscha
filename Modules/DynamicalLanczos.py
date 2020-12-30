@@ -833,19 +833,25 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         # Invert the propagator
         den = X_ab_NI * Y1_ab_NI - X1_ab_NI * Y_ab_NI
+
+        # Regularize (avoid non invertibility when w_a = w_b and kbT << w)
+        den_mask = den < __EPSILON__ 
+        den[den_mask] = np.inf
+
         X_new = -Y1_ab_NI / den
         Y_new = Y_ab_NI / den
         X1_new = X1_ab_NI / den 
         Y1_new = - X_ab_NI / den
 
-        # Deal with degeneracies in the T = 0K case
-        # Degenerasies come from the redundance of ReA fluctuations (the non pure states) at T = 0K
-        if self.T < __EPSILON__:
-            deg_mask = np.abs(w_a - w_b) < 1e-8
-            X_new[deg_mask] = - 1 / X_ab_NI[deg_mask]
-            Y_new[deg_mask] = 0
-            X1_new[deg_mask] = 0
-            Y1_new[deg_mask] = 0
+        X_new[den_mask] = - 1 / X_ab_NI[den_mask]
+
+        # If T > 0, then also ReA could be inverted (only if w_a and w_b are thermally populated)
+        if self.T > __EPSILON__:
+            new_mask = w_a == w_b
+            new_mask = (new_mask & den_mask)
+            good_mask = 0.01 * w_a *__RyToK__ > self.T
+            new_mask = (new_mask & good_mask)
+            Y1_new[new_mask] = -1 / Y1_ab_NI[new_mask]
 
         out_vect[start_Y: start_A] = X_new * psi[start_Y: start_A]
         if not transpose:
@@ -1275,7 +1281,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         t2 = timer()
 
         # Apply the quck_lanczos
-        if fast_lanczos:
+        if fast_lanczos and (not self.ignore_v3):
             output += self.apply_anharmonic_FT(transpose)
             t3 = timer()
             t4 = t3
@@ -1416,7 +1422,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
 
 
-    def run_biconjugate_gradient(self, verbose = True, tol = 1e-5, maxiter = 1000, save_g = None, save_each = 1):
+    def run_biconjugate_gradient(self, verbose = True, tol = 1e-5, maxiter = 1000, save_g = None, save_each = 1, use_preconditioning = True):
         """
         STATIC RESPONSE
         ===============
@@ -1437,6 +1443,10 @@ This may be caused by the Lanczos initialized at the wrong temperature.
                 It is saved after a number of steps specified by save_each.
             save_each: int
                 Determines after how many steps to save the green function.
+            use_preconditioning: bool
+                If true, uses the preconditioning to solve the gradient.
+                The precondition is obtained by inverting analytically only the Harmonic propagation of the
+                L matrix
 
         Results
         -------
@@ -1486,8 +1496,14 @@ This may be caused by the Lanczos initialized at the wrong temperature.
                     j[0] += 1
                     x_old[:] = xk
                 
+            # Prepare the preconditioning
+            M_prec = None
+            if use_preconditioning:
+                M_prec = self.M_linop
+
+            # Run the biconjugate gradient
             t1 = time.time()
-            res, info = scipy.sparse.linalg.bicgstab(self.L_linop, self.psi, self.psi, tol = tol, maxiter = maxiter, callback=callback)
+            res, info = scipy.sparse.linalg.bicgstab(self.L_linop, self.psi, self.psi, tol = tol, maxiter = maxiter, callback=callback, M = M_prec)
             t2 = time.time()
 
             if  verbose:
