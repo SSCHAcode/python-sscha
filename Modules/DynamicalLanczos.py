@@ -808,9 +808,15 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         n_a = np.zeros(np.shape(w_a), dtype = TYPE_DP)
         n_b = np.zeros(np.shape(w_a), dtype = TYPE_DP)
+
+        not_populated_mask_a = 0.01 * w_a *__RyToK__ > self.T
+        not_populated_mask_b = 0.01 * w_a *__RyToK__ > self.T
+
         if self.T > 0:
             n_a = 1 / (np.exp( w_a / np.double(self.T /__RyToK__)) - 1)
             n_b = 1 / (np.exp( w_b / np.double(self.T / __RyToK__)) - 1)
+            n_a[not_populated_mask_a] = 0
+            n_b[not_populated_mask_b] = 0
 
 
         # Apply the non interacting X operator
@@ -847,10 +853,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         # If T > 0, then also ReA could be inverted (only if w_a and w_b are thermally populated)
         if self.T > __EPSILON__:
-            new_mask = w_a == w_b
-            new_mask = (new_mask & den_mask)
-            good_mask = 0.01 * w_a *__RyToK__ > self.T
-            new_mask = (new_mask & good_mask)
+            new_mask = (w_a == w_b) & (n_a > __EPSILON__)
             Y1_new[new_mask] = -1 / Y1_ab_NI[new_mask]
 
         out_vect[start_Y: start_A] = X_new * psi[start_Y: start_A]
@@ -1490,6 +1493,8 @@ This may be caused by the Lanczos initialized at the wrong temperature.
             x_old = self.psi.copy()
             j = np.zeros(1, dtype = np.intc)
             def callback(xk, x_old = x_old, j = j):
+                if np.isnan(np.sum(xk)):
+                    raise ValueError("Error, NaN value found during the Biconjugate Gradient.") 
                 if verbose:
                     disp = sum( (xk - x_old)**2)
                     print("BCG STEP {} | solution changed by {} (tol = {})".format(j[0], disp, tol))
@@ -1542,7 +1547,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         # Check the hermitianeity
         disp = np.max(np.abs(G_one_phonon - G_one_phonon.T))
-        assert disp < 1e-5, "Error, the resulting one-phonon Green function is not Hermitian."
+        assert disp < 1e-4, "Error, the resulting one-phonon Green function is not Hermitian."
 
         # Force hermitianity
         G = 0.5 * (G_one_phonon + G_one_phonon.T)
