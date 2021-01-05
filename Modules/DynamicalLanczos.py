@@ -196,6 +196,15 @@ class Lanczos:
         u = ensemble.u_disps  / Ensemble.Bohr
         f = ensemble.forces.reshape(self.N, 3 * self.nat).copy()
         f -= ensemble.sscha_forces.reshape(self.N, 3 * self.nat)
+
+        # Get the average force
+        f_mean = ensemble.get_average_forces(get_error = False)
+        f_mean = np.tile(f_mean, (np.prod(ensemble.current_dyn.GetSupercell()), 1)).ravel()
+
+        # Subtract the SSCHA gradient on nuclei
+        # This allows the correct calculation also if the average force is not zero
+        print(np.shape(f), np.shape(f_mean))
+        f[:, :] -= np.tile(f_mean, (self.N, 1))
         
         # Subtract also the average force to clean more the stochastic noise
         #av_force = ensemble.get_average_forces(get_error = False).ravel()
@@ -210,6 +219,7 @@ class Lanczos:
 
             u /= Ensemble.Bohr
             f *= Ensemble.Bohr
+
 
         # Perform the mass rescale to get the tilde variables
         u *= np.tile(np.sqrt(self.m), (self.N, 1)) 
@@ -519,6 +529,8 @@ class Lanczos:
                 if you want to divide by the quare root use -1, use 0 if you do not want to use the
                 masses.
         """
+        self.reset()
+
 
         self.psi = np.zeros(self.psi.shape, dtype = TYPE_DP)
 
@@ -542,11 +554,14 @@ class Lanczos:
             index : int
                 The index of the mode in the supercell. Starting from 0 (lowest frequency, excluding acoustic modes at Gamma) 
         """
+        
+        self.reset()
 
         self.psi[:] = 0
         self.psi[index] = 1 
         self.perturbation_modulus = 1
 
+        
 
 
     def get_vector_dyn_from_psi(self):
@@ -728,7 +743,7 @@ class Lanczos:
         start_Y = self.n_modes
         start_A = self.n_modes + N_w2
 
-        print("start_Y: {} | start_A: {} | end_A: {} | len_psi: {}".format(start_Y, start_A, start_A + N_w2, len(self.psi)))
+        #print("start_Y: {} | start_A: {} | end_A: {} | len_psi: {}".format(start_Y, start_A, start_A + N_w2, len(self.psi)))
 
         ERR_MSG ="""
 ERROR,
@@ -997,13 +1012,13 @@ This may be caused by the Lanczos initialized at the wrong temperature.
             apply_d4 = 0
 
         # Compute the perturbed averages (the time consuming part is HERE)
-        print("Entering in get pert...")
+        #print("Entering in get pert...")
         sscha_HP_odd.GetPerturbAverage(self.X, self.Y, self.w, self.rho, R1, Y1, self.T, apply_d4, f_pert_av, d2v_pert_av)
-        print("Out get pert")
+        #print("Out get pert")
 
-        print("<f> pert = {}".format(f_pert_av))
-        print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
-        print()
+        #print("<f> pert = {}".format(f_pert_av))
+        #print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
+        #print()
 
         # Compute the average with the old version
         if use_old_version:
@@ -1073,9 +1088,9 @@ This may be caused by the Lanczos initialized at the wrong temperature.
             sscha_HP_odd.Get_D2DR2_PertV(self.X, self.Y, self.w, self.rho, weights, self.T, d2v_pert_av)
 
 
-            print("<f> pert = {}".format(f_pert_av))
-            print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
-            print()
+            #print("<f> pert = {}".format(f_pert_av))
+            #print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
+            #print()
 
 
         # Get the final vector
@@ -1300,9 +1315,9 @@ This may be caused by the Lanczos initialized at the wrong temperature.
                 output += self.apply_L3_FT(transpose)
             t4 = timer()
 
-        print("Time to apply L1: {}".format(t2 - t1))
-        print("Time to apply L2: {}".format(t3-t2))
-        print("Time to apply L3: {}".format(t4-t3))
+        print("Time to apply the full L: {}".format(t4 - t1))
+        #print("Time to apply L2: {}".format(t3-t2))
+        #print("Time to apply L3: {}".format(t4-t3))
 
         # Apply the shift reverse
         #print ("Output before:")
@@ -1425,8 +1440,8 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
 
 
-    def run_biconjugate_gradient(self, verbose = True, tol = 1e-5, maxiter = 1000, save_g = None, save_each = 1, use_preconditioning = True):
-        """
+    def run_biconjugate_gradient(self, verbose = True, tol = 1e-5, maxiter = 1000, save_g = None, save_each = 1, use_preconditioning = True, algorithm = "bicgstab"):
+        r"""
         STATIC RESPONSE
         ===============
 
@@ -1450,6 +1465,19 @@ This may be caused by the Lanczos initialized at the wrong temperature.
                 If true, uses the preconditioning to solve the gradient.
                 The precondition is obtained by inverting analytically only the Harmonic propagation of the
                 L matrix
+            algorithm: string
+                The algorithm used to invert the L matrix. One between:
+                   - bicg : Conjugate Gradient (Default)
+                   - bicgstab : Stabilized Conjugate Gradient.
+                   - cg-minimize: Conjugate Gradient with preconditioned minimization.
+                         This algorithm minimizes the auxiliary function
+                         .. math::
+
+                            f(x) = \frac 12 r H^-1 r
+
+                        where :math:`r = Lx - b` and :math:`H = L^\dagger L`. 
+                        The hessian :math:`H` is guessed neglecting interaction (as for the perfectly harmonic case).
+                It will invoke the corresponding scipy subroutine
 
         Results
         -------
@@ -1475,6 +1503,8 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         if not self.initialized:
             self.prepare_symmetrization()
 
+        j = np.zeros(1, dtype = np.intc)
+        x_old = self.psi.copy()
         for i in range(self.n_modes):
             if verbose:
                 # Print the status
@@ -1490,8 +1520,8 @@ This may be caused by the Lanczos initialized at the wrong temperature.
             self.psi = np.zeros(self.psi.shape, dtype = type(self.psi[0]))
             self.psi[i] = 1
 
-            x_old = self.psi.copy()
-            j = np.zeros(1, dtype = np.intc)
+            x_old[:] = self.psi
+            j[0] = 0
             def callback(xk, x_old = x_old, j = j):
                 if np.isnan(np.sum(xk)):
                     raise ValueError("Error, NaN value found during the Biconjugate Gradient.") 
@@ -1503,12 +1533,76 @@ This may be caused by the Lanczos initialized at the wrong temperature.
                 
             # Prepare the preconditioning
             M_prec = None
+            x0 = self.psi.copy()
             if use_preconditioning:
                 M_prec = self.M_linop
+                x0 = M_prec.matvec(self.psi)
 
             # Run the biconjugate gradient
             t1 = time.time()
-            res, info = scipy.sparse.linalg.bicgstab(self.L_linop, self.psi, self.psi, tol = tol, maxiter = maxiter, callback=callback, M = M_prec)
+            if algorithm.lower() == "bicgstab":
+                res, info = scipy.sparse.linalg.bicgstab(self.L_linop, self.psi, x0 = x0, tol = tol, maxiter = maxiter, callback=callback, M = M_prec)
+            elif algorithm.lower() == "bicg":
+                res, info = scipy.sparse.linalg.bicg(self.L_linop, self.psi, x0 = x0, tol = tol, maxiter = maxiter, callback=callback, M = M_prec)
+            elif algorithm.lower() == "cg-minimize":
+                # This algorithm minimizes f(x) = 1/2  (Lx - b) H^-1 (Lx - b)
+                # where H is the matrix H = L^T L (so it is positive definite). 
+                # We pick the H inverse as the inverse of the SSCHA harmonic solution.  
+                # To find x and compute x = A^-1 b
+
+                # Here we define the function that returns f(x) and its gradient
+                def func(x, b):
+                    # Apply
+                    r = self.L_linop.matvec(x) 
+                    r -= b 
+
+                    # Apply the precondition H^-1 = (L^t L)^-1 => M M^t
+                    if use_preconditioning:
+                        Hinv_r = self.M_linop.rmatvec(r)
+                        Hinv_r = self.M_linop.matvec(Hinv_r)
+                    else:
+                        Hinv_r = r
+
+                    # Now we get the gradient
+                    gradient = self.L_linop.rmatvec(Hinv_r) 
+                    
+                    # We get the function
+                    f = 0.5 * np.sum(r * Hinv_r)
+
+                    if verbose:
+                        print("Evaluated function: value = {} | norm gradient = {}".format(f, np.max(np.abs(gradient))))
+                        print()
+
+                    return f, gradient
+
+                
+                psi_vector = self.psi.copy() 
+
+                # Setup the minimization parameters
+                options = {"gtol" : tol, "maxiter" : maxiter, "disp" : verbose}
+                
+                # Start the minimization
+                results = scipy.optimize.minimize(func, x0, args = (psi_vector), method = "bfgs", jac = True)
+
+                # Get the number of iterations
+                j[0] = results.nit
+
+                # Check the success
+                if results.success:
+                    info = 0
+                else:
+                    info = 1
+
+                if verbose:
+                    print("Minimization terminated after {} evaluations.".format(results.nfev))
+
+                # Get the result
+                res = results.x.copy()
+            else:
+                raise ValueError("""
+Error, algorithm type '{}' in subroutine run_biconjugate_gradient not implemented.
+       the only supported algorithms are ['bicgstab', 'bicg']
+""".format(algorithm))
             t2 = time.time()
 
             if  verbose:
@@ -1517,7 +1611,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
                 print()
 
             # Check if the minimization converged
-            assert info >= 0, "Error on input for the biconjugate gradient algorithm."
+            assert info >= 0, "Error on input for the biconjugate gradient algorithm (info = {})".format(info)
 
             if info > 0:
                 print("The biconjugate gradient (step {}) algorithm did not converge after {} iterations.".format(i+1, maxiter))
@@ -2592,7 +2686,7 @@ Max number of iterations: {}
 
 
             
-    def run_FT(self, n_iter, save_dir = ".", verbose = True):
+    def run_FT(self, n_iter, save_dir = ".", verbose = True, n_rep_orth = 1):
         """
         RUN LANCZOS ITERATIONS FOR FINITE TEMPERATURE
         =============================================
@@ -2610,6 +2704,10 @@ Max number of iterations: {}
                 in order to do a preliminar analysis or restart the calculation later.
             verbose : bool
                 If true all the info during the minimization will be printed on output.
+            n_rep_orth : int
+                The number of times in which the GS orthonormalization is repeated.
+                The higher, the lower the precision of the Lanczos step, the lower, the higher
+                the probability of finding ghost states
         """
 
         # Check if the symmetries has been initialized
@@ -2764,7 +2862,7 @@ or if the acoustic sum rule is not satisfied.
                 norm_p = np.sqrt(new_p.dot(new_p))
                 print("Norm of q = {} and p = {} before Gram-Schmidt".format(norm_q, norm_p))
 
-            for k_orth in range(N_REP_ORTH):
+            for k_orth in range(n_rep_orth):
                 ortho_q = 0
                 ortho_p = 0
                 for j in range(len(self.basis_P)):
@@ -3675,3 +3773,44 @@ def get_weights_finite_differences(u_tilde, w, T, R1, Y1):
     weights = (w_new/w_old - 1) / lambda_small * norm 
 
     return weights
+
+
+def get_full_L_matrix(lanczos):
+    """
+    Return the full L matrix from the Lanczos utilities, by exploiting the linear operator.
+    This is very usefull for testing purpouses.
+
+    NOTE: The memory required to store the full matrix may diverge.
+    """
+
+    n_iters = len(lanczos.psi)
+
+    v = np.zeros(lanczos.psi.shape, dtype = np.double)
+
+    L_matrix = np.zeros((n_iters, n_iters), dtype = np.double)
+
+    for i in range(n_iters):
+        print("Step {} out of {}".format(i+1, n_iters))
+
+        v[:] = 0.0
+        v[i] = 1.0
+        L_matrix[:, i] = lanczos.L_linop.matvec(v)
+
+    return L_matrix
+
+
+def min_stdes(func, args, x0, step = 1e-2, n_iters = 100):
+    """
+    A simple steepest descend algorithm with fixed step. Used for testing purpouses
+    """
+    
+    x = x0.copy()
+    for i in range(n_iters):
+        f, grad = func(x, args)
+
+        x -= grad * step
+
+        print("F: {} | G: {}".format( f, np.sqrt(np.sum(grad**2))))
+    return x
+
+

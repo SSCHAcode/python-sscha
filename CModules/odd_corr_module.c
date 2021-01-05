@@ -463,19 +463,19 @@ static PyObject * Get_Perturb_Averages(PyObject * self, PyObject * args) {
 
   
   // Employ the Y1 to get the average force (D3)
-  printf("Getting f av...\n");
-  fflush(stdout);
+  // printf("Getting f av...\n");
+  // fflush(stdout);
   get_f_average_from_Y_pert(X, Y, w, Y1, T, N_modes, N_configs, rho, force);
 
   // Employ the R1 to get the average of the second derivative of the potential (D3)
-  printf("Getting d2v_dr2 av...\n");
-  fflush(stdout);
+  // printf("Getting d2v_dr2 av...\n");
+  // fflush(stdout);
   get_d2v_dR2_from_R_pert(X, Y, w, R1, T, N_modes, N_configs, rho, d2vdr2);
 
   // Employ Y1 to get the average of the second derivative of the potential (D4)
   if (apply_D4) {
-    printf("Getting d2v_dr2 av from d4...\n");
-    fflush(stdout);
+    // printf("Getting d2v_dr2 av from d4...\n");
+    // fflush(stdout);
     get_d2v_dR2_from_Y_pert(X, Y, w, Y1, T, N_modes, N_configs, rho, d2vdr2);
   }
 
