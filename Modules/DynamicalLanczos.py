@@ -122,8 +122,9 @@ class Lanczos:
         self.b_coeffs = [] # Coefficients close to the diagonal
         self.c_coeffs = [] # Coefficients in the case of the biconjugate Lanczos
         self.krilov_basis = [] # The basis of the krilov subspace
-        self.basis_P = [] # The basis of the P vectors for the biconjugate Lanczos
+        self.basis_P = [] # The basis of the P vectors for the biconjugate Lanczos (normalized)
         self.basis_Q = [] # The basis of the Q vectors for the biconjugate Lanczos
+        self.s_norm = [] # Store the normalization of the s vector, this allows to rebuild the correct p when needed. 
         self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
         self.reverse_L = False
         self.shift_value = 0
@@ -333,6 +334,7 @@ class Lanczos:
         # The krilov basis for the symmetric and unsymmetric Lanczos
         self.basis_P = []
         self.basis_Q = []
+        self.s_norm = []
         self.krilov_basis = [] # The basis of the krilov subspace
         self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
 
@@ -2684,7 +2686,6 @@ Max number of iterations: {}
         return L_operator
 
 
-
             
     def run_FT(self, n_iter, save_dir = ".", verbose = True, n_rep_orth = 1):
         """
@@ -2756,13 +2757,16 @@ Max number of iterations: {}
         if i_step == 0:
             self.basis_Q = []
             self.basis_P = []
+            self.s_norm = []
             first_vector = self.psi / np.sqrt(self.psi.dot(self.psi))
             self.basis_Q.append(first_vector)
             self.basis_P.append(first_vector)
+            self.s_norm.append(1)
         else:
             # Convert everything in a list
             self.basis_Q = list(self.basis_Q)
             self.basis_P = list(self.basis_P)
+            self.s_norm = list(self.s_norm)
             self.a_coeffs = list(self.a_coeffs)
             self.b_coeffs = list(self.b_coeffs)
             self.c_coeffs = list(self.c_coeffs)
@@ -2774,6 +2778,7 @@ Max number of iterations: {}
                 raise ValueError("Error the starting krilov basis does not matches the matrix, Look stdout.")
 
         assert len(self.basis_Q) == len(self.basis_P), "Something wrong when restoring the Lanczos."
+        assert len(self.s_norm) == len(self.basis_P), "Something wrong when restarting the Lanczos."
         assert len(self.b_coeffs) == len(self.c_coeffs), "Something wrong when restoring the Lanczos. {} {}".format(len(self.b_coeffs), len(self.c_coeffs))
 
 
@@ -2800,7 +2805,7 @@ Max number of iterations: {}
             t1 = time.time()
 
             L_q = self.L_linop.matvec(psi_q)
-            p_L = self.L_linop.rmatvec(psi_p)
+            p_L = self.L_linop.rmatvec(psi_p) # psi_p is normalized (this must be considered when computing c coeff) 
             t2 = time.time()
 
             if verbose:
@@ -2811,8 +2816,14 @@ Max number of iterations: {}
             #if verbose:
             #    print("Time to apply the full L: %d s" % (t2 -t1))
 
+            # Get the normalization of p_k (with respect to s_k)
+            c_old = 1
+            if len(self.c_coeffs) > 0:
+                c_old = self.c_coeffs[-1]
+            p_norm = self.s_norm[-1] / c_old
+
             # Get the a coefficient
-            a_coeff = psi_p.dot(L_q)
+            a_coeff = psi_p.dot(L_q) * p_norm
 
             # Check if something whent wrong
             if np.isnan(a_coeff):
@@ -2834,9 +2845,13 @@ or if the acoustic sum rule is not satisfied.
             if len(self.basis_P) > 1:
                 print("Removing p")
                 sk -= self.b_coeffs[-1] * self.basis_P[-2]
+
+            # Get the normalization of sk 
+            s_norm = np.sqrt(sk.dot(sk))
+            sk_tilde = sk / s_norm # This normalization regularizes the lanczos
             
             b_coeff = np.sqrt( rk.dot(rk) )
-            c_coeff = sk.dot(rk) / b_coeff
+            c_coeff = (sk_tilde.dot(rk / b_coeff)) * s_norm
 
             print("Modulus of rk: {}".format(b_coeff))
             print("Modulus of sk: {}".format(np.sqrt(sk.dot(sk))))
@@ -2863,18 +2878,24 @@ or if the acoustic sum rule is not satisfied.
 
             # Get the vectors for the next iteration
             psi_q = rk / b_coeff
-            psi_p = sk / c_coeff  
+
+            # psi_p is the normalized p vector, the sk_tilde one
+            psi_p = sk_tilde.copy()
+
+            # AFTER THIS p_norm refers to the norm of P in the previous step as psi_p has been updated
 
 
-            print("Check c = ", psi_q.dot(p_L))
+            print("Check c = ", psi_q.dot(p_L) * p_norm)
 
 
             if verbose:
                 # Check the tridiagonality
                 print("Tridiagonal matrix:")
                 for k in range(len(self.basis_P)):
-                    print("p_{:d} L q_{:d} = {}".format(k, len(self.basis_P)-1, self.basis_P[k].dot(L_q)))
-                print("p_{:d} L q_{:d} = {}".format(len(self.basis_P), len(self.basis_P)-1, psi_p.dot(L_q)))
+                    pp_norm = self.s_norm[k] / self.c_coeffs[k]
+                    print("p_{:d} L q_{:d} = {}".format(k, len(self.basis_P)-1, pp_norm* self.basis_P[k].dot(L_q)))
+                pp_norm = s_norm / c_coeff
+                print("p_{:d} L q_{:d} = {}".format(len(self.basis_P), len(self.basis_P)-1, pp_norm* psi_p.dot(L_q)))
 
             t1 = time.time()
 
@@ -2894,8 +2915,9 @@ or if the acoustic sum rule is not satisfied.
                 print("GS orthogonality check: (should all be zeros)")
                 print("step) Q dot old Ps  | P dot old Qs")
                 for k in range(len(self.basis_P)):
-                    q_dot_pold = self.basis_P[k].dot(new_q)
-                    p_dot_qold = self.basis_Q[k].dot(new_p)
+                    pp_norm = self.s_norm[k] / self.c_coeffs[k]
+                    q_dot_pold = self.basis_P[k].dot(new_q) * pp_norm
+                    p_dot_qold = self.basis_Q[k].dot(new_p) * pp_norm
                     print("{:4d}) {:16.8e} | {:16.8e}".format(k, q_dot_pold, p_dot_qold))
 
 
@@ -2903,7 +2925,7 @@ or if the acoustic sum rule is not satisfied.
                 ortho_q = 0
                 ortho_p = 0
                 for j in range(len(self.basis_P)):
-                    coeff1 = self.basis_P[j].dot(new_q) / np.sqrt(self.basis_P[j].dot(self.basis_P[j]))
+                    coeff1 = self.basis_P[j].dot(new_q)
                     coeff2 = self.basis_Q[j].dot(new_p)
 
                     # Gram Schmidt
@@ -2931,8 +2953,8 @@ or if the acoustic sum rule is not satisfied.
                 
                 new_q /= normq
 
-                # Normalize the p with respect to the scalar product with q
-                normp = new_p.dot(new_q)
+                # Normalize the p vector
+                normp = new_p.dot(new_p)
                 if verbose:
                     print("Vector norm (p biconjugate) after GS number {}: {:16.8e}".format(k_orth, normp))
 
@@ -2944,6 +2966,10 @@ or if the acoustic sum rule is not satisfied.
                         print("The algorithm converged.")
             
                 new_p /= normp
+
+                # Now we need to update s_norm to enforce p dot q = 1
+                s_norm = c_coeff / new_p.dot(new_q)
+
 
                 # We have a correctly satisfied orthogonality condition
                 if ortho_p < __EPSILON__ and ortho_q < __EPSILON__:
@@ -2959,6 +2985,7 @@ or if the acoustic sum rule is not satisfied.
                 # Add the new coefficients to the Arnoldi matrix
                 self.b_coeffs.append(b_coeff)
                 self.c_coeffs.append(c_coeff)
+                self.s_norm.append(s_norm)
 
             t2 = time.time()
 
