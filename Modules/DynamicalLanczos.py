@@ -1440,7 +1440,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         self.L_linop = scipy.sparse.linalg.LinearOperator(shape = (len(self.psi), len(self.psi)), matvec = self.apply_full_L, dtype = TYPE_DP)
 
 
-    def run_biconjugate_gradient(self, verbose = True, tol = 1e-5, maxiter = 1000, save_g = None, save_each = 1, use_preconditioning = True, algorithm = "bicgstab"):
+    def run_biconjugate_gradient(self, verbose = True, tol = 5e-4, maxiter = 1000, save_g = None, save_each = 1, use_preconditioning = True, algorithm = "bicgstab"):
         r"""
         STATIC RESPONSE
         ===============
@@ -1570,7 +1570,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
                     f = 0.5 * np.sum(r * Hinv_r)
 
                     if verbose:
-                        print("Evaluated function: value = {} | norm gradient = {}".format(f, np.max(np.abs(gradient))))
+                        print("Evaluated function: value = {} | norm gradient = {}".format(f, np.sum(gradient**2)))
                         print()
 
                     return f, gradient
@@ -1579,10 +1579,10 @@ This may be caused by the Lanczos initialized at the wrong temperature.
                 psi_vector = self.psi.copy() 
 
                 # Setup the minimization parameters
-                options = {"gtol" : tol, "maxiter" : maxiter, "disp" : verbose}
+                options = {"gtol" : tol, "maxiter" : maxiter, "disp" : verbose, "norm" : 2}
                 
                 # Start the minimization
-                results = scipy.optimize.minimize(func, x0, args = (psi_vector), method = "bfgs", jac = True)
+                results = scipy.optimize.minimize(func, x0, args = (psi_vector), method = "bfgs", jac = True, options=options)
 
                 # Get the number of iterations
                 j[0] = results.nit
@@ -2804,7 +2804,12 @@ Max number of iterations: {}
             t2 = time.time()
 
             if verbose:
-                print("Time to apply the full L: %d s" % (t2 -t1))
+                print("Modulus of L_q: {}".format(np.sqrt(L_q.dot(L_q))))
+                print("Modulus of p_L: {}".format(np.sqrt(p_L.dot(p_L))))
+
+
+            #if verbose:
+            #    print("Time to apply the full L: %d s" % (t2 -t1))
 
             # Get the a coefficient
             a_coeff = psi_p.dot(L_q)
@@ -2822,14 +2827,25 @@ or if the acoustic sum rule is not satisfied.
             # Get the two residual vectors
             rk = L_q - a_coeff * psi_q 
             if len(self.basis_Q) > 1:
+                print("Removing q")
                 rk -= self.c_coeffs[-1] * self.basis_Q[-2]
 
             sk = p_L - a_coeff * psi_p 
             if len(self.basis_P) > 1:
+                print("Removing p")
                 sk -= self.b_coeffs[-1] * self.basis_P[-2]
             
             b_coeff = np.sqrt( rk.dot(rk) )
             c_coeff = sk.dot(rk) / b_coeff
+
+            print("Modulus of rk: {}".format(b_coeff))
+            print("Modulus of sk: {}".format(np.sqrt(sk.dot(sk))))
+
+            if verbose:
+                print("Direct computation resulted in:")
+                print("     |  a = {}".format(a_coeff))
+                print("     |  b = {}".format(b_coeff))
+                print("     |  c = {}".format(c_coeff))
 
             # Check the convergence
             self.a_coeffs.append(a_coeff)
@@ -2847,7 +2863,18 @@ or if the acoustic sum rule is not satisfied.
 
             # Get the vectors for the next iteration
             psi_q = rk / b_coeff
-            psi_p = sk / c_coeff
+            psi_p = sk / c_coeff  
+
+
+            print("Check c = ", psi_q.dot(p_L))
+
+
+            if verbose:
+                # Check the tridiagonality
+                print("Tridiagonal matrix:")
+                for k in range(len(self.basis_P)):
+                    print("p_{:d} L q_{:d} = {}".format(k, len(self.basis_P)-1, self.basis_P[k].dot(L_q)))
+                print("p_{:d} L q_{:d} = {}".format(len(self.basis_P), len(self.basis_P)-1, psi_p.dot(L_q)))
 
             t1 = time.time()
 
@@ -2861,6 +2888,16 @@ or if the acoustic sum rule is not satisfied.
                 norm_q = np.sqrt(new_q.dot(new_q))
                 norm_p = np.sqrt(new_p.dot(new_p))
                 print("Norm of q = {} and p = {} before Gram-Schmidt".format(norm_q, norm_p))
+                print("current p dot q = {} (should be 1)".format(new_q.dot(new_p)))
+
+                # Check the Gram-Schmidt
+                print("GS orthogonality check: (should all be zeros)")
+                print("step) Q dot old Ps  | P dot old Qs")
+                for k in range(len(self.basis_P)):
+                    q_dot_pold = self.basis_P[k].dot(new_q)
+                    p_dot_qold = self.basis_Q[k].dot(new_p)
+                    print("{:4d}) {:16.8e} | {:16.8e}".format(k, q_dot_pold, p_dot_qold))
+
 
             for k_orth in range(n_rep_orth):
                 ortho_q = 0
@@ -2916,8 +2953,8 @@ or if the acoustic sum rule is not satisfied.
             if not converged:
                 self.basis_Q.append(new_q)
                 self.basis_P.append(new_p)
-                psi_q = new_q
-                psi_p = new_p
+                psi_q = new_q.copy()
+                psi_p = new_p.copy()
 
                 # Add the new coefficients to the Arnoldi matrix
                 self.b_coeffs.append(b_coeff)
@@ -2930,9 +2967,9 @@ or if the acoustic sum rule is not satisfied.
                 print("Time to perform the Gram-Schmidt and retrive the coefficients: %d s" % (t2-t1))
                 print()
                 print("a_%d = %.8e" % (i, self.a_coeffs[-1]))
-                if i > 0:
-                    print("b_%d = %.8e" % (i, self.b_coeffs[-1]))
-                    print("c_%d = %.8e" % (i, self.c_coeffs[-1]))
+                
+                print("b_%d = %.8e" % (i, self.b_coeffs[-1]))
+                print("c_%d = %.8e" % (i, self.c_coeffs[-1]))
                 print()
             
             # Save the step
