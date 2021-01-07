@@ -2788,6 +2788,7 @@ Max number of iterations: {}
 
         print("Q basis:", self.basis_Q)
         print("P basis:", self.basis_P)
+        print("S norm:", self.s_norm)
         print("SHAPE PSI Q, P :", psi_q.shape, psi_p.shape)
 
         next_converged = False
@@ -2821,6 +2822,7 @@ Max number of iterations: {}
             if len(self.c_coeffs) > 0:
                 c_old = self.c_coeffs[-1]
             p_norm = self.s_norm[-1] / c_old
+            print("p_norm: {}".format(p_norm))
 
             # Get the a coefficient
             a_coeff = psi_p.dot(L_q) * p_norm
@@ -2844,7 +2846,14 @@ or if the acoustic sum rule is not satisfied.
             sk = p_L - a_coeff * psi_p 
             if len(self.basis_P) > 1:
                 print("Removing p")
-                sk -= self.b_coeffs[-1] * self.basis_P[-2]
+                # Get the multiplication factor to rescale the old p to the normalization of the new one.
+                if len(self.c_coeffs) <= 2:
+                    old_p_norm = self.s_norm[-2]
+                else:
+                    old_p_norm = self.s_norm[-2] / self.c_coeffs[-3]
+
+                # TODO: Check whether it better to use this or the default norms to update sk
+                sk -= self.b_coeffs[-1] * self.basis_P[-2] * (old_p_norm / p_norm)
 
             # Get the normalization of sk 
             s_norm = np.sqrt(sk.dot(sk))
@@ -2852,6 +2861,8 @@ or if the acoustic sum rule is not satisfied.
             
             b_coeff = np.sqrt( rk.dot(rk) )
             c_coeff = (sk_tilde.dot(rk / b_coeff)) * s_norm
+
+            print("new p norm: {}".format(s_norm / c_coeff))
 
             print("Modulus of rk: {}".format(b_coeff))
             print("Modulus of sk: {}".format(np.sqrt(sk.dot(sk))))
@@ -2882,20 +2893,36 @@ or if the acoustic sum rule is not satisfied.
             # psi_p is the normalized p vector, the sk_tilde one
             psi_p = sk_tilde.copy()
 
+
             # AFTER THIS p_norm refers to the norm of P in the previous step as psi_p has been updated
 
 
-            print("Check c = ", psi_q.dot(p_L) * p_norm)
+            print("1) Check c = ", psi_q.dot(p_L) * p_norm)
+            print("2) Check b = ", psi_p.dot(L_q) * s_norm / c_coeff)
+
 
 
             if verbose:
                 # Check the tridiagonality
-                print("Tridiagonal matrix:")
+                print("Tridiagonal matrix: (lenp: {}, lens: {})".format(len(self.basis_P), len(self.s_norm)))
                 for k in range(len(self.basis_P)):
-                    pp_norm = self.s_norm[k] / self.c_coeffs[k]
-                    print("p_{:d} L q_{:d} = {}".format(k, len(self.basis_P)-1, pp_norm* self.basis_P[k].dot(L_q)))
+                    if k >= 1:
+                        pp_norm = self.s_norm[k] / self.c_coeffs[k-1]
+                    else:
+                        pp_norm = self.s_norm[k]
+
+                    print("p_{:d} L q_{:d} = {} | p_{:d} norm = {}".format(k, len(self.basis_P)-1, pp_norm* self.basis_P[k].dot(L_q), k, pp_norm))
                 pp_norm = s_norm / c_coeff
-                print("p_{:d} L q_{:d} = {}".format(len(self.basis_P), len(self.basis_P)-1, pp_norm* psi_p.dot(L_q)))
+                print("p_{:d} L q_{:d} = {} | p_{:d} norm = {}".format(len(self.basis_P), len(self.basis_P)-1, pp_norm* psi_p.dot(L_q), k+1, pp_norm))
+
+
+                # Check the tridiagonality
+                print()
+                print("Transposed:".format(len(self.basis_P), len(self.s_norm)))
+                for k in range(len(self.basis_Q)):
+                    print("q_{:d} L^T p_{:d} = {} | p_{:d} norm = {}".format(k, len(self.basis_P)-1, p_norm* self.basis_Q[k].dot(p_L), k, p_norm))
+                print("q_{:d} L^T p_{:d} = {} | p_{:d} norm = {}".format(len(self.basis_P), len(self.basis_P)-1, p_norm* psi_q.dot(p_L), k+1, p_norm))
+
 
             t1 = time.time()
 
@@ -2909,13 +2936,17 @@ or if the acoustic sum rule is not satisfied.
                 norm_q = np.sqrt(new_q.dot(new_q))
                 norm_p = np.sqrt(new_p.dot(new_p))
                 print("Norm of q = {} and p = {} before Gram-Schmidt".format(norm_q, norm_p))
-                print("current p dot q = {} (should be 1)".format(new_q.dot(new_p)))
+                print("current p dot q = {} (should be 1)".format(new_q.dot(new_p) * s_norm / c_coeff))
 
                 # Check the Gram-Schmidt
                 print("GS orthogonality check: (should all be zeros)")
                 print("step) Q dot old Ps  | P dot old Qs")
                 for k in range(len(self.basis_P)):
-                    pp_norm = self.s_norm[k] / self.c_coeffs[k]
+                    if k >= 1:
+                        pp_norm = self.s_norm[k] / self.c_coeffs[k-1]
+                    else:
+                        pp_norm = self.s_norm[k]
+                        
                     q_dot_pold = self.basis_P[k].dot(new_q) * pp_norm
                     p_dot_qold = self.basis_Q[k].dot(new_p) * pp_norm
                     print("{:4d}) {:16.8e} | {:16.8e}".format(k, q_dot_pold, p_dot_qold))
@@ -3839,7 +3870,7 @@ def get_weights_finite_differences(u_tilde, w, T, R1, Y1):
     return weights
 
 
-def get_full_L_matrix(lanczos):
+def get_full_L_matrix(lanczos, transpose = False):
     """
     Return the full L matrix from the Lanczos utilities, by exploiting the linear operator.
     This is very usefull for testing purpouses.
@@ -3858,9 +3889,14 @@ def get_full_L_matrix(lanczos):
 
         v[:] = 0.0
         v[i] = 1.0
-        L_matrix[:, i] = lanczos.L_linop.matvec(v)
+
+        if transpose:
+            L_matrix[:, i] = lanczos.L_linop.rmatvec(v)
+        else:
+            L_matrix[:, i] = lanczos.L_linop.matvec(v)
 
     return L_matrix
+
 
 
 def min_stdes(func, args, x0, step = 1e-2, n_iters = 100):
