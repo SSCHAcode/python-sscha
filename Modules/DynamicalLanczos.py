@@ -174,7 +174,7 @@ class Lanczos:
         trans_mask = CC.Methods.get_translations(pols, m)
 
         # If requested, isolate only the specified modes.
-        good_mask = trans_mask
+        good_mask = ~trans_mask
         if select_modes is not None:
             if len(select_modes) != len(trans_mask):
                 raise ValueError("""
@@ -1049,8 +1049,8 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         sscha_HP_odd.GetPerturbAverage(self.X, self.Y, self.w, self.rho, R1, Y1, self.T, apply_d4, f_pert_av, d2v_pert_av)
         #print("Out get pert")
 
-        print("<f> pert = {}".format(f_pert_av))
-        print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
+        #print("<f> pert = {}".format(f_pert_av))
+        #print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
         #print()
 
         # Compute the average with the old version
@@ -2876,12 +2876,16 @@ or if the acoustic sum rule is not satisfied.
 
             sk = p_L - a_coeff * psi_p 
             if len(self.basis_P) > 1:
-                print("Removing p")
                 # Get the multiplication factor to rescale the old p to the normalization of the new one.
-                if len(self.c_coeffs) <= 2:
+                if len(self.c_coeffs) < 2:
                     old_p_norm = self.s_norm[-2]
                 else:
-                    old_p_norm = self.s_norm[-2] / self.c_coeffs[-3]
+                    print("also c")
+                    old_p_norm = self.s_norm[-2] / self.c_coeffs[-2] 
+                    # C is smaller than s_norm as it does not contain the first vector
+                    # But this does not matter as we are counting from the end of the array
+
+                print("Removing p: current norm {} | old norm {}".format(p_norm, old_p_norm))
 
                 # TODO: Check whether it better to use this or the default norms to update sk
                 sk -= self.b_coeffs[-1] * self.basis_P[-2] * (old_p_norm / p_norm)
@@ -2889,9 +2893,10 @@ or if the acoustic sum rule is not satisfied.
             # Get the normalization of sk 
             s_norm = np.sqrt(sk.dot(sk))
             sk_tilde = sk / s_norm # This normalization regularizes the lanczos
+            s_norm *= p_norm # Add the p normalization of L^t p that was divided from the s_k
             
             b_coeff = np.sqrt( rk.dot(rk) )
-            c_coeff = (sk_tilde.dot(rk / b_coeff)) * s_norm
+            c_coeff = (sk_tilde.dot(rk / b_coeff)) * s_norm 
 
             print("new p norm: {}".format(s_norm / c_coeff))
 
