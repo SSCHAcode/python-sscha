@@ -407,6 +407,18 @@ def test_lanczos_1d(plot = False):
     print(lanc.psi)
     print()
 
+    # Get the L and Lt to test hermitianity
+    L = sscha.DynamicalLanczos.get_full_L_matrix(lanc)
+    Lt = sscha.DynamicalLanczos.get_full_L_matrix(lanc)
+
+    disp = np.max(np.abs(L - Lt.T)) / np.max(np.abs(L))
+    print("Discrepance between L and Lt: {}".format(disp))
+
+    np.savetxt("L.dat", L)
+    np.savetxt("Lt.dat", Lt)
+
+    assert disp < 1e-6, "Error, L application is not correctly transposed."
+
 
     lanc.run_FT(10)
 

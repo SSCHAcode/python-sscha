@@ -69,7 +69,7 @@ MODE_SLOW_SERIAL = 0
 
 
 class Lanczos:
-    def __init__(self, ensemble = None, mode = 1, unwrap_symmetries = True):
+    def __init__(self, ensemble = None, mode = 1, unwrap_symmetries = True, select_modes = None):
         """
         INITIALIZE THE LANCZOS
         ======================
@@ -90,6 +90,9 @@ class Lanczos:
             unwrap_symmetries : bool
                 If true (default), the ensemble is unwrapped to respect the symmetries.
                 This requires SPGLIB installed.
+            select_modes : ndarray(size = n_modes, dtype = bool)
+                A mask for each mode, if False, the mode is neglected. Use this to exclude some modes that you know are not
+                involved in the calculation. If not specified, all modes are considered by default.
 
         """
 
@@ -170,9 +173,24 @@ class Lanczos:
         # Remove the translations
         trans_mask = CC.Methods.get_translations(pols, m)
 
+        # If requested, isolate only the specified modes.
+        good_mask = trans_mask
+        if select_modes is not None:
+            if len(select_modes) != len(trans_mask):
+                raise ValueError("""
+Error, 'select_modes' should be an array of the same lenght of the number of modes.
+ n_modes = {} | len(select_modes) = {}
+""".format(len(ws), len(select_modes)))
+
+            good_mask = (~trans_mask) & select_modes
+
         # Get the polarization vectors
-        self.w = ws[~trans_mask]
-        self.pols = pols[:, ~trans_mask]
+        self.w = ws[good_mask]
+        self.pols = pols[:, good_mask]
+
+        # Correctly reshape the polarization in case only one mode is selected
+        if len(self.w) == 1:
+            self.pols = self.pols.reshape((len(self.m), 1))
 
         self.n_modes = len(self.w)
 
@@ -917,6 +935,13 @@ This may be caused by the Lanczos initialized at the wrong temperature.
             # Fill symmetric
             Y1[i, :i] = Y1[:i, i]
 
+        # Normalize each term outside the diagonal
+        norm_mask = np.ones((self.n_modes, self.n_modes), dtype = np.double) / 2
+        np.fill_diagonal(norm_mask, 1)
+
+        Y1 *= norm_mask
+
+
         return  Y1
 
 
@@ -938,6 +963,12 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
             # Fill symmetric
             ReA1[i, :i] = ReA1[:i, i]
+
+        # Normalize each term outside the diagonal
+        norm_mask = np.ones((self.n_modes, self.n_modes), dtype = np.double) / 2
+        np.fill_diagonal(norm_mask, 1)
+
+        ReA1 *= norm_mask
 
         return  ReA1
 
@@ -989,7 +1020,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
             coeff_RA = np.einsum("a, b, b -> ab", Y_w, ReA_w, Y_w)
             coeff_RA += np.einsum("a, a, b -> ab", Y_w, ReA_w, Y_w)
-            coeff_RA += 2
+            coeff_RA *= 2
 
             # Get the new perturbation
             Y1_new = Y1 * coeff_Y + ReA1 * coeff_RA
@@ -1018,8 +1049,8 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         sscha_HP_odd.GetPerturbAverage(self.X, self.Y, self.w, self.rho, R1, Y1, self.T, apply_d4, f_pert_av, d2v_pert_av)
         #print("Out get pert")
 
-        #print("<f> pert = {}".format(f_pert_av))
-        #print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
+        print("<f> pert = {}".format(f_pert_av))
+        print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
         #print()
 
         # Compute the average with the old version

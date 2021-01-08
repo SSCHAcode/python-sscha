@@ -426,10 +426,11 @@ static PyObject * Get_Perturb_Averages(PyObject * self, PyObject * args) {
     return NULL;
   
   // Check the array memory setting
-  if (npy_X->flags & NPY_ARRAY_F_CONTIGUOUS) {
-    index_mode = 0;
-    index_config = 1;
-  }
+  // if (npy_X->flags & NPY_ARRAY_F_CONTIGUOUS) {
+  //   index_mode = 0;
+  //   index_config = 1;
+  //   fprintf(stderr, "F contigouos\n");
+  // }
   
 
   // Get the dimension of the arrays
