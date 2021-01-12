@@ -68,7 +68,7 @@ MODE_FAST_SERIAL = 1
 MODE_SLOW_SERIAL = 0
 
 
-class Lanczos:
+class Lanczos(object):
     def __init__(self, ensemble = None, mode = 1, unwrap_symmetries = True, select_modes = None):
         """
         INITIALIZE THE LANCZOS
