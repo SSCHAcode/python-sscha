@@ -915,7 +915,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         return out_vect
 
-    def get_Y1(self):
+    def get_Y1(self, half_off_diagonal = False):
         """
         Get the perturbation on the Y matrix from the psi vector
         """
@@ -936,18 +936,21 @@ This may be caused by the Lanczos initialized at the wrong temperature.
             Y1[i, :i] = Y1[:i, i]
 
         # Normalize each term outside the diagonal
-        norm_mask = np.ones((self.n_modes, self.n_modes), dtype = np.double) / 2
-        np.fill_diagonal(norm_mask, 1)
+        if half_off_diagonal:
+            norm_mask = np.ones((self.n_modes, self.n_modes), dtype = np.double) / 2
+            np.fill_diagonal(norm_mask, 1)
 
-        Y1 *= norm_mask
+            Y1 *= norm_mask
 
 
         return  Y1
 
 
-    def get_ReA1(self):
+    def get_ReA1(self, half_off_diagonal = False):
         """
-        Get the perturbation on the ReA matrix from the psi vector
+        Get the perturbation on the ReA matrix from the psi vector.
+
+        If half_the_off_diagonal is true, divide by 2 the off-diagonal elements
         """
         start_A = self.n_modes +  (self.n_modes * (self.n_modes + 1)) // 2
 
@@ -965,10 +968,11 @@ This may be caused by the Lanczos initialized at the wrong temperature.
             ReA1[i, :i] = ReA1[:i, i]
 
         # Normalize each term outside the diagonal
-        norm_mask = np.ones((self.n_modes, self.n_modes), dtype = np.double) / 2
-        np.fill_diagonal(norm_mask, 1)
+        if half_off_diagonal:
+            norm_mask = np.ones((self.n_modes, self.n_modes), dtype = np.double) / 2
+            np.fill_diagonal(norm_mask, 1)
 
-        ReA1 *= norm_mask
+            ReA1 *= norm_mask
 
         return  ReA1
 
@@ -995,7 +999,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         """
         #print("Starting with psi:", self.psi)
 
-        Y1 = self.get_Y1()
+        Y1 = self.get_Y1(half_off_diagonal = transpose)
         R1 = self.psi[: self.n_modes]
 
         weights = np.zeros(self.N, dtype = np.double)
@@ -1010,7 +1014,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         # Check if we must compute the transpose
         if transpose:
-            ReA1 = self.get_ReA1()
+            ReA1 = self.get_ReA1(half_off_diagonal = transpose)
 
             # The equation is
             # Y^(1)_new = 2 Ya Yb^2 Y^(1) + 2 Yb Ya^2 Y^(1)
@@ -1141,6 +1145,14 @@ This may be caused by the Lanczos initialized at the wrong temperature.
             Y_inv = 1 / Y_w
             pert_Y = 0.5 * np.einsum("a, ab, b -> ab", Y_inv, d2v_pert_av, Y_inv)
             pert_RA = np.zeros(pert_Y.shape, dtype = np.double)
+
+            # Now double the off diagonal values of pert_Y and pert_RA
+            # This is to take into account the symmetric storage of psi
+            sym_mask = np.ones(pert_Y.shape) * 2 
+            np.fill_diagonal(sym_mask, 1) 
+            pert_Y *= sym_mask 
+            pert_RA *= sym_mask
+
 
         # Now get the perturbation on the vector
         current = self.n_modes
@@ -1566,10 +1578,10 @@ This may be caused by the Lanczos initialized at the wrong temperature.
                 
             # Prepare the preconditioning
             M_prec = None
-            x0 = self.psi.copy()
+            x0 = self.M_linop.matvec(self.psi)
             if use_preconditioning:
                 M_prec = self.M_linop
-                x0 = M_prec.matvec(self.psi)
+                #x0 = M_prec.matvec(self.psi)
 
             # Run the biconjugate gradient
             t1 = time.time()
@@ -1644,7 +1656,7 @@ Error, algorithm type '{}' in subroutine run_biconjugate_gradient not implemente
                 print()
 
             # Check if the minimization converged
-            assert info >= 0, "Error on input for the biconjugate gradient algorithm (info = {})".format(info)
+            assert info >= 0, "Error on input or breakdown of biconjugate gradient algorithm (info = {})".format(info)
 
             if info > 0:
                 print("The biconjugate gradient (step {}) algorithm did not converge after {} iterations.".format(i+1, maxiter))
