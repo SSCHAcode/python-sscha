@@ -1909,6 +1909,7 @@ double get_d2v_dR2_from_Y_pert(const double * X, const double * Y, const double 
 }
 
 
+// Deprecated
 double get_d2v_dR2_pert(double * X, double * Y, double *w, double * weights, double * w_is, double T, int n_modes, int n_configs, double * d2v_dR2) {
 	int i, mu, nu;
 
