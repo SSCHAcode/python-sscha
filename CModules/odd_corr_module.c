@@ -28,6 +28,7 @@ static PyObject *ApplyV4_FT(PyObject * self, PyObject * args);
 static PyObject *GetWeights(PyObject * self, PyObject * args);
 static PyObject *Get_D2DR2_PertV(PyObject * self, PyObject * args);
 static PyObject *Get_Perturb_Averages(PyObject * self, PyObject * args);
+static PyObject *Get_Perturb_AveragesSym(PyObject * self, PyObject * args);
 
 
 static PyMethodDef odd_engine[] = {
@@ -41,6 +42,7 @@ static PyMethodDef odd_engine[] = {
     {"GetWeights", GetWeights, METH_VARARGS, "Get the self-consistent weights for the L application"},
     {"Get_D2DR2_PertV", Get_D2DR2_PertV, METH_VARARGS, "Get the d2V_dr2 matrix averaged on the perturbed ensemble"},
     {"GetPerturbAverage", Get_Perturb_Averages, METH_VARARGS, "Get the average forces and second derivative of the potential from a perturbed ensemble"},
+    {"GetPerturbAverageSym", Get_Perturb_AveragesSym, METH_VARARGS, "Get the average forces and second derivative of the potential from a perturbed ensemble (with explicit symmetrization)"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -575,18 +577,18 @@ static PyObject * Get_Perturb_AveragesSym(PyObject * self, PyObject * args) {
   // Employ the Y1 to get the average force (D3)
   // printf("Getting f av...\n");
   // fflush(stdout);
-  get_f_average_from_Y_pert_sym(X, Y, w, Y1, T, N_modes, N_configs, rho, n_deg, symmetries, good_deg_space, force);
+  get_f_average_from_Y_pert_sym(X, Y, w, Y1, T, N_modes, N_configs, rho, symmetries, N_symmetries, n_deg, good_deg_space, force);
 
   // Employ the R1 to get the average of the second derivative of the potential (D3)
   // printf("Getting d2v_dr2 av...\n");
   // fflush(stdout);
-  get_d2v_dR2_from_R_pert_sym(X, Y, w, R1, T, N_modes, N_configs, rho, d2vdr2);
+  get_d2v_dR2_from_R_pert_sym(X, Y, w, R1, T, N_modes, N_configs, rho, symmetries, N_symmetries, n_deg, good_deg_space, d2vdr2);
 
   // Employ Y1 to get the average of the second derivative of the potential (D4)
   if (apply_D4) {
     // printf("Getting d2v_dr2 av from d4...\n");
     // fflush(stdout);
-    get_d2v_dR2_from_Y_pert_sym(X, Y, w, Y1, T, N_modes, N_configs, rho, d2vdr2);
+    get_d2v_dR2_from_Y_pert_sym(X, Y, w, Y1, T, N_modes, N_configs, rho, symmetries, N_symmetries, n_deg, good_deg_space, d2vdr2);
   }
 
   // Free the memory of the degenerate space allocated
