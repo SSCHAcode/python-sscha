@@ -10,6 +10,8 @@ import sscha.Ensemble
 
 import scipy, scipy.sparse
 
+from sscha.Parallel import pprint as print
+
 import sys, os
 
 def test_lanczos_symmetries(temperature = 250, N = 10000):
@@ -57,12 +59,6 @@ def test_lanczos_symmetries(temperature = 250, N = 10000):
     v1 = np.random.uniform(size = lanc1.psi.shape)
     lanc1.psi[:] = v1
     lanc2.psi[:] = v1
-
-    print("ALL THE UNWRAPPED FORCES:")
-    print(lanc1.Y)
-
-    print("ALL THE UNWRAPPED FORCES 2:")
-    print(lanc2.Y)
 
     # Apply L
     print("APPLY UNWRAPPED.")

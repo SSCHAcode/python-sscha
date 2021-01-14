@@ -1087,7 +1087,7 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         print("<f> pert = {}".format(f_pert_av))
         print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
-        print()
+        #print()
 
         # Compute the average with the old version
         if use_old_version:
