@@ -485,6 +485,121 @@ static PyObject * Get_Perturb_Averages(PyObject * self, PyObject * args) {
   return Py_None;
 }
 
+
+static PyObject * Get_Perturb_AveragesSym(PyObject * self, PyObject * args) {
+  PyArrayObject * npy_X, *npy_Y, *npy_omega, *npy_rho, *npy_R1, *npy_Y1;
+  PyArrayObject *npy_force, *npy_d2vdr2, *npy_symmetries, *npy_n_deg, *npy_deg_space;
+  double * X; 
+  double * Y;
+  double * R1, *Y1;
+  double * force;
+  double *w;
+  double * rho;
+  double * weights;
+  double * d2vdr2;
+
+  double * symmetries;
+  int * n_deg;
+  int ** good_deg_space;
+  int N_configs;
+  int N_modes;
+  int apply_D4;
+
+  double T;
+
+  int index_mode = 1, index_config = 0;
+
+  // Parse the python arguments
+  if (!PyArg_ParseTuple(args, "OOOOOOdiOOOOO", &npy_X,  &npy_Y, &npy_omega, &npy_rho, &npy_R1, &npy_Y1, &T, &apply_D4, 
+                        &npy_symmetries, &npy_n_deg, &npy_deg_space, &npy_force, &npy_d2vdr2))
+    return NULL;
+  
+  // Check the array memory setting
+  // if (npy_X->flags & NPY_ARRAY_F_CONTIGUOUS) {
+  //   index_mode = 0;
+  //   index_config = 1;
+  //   fprintf(stderr, "F contigouos\n");
+  // }
+  
+
+  // Get the dimension of the arrays
+  N_modes = PyArray_DIM(npy_X, index_mode);
+  N_configs = PyArray_DIM(npy_X, index_config);
+
+  if (N_modes != PyArray_DIM(npy_omega,0)) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__ ,  __LINE__);
+    fprintf(stderr, "N_modes from X is %d, while len(w) = %d\n", N_modes, PyArray_DIM(npy_omega, 0));
+    exit(EXIT_FAILURE);
+  }
+
+  // Check the value of apply D4
+  if (apply_D4 != 0 && apply_D4 != 1) {
+    fprintf(stderr, "Error in file %s, line %d:\n", __FILE__, __LINE__);
+    fprintf(stderr, "   the apply_D4 value passed must be either 0 or 1.\n");
+    fprintf(stderr, "   apply_D4 = %d\n", apply_D4);
+    exit(EXIT_FAILURE);
+  }
+
+  // Retrive the pointer to the data from the python object
+  X = (double*) PyArray_DATA(npy_X);
+  Y = (double*) PyArray_DATA(npy_Y);
+  rho = (double*) PyArray_DATA(npy_rho);
+  w = (double*) PyArray_DATA(npy_omega);
+  force = (double*) PyArray_DATA(npy_force);
+  d2vdr2 = (double*) PyArray_DATA(npy_d2vdr2);
+
+  R1 = (double*) PyArray_DATA(npy_R1);
+  Y1 = (double*) PyArray_DATA(npy_Y1);
+
+
+  // Read the symmetries
+  symmetries = (double*)PyArray_DATA(npy_symmetries);
+  n_deg = (int*)PyArray_DATA(npy_n_deg);
+
+  // Build the degeneracy space
+  good_deg_space = (int **) malloc(sizeof(int*) * N_modes);
+  int i, j;
+  int counter= 0;
+  int N_symmetries;
+  for (i = 0; i < N_modes;++i) {
+    good_deg_space[i] = (int*) malloc(sizeof(int) * n_deg[i]);
+    for (j = 0; j < n_deg[i]; ++j) {
+      good_deg_space[i][j] = ((int*) PyArray_DATA(npy_deg_space))[counter++];
+    }
+  }
+
+  N_symmetries = PyArray_DIM(npy_symmetries, 0);
+
+
+  
+  // Employ the Y1 to get the average force (D3)
+  // printf("Getting f av...\n");
+  // fflush(stdout);
+  get_f_average_from_Y_pert_sym(X, Y, w, Y1, T, N_modes, N_configs, rho, n_deg, symmetries, good_deg_space, force);
+
+  // Employ the R1 to get the average of the second derivative of the potential (D3)
+  // printf("Getting d2v_dr2 av...\n");
+  // fflush(stdout);
+  get_d2v_dR2_from_R_pert_sym(X, Y, w, R1, T, N_modes, N_configs, rho, d2vdr2);
+
+  // Employ Y1 to get the average of the second derivative of the potential (D4)
+  if (apply_D4) {
+    // printf("Getting d2v_dr2 av from d4...\n");
+    // fflush(stdout);
+    get_d2v_dR2_from_Y_pert_sym(X, Y, w, Y1, T, N_modes, N_configs, rho, d2vdr2);
+  }
+
+  // Free the memory of the degenerate space allocated
+  for (i = 0; i < N_modes; ++i) {
+    free(good_deg_space[i]);
+  }
+  free(good_deg_space);
+
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
 static PyObject *ApplyV4_FT(PyObject * self, PyObject * args) {
   PyArrayObject * npy_X, *npy_Y, *npy_rho, *npy_omega, *npy_input, *npy_output, *npy_symmetries, *npy_n_deg, *npy_deg_space;
   double * X; 

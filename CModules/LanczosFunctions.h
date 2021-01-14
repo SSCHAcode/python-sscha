@@ -225,6 +225,36 @@ void get_d2v_dR2_from_R_pert(const double * X, const double * Y, const double * 
 double get_d2v_dR2_from_Y_pert(const double * X, const double * Y, const double * w, const double * Y1, double T, int n_modes, int n_configs, double * w_is, double * d2v_dR2);
 
 
+// ---------------------- HERE THE VERSION WITH THE EXPLICIT SYMMETRIZATION -----------------------------
+
+/* Symmetries related variables must be initialized as follows:
+ *	
+ *      sym_matrix : array (size = (N_sym * N_modes * N_modes)
+ *          The symmetry matrix in the mode basis.
+ *      N_sym : int
+ *          The number of symmetries
+ *      N_degeneracy : array (size = N_modes)
+ *          The degree of degeneracy of the mode
+ *      degenerate_space : array of array [N_modes, N_degeneracy[i]]
+ *          The mode indices that compose the degenerate subspace in which the first mode label belong to.
+ * 
+ * 
+ * All other variables matches the functions defined above.
+ */
+
+void get_f_average_from_Y_pert_sym(const double * X, const double * Y, const double * w, const double * Y1, double T, int n_modes, int n_configs, 
+                                   const double * w_is, const double * symmetries, int N_sym, const int * N_degeneracy, const int ** degenerate_space,
+								   double * f_average);
+
+void get_d2v_dR2_from_R_pert_sym(const double * X, const double * Y, const double * w, const double * R1, double T, int n_modes, 
+                                 int n_configs, double * w_is, 
+								 const double * symmetries, int N_sym, const int * N_degeneracy, const int ** degenerate_space,
+								 double * d2v_dR2);
+
+double get_d2v_dR2_from_Y_pert_sym(const double * X, const double * Y, const double * w, const double * Y1, double T, int n_modes, int n_configs, 
+                                   double * w_is, const double * symmetries, int N_sym, const int * N_degeneracy, const int ** degenerate_space,
+								   double * d2v_dR2_out);
+
 /*
  * Here we define some working methods that are usefull to be
  * called outside. They take the frequency and the occupation number
