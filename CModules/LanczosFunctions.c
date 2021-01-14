@@ -1941,10 +1941,8 @@ void get_f_average_from_Y_pert_sym(const double * X, const double * Y, const dou
 			for(mu = 0; mu < n_modes; ++mu){
 				force[mu] = 0;
 				displacement[mu] = 0;
-				//for (k = 0; k < N_degeneracy[mu]; ++k) { // Exploit the sparseness of the symmetry matrix
-				//	nu = degenerate_space[mu][k];
-				for (nu = 0; nu < n_modes; ++nu){
-
+				for (k = 0; k < N_degeneracy[mu]; ++k) { // Exploit the sparseness of the symmetry matrix
+					nu = degenerate_space[mu][k];
 					force[mu] += Y[i * n_modes + nu] * symmetries[j * n_modes * n_modes + mu * n_modes + nu];
 					displacement[mu] += X[i * n_modes + nu] * symmetries[j * n_modes * n_modes + mu * n_modes + nu];
 				}
