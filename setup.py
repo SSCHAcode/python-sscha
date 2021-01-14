@@ -4,7 +4,7 @@ from numpy.distutils.core import setup, Extension
 import os, sys 
 import numpy 
 
-extra_flags_c = ["-fopenmp"]
+extra_flags_c = ["-fopenmp", "-g"]
 extra_link_args_c = ["-fopenmp"]
 mpi_compile_args = []
 mpi_link_args = []

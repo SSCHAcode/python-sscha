@@ -1941,12 +1941,30 @@ void get_f_average_from_Y_pert_sym(const double * X, const double * Y, const dou
 			for(mu = 0; mu < n_modes; ++mu){
 				force[mu] = 0;
 				displacement[mu] = 0;
-				for (k = 0; k < N_degeneracy[mu]; ++k) { // Exploit the sparseness of the symmetry matrix
-					nu = degenerate_space[mu][k];
+				//for (k = 0; k < N_degeneracy[mu]; ++k) { // Exploit the sparseness of the symmetry matrix
+				//	nu = degenerate_space[mu][k];
+				for (nu = 0; nu < n_modes; ++nu){
 
 					force[mu] += Y[i * n_modes + nu] * symmetries[j * n_modes * n_modes + mu * n_modes + nu];
 					displacement[mu] += X[i * n_modes + nu] * symmetries[j * n_modes * n_modes + mu * n_modes + nu];
 				}
+			}
+
+			if (DEB) {
+				printf("#C DEB | CONFIG %d | SYMMETRY %d\n", i, j);
+				printf(" force_old = ");
+				for (mu = 0; mu < n_modes; ++mu) 
+					printf("%10.3e ", Y[i * n_modes + mu]);
+				printf("\n\n");
+				printf(" force_new[9] = %.8e\n", force[9]);
+				for (mu = 0; mu < n_modes; ++mu) 
+					printf("%10.3e ", force[mu]);
+				printf("\n");
+				printf(" displacement = ");
+				for (mu = 0; mu < n_modes; ++mu) 
+					printf("%8.3lf ", displacement[mu]);
+				printf("\n");
+				fflush(stdout);
 			}
 			
 
@@ -1962,6 +1980,9 @@ void get_f_average_from_Y_pert_sym(const double * X, const double * Y, const dou
 			// Get the average of the potential
 			for (mu = 0; mu < n_modes; ++mu) {
 				f_average[mu] += w_is[i] * weight * force[mu] / 3;
+				//if (mu == 9) {
+				//printf("ADD1 %d | CONF %d | SYM %d => %.8e\n", mu, i, j, w_is[i] * weight * force[mu] / 3);
+				//}
 			}
 
 			// Get the permutated average
@@ -1979,7 +2000,10 @@ void get_f_average_from_Y_pert_sym(const double * X, const double * Y, const dou
 			// Get the average of the potential
 			for (mu = 0; mu < n_modes; ++mu) {
 				u_mu = f_ups(w[mu], T) * displacement[mu];
-				f_average[mu] += w_is[i] * weight * u_mu * 2 / 3; // Since we have 2 permutations here, this count twice
+				f_average[mu] += w_is[i] * weight * u_mu * 2 / 3.; // Since we have 2 permutations here, this count twice
+				//if (mu == 9) {
+				//printf("ADD2 %d | CONF %d | SYM %d => %.8e\n", mu, i, j, w_is[i] * weight * u_mu * 2 / 3.);
+				//}
 			}
 		}
 	}

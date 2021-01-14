@@ -219,12 +219,17 @@ Error, 'select_modes' should be an array of the same lenght of the number of mod
 
         # Get the average force
         f_mean = ensemble.get_average_forces(get_error = False)
+
+        # Perform the symmetrization of the average force
+        qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+        qe_sym.SetupQPoint()
+        qe_sym.SymmetrizeVector(f_mean)
+
+        # Reproduce the average force on the full supercell
         f_mean = np.tile(f_mean, (np.prod(ensemble.current_dyn.GetSupercell()), 1)).ravel()
 
-        # Subtract the SSCHA gradient on nuclei
-        # This allows the correct calculation also if the average force is not zero
-        print(np.shape(f), np.shape(f_mean))
-        f[:, :] -= np.tile(f_mean, (self.N, 1))
+        # Transpform in Bohr
+        f_mean *= Ensemble.Bohr
         
         # Subtract also the average force to clean more the stochastic noise
         #av_force = ensemble.get_average_forces(get_error = False).ravel()
@@ -240,6 +245,11 @@ Error, 'select_modes' should be an array of the same lenght of the number of mod
 
             u /= Ensemble.Bohr
             f *= Ensemble.Bohr
+
+        # Subtract the SSCHA GRADIENT on average position
+        # In this way the calculation works even if the system is not in equilibrium
+        print(np.shape(f), np.shape(f_mean))
+        f[:, :] -= np.tile(f_mean, (self.N, 1))
 
 
         # Perform the mass rescale to get the tilde variables
@@ -359,7 +369,7 @@ Error, 'select_modes' should be an array of the same lenght of the number of mod
         self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
 
 
-    def init(self, use_symmetries = False):
+    def init(self, use_symmetries = True):
         """
         INITIALIZE THE CALCULATION
         ==========================
@@ -369,7 +379,7 @@ Error, 'select_modes' should be an array of the same lenght of the number of mod
         Parameters
         ----------
             use_symmetries : bool
-                if False (default True) symmetries are neglected.
+                if False (default True) symmetries are neglected (unless the ensemble has been unwrapped).
     
         """
         self.prepare_symmetrization(no_sym = not use_symmetries)
@@ -1070,12 +1080,14 @@ This may be caused by the Lanczos initialized at the wrong temperature.
 
         # Compute the perturbed averages (the time consuming part is HERE)
         #print("Entering in get pert...")
-        sscha_HP_odd.GetPerturbAverage(self.X, self.Y, self.w, self.rho, R1, Y1, self.T, apply_d4, f_pert_av, d2v_pert_av)
+        sscha_HP_odd.GetPerturbAverageSym(self.X, self.Y, self.w, self.rho, R1, Y1, self.T, apply_d4, 
+                                          self.symmetries, self.N_degeneracy, deg_space_new, 
+                                          f_pert_av, d2v_pert_av)
         #print("Out get pert")
 
-        #print("<f> pert = {}".format(f_pert_av))
-        #print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
-        #print()
+        print("<f> pert = {}".format(f_pert_av))
+        print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
+        print()
 
         # Compute the average with the old version
         if use_old_version:
