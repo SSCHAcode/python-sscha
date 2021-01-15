@@ -1944,6 +1944,10 @@ void get_f_average_from_Y_pert_sym(const double * X, const double * Y, const dou
 	#ifdef _MPI
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	//MPI_Bcast(X, n_configs*n_modes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	//MPI_Bcast(Y, n_configs*n_modes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Bcast(Y1, n_modes*n_modes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 	#endif
 
 	// Get each pool of configurations over different processors (if MPI)
@@ -1995,7 +1999,7 @@ void get_f_average_from_Y_pert_sym(const double * X, const double * Y, const dou
 				for (mu = 0; mu < n_modes; ++mu) 
 					printf("%8.3lf ", displacement[mu]);
 				printf("\n");
-				fflush(stdout);
+				//fflush(stdout);
 			}
 			
 
@@ -2096,6 +2100,8 @@ void get_d2v_dR2_from_R_pert_sym(const double * X, const double * Y, const doubl
 	#ifdef _MPI
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	MPI_Bcast(R1, n_modes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 	#endif
 
 	// Get each pool of configurations over different processors (if MPI)
@@ -2221,6 +2227,8 @@ double get_d2v_dR2_from_Y_pert_sym(const double * X, const double * Y, const dou
 	#ifdef _MPI
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	MPI_Bcast(Y1, n_modes*n_modes, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 	#endif
 
 	// Get each pool of configurations over different processors (if MPI)
