@@ -1914,6 +1914,8 @@ Error, algorithm type '{}' in subroutine run_biconjugate_gradient not implemente
                 If true all the info during the minimization will be printed on output.
         """
 
+        raise ValueError("Error, this run funciton has been deprecated, use run_FT instead.")
+
         # Check if the symmetries has been initialized
         if not self.initialized:
             self.prepare_symmetrization()
@@ -2762,7 +2764,7 @@ Max number of iterations: {}
 
 
             
-    def run_FT(self, n_iter, save_dir = ".", verbose = True, n_rep_orth = 1):
+    def run_FT(self, n_iter, save_dir = ".", verbose = True, n_rep_orth = 1, flush_output = True):
         """
         RUN LANCZOS ITERATIONS FOR FINITE TEMPERATURE
         =============================================
@@ -2784,6 +2786,10 @@ Max number of iterations: {}
                 The number of times in which the GS orthonormalization is repeated.
                 The higher, the lower the precision of the Lanczos step, the lower, the higher
                 the probability of finding ghost states
+            flush_output : bool
+                If true it flushes the output at each step. 
+                This is usefull to avoid ending without any output if a calculation is killed before it ends normally.
+                However, it could slow down things a bit on clusters.
         """
 
         # Check if the symmetries has been initialized
@@ -2876,6 +2882,9 @@ Max number of iterations: {}
                 print(step_txt)
                 print("Length of the coefficiets: a = {}, b = {}".format(len(self.a_coeffs), len(self.b_coeffs)))
                 print()
+
+                if flush_output:
+                    sys.stdout.flush()
 
             # Apply the matrix L
             t1 = time.time()
