@@ -1196,6 +1196,9 @@ DETAILS OF ERROR:
         for i in xrange(self.N):
             v_new = self.u_disps[i, :].dot(ups_new.dot(self.u_disps[i, :])) * __A_TO_BOHR__**2
             v_old = old_disps[i, :].dot(ups_old.dot(old_disps[i, :])) * __A_TO_BOHR__**2
+
+            if __DEBUG_RHO__:
+                print("CONF {} | displacement = {}".format(i, v_new - v_old))
             rho_tmp[i] *= np.exp(-0.5 * (v_new - v_old) )
         # Lets try to use this one
         self.rho = rho_tmp
