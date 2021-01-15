@@ -144,6 +144,7 @@ class Lanczos(object):
         self.qe_sym = None
         self.L_linop = None
         self.M_linop = None
+        self.unwrapped = False
 
         # Perform a bare initialization if the ensemble is not provided
         if ensemble is None:
@@ -218,12 +219,17 @@ Error, 'select_modes' should be an array of the same lenght of the number of mod
 
         # Get the average force
         f_mean = ensemble.get_average_forces(get_error = False)
+
+        # Perform the symmetrization of the average force
+        qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+        qe_sym.SetupQPoint()
+        qe_sym.SymmetrizeVector(f_mean)
+
+        # Reproduce the average force on the full supercell
         f_mean = np.tile(f_mean, (np.prod(ensemble.current_dyn.GetSupercell()), 1)).ravel()
 
-        # Subtract the SSCHA gradient on nuclei
-        # This allows the correct calculation also if the average force is not zero
-        print(np.shape(f), np.shape(f_mean))
-        f[:, :] -= np.tile(f_mean, (self.N, 1))
+        # Transpform in Bohr
+        f_mean *= Ensemble.Bohr
         
         # Subtract also the average force to clean more the stochastic noise
         #av_force = ensemble.get_average_forces(get_error = False).ravel()
@@ -235,9 +241,15 @@ Error, 'select_modes' should be an array of the same lenght of the number of mod
         if unwrap_symmetries:
             u, f, rho = ensemble.get_unwrapped_ensemble()
             self.N = len(rho)
+            self.unwrapped = True
 
             u /= Ensemble.Bohr
             f *= Ensemble.Bohr
+
+        # Subtract the SSCHA GRADIENT on average position
+        # In this way the calculation works even if the system is not in equilibrium
+        print(np.shape(f), np.shape(f_mean))
+        f[:, :] -= np.tile(f_mean, (self.N, 1))
 
 
         # Perform the mass rescale to get the tilde variables
@@ -357,7 +369,7 @@ Error, 'select_modes' should be an array of the same lenght of the number of mod
         self.arnoldi_matrix = [] # If requested, the upper triangular arnoldi matrix
 
 
-    def init(self, use_symmetries = False):
+    def init(self, use_symmetries = True):
         """
         INITIALIZE THE CALCULATION
         ==========================
@@ -367,20 +379,22 @@ Error, 'select_modes' should be an array of the same lenght of the number of mod
         Parameters
         ----------
             use_symmetries : bool
-                if False (default True) symmetries are neglected.
+                if False (default True) symmetries are neglected (unless the ensemble has been unwrapped).
     
         """
         self.prepare_symmetrization(no_sym = not use_symmetries)
         self.initialized = True
 
 
-    def prepare_symmetrization(self, no_sym = True):
+    def prepare_symmetrization(self, no_sym = False):
         """
         PREPARE THE SYMMETRIZATION
         ==========================
 
         This function analyzes the character of the symmetry operations for each polarization vectors.
         This will allow the method do know how many modes are degenerate.
+
+        If the ensemble has been unwrapped, then the symmetries are not initialized.
 
         Parameters
         ----------
@@ -393,58 +407,58 @@ Error, 'select_modes' should be an array of the same lenght of the number of mod
         # All the rest is deprecated in the Fast Lanczos implementation
         # As the symmetrization is performed by unwrapping the ensemble
 
-        # # Generate the dynamical matrix in the supercell
-        # super_structure = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
-        # w, pols = self.dyn.DiagonalizeSupercell()
+        # Generate the dynamical matrix in the supercell
+        super_structure = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
+        w, pols = self.dyn.DiagonalizeSupercell()
 
-        # # Get the symmetries of the super structure
-        # if not __SPGLIB__ and not no_sym:
-        #     raise ImportError("Error, spglib module required to perform symmetrization in a supercell. Otherwise, use no_sym")
+        # Get the symmetries of the super structure
+        if not __SPGLIB__ and not no_sym:
+            raise ImportError("Error, spglib module required to perform symmetrization in a supercell. Otherwise, use no_sym")
         
-        # # Neglect the symmetries
-        # if no_sym:
-        #     self.symmetries = np.zeros( (1, self.n_modes, self.n_modes), dtype = TYPE_DP)
-        #     self.symmetries[0, :, :] = np.eye(self.n_modes)
-        #     self.N_degeneracy = np.ones(self.n_modes, dtype = np.intc)
-        #     self.degenerate_space = [[i] for i in range(self.n_modes)]
-        #     return
+        # Neglect the symmetries
+        if no_sym or self.unwrapped:
+            self.symmetries = np.zeros( (1, self.n_modes, self.n_modes), dtype = TYPE_DP)
+            self.symmetries[0, :, :] = np.eye(self.n_modes)
+            self.N_degeneracy = np.ones(self.n_modes, dtype = np.intc)
+            self.degenerate_space = [[i] for i in range(self.n_modes)]
+            return
 
-        # super_symmetries = CC.symmetries.GetSymmetriesFromSPGLIB(spglib.get_symmetry(super_structure.get_ase_atoms()), False)
+        super_symmetries = CC.symmetries.GetSymmetriesFromSPGLIB(spglib.get_symmetry(super_structure.get_ase_atoms()), False)
 
-        # # Get the symmetry matrix in the polarization space
-        # # Translations are needed, as this method needs a complete basis.
-        # pol_symmetries = CC.symmetries.GetSymmetriesOnModes(super_symmetries, super_structure, pols)
+        # Get the symmetry matrix in the polarization space
+        # Translations are needed, as this method needs a complete basis.
+        pol_symmetries = CC.symmetries.GetSymmetriesOnModes(super_symmetries, super_structure, pols)
 
-        # Ns, dumb, dump = np.shape(pol_symmetries)
+        Ns, dumb, dump = np.shape(pol_symmetries)
         
-        # # Now we can pull out the translations
-        # trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
-        # self.symmetries = np.zeros( (Ns, self.n_modes, self.n_modes), dtype = TYPE_DP)
-        # ptmp = pol_symmetries[:, :,  ~trans_mask] 
-        # self.symmetries[:,:,:] = ptmp[:, ~trans_mask, :]
+        # Now we can pull out the translations
+        trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
+        self.symmetries = np.zeros( (Ns, self.n_modes, self.n_modes), dtype = TYPE_DP)
+        ptmp = pol_symmetries[:, :,  ~trans_mask] 
+        self.symmetries[:,:,:] = ptmp[:, ~trans_mask, :]
 
-        # # Get the degeneracy
-        # w = w[~trans_mask]
-        # N_deg = np.ones(len(w), dtype = np.intc)
-        # start_deg = -1
-        # deg_space = [ [x] for x in range(self.n_modes)]
-        # for i in range(1, len(w)):
-        #     if np.abs(w[i-1] - w[i]) < __EPSILON__ :
-        #         N_deg[i] = N_deg[i-1] + 1
+        # Get the degeneracy
+        w = w[~trans_mask]
+        N_deg = np.ones(len(w), dtype = np.intc)
+        start_deg = -1
+        deg_space = [ [x] for x in range(self.n_modes)]
+        for i in range(1, len(w)):
+            if np.abs(w[i-1] - w[i]) < __EPSILON__ :
+                N_deg[i] = N_deg[i-1] + 1
 
-        #         if start_deg == -1:
-        #             start_deg = i - 1
+                if start_deg == -1:
+                    start_deg = i - 1
 
-        #         for j in range(start_deg, i):
-        #             N_deg[j] = N_deg[i]
-        #             deg_space[j].append(i)
-        #             deg_space[i].append(j)
-        #     else:
-        #         start_deg = -1
+                for j in range(start_deg, i):
+                    N_deg[j] = N_deg[i]
+                    deg_space[j].append(i)
+                    deg_space[i].append(j)
+            else:
+                start_deg = -1
 
 
-        # self.N_degeneracy = N_deg
-        # self.degenerate_space = deg_space
+        self.N_degeneracy = N_deg
+        self.degenerate_space = deg_space
 
     def prepare_raman(self, pol_vec_in= np.array([1,0,0]), pol_vec_out = np.array([1,0,0])):
         """
@@ -469,7 +483,7 @@ Error, 'select_modes' should be an array of the same lenght of the number of mod
         # Get the raman vector
         raman_v = self.dyn.GetRamanVector(pol_vec_in, pol_vec_out)
 
-        # Get the raman vector in the supercell
+        # Get the raman vector in the supercelld
         n_supercell = np.prod(self.dyn.GetSupercell())
         new_raman_v = np.tile(raman_v.ravel(), n_supercell)
 
@@ -1048,13 +1062,31 @@ This may be caused by the Lanczos initialized at the wrong temperature.
         if self.ignore_v4:
             apply_d4 = 0
 
+        # Prepare the symmetry variables for the C code
+        deg_space_new = np.zeros(np.sum(self.N_degeneracy), dtype = np.intc)
+        i = 0
+        i_mode = 0
+        j_mode = 0
+        #print("Mapping degeneracies:", np.sum(n_degeneracies))
+        while i_mode < self.n_modes:
+            #print("cross_modes: ({}, {}) | deg_i = {}".format(i_mode, j_mode, n_degeneracies[i_mode]))
+            deg_space_new[i] = self.degenerate_space[i_mode][j_mode]
+            j_mode += 1
+            i += 1
+            if j_mode == self.N_degeneracy[i_mode]:
+                i_mode += 1
+                j_mode = 0
+
+
         # Compute the perturbed averages (the time consuming part is HERE)
         #print("Entering in get pert...")
-        sscha_HP_odd.GetPerturbAverage(self.X, self.Y, self.w, self.rho, R1, Y1, self.T, apply_d4, f_pert_av, d2v_pert_av)
+        sscha_HP_odd.GetPerturbAverageSym(self.X, self.Y, self.w, self.rho, R1, Y1, self.T, apply_d4, 
+                                          self.symmetries, self.N_degeneracy, deg_space_new, 
+                                          f_pert_av, d2v_pert_av)
         #print("Out get pert")
 
-        #print("<f> pert = {}".format(f_pert_av))
-        #print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
+        print("<f> pert = {}".format(f_pert_av))
+        print("<d2v/dr^2> pert = {}".format(d2v_pert_av))
         #print()
 
         # Compute the average with the old version
@@ -1881,6 +1913,8 @@ Error, algorithm type '{}' in subroutine run_biconjugate_gradient not implemente
             verbose : bool
                 If true all the info during the minimization will be printed on output.
         """
+
+        raise ValueError("Error, this run funciton has been deprecated, use run_FT instead.")
 
         # Check if the symmetries has been initialized
         if not self.initialized:
@@ -2730,7 +2764,7 @@ Max number of iterations: {}
 
 
             
-    def run_FT(self, n_iter, save_dir = ".", verbose = True, n_rep_orth = 1):
+    def run_FT(self, n_iter, save_dir = ".", verbose = True, n_rep_orth = 1, flush_output = True):
         """
         RUN LANCZOS ITERATIONS FOR FINITE TEMPERATURE
         =============================================
@@ -2752,6 +2786,10 @@ Max number of iterations: {}
                 The number of times in which the GS orthonormalization is repeated.
                 The higher, the lower the precision of the Lanczos step, the lower, the higher
                 the probability of finding ghost states
+            flush_output : bool
+                If true it flushes the output at each step. 
+                This is usefull to avoid ending without any output if a calculation is killed before it ends normally.
+                However, it could slow down things a bit on clusters.
         """
 
         # Check if the symmetries has been initialized
@@ -2844,6 +2882,9 @@ Max number of iterations: {}
                 print(step_txt)
                 print("Length of the coefficiets: a = {}, b = {}".format(len(self.a_coeffs), len(self.b_coeffs)))
                 print()
+
+                if flush_output:
+                    sys.stdout.flush()
 
             # Apply the matrix L
             t1 = time.time()
