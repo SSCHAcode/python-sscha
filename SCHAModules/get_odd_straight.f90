@@ -52,7 +52,7 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
   !allocate(phi_aux(n_mode,n_mode))
   allocate(v1(n_mode,n_mode*n_mode))
   allocate(v2(n_mode,n_mode*n_mode))
-  allocate(v32(n_mode,n_mode*n_mode))
+  !allocate(v32(n_mode,n_mode*n_mode))
   allocate(laux1(n_mode))
   allocate(lres1(n_mode))
   allocate(laux2(n_mode))
@@ -99,12 +99,12 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
 
   ka = 0
    
-  do x = 1, n_mode
-    do y = 1, n_mode
-      ka = ka + 1
-      v32(:,ka) = v3(:,x,y)
-    end do
-  end do
+  ! do x = 1, n_mode
+  !   do y = 1, n_mode
+  !     ka = ka + 1
+  !     v32(:,ka) = v3(:,x,y)
+  !   end do
+  ! end do
 
   ! Calculate the auxiliary matrices
 
@@ -196,6 +196,7 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
 
   ! Deallocate stuff
 
-  deallocate(l,g,v1,v2,v32)
+  deallocate(l,g,v1,v2)
+  !deallocate(v32)
 
 end subroutine get_odd_straight 
