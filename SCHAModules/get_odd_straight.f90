@@ -132,9 +132,9 @@ subroutine get_odd_straight ( a, wr, er, transmode, amass, ityp_sc, T, v3, phi_s
     ja = 0 
     do mu = 1, n_mode 
       laux1 = l(mu,:)
+      call dgemv ('N',ns,ns,1.0d0,maux,ns,laux1,1,0.0d0,lres1,1)
       do nu = 1, n_mode         
         laux2 = l(nu,:)
-        call dgemv ('N',ns,ns,1.0d0,maux,ns,laux1,1,0.0d0,lres1,1)
         ja = ja + 1
 !        call dgemv ('T',ns,1,1.0d0,lres1,ns,laux2,1,0.0d0,lsum,1)
         v1(i,ja) = dot_product(lres1,laux2) 
