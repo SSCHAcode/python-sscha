@@ -281,6 +281,7 @@ class ModeProjection:
         for iq in range(self.nq):
             for mu in range(index_mode_start, index_mode_end):
                 pvec = self.pols[:, mu, iq].copy()
+                
                 #pvec /= pvec.dot(pvec) # Normalization
                 self.projector[iq, :, :] += np.outer(pvec / _msq_, np.conj(pvec) * _msq_ )
                 self.projectorH[iq, :, :] += np.outer(pvec*_msq_, np.conj(pvec) / _msq_)
