@@ -3,7 +3,6 @@ from __future__ import print_function
 from __future__ import division
 
 import sys, os
-import shutil
 import cellconstructor as CC
 import cellconstructor.Phonons
 
@@ -29,10 +28,10 @@ def test_generate_ensemble_sup():
     ens.generate(N_RANDOM)
 
     # Save the ensemble
-    if not os.path.isdir(DATA_DIR):
-        os.mkdir(DATA_DIR)
+    os.mkdir(DATA_DIR)
     ens.save(DATA_DIR, POPULATION)
-    shutil.rmtree(DATA_DIR, ignore_errors= True)
+    os.remove(DATA_DIR)
+
 
 if __name__ == "__main__":
     test_generate_ensemble_sup()

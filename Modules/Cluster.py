@@ -175,8 +175,7 @@ class Cluster(object):
         self.timeout = 1000
         self.use_timeout = False
 
-        # This is the number of configurations to be computed for each jub submitted
-        # This times the self.batch_size is the total amount of configurations submitted toghether
+
         self.job_number = 1
         self.n_together_def = 1
         self.use_multiple_submission = False
@@ -219,10 +218,6 @@ class Cluster(object):
         # The new jobs will be submitted only after a batch is compleated
         # Useful if the cluster has a limit for the maximum number of jobs allowed.
         self.batch_size = 1000
-
-
-        # Allow to setup additional custom extra parameters
-        self.custom_params = {}
 
         # Fix the attributes
 
@@ -287,11 +282,6 @@ class Cluster(object):
             # Subprocess opening
             p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell = True)
             output, err = p.communicate()
-            if not isinstance(output, str):
-                try:
-                    output = str(output.decode("utf-8"))
-                except:
-                    pass
             output = output.strip()
             status = p.wait()
             if not err is None:
@@ -494,10 +484,6 @@ class Cluster(object):
             submission += "#%s %s%s\n" % (self.submit_name, self.v_memory, self.ram)
         if self.use_partition:
             submission += "#%s %s%s\n" % (self.submit_name, self.v_partition, self.partition_name)
-
-        # Append the additional parameters
-        for add_parameter in self.custom_params:
-            submission += "#{} --{}={}\n".format(self.submit_name, add_parameter, self.custom_params[add_parameter])
         
         # Add the set -x option
         submission += "set -x\n"
@@ -514,7 +500,7 @@ class Cluster(object):
         
         # Copy the submission script
         sub_fpath = "%s/%s.sh" % (self.local_workdir, label + "_" + str(indices[0]))
-        f = open(sub_fpath, "w")
+        f = file(sub_fpath, "w")
         f.write(submission)
         f.close()
         cmd = self.scpcmd + " %s %s:%s" % (sub_fpath, self.hostname, self.workdir)
@@ -600,11 +586,6 @@ class Cluster(object):
             submission += "#%s %s%s\n" % (self.submit_name, self.v_memory, self.ram)
         if self.use_partition:
             submission += "#%s %s%s\n" % (self.submit_name, self.v_partition, self.partition_name)
-
-
-        # Append the additional parameters
-        for add_parameter in self.custom_params:
-            submission += "#{} --{}={}\n".format(self.submit_name, add_parameter, self.custom_params[add_parameter])
         
         # Add the loading of the modules
         submission += self.load_modules + "\n"
@@ -630,7 +611,7 @@ class Cluster(object):
 #            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
 #        
         # Copy the input files into the target directory
-        f = open("%s/%s.sh" % (self.local_workdir, label), "w")
+        f = file("%s/%s.sh" % (self.local_workdir, label), "w")
         f.write(submission)
         f.close()
         cmd = self.scpcmd + " %s/%s.sh %s:%s" % (self.local_workdir, label, self.hostname, self.workdir)
@@ -853,7 +834,7 @@ class Cluster(object):
                 raise IOError("Error, the provided script path %s does not exists." % script_path)
             
             # Read the script and store the contnet
-            f = open(script_path, "r")
+            f = file(script_path, "r")
             self.load_modules = f.read()
             f.close()
         
@@ -953,7 +934,7 @@ class Cluster(object):
 #            print "Error, status:", status
 #            raise ValueError("Error, while connecting with the server.")
         
-        return str(output)
+        return output
             
     def compute_ensemble_batch(self, ensemble, ase_calc, get_stress = True, timeout=None):
         """
@@ -1028,7 +1009,7 @@ class Cluster(object):
             
             count = 0
             # Submit in parallel
-            jobs = [false_id[i : i + self.job_number] for i in range(0, len(false_id), self.job_number)]
+            jobs = [false_id[i : i + self.job_number] for i in xrange(0, len(false_id), self.job_number)]
             
             for job in jobs:
                 # Submit only the batch size

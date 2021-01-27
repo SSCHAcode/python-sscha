@@ -1,5 +1,4 @@
 #!python
-from __future__ import print_function
 
 import sys, os
 import numpy as np
@@ -64,14 +63,14 @@ if sscha.Calculator.__CALCULATOR_HEAD__ in namelist:
     is_calc = True
 
 # Check the cluster connectivity
-print ("Checking communication...")
+print "Checking communication..."
 comm = cluster.CheckCommunication()
 if not comm:
-    print ("Error, while trying to communicate with the cluster.")
-    print ("Please, make sure your setup is correct.")
+    print "Error, while trying to communicate with the cluster."
+    print "Please, make sure your setup is correct."
     exit(1)
 else:
-    print ("Communication established.")
+    print "Communication established."
 
 # If a calculator has been setup, perform a trial calculation
 if is_calc:
@@ -97,22 +96,22 @@ if is_calc:
     ensemble.forces = np.zeros( (N_structs, 2, 3), dtype = np.float64)
     
     # Submit the calculation as a single
-    print ("Submitting the calculation as a single...")
+    print "Submitting the calculation as a single..."
     cluster.compute_ensemble(ensemble, calc, False)
     
-    print ("Calculation ended.")
-    print ("Printing energies (should be all equal):")
-    print ("\n".join(["%16.8f Ry" % x for x in ensemble.energies]))
-    print ()
+    print "Calculation ended."
+    print "Printing energies (should be all equal):"
+    print "\n".join(["%16.8f Ry" % x for x in ensemble.energies])
+    print ""
     
     # Submit the parallel calculation
-    print ("Submitting the calculation as a batch...")
-    print ("(this is the way for big ensembles)")
+    print "Submitting the calculation as a batch..."
+    print "(this is the way for big ensembles)"
     cluster.compute_ensemble_batch(ensemble, calc, False)
     
-    print ("Calculation ended.")
-    print ("Printing energies (should be all equal):")
-    print ("\n".join(["%16.8f Ry" % x for x in ensemble.energies]))
-    print ("")
+    print "Calculation ended."
+    print "Printing energies (should be all equal):"
+    print "\n".join(["%16.8f Ry" % x for x in ensemble.energies])
+    print ""
     
-print ("Done.")
+print "Done."

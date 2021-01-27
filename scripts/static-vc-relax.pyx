@@ -1,5 +1,4 @@
 #!python
-from __future__ import print_function
 
 # -*- coding: utf-8 -*-
 
@@ -58,7 +57,7 @@ def is_valid_file(parser, arg):
 # Prepare the parser for the command line
 parser = argparse.ArgumentParser(prog = PROG_NAME,
                                  description = INFO,
-                                 formatter_class = argparse.RawTextHelpFormatter)
+                                 version = VERSION, formatter_class = argparse.RawTextHelpFormatter)
 
 
 # Add the arguments
@@ -175,17 +174,17 @@ for i in range(start_ka, max_ka):
     ase_struct.set_calculator(calc)
 
     # Perform the fixed cell relaxation
-    print ("Relaxation %d:" % i)
+    print "Relaxation %d:" % i
     relaxation = BFGS(ase_struct, trajectory = "struct-relax-%04d.traj" % i)
     relaxation.run(fmax = max_force)
 
     # Get the stress
     stress = - ase_struct.get_stress(False) 
     
-    print ("Final stress [GPa]:")
-    print (np.array_str(stress / GPa, precision=4, suppress_small=True))
-    print() 
-    print()
+    print "Final stress [GPa]:"
+    print np.array_str(stress / GPa, precision=4, suppress_small=True)
+    print 
+    print
 
 
     # Perform the cell optimization
@@ -202,7 +201,7 @@ for i in range(start_ka, max_ka):
     
     # Apply the symmetries on the structure
     if use_symmetries:
-        print ("Imposing the simmetries on the final structure and stress.")
+        print "Imposing the simmetries on the final structure and stress."
         new_struct.impose_symmetries(symmetries)
         
         # Impose the symmetries on the stress
@@ -229,7 +228,7 @@ for i in range(start_ka, max_ka):
         break
 
 new_struct.save_scf("final_relaxed.scf")
-print ("Final structure saved in final_relaxed.scf")
+print "Final structure saved in final_relaxed.scf"
 
 
 if not append_file is None:
@@ -243,8 +242,8 @@ if not append_file is None:
         myfile.write("%16.8f %16.8f %16.8f %16.8f\n" % (press, volume, energy, tot_force))
         myfile.close()
 
-    print ("Info on the last minimization saved in '%s'" % append_file)
+    print "Info on the last minimization saved in '%s'" % append_file
 
 
-print ("Done.")
+print "Done."
     

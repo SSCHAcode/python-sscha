@@ -212,7 +212,8 @@ class SSCHA_Minimizer(object):
         self.__gw_err__ = []
         self.__KL__ = []
 
-
+        # @JP add
+        self.imag_freq=False
 
         # Setup the attribute control
         self.__total_attributes__ = [item for item in self.__dict__.keys()]
@@ -383,11 +384,14 @@ class SSCHA_Minimizer(object):
             # Perform the gradient restriction
             if custom_function_gradient is not None:
                 custom_function_gradient(dyn_grad, struct_grad)    
-                
+
                 #print "applying sum rule and symmetries:"
                 #qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
                 #print "SECOND DIAG:", np.linalg.eigvalsh(dyn_grad[0, :, :])
+
             
+            #print('JP shape',np.shape(struct_grad)) # @JP
+            print("JP struct grad",struct_grad[:,:]) # @JP
             # Append the gradient modulus to the minimization info
             self.__gw__.append(np.sqrt( np.sum(struct_grad**2)))
             self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
@@ -409,8 +413,8 @@ class SSCHA_Minimizer(object):
 
         
         # Store the gradient in the minimization
-        self.__gc__.append(np.real(np.einsum("abc,acb", dyn_grad, np.conj(dyn_grad))))
-        self.__gc_err__.append(np.real(np.einsum("abc, acb", err, np.conj(err))))
+        self.__gc__.append(np.real(np.einsum("abc,acb", dyn_grad, dyn_grad)))
+        self.__gc_err__.append(np.real(np.einsum("abc, abc", err, err))) # @ JP
             
         # Perform the step for the dynamical matrix respecting the root representation
         new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
@@ -725,18 +729,28 @@ class SSCHA_Minimizer(object):
         
         self.ensemble.update_weights(self.dyn, self.ensemble.current_T)
         
+    def first_step(self):
+        """                           
+        ================             
+   
+        This method evaluates the original displacemtents, Upsilon matrix e the product u_a Upsilon_{ab} u_b
+        """
+        self.ensemble.original()
+
         
     def get_free_energy(self, return_error = False):
         """
         SSCHA FREE ENERGY
         =================
         
-        Obtain the SSCHA free energy per unit cell for the system. This is done through thermodynamic integration.
-        Note that for the SSCHA this integration is performed analytically, so evaluating this function
-        is almost immediate.
+        Obtain the SSCHA free energy for the system.
+        This is done by integrating the free energy along the hamiltonians, starting
+        from current_dyn to the real system.
         
         The result is in Rydberg.
-                
+        
+        NOTE: this method just recall the self.ensemble.get_free_energy function.
+        
         .. math::
             
             \\mathcal F = \\mathcal F_0 + \\int_0^1 \\frac{d\\mathcal F_\\lambda}{d\\lambda} d\\lambda
@@ -788,41 +802,37 @@ Maybe data_dir is missing from your input?"""
             raise IOError(s)
         
         # Symmetrize the starting dynamical matrix and apply the sum rule
-        if not self.neglect_symmetries:
+        if verbosity:
+            print("Symmetry initialization...")
+        qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+        qe_sym.SetupQPoint(verbose = verbosity)
+
+        if self.use_spglib:
+            qe_sym.SetupFromSPGLIB()
+
+            import spglib
             if verbosity:
-                print("Symmetry initialization...")
-            qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
-            qe_sym.SetupQPoint(verbose = verbosity)
-
-            if self.use_spglib:
-                qe_sym.SetupFromSPGLIB()
-
-                import spglib
-                if verbosity:
-                    print("Symmetry group: ", spglib.get_spacegroup(self.dyn.structure.get_ase_atoms()))
-                
-                self.N_symmetries = qe_sym.QE_nsym
-
-                # Symmetrize the dynamical matrix
-                self.dyn.SymmetrizeSupercell()
-            else:
-                fcq = np.array(self.dyn.dynmats)
-                qe_sym.SymmetrizeFCQ(fcq, self.dyn.q_stars, asr = "custom")
-                for iq in range(len(self.dyn.q_tot)):
-                    self.dyn.dynmats[iq] = fcq[iq, :, :]
-                
-            # Save the number of symmetries
-            self.N_symmetries = qe_sym.QE_nsym
-        else:
-            # Only apply the acoustic sum rule
-            CC.symmetries.CustomASR(self.dyn.dynmats[0])
-            self.N_symmetries = 1
+                print("Symmetry group: ", spglib.get_spacegroup(self.dyn.structure.get_ase_atoms()))
             
+            self.N_symmetries = qe_sym.QE_nsym
+
+            # Symmetrize the dynamical matrix
+            self.dyn.SymmetrizeSupercell()
+        else:
+            fcq = np.array(self.dyn.dynmats)
+            qe_sym.SymmetrizeFCQ(fcq, self.dyn.q_stars, asr = "custom")
+            for iq in range(len(self.dyn.q_tot)):
+                self.dyn.dynmats[iq] = fcq[iq, :, :]
+        
+        # Save the number of symmetries
+        self.N_symmetries = qe_sym.QE_nsym
+        
         if verbosity:
             print("Total number of symmetries: {}".format(self.N_symmetries))
             print("Check for the imaginary frequencies...")
         
         self.check_imaginary_frequencies()
+        self.first_step()
         self.update()
         
         # Clean all the minimization variables
@@ -869,8 +879,9 @@ Maybe data_dir is missing from your input?"""
         
         # For now check that if root representation is activated
         # The preconditioning must be deactivated
-        if self.root_representation != "normal" and self.precond_dyn:
-            raise ValueError("Error, deactivate the preconditioning if a root_representation is used.")
+        # @JP Allow root2 to use preconditioning
+        #if self.root_representation != "normal" and self.precond_dyn:
+        #    raise ValueError("Error, deactivate the preconditioning if a root_representation is used.")
         
 #
 #        # Initialize the symmetry
@@ -965,11 +976,14 @@ Maybe data_dir is missing from your input?"""
             t2 = time.time()
             if verbose >=1:
                 print ("Time elapsed to perform the minimization step:", t2 - t1, "s")
-            
+
+            print('Coordinates:\n',self.dyn.structure.coords,'\n')# @JP
             
             if self.check_imaginary_frequencies():
                 print ("Immaginary frequencies found.")
                 print ("Minimization aborted.")
+                #running=False # @JP
+                self.imag_freq=True
                 break
             
             # Compute the free energy and its error
@@ -978,7 +992,7 @@ Maybe data_dir is missing from your input?"""
             self.__fe__.append(np.real(fe))
             self.__fe_err__.append(np.real(err))
             
-            harm_fe = self.dyn.GetHarmonicFreeEnergy(self.ensemble.current_T) / np.prod(self.ensemble.supercell)
+            harm_fe = self.dyn.GetHarmonicFreeEnergy(self.ensemble.current_T,allow_imaginary_freq = True) / np.prod(self.ensemble.supercell)
             anharm_fe = np.real(fe - harm_fe)
             
             # Compute the KL ratio
@@ -1016,7 +1030,20 @@ Maybe data_dir is missing from your input?"""
             # Get the stopping criteria
             running = not self.check_stop()
             print ("Check the stopping criteria: Running = ", running)
+
+            # @JP print frequencies after every step...not saved in frequencies.dat
+            super_dyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
+            w, pols = super_dyn.DyagDinQ(0)
+            print('Eigenvalues:\n',w*__RyToCm__) # @JP
+            print('Eigenvector[0]:\n',pols[:,0])
+            print('Eigenvector[1]:\n',pols[:,1])
+            print('Eigenvector[2]:\n',pols[:,2]) 
+            print('Eigenvector[3]:\n',pols[:,3])#.round(6).tolist())
+            print('Eigenvector[last]:\n',pols[:,-1])
             
+            # Get the current frequencies
+            #        w, pols = self.dyn.GenerateSupercellDyn(self.ensemble.supercell).DyagDinQ(0)
+            #                w *= __RyToCm__
             
             if len(self.__fe__) > self.max_ka and self.max_ka > 0:
                 print ("Maximum number of steps reached.")
@@ -1123,7 +1150,7 @@ Maybe data_dir is missing from your input?"""
             print (" ==== FINAL FREQUENCIES [cm-1] ==== ")
             super_dyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
             w, pols = super_dyn.DyagDinQ(0)
-            trans = CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())
+            trans = CC.Methods.get_translations(w,pols, super_dyn.structure.get_masses_array())
             
             for i in range(len(w)):
                 print ("Mode %5d:   freq %16.8f cm-1  | is translation? " % (i+1, w[i] * __RyToCm__), trans[i])
@@ -1143,8 +1170,9 @@ Maybe data_dir is missing from your input?"""
         w, pols = superdyn.DyagDinQ(0)
 
         # Get translations
-        trans_mask = ~CC.Methods.get_translations(pols, superdyn.structure.get_masses_array())
-
+        trans_mask = ~CC.Methods.get_translations(w,pols, superdyn.structure.get_masses_array())
+        #print('trans_mask',trans_mask[0:10]) # @JP
+        
         # Remove translations
         w = w[trans_mask]
         pols = pols[:, trans_mask]
@@ -1155,7 +1183,7 @@ Maybe data_dir is missing from your input?"""
             superdyn0 = self.ensemble.dyn_0.GenerateSupercellDyn(self.ensemble.supercell)
             wold, pold = superdyn0.DyagDinQ(0)
             
-            trans_mask = ~CC.Methods.get_translations(pold, superdyn0.structure.get_masses_array())
+            trans_mask = ~CC.Methods.get_translations(wold,pold, superdyn0.structure.get_masses_array())
             wold = wold[trans_mask] * __RyToCm__
             pold = pold[:, trans_mask]
             total_mask = list(range(len(w)))
@@ -1452,12 +1480,12 @@ def PerformRootStep(dyn_q, grad_q, step_size=1, root_representation = "sqrt", mi
                 eigvals[eigvals < 0] = 0.
             
             # The sqrt conversion
-            new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(eigvals), np.conj(eigvects), eigvects)
+            new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(eigvals), eigvects, np.conj(eigvects))
             new_grad[iq, :, :] = new_dyn[iq, :, :].dot(grad_q[iq, :, :]) + grad_q[iq, :, :].dot(new_dyn[iq, :, :])
             
             # If root4 another loop needed
             if root_representation == "root4":                
-                new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(np.sqrt(eigvals)), np.conj(eigvects), eigvects)
+                new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(np.sqrt(eigvals)), eigvects, np.conj(eigvects))
                 new_grad[iq, :, :] = new_dyn[iq, :, :].dot(new_grad[iq, :, :]) + new_grad[iq, :, :].dot(new_dyn[iq, :, :])
     
     # Perform the step
@@ -1511,7 +1539,7 @@ def ApplyLambdaTensor(current_dyn, matrix, T = 0):
     w, pols = current_dyn.DyagDinQ(0)
     
     # Get the translations
-    trans = ~CC.Methods.get_translations(pols, current_dyn.structure.get_masses_array())
+    trans = ~CC.Methods.get_translations(w,pols, current_dyn.structure.get_masses_array())
     
     # Restrict only to non translational modes
     w = np.real(w[trans])
@@ -1575,7 +1603,7 @@ def ApplyFCPrecond(current_dyn, matrix, T = 0):
     w, pols = current_dyn.DyagDinQ(0)
     
     # Get the translations
-    trans = ~CC.Methods.get_translations(pols, current_dyn.structure.get_masses_array())
+    trans = ~CC.Methods.get_translations(w,pols, current_dyn.structure.get_masses_array())
     
     # Restrict only to non translational modes
     w = np.real(w[trans])
@@ -1659,7 +1687,7 @@ def GetStructPrecond(current_dyn):
     _msi_ = 1 / np.sqrt(_m_)
     
     # Select translations
-    not_trans = ~CC.Methods.get_translations(pols, mass)
+    not_trans = ~CC.Methods.get_translations(w,pols, mass)
     
     # Delete the translations from the dynamical matrix
     w = w[not_trans]

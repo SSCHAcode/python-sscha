@@ -232,8 +232,7 @@ subroutine get_gradient_supercell( n_random, natsc, n_modes, ntyp_sc, rho, u_dis
   
   ! Perform the inverse preconditioning if required:
   if (.not. precond) then
-     print *, "Applying the dPsi/dPhi tensor to the gradient [This may require some time for system with more than 50 atoms]"
-     print *, "If it takes too long, turn on preconditioning."
+     print *, "Computing the inverse preconditioning..."
      call flush()
      call multiply_lambda_tensor(n_modes, natsc, ntyp_sc, wr_sc, epols_sc, trans, &
           mass, ityp_sc, T, grad, tmp, .false.)
@@ -492,8 +491,7 @@ end do
 
 ! Perform the inverse preconditioning if required:
 if (.not. precond) then
-   print *, "Applying the dPsi/dPhi tensor to the gradient [This may require some time for system with more than 50 atoms]"
-   print *, "If it takes too long, turn on preconditioning."
+   print *, "Computing the inverse preconditioning..."
    call flush()
    call multiply_lambda_tensor(n_modes, natsc, ntyp_sc, wr_sc, epols_sc, trans, &
         mass, ityp_sc, T, grad, tmp, .false.)

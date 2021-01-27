@@ -15,7 +15,8 @@ import sscha.Cluster
 import sscha.Utilities as Utilities
 import cellconstructor as CC
 import cellconstructor.symmetries
-
+import os # @JP
+import time # @JP
 
 __EPSILON__ = 1e-5
 
@@ -93,6 +94,7 @@ class SSCHA(object):
 
         # The variable cell attributes
         self.bulk_modulus = 15
+        self.cluster = None 
         self.target_pressure = 0
         self.fix_volume = False
 
@@ -243,7 +245,7 @@ class SSCHA(object):
         
         
     def relax(self, restart_from_ens = False, get_stress = False,
-              ensemble_loc = None, start_pop = None):
+              ensemble_loc = ".", start_pop = 1):
         """
         COSTANT VOLUME RELAX
         ====================
@@ -262,12 +264,11 @@ class SSCHA(object):
                 cost, as it will be computed for each ab-initio configuration (it may be not available
                 with some ase calculator)
             ensemble_loc : string
-                Where the ensemble of each population is saved on the disk. If none, it will
-                use the content of self.data_dir. If also self.data_dir is None, 
-                the ensemble will not not be saved (useful to avoid disk I/O for force fields)
+                Where the ensemble of each population is saved on the disk. You can specify None
+                if you do not want to save the ensemble (useful to avoid disk I/O for force fields)
             start_pop : int, optional
                 The starting index for the population, used only for saving the ensemble and the dynamical 
-                matrix. If None, the content of self.start_pop will be used.
+                matrix.
             
         Returns
         -------
@@ -275,13 +276,7 @@ class SSCHA(object):
                 True if the minimization converged, False if the maximum number of 
                 populations has been reached.
         """
-
-        if ensemble_loc is None:
-            ensemble_loc = self.data_dir
         
-        if start_pop is None:
-            start_pop = self.start_pop
-
         pop = start_pop
                 
         running = True
@@ -290,16 +285,52 @@ class SSCHA(object):
             self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
             
             if pop != start_pop or not restart_from_ens:
+                t0=time.time() # @JP
                 self.minim.ensemble.generate(self.N_configs)
-            
+                print((time.time()-t0)/60) # @JP
+                
+                ############################################################################
+                #Can i parallelize this part only? so call it with an external
+                #maybe yes? we already have the population counter anyway...
+                #then load and thats it i guess...
+                #DATA_DIR=
+                #POPULATION=pop
+                #self.minim.ensemble.save_bin(DATA_DIR,POPULATION)
+                #os.system("mpirun -np 4 python JP_run.py")
+                #ens.load_bin(DATA_DIR,POPULATION,load_sscha=True)
+                #self.minim.ensemble.load_bin(DATA_DIR,POPULATION)
+                with open('is_MPI','r') as f:
+                    for line in f:
+                        is_MPI=line
+                #bla
+                if is_MPI=='True':
+                    print('Parallelization')
+                    with open('input_dat','w') as f:
+                        f.write(str(self.minim.dyn.GetSupercell()[0])+'\n')
+                        f.write(str(self.minim.ensemble.T0)+'\n')
+                        f.write(str(pop)+'\n')
+                        f.write(str(self.minim.dyn.nqirr)+'\n')
+                        f.write(str(self.minim.ensemble.N))
+                        
+                    t0=time.time()
+                    self.minim.ensemble.save_bin('data_N%s_T%s' % (self.minim.dyn.GetSupercell()[0],self.minim.ensemble.T0),pop,save_sscha=True)
+                    os.system("mpirun -np 4 python JP_run_relax.py") # I need to put the population number in here...
+                    print('Time elapsed: ',(time.time()-t0)/60)
+                    print('Paral done')
+                    self.minim.ensemble.load_bin('data_N%s_T%s' % (self.minim.dyn.GetSupercell()[0],self.minim.ensemble.T0),pop,load_sscha=True)
+                    ###########################################################################
+                else:
                 # Compute energies and forces
-                self.minim.ensemble.compute_ensemble(self.calc, get_stress, 
-                                                 cluster = self.cluster)
+                    self.minim.ensemble.compute_ensemble(self.calc, get_stress, 
+                                                 cluster = self.cluster) # @JP put a 
                 #self.minim.ensemble.get_energy_forces(self.calc, get_stress)
-            
+
+                print('Cluster',str(self.cluster))
+                print('get_stress',str(get_stress))
+                
                 if ensemble_loc is not None and self.save_ensemble:
                     self.minim.ensemble.save_bin(ensemble_loc, pop)
-            
+            #asda
             self.minim.population = pop
             self.minim.init(delete_previous_data = False)
 
@@ -329,8 +360,10 @@ class SSCHA(object):
             running = not self.minim.is_converged()
             pop += 1
             
-            
-            if pop > self.max_pop:
+            print('pop, max_pop:', pop, self.max_pop)
+            print('ka: ', len(self.minim.__fe__), self.minim.max_ka)
+            print('imag_freq:',self.minim.imag_freq) 
+            if pop > self.max_pop or len(self.minim.__fe__) > self.minim.max_ka > 0 or self.minim.imag_freq==True:
                 running = False
                 
         return self.minim.is_converged()
@@ -431,7 +464,7 @@ class SSCHA(object):
         
         
 
-        if static_bulk_modulus == "recalc":
+        if static_bulk_modulus is not "recalc":
             # Rescale the static bulk modulus in eV / A^3
             static_bulk_modulus /= sscha.SchaMinimizer.__evA3_to_GPa__ 
 

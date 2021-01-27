@@ -1,6 +1,4 @@
-from __future__ import print_function
 from numpy.distutils.core import setup, Extension
-
 
 
 
@@ -13,6 +11,7 @@ SCHAModules = Extension(name = "SCHAModules",
                         sources = ["SCHAModules/module_stochastic.f90",
                                    "SCHAModules/module_new_thermodynamic.f90",
                                    "SCHAModules/module_anharmonic.f90",
+				   "SCHAModules/module_harmonic.f90",
                                    "SCHAModules/get_stress_tensor.f90",
                                    "SCHAModules/get_gradient_supercell.f90",
                                    "SCHAModules/get_upsilon_matrix.f90",
