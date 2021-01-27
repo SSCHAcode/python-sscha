@@ -21,7 +21,10 @@ import cellconstructor as CC
 import cellconstructor.Methods
 
 # SETUP THE CODATA 2006, To match the QE definition of Rydberg
-units = ase.units.create_units("2006")
+try:
+    units = ase.units.create_units("2006")
+except:
+    units = {"Ry": 13.605698066, "Bohr": 1/1.889725989}
 
 """
 This is an untility script that is able to manage the submission into
@@ -251,6 +254,13 @@ class Cluster(object):
                 raise AttributeError(ERROR_MSG)
         else:
             super(Cluster, self).__setattr__(name, value)
+
+
+        # Setting the account or partition name will automatically result in
+        # activating the corresponding flags
+        if name.endswith("_name"):
+            key = "use_{}".format(name.split("_")[0])
+            self.__dict__[key] = True
         
         
         
@@ -691,6 +701,9 @@ class Cluster(object):
             namelist: 
                 The parsed namelist dictionary.
         """
+        # Parse the namelist if needed
+        if isinstance(namelist, str):
+            namelist = CC.Methods.read_namelist(namelist)
         
         # Check if the cluster namelist is present
         if not __CLUSTER_NAMELIST__ in namelist.keys():

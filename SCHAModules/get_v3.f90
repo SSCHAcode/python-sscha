@@ -93,6 +93,7 @@ subroutine get_v3 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v3, &
   
     ! Rotate displacementes
     ! Here ur are Upsilon * u2
+
     do x = 1, n_mode
       ur(:,x) = 0.0d0
       do mu = 1, n_mode
@@ -113,6 +114,7 @@ subroutine get_v3 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v3, &
         do z = 1, n_mode 
           ! Here <eprod *f2> is eprod <f2> that correspond to subtract the average of the forces
           ! This term is important if the minimization is not performed on the average positions 
+
   !        fun(:) = - f2(:,x) * ur(:,y) * ur(:,z)
           fun(:) = ( eprod(y,z) - ur(:,y) * ur(:,z) ) * f2(:,x)
           call average_error_weight(fun,rho,log_err,av,av_err)
@@ -122,6 +124,7 @@ subroutine get_v3 ( a, er, transmode, amass, ityp_sc, f, u, rho, log_err, v3, &
     end do
     !$omp end do
     !$omp end parallel
+
   
     deallocate(e,ur,u2,f2,fun)
   

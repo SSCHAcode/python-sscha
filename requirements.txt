@@ -1,0 +1,5 @@
+setuptools
+numpy
+scipy
+ase
+spglib

@@ -1,6 +1,7 @@
 module thermodynamic
 
   PUBLIC :: w_to_a
+  PUBLIC :: w_to_da
   
   ! The following subroutine translates the frequency in
   ! the a distance
@@ -31,6 +32,8 @@ contains
     double precision, intent(in) :: T
     double precision, dimension(n), intent(in) :: w
     double precision, dimension(n), intent(out) :: da
+
+
     integer, intent(in) :: n
     double precision, dimension(n) :: a, b
     double precision :: beta
