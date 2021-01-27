@@ -48,6 +48,9 @@ print()
 
 print("Loading the original dynamical matrix...")
 dyn = CC.Phonons.Phonons(DYN_PREFIX, NQIRR)
+print("Symmetrizing...")
+dyn.Symmetrize()
+
 print("Loading the current dynamical matrix...")
 final_dyn = CC.Phonons.Phonons(FINAL_DYN, NQIRR)
 
@@ -60,7 +63,10 @@ ens.load(DATA_DIR, POPULATION, N_RANDOM)
 print("Updating the importance sampling...")
 ens.update_weights(final_dyn, T)
 
+print("")
+
 print("Computing the free energy hessian...")
+print("(This may take a while)")
 # Set get_full_hessian to false to have only the odd correction
 # Usefull if you want to study the convergence with the number of configuration
 dyn_hessian = ens.get_free_energy_hessian(include_v4 = INCLUDE_V4,
