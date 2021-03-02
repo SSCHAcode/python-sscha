@@ -42,7 +42,7 @@ import sscha.Parallel as Parallel
 
 
 import SCHAModules
-import sscha_HP_odd
+#import sscha_HP_odd
 
 _SSCHA_ODD_ = False 
 #try:
