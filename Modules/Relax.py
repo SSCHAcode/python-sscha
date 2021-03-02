@@ -90,7 +90,6 @@ class SSCHA(object):
         self.__cfpost__ = None
         self.__cfg__ = None
 
-
         # The variable cell attributes
         self.bulk_modulus = 15
         self.target_pressure = 0

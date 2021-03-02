@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!python
 from __future__ import print_function
 
 from numpy import *
@@ -23,12 +23,13 @@ if len(sys.argv) < 2:
 
 
 print("Loading the data...")
+
 freq_data = concatenate([loadtxt(sys.argv[x]) for x in range(1, len(sys.argv))])
 
 N_points, Nw = shape(freq_data)
 
-
 print("Plotting...")
+
 figure(dpi = 200)
 for i in range(Nw):
     plot(freq_data[:, i] * RY_TO_CM)
@@ -38,5 +39,7 @@ ylabel("Frequency [cm-1]")
 title("Frequcency evolution")
 tight_layout()
 
+
 print("Done.")
+
 show()
