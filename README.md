@@ -1,6 +1,8 @@
 Introduction
 ============
 
+Website for more information [sscha.eu](http://sscha.eu/).
+
 What is python-sscha?
 ---------------------
 
