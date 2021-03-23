@@ -1045,7 +1045,7 @@ class Cluster(object):
             
             for job in jobs:
                 # Submit only the batch size
-                if count > self.batch_size:
+                if count >= self.batch_size:
                     break
                 t = threading.Thread(target = compute_single_jobarray, args=(job, ase_calc, ))
                 t.start()
@@ -1131,7 +1131,7 @@ class Cluster(object):
             # Submit in parallel
             for i in false_id:
                 # Submit only the batch size
-                if count > self.batch_size:
+                if count >= self.batch_size:
                     break
                 t = threading.Thread(target = compute_single, args=(i, ase_calc, ))
                 t.start()
