@@ -507,7 +507,11 @@ class Cluster(object):
 
         # Append the additional parameters
         for add_parameter in self.custom_params:
-            submission += "#{} --{}={}\n".format(self.submit_name, add_parameter, self.custom_params[add_parameter])
+            if self.custom_params[add_parameter] is None:
+                submission += "#{} --{}\n".format(self.submit_name, add_parameter)
+            else:
+                submission += "#{} --{}={}\n".format(self.submit_name, add_parameter, self.custom_params[add_parameter])
+
         
         # Add the set -x option
         submission += "set -x\n"
