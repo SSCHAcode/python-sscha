@@ -416,9 +416,9 @@ class SSCHA_Minimizer(object):
 
         
         # Store the gradient in the minimization
-        self.__gc__.append(np.real(np.einsum("abc,acb", dyn_grad, np.conj(dyn_grad))))
-        self.__gc_err__.append(np.real(np.einsum("abc, acb", err, np.conj(err))))
-            
+        self.__gc__.append( np.sqrt(np.sum( np.abs(dyn_grad)**2)))
+        self.__gc_err__.append( np.sqrt(np.sum( np.abs(err)**2)))
+
         # Perform the step for the dynamical matrix respecting the root representation
         new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
                                   self.min_step_dyn, root_representation = self.root_representation,
