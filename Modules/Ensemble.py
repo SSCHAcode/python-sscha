@@ -3034,7 +3034,7 @@ DETAILS OF ERROR:
 
 
     def compute_ensemble(self, calculator, compute_stress = True, stress_numerical = False,
-                         cluster = None):
+                         cluster = None, verbose = True):
         """
         GET ENERGY AND FORCES
         =====================
@@ -3084,7 +3084,7 @@ DETAILS OF ERROR:
         if is_cluster:
             cluster.compute_ensemble(computing_ensemble, calculator, compute_stress)
         else:
-            computing_ensemble.get_energy_forces(calculator, compute_stress, stress_numerical)
+            computing_ensemble.get_energy_forces(calculator, compute_stress, stress_numerical, verbose = verbose)
         
         if should_i_merge:
             # Remove the noncomputed ensemble from here, and merge 
@@ -3203,7 +3203,7 @@ DETAILS OF ERROR:
 
         return self.split(non_mask)
 
-    def get_energy_forces(self, ase_calculator, compute_stress = True, stress_numerical = False, skip_computed = False):
+    def get_energy_forces(self, ase_calculator, compute_stress = True, stress_numerical = False, skip_computed = False, verbose = False):
         """
         GET ENERGY AND FORCES FOR THE CURRENT ENSEMBLE
         ==============================================
@@ -3231,27 +3231,30 @@ DETAILS OF ERROR:
         """
         
         # Setup the calculator for each structure
+        parallel = False
         if __MPI__:
             comm = MPI.COMM_WORLD
             size = comm.Get_size()
             rank = comm.Get_rank()
             
-            # Broad cast to all the structures
-            structures = comm.bcast(self.structures, root = 0)            
-            nat3 = comm.bcast(self.current_dyn.structure.N_atoms* 3* np.prod(self.supercell), root = 0)
-            N_rand = comm.bcast(self.N, root=0)
+            if size > 1:
+                parallel = True
+                # Broad cast to all the structures
+                structures = comm.bcast(self.structures, root = 0)            
+                nat3 = comm.bcast(self.current_dyn.structure.N_atoms* 3* np.prod(self.supercell), root = 0)
+                N_rand = comm.bcast(self.N, root=0)
+                
+                # Setup the label of the calculator
+                #ase_calculator = comm.bcast(ase_calculator, root = 0)   # This broadcasting seems causing some issues on some fortran codes called by python (which may interact with MPI)
+                ase_calculator.set_label("esp_%d" % rank) # Avoid overwriting the same file
+                
+                compute_stress = comm.bcast(compute_stress, root = 0)
+                
+                # Check if the parallelization is correct        
+                if N_rand % size != 0:
+                    raise ValueError("Error, for paralelization the ensemble dimension must be a multiple of the processors")
             
-            # Setup the label of the calculator
-            ase_calculator = comm.bcast(ase_calculator, root = 0)
-            ase_calculator.set_label("esp_%d" % rank) # Avoid overwriting the same file
-            
-            compute_stress = comm.bcast(compute_stress, root = 0)
-            
-            # Check if the parallelization is correct        
-            if N_rand % size != 0:
-                raise ValueError("Error, for paralelization the ensemble dimension must be a multiple of the processors")
-            
-        else:
+        if not parallel:
             size = 1
             rank = 0
             structures = self.structures
@@ -3296,7 +3299,7 @@ DETAILS OF ERROR:
 
 
             # Print the status
-            if rank == 0:
+            if rank == 0 and verbose:
                 print ("Computing configuration %d / %d" % (i0+1, N_rand / size))
             
             # Avoid for errors
@@ -3333,7 +3336,7 @@ DETAILS OF ERROR:
         
         # Collect all togheter
         
-        if __MPI__:
+        if parallel:
             comm.Allgather([energies, MPI.DOUBLE], [self.energies, MPI.DOUBLE])
             comm.Allgather([forces, MPI.DOUBLE], [total_forces, MPI.DOUBLE])
             
