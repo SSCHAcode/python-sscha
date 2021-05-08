@@ -67,6 +67,9 @@ class Minimizer:
         pos = 0
         for i in range(nq):
             x_dyn[pos : pos + self.n_modes**2] = dyn.dynmats[i].ravel()
+
+        # Transform in root space if needed.
+        x_dyn, = get_root_dyn_grad(x_dyn, np.zeros(x_dyn.shape, dtype = np.complex128), self.root_representation)
         
         if self.minim_struct:
             x_struct = np.zeros(self.n_modes, dtype = np.complex128)
@@ -187,7 +190,7 @@ class Minimizer:
         current_dyn, = self.get_dyn_struct()
 
         # Now we can obtain the gradient in the root representation
-        root_dyn, root_grad = get_root_dyn_grad(current_dyn, dyn_gradient)
+        root_dyn, root_grad = get_root_dyn_grad(current_dyn, dyn_gradient, self.root_representation)
 
         grad_vector = self.transform_gradients(root_grad, structure_gradient)
         self.run_step(grad_vector, new_kl_ratio)

@@ -148,7 +148,9 @@ class SSCHA_Minimizer(object):
         self.dyn = dyn
         self.dyn_path = "dyn"
         self.population = 0
-        
+
+        self.minimizer = None# 
+
         # Projection. This is chosen to fix some constraint on the minimization
         self.projector_dyn = None
         self.projector_struct = None
@@ -361,6 +363,7 @@ class SSCHA_Minimizer(object):
         
             
         # If the structure must be minimized perform the step
+        struct_grad = np.zeros(dyn.structure.coords.shape, dtype = np.double, order = "C")
         if self.minim_struct:
             t1 = time.time()
             # Get the gradient of the free-energy respect to the structure
@@ -387,9 +390,6 @@ class SSCHA_Minimizer(object):
                 #qe_sym.SymmetrizeVector(struct_grad_err)
                 struct_grad_err /= np.sqrt(qe_sym.QE_nsym)
 
-            # Perform the gradient restriction
-            if custom_function_gradient is not None:
-                custom_function_gradient(dyn_grad, struct_grad)    
                 
                 #print "applying sum rule and symmetries:"
                 #qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
@@ -402,16 +402,18 @@ class SSCHA_Minimizer(object):
             
             # Perform the step for the structure
             #print "min step:", self.min_step_struc
-            self.dyn.structure.coords -= self.min_step_struc * struct_grad
+            #self.dyn.structure.coords -= self.min_step_struc * struct_grad
         else:
 
-            # Prepare the gradient imposing the constraints
-            if custom_function_gradient is not None:
-                custom_function_gradient(dyn_grad, np.zeros((self.dyn.structure.N_atoms, 3))) 
-             
             # Append the gradient modulus to the minimization info
             self.__gw__.append(0)
             self.__gw_err__.append(0)
+
+
+        # Perform the gradient restriction
+        if custom_function_gradient is not None:
+            custom_function_gradient(dyn_grad, struct_grad)    
+            
 
 
         
@@ -419,16 +421,26 @@ class SSCHA_Minimizer(object):
         self.__gc__.append( np.sqrt(np.sum( np.abs(dyn_grad)**2)))
         self.__gc_err__.append( np.sqrt(np.sum( np.abs(err)**2)))
 
+        # Perform the minimization step (with the chosen minimization algorithm)
+        new_kl_ratio = self.ensemble.get_effective_sample_size() / self.ensemble.N
+        self.minimizer.update_dyn(new_kl_ratio, dyn_grad, struct_grad)
+
+        # Get the new dynamical matrix and strucure after the step
+        new_dyn, new_struct = self.minimizer.get_dyn_struct()
+
         # Perform the step for the dynamical matrix respecting the root representation
-        new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
-                                  self.min_step_dyn, root_representation = self.root_representation,
-                                  minimization_algorithm = self.minimization_algorithm)
+        #new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
+        #                          self.min_step_dyn, root_representation = self.root_representation,
+        #                          minimization_algorithm = self.minimization_algorithm)
         
         # Update the dynamical matrix
         for iq in range(len(self.dyn.q_tot)):
             self.dyn.dynmats[iq] = new_dyn[iq, : ,: ]
         
-        #self.dyn.save_qe("Prova")
+
+        # Update the structure
+        if self.minim_struct:
+            self.dyn.structure.coords[:,:] = new_struct
         
 
         # Update the ensemble
@@ -965,6 +977,10 @@ WARNING, the preconditioning is activated together with a root representation.
         # TODO: Activate a new pipe to avoid to stop the execution of the python 
         #       code when running the minimization. This allows for interactive plots
         running = True
+
+        # Prepare the minimizer
+        self.minimizer = sscha.Minimizer.Minimizer(self.minim_struct, root_representation = self.root_representation)
+        self.minimizer.init(self.dyn, self.ensemble.get_effective_sample_size() / self.ensemble.N)
         
         
         while running:
