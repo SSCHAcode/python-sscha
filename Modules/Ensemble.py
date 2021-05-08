@@ -4,13 +4,6 @@ import sys, os
 import numpy as np
 import time
 
-# Fix the xrange python3 problem
-try:
-    xrange = xrange
-    # We have Python 2
-except:
-    xrange = range
-    # We have Python 3
 
 
 """
@@ -374,7 +367,7 @@ class Ensemble:
         total_t_for_loading = 0
         total_t_for_sscha_ef = 0
         t_before_for = time.time()
-        for i in xrange(self.N):
+        for i in range(self.N):
             # Load the structure
             structure = CC.Structure.Structure()
             if os.path.exists(os.path.join(data_dir, "scf_population%d_%d.dat" % (population, i+1))) and not load_displacements:
@@ -657,7 +650,7 @@ Error, the following stress files are missing from the ensemble:
         
         super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
             
-        for i in xrange(self.N):
+        for i in range(self.N):
             # Save the forces
             if self.force_computed[i]:
                 np.savetxt("%s/forces_population%d_%d.dat" % (data_dir, population, i+1), self.forces[i,:,:] / A_TO_BOHR)
@@ -759,7 +752,7 @@ Error, the following stress files are missing from the ensemble:
         
         # Build the structures
         self.structures = [None] * self.N
-        for i in xrange(self.N):
+        for i in range(self.N):
             self.structures[i] = super_structure.copy()
             self.structures[i].coords = self.xats[i,:,:]
             self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
@@ -1148,7 +1141,7 @@ DETAILS OF ERROR:
         self.u_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_structure.coords.ravel(), (self.N,1))
         old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_dyn.structure.coords.ravel(), (self.N,1))
 
-        # for i in xrange(self.N):
+        # for i in range(self.N):
         #     self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
             
         #     old_disps[i,:] = (self.xats[i, :, :] - super_dyn.structure.coords).reshape( 3*Nat_sc )
@@ -1193,7 +1186,7 @@ DETAILS OF ERROR:
         rho_tmp = np.ones( self.N, dtype = np.float64) * norm 
         if __DEBUG_RHO__:
             print("Norm factor:", norm)
-        for i in xrange(self.N):
+        for i in range(self.N):
             v_new = self.u_disps[i, :].dot(ups_new.dot(self.u_disps[i, :])) * __A_TO_BOHR__**2
             v_old = old_disps[i, :].dot(ups_old.dot(old_disps[i, :])) * __A_TO_BOHR__**2
 
@@ -1347,7 +1340,7 @@ DETAILS OF ERROR:
             new_forces = np.zeros((self.N, nat, 3), dtype  =np.float64, order = "C")
             
             # Project in the unit cell the forces
-            for i in xrange(nat):
+            for i in range(nat):
                 #print "%d) ITAU LIST:" % i, itau == i
                 new_forces[:, i, :] = np.sum(eforces[:, itau==i,:], axis = 1) / np.prod(self.supercell)
                 #new_forces[:, i, :] = 
@@ -1627,7 +1620,7 @@ DETAILS OF ERROR:
             eforces[:,:,:] = self.forces - self.sscha_forces
         else:
             eforces[:,:,:] = self.forces
-        for i in xrange(self.N):
+        for i in range(self.N):
             u_disp[i, :, :] = np.reshape(self.u_disps[i,:], (nat, 3)) 
         
         
@@ -1810,15 +1803,15 @@ DETAILS OF ERROR:
         # Get the correctly shaped polarization vectors
         er = np.zeros( (nat, len(wr), 3), dtype = np.float64, order = "F")
         
-        for i in xrange(len(wr)):
-            for j in xrange(nat):
+        for i in range(len(wr)):
+            for j in range(nat):
                 er[j, i, 0] = pols[3*j, i] 
                 er[j, i, 1] = pols[3*j+1, i] 
                 er[j, i, 2] = pols[3*j+2, i] 
                 
         # Prepare the displacement in fortran order
         u_disps = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
-        for i in xrange(self.N):
+        for i in range(self.N):
             u_disps[i,:,:] = np.reshape(self.u_disps[i,:], (nat, 3))
         
         abinit_stress = np.einsum("abc -> cba", self.stresses, order = "F")
@@ -1840,7 +1833,7 @@ DETAILS OF ERROR:
                 new_forces = np.zeros((self.N, nat, 3), dtype  =np.float64, order = "C")
                 
                 # Project in the unit cell the forces
-                for i in xrange(nat):
+                for i in range(nat):
                     #print "%d) ITAU LIST:" % i, itau == i
                     new_forces[:, i, :] = np.sum(eforces[:, itau==i,:], axis = 1) / np.prod(self.supercell)
                     #new_forces[:, i, :] = 
@@ -1849,8 +1842,8 @@ DETAILS OF ERROR:
             
             stress_centr = np.zeros( (3,3), dtype = np.float64)
             error_centr = np.zeros( (3,3), dtype = np.float64)
-            for i in xrange(0, 3):
-                for j in xrange(i, 3):
+            for i in range(0, 3):
+                for j in range(i, 3):
                     av_array = 0.5 * np.einsum("h, ah", self.current_dyn.structure.coords[:, i],
                                                eforces[:,:,j])
                     av_array += 0.5 * np.einsum("h, ah", self.current_dyn.structure.coords[:, j],
@@ -1999,8 +1992,8 @@ DETAILS OF ERROR:
 
 #         # Print the sscha forces converted
 #         print ("SCHA forces:")
-#         for i in xrange(self.N):
-#             for j in xrange(self.current_dyn.structure.N_atoms):
+#         for i in range(self.N):
+#             for j in range(self.current_dyn.structure.N_atoms):
 #                 print ("Conf\t%d\tAtom\t%d\t" % (i, j), self.sscha_forces[i, j, :]/ (__A_TO_BOHR__))
                 
                 
@@ -2020,8 +2013,8 @@ DETAILS OF ERROR:
 #         # Just to do something good
 #         da_dcr_mat = np.zeros( (nat * 3, nat * 3, len(w)), dtype = np.float64)
         
-#         for x_i in xrange(self.current_dyn.structure.N_atoms * 3):
-#             for y_i in xrange(x_i, self.current_dyn.structure.N_atoms * 3):
+#         for x_i in range(self.current_dyn.structure.N_atoms * 3):
+#             for y_i in range(x_i, self.current_dyn.structure.N_atoms * 3):
 #                 da_dcr, de_dcr = SCHAModules.anharmonic.get_da_dcr_and_de_dcr(w, pols, self.current_T,
 #                                                                               mass, x_i+1, y_i+1)
                 
@@ -2905,7 +2898,7 @@ DETAILS OF ERROR:
 
 
                     while running:
-                        for x in xrange( n_modes_sc):
+                        for x in range( n_modes_sc):
                             aux1 = new_d3[x, :, :] * Lambda_G
                             new_d3[x, :, :] = np.einsum("ab,ai,bi,ci,di->cd", aux1, X, X, X, Y)
                             new_d3[x, :, :] += np.einsum("ab,ai,bi,ci,di->cd", aux1, X, X, Y, X)
@@ -2913,7 +2906,7 @@ DETAILS OF ERROR:
                             new_d3[x, :, :] += np.einsum("ab,ai,bi,ci,di->cd", aux1, Y, X, X, X)
                             new_d3[x, :, :] /= -4*N_eff
                             aux2 = new_d3[x, :, :] * Lambda_G
-                            for y in xrange(x, n_modes_sc):
+                            for y in range(x, n_modes_sc):
                                 new_corr[x,y] = np.sum(aux2 * d3[y, :, :])
                                 new_corr[y,x] = new_corr[x,y]
                             
@@ -3278,7 +3271,7 @@ DETAILS OF ERROR:
             
 
         # If an MPI istance is running, split the calculation
-        for i0 in xrange(N_rand // size):
+        for i0 in range(N_rand // size):
             i = i0 + size * rank
 
             # Avoid performing this calculation if already done
