@@ -30,6 +30,8 @@ class Minimizer:
         self.old_x = None
         self.old_kl = None 
         self.dyn = None
+        self.nq = 0
+        self.n_modes = 0
 
         self.new_direction = True
 
@@ -57,17 +59,17 @@ class Minimizer:
         self.step_index = 0
 
         # create a vector of the dyn shape
-        nq = len(dyn.q_tot)
-        nmodes = dyn.structure.N_atoms * 3
+        self.nq = len(dyn.q_tot)
+        self.n_modes = dyn.structure.N_atoms * 3
 
-        x_dyn = np.zeros( nq * nmodes**2, dtype = np.complex128)
+        x_dyn = np.zeros( self.nq * self.n_modes**2, dtype = np.complex128)
 
         pos = 0
         for i in range(nq):
-            x_dyn[pos : pos + nmodes**2] = dyn.dynmats[i].ravel()
+            x_dyn[pos : pos + self.n_modes**2] = dyn.dynmats[i].ravel()
         
         if self.minim_struct:
-            x_struct = np.zeros(nmodes, dtype = np.complex128)
+            x_struct = np.zeros(self.n_modes, dtype = np.complex128)
             x_struct[:] = dyn.structure.coords.ravel()
             self.current_x  = np.concatenate((x_dyn, x_struct))
         else:
@@ -100,6 +102,25 @@ class Minimizer:
             return dyn_gradient.ravel()
         
         return np.concatenate( (dyn_gradient.ravel(), structure_gradient.ravel()) )
+
+    def get_dyn_struct(self):
+        """
+        From the current position of the minimization,
+        get back the dynamical matrix and the structure
+        """
+
+        dynq = np.zeros( (self.nq, self.n_modes, self.n_modes), dtype = np.complex128)
+
+        for i in range(self.nq):
+            dynq[i,  :, :] = self.current_x[ i * self.n_modes**2 : (i+1) * self.n_modes**2].reshape( (self.n_modes, self.n_modes))
+        
+        # Revert the dynamical matrix if we are in the root representation
+        dynq = get_standard_dyn(dynq, self.root_representation)
+
+        struct = self.dyn.structure.coords.copy()
+        if self.minim_struct:
+            struct = self.current_x[self.nq * self.n_modes * self.n_modes :].reshape((self.n_modes, 3))
+        return dynq, struct
 
     def run_step(self, gradinet, kl_new):
         """
@@ -163,13 +184,131 @@ class Minimizer:
         """
         assert new_kl_ratio <= 1, "Error, the kl_ratio is defined between (0, 1], {} given.".format(new_kl_ratio)
 
-        # TODO: Transform the dyn gradient in the root gradient
+        current_dyn, = self.get_dyn_struct()
 
-        grad_vector = self.transform_gradients(dyn_gradient, structure_gradient)
+        # Now we can obtain the gradient in the root representation
+        root_dyn, root_grad = get_root_dyn_grad(current_dyn, dyn_gradient)
+
+        grad_vector = self.transform_gradients(root_grad, structure_gradient)
         self.run_step(grad_vector, new_kl_ratio)
 
-
-
-        
         
 
+
+
+def get_root_dyn_grad(dyn_q, grad_q, root_representation = "sqrt"):
+    """
+    ROOT MINIMIZATION STEP
+    ======================
+    
+    As for the [Monacelli, Errea, Calandra, Mauri, PRB 2017], the nonlinear
+    change of variable is used to perform the step.
+    
+    It works as follows:
+    
+    .. math::
+        
+        \\Phi \\rightarrow \\sqrt{x}{\\Phi}
+        
+        \\frac{\\partial F}{\\partial \\Phi} \\rightarrow \\frac{\\partial F}{\\partial \\sqrt{x}{\\Phi}}
+        
+        \\sqrt{x}{\\Phi^{(n)}} \\stackrel{\\frac{\\partial F}{\\partial \\sqrt{x}{\\Phi}}}{\\longrightarrow} \\sqrt{x}{\\Phi^{(n+1)}}
+        
+        \\Phi^{(n+1)} = \\left(\\sqrt{x}{\\Phi^{(n+1)}})^{x}
+        
+    Where the specific update step is determined by the minimization_algorithm, while the :math:`x` order 
+    of the root representation is determined by the root_representation argument.
+    
+    Parameters
+    ----------
+        dyn_q : ndarray( NQ x 3nat x 3nat )
+            The dynamical matrix in q space. The Nq are the total number of q.
+        grad_q : ndarray( NQ x 3nat x 3nat )
+            The gradient of the dynamical matrix.
+        step_size : float
+            The step size for the minimization
+        root_representation : string
+            choice between "normal", "sqrt" and "root4". The value of :math:`x` will be, respectively,
+            1, 2, 4.
+        minimization_algorithm : string
+            The minimization algorithm to be used for the update.
+    
+    Result
+    ------
+        new_dyn_q : ndarray( NQ x 3nat x 3nat )
+            The updated dynamical matrix in q space
+    """
+    ALLOWED_REPRESENTATION = ["normal", "root4", "sqrt", "root2"]
+
+    # Avoid case sensitiveness
+    root_representation = root_representation.lower()
+    
+    if not root_representation in ALLOWED_REPRESENTATION:
+        raise ValueError("Error, root_representation is %s must be one of '%s'." % (root_representation,
+                                                                                  ", ".join(ALLOWED_REPRESENTATION)))
+    # Allow also for the usage of root2 instead of sqrt
+    if root_representation == "root2":
+        root_representation = "sqrt"
+    
+    # Apply the diagonalization
+    nq = np.shape(dyn_q)[0]
+    
+    # Check if gradient and dyn_q have the same number of q points
+    if nq != np.shape(grad_q)[0]:
+        raise ValueError("Error, the number of q point of the dynamical matrix %d and gradient %d does not match!" % (nq, np.shape(grad_q)[0]))
+    
+    # Create the root representation
+    new_dyn = np.zeros(np.shape(dyn_q), dtype = np.complex128)
+    new_grad = np.zeros(np.shape(dyn_q), dtype = np.complex128)
+
+    # Copy
+    new_dyn[:,:,:] = dyn_q
+    new_grad[:,:,:] = grad_q
+
+    # Cycle over all the q points
+    if root_representation != "normal":
+        for iq in range(nq):
+            # Dyagonalize the matrix
+            eigvals, eigvects = np.linalg.eigh(dyn_q[iq, :, :])
+            
+            # Regularize acustic modes
+            if iq == 0:
+                eigvals[eigvals < 0] = 0.
+            
+            # The sqrt conversion
+            new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(eigvals), eigvects, np.conj(eigvects))
+            new_grad[iq, :, :] = new_dyn[iq, :, :].dot(grad_q[iq, :, :]) + grad_q[iq, :, :].dot(new_dyn[iq, :, :])
+            
+            # If root4 another loop needed
+            if root_representation == "root4":                
+                new_dyn[iq, :, :] = np.einsum("a, ba, ca", np.sqrt(np.sqrt(eigvals)), eigvects, np.conj(eigvects))
+                new_grad[iq, :, :] = new_dyn[iq, :, :].dot(new_grad[iq, :, :]) + new_grad[iq, :, :].dot(new_dyn[iq, :, :])
+
+    return new_dyn, new_grad
+
+def get_standard_dyn(root_dyn, root_representation):
+    """
+    Get the standard dynamical matrix from the root representation
+
+    Parameters
+    ----------
+        root_dyn : ndarray (nq x 3nats x 3nats)
+            The dynamical matrix in the root representation
+        root_representation : string
+            The kind of root representation
+    """
+
+    new_dyn = root_dyn.copy()
+    if root_representation != "normal":
+        for iq in range(nq):
+            # The square root conversion
+            new_dyn[iq, :, :] = new_dyn[iq, :,:].dot(new_dyn[iq, :,:])
+            
+            # The root4 conversion
+            if root_representation == "root4":
+                new_dyn[iq, :, :] = new_dyn[iq, :,:].dot(new_dyn[iq, :,:])
+    
+    # Return the matrix
+    return new_dyn
+            
+            
