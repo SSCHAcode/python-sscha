@@ -90,7 +90,6 @@ class Minimizer:
             x_struct = np.zeros(self.n_modes, dtype = np.complex128)
             x_struct[:] = dyn.structure.coords.ravel()
             self.current_x  = np.concatenate((x_dyn, x_struct))
-            print("Total shape: {}".format(self.current_x.shape))
         else:
             self.current_x = x_dyn
         
@@ -212,14 +211,10 @@ class Minimizer:
         current_dyn, _  = self.get_dyn_struct()
 
         # Now we can obtain the gradient in the root representation
-        np.savetxt("current_dyn.txt", current_dyn[0, :, :])
         root_dyn, root_grad = get_root_dyn_grad(current_dyn, dyn_gradient, self.root_representation)
-        np.savetxt("root_dyn.txt", root_dyn[0, :, :])
 
         grad_vector = self.transform_gradients(root_grad, structure_gradient)
-        np.savetxt("grad_vector.txt", grad_vector)
         self.run_step(grad_vector, new_kl_ratio)
-        np.savetxt("new_dyn.txt", self.current_x)
 
         
 

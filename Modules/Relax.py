@@ -438,10 +438,10 @@ class SSCHA(object):
         #BFGS = sscha.Optimizer.BFGS_UC(self.minim.dyn.structure.unit_cell, static_bulk_modulus)
         if kind_minimizer == "SD":
             BFGS = sscha.Optimizer.UC_OPTIMIZER(self.minim.dyn.structure.unit_cell)
-            BFGS.alpha = 1 / (3 * static_bulk_modulus * np.linalg.det(self.minim.dyn.structure.unit_cell))
+            BFGS.alpha = 1 / (3 * static_bulk_modulus * self.minim.dyn.structure.get_volume())
         if kind_minimizer == "CG":
             BFGS = sscha.Optimizer.CG_UC(self.minim.dyn.structure.unit_cell)
-            BFGS.alpha = 1 / (3 * static_bulk_modulus * np.linalg.det(self.minim.dyn.structure.unit_cell))
+            BFGS.alpha = 1 / (3 * static_bulk_modulus * self.minim.dyn.structure.get_volume())
         elif kind_minimizer == "PSD":
             BFGS = sscha.Optimizer.SD_PREC_UC(self.minim.dyn.structure.unit_cell, static_bulk_modulus)
         elif kind_minimizer == "BFGS":
@@ -495,7 +495,7 @@ class SSCHA(object):
             Press = np.trace(stress_tensor) / 3
             
             # Get the volume
-            Vol = np.linalg.det(self.minim.dyn.structure.unit_cell)
+            Vol = self.minim.dyn.structure.get_volume()
             
             # Get the Helmoltz-Gibbs free energy
             helmoltz = self.minim.get_free_energy() * sscha.SchaMinimizer.__RyToev__

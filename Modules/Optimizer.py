@@ -86,13 +86,16 @@ class UC_OPTIMIZER:
             factor = y0 / (y0 - y1)
             
             # Regularization (avoid run away)
-            factor = 1 + np.tanh( (factor - 1) )
+            if factor > 2:
+                factor = 2
+
+            #factor = 1 + np.tanh( (factor - 1) )
             if factor < self.min_alpha_factor:
                 factor = self.min_alpha_factor
             self.alpha *= factor
             
-            if self.alpha < self.min_alpha_step * self.alpha0:
-                self.alpha = self.min_alpha_step * self.alpha0
+            #if self.alpha < self.min_alpha_step * self.alpha0:
+            #    self.alpha = self.min_alpha_step * self.alpha0
             #self.alpha *= factor
 
     def perform_step(self, x_old, grad):

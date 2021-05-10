@@ -450,7 +450,6 @@ class SSCHA_Minimizer(object):
             if self.minim_struct:
                 self.dyn.structure.coords[:,:] = new_struct
             
-            self.dyn.save_qe("prova_{}_".format(diag_error_counter))
 
             # Update the ensemble
             try:
