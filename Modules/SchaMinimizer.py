@@ -95,6 +95,8 @@ __SCHA_ALLOWED_KEYS__ = [__SCHA_LAMBDA_A__, __SCHA_ISBIN__,
 __SCHA_MANDATORY_KEYS__ = [__SCHA_FILDYN__, __SCHA_NQIRR__, __SCHA_NQIRR__,
                            __SCHA_T__]
 
+__MAX_DIAG_ERROR_COUNTER__ = 5
+
 class SSCHA_Minimizer(object):
     
     def __init__(self, ensemble = None, root_representation = "normal",
@@ -364,7 +366,7 @@ class SSCHA_Minimizer(object):
         
             
         # If the structure must be minimized perform the step
-        struct_grad = np.zeros(dyn.structure.coords.shape, dtype = np.double, order = "C")
+        struct_grad = np.zeros(self.dyn.structure.coords.shape, dtype = np.double, order = "C")
         if self.minim_struct:
             t1 = time.time()
             # Get the gradient of the free-energy respect to the structure
@@ -424,28 +426,57 @@ class SSCHA_Minimizer(object):
 
         # Perform the minimization step (with the chosen minimization algorithm)
         new_kl_ratio = self.ensemble.get_effective_sample_size() / self.ensemble.N
-        self.minimizer.update_dyn(new_kl_ratio, dyn_grad, struct_grad)
 
-        # Get the new dynamical matrix and strucure after the step
-        new_dyn, new_struct = self.minimizer.get_dyn_struct()
+        # Here a cycle to avoid diagonalization issues
+        is_diag_ok = False
+        diag_error_counter = 0
+        while not is_diag_ok:
+            self.minimizer.update_dyn(new_kl_ratio, dyn_grad, struct_grad)
 
-        # Perform the step for the dynamical matrix respecting the root representation
-        #new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
-        #                          self.min_step_dyn, root_representation = self.root_representation,
-        #                          minimization_algorithm = self.minimization_algorithm)
-        
-        # Update the dynamical matrix
-        for iq in range(len(self.dyn.q_tot)):
-            self.dyn.dynmats[iq] = new_dyn[iq, : ,: ]
-        
+            # Get the new dynamical matrix and strucure after the step
+            new_dyn, new_struct = self.minimizer.get_dyn_struct()
 
-        # Update the structure
-        if self.minim_struct:
-            self.dyn.structure.coords[:,:] = new_struct
-        
+            # Perform the step for the dynamical matrix respecting the root representation
+            #new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
+            #                          self.min_step_dyn, root_representation = self.root_representation,
+            #                          minimization_algorithm = self.minimization_algorithm)
+            
+            # Update the dynamical matrix
+            for iq in range(len(self.dyn.q_tot)):
+                self.dyn.dynmats[iq] = new_dyn[iq, : ,: ]
+            
 
-        # Update the ensemble
-        self.update()
+            # Update the structure
+            if self.minim_struct:
+                self.dyn.structure.coords[:,:] = new_struct
+            
+            self.dyn.save_qe("prova_{}_".format(diag_error_counter))
+
+            # Update the ensemble
+            try:
+                self.update()
+            except np.linalg.LinAlgError as error:
+                print("Diagonalization error:")
+                print(error)
+                print("Reducing the minimization step...")
+                new_kl_ratio = 0 # Force step reduction
+                is_diag_ok = False 
+                diag_error_counter += 1
+            else:
+                # No error? Go on
+                is_diag_ok = True 
+            
+            if diag_error_counter >= __MAX_DIAG_ERROR_COUNTER__:
+                ERROR_MSG = """
+Error, exceeded the maximum number of diagonalization error. 
+       something is very wrong with the dynamical matrix.
+       I'm saving the dynamical matrix as error_dyn, 
+       if you want to check it or restart the calculation from there.
+"""
+                print(ERROR_MSG)
+                minim.dyn.save_qe("error_dyn")
+                raise ValueError(ERROR_MSG)
+
         
         # Save the ensemble [TODO: IT IS DEBUG]
         #print "SAVING RHO...."
@@ -980,7 +1011,7 @@ WARNING, the preconditioning is activated together with a root representation.
         running = True
 
         # Prepare the minimizer
-        self.minimizer = sscha.Minimizer.Minimizer(self.minim_struct, root_representation = self.root_representation)
+        self.minimizer = sscha.Minimizer.Minimizer(self.minim_struct, root_representation = self.root_representation, verbose = verbosity >= 1)
         self.minimizer.init(self.dyn, self.ensemble.get_effective_sample_size() / self.ensemble.N)
         
         

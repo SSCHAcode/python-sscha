@@ -1,8 +1,10 @@
 import numpy as np 
 import sys, os
 
+__ERROR_THR__ = 1e-7
+
 class Minimizer:
-    def __init__(self, minim_struct = True, algorithm = "sdes", root_representation = False, step = 1):
+    def __init__(self, minim_struct = True, algorithm = "sdes", root_representation = "normal", step = 1, verbose = True):
         """
         This class is a minimizer that performs the optimization given the gradient of the dynamical matrix.
 
@@ -12,8 +14,10 @@ class Minimizer:
                 If true minimizes also the structure
             algorithm : string
                 The algorithm used for the minimization
-            root_representation : bool
-                If true the minimization is performed in the root space
+            root_representation : string
+                One between 'normal', 'sqrt' (or 'root2') and 'root4'.
+                If normal the minimization is performed in the force constant matrix space, otherwise on the space of
+                one of the root of the force constant matrix.
             step : double
                 The initial step of the minimization
         """
@@ -22,6 +26,8 @@ class Minimizer:
         self.algorithm = algorithm
         self.step = step
         self.setp_index = 0 # The index of the minimization
+        self.root_representation = root_representation
+        self.verbose = verbose
 
         self.old_direction = None 
         self.current_direction = None
@@ -40,10 +46,13 @@ class Minimizer:
 
         # Maximum step of the kl ratio for the minimization
         self.kl_ratio_thr = 0.95
+
+        # The default combinations assures that 3 steps are required to decrement the same incremented step.
         # How much try to increase the step when a good step is found (must be > 1)
-        self.increment_step = 2 
+        self.increment_step = 1.5 
         # How much decrease the step when it is too big (must be < 1)
-        self.decrement_step = 0.9
+        self.decrement_step = .87358046475 
+        
 
     def init(self, dyn, kl_ratio):
         """
@@ -61,20 +70,27 @@ class Minimizer:
         # create a vector of the dyn shape
         self.nq = len(dyn.q_tot)
         self.n_modes = dyn.structure.N_atoms * 3
+        self.dyn = dyn
 
         x_dyn = np.zeros( self.nq * self.n_modes**2, dtype = np.complex128)
 
         pos = 0
-        for i in range(nq):
+        dynq = np.zeros( (self.nq, self.n_modes, self.n_modes), dtype = np.complex128)
+        for i in range(self.nq):
             x_dyn[pos : pos + self.n_modes**2] = dyn.dynmats[i].ravel()
+            dynq[i, :,:] = dyn.dynmats[i]
+            pos += self.n_modes**2
 
         # Transform in root space if needed.
-        x_dyn, = get_root_dyn_grad(x_dyn, np.zeros(x_dyn.shape, dtype = np.complex128), self.root_representation)
+        if self.root_representation != "normal":
+            new_dyn, _ = get_root_dyn_grad(dynq, np.zeros(dynq.shape, dtype = np.complex128), self.root_representation)
+            x_dyn[:] = new_dyn.ravel() 
         
         if self.minim_struct:
             x_struct = np.zeros(self.n_modes, dtype = np.complex128)
             x_struct[:] = dyn.structure.coords.ravel()
             self.current_x  = np.concatenate((x_dyn, x_struct))
+            print("Total shape: {}".format(self.current_x.shape))
         else:
             self.current_x = x_dyn
         
@@ -122,10 +138,10 @@ class Minimizer:
 
         struct = self.dyn.structure.coords.copy()
         if self.minim_struct:
-            struct = self.current_x[self.nq * self.n_modes * self.n_modes :].reshape((self.n_modes, 3))
+            struct = self.current_x[self.nq * self.n_modes * self.n_modes :].reshape(self.dyn.structure.coords.shape)
         return dynq, struct
 
-    def run_step(self, gradinet, kl_new):
+    def run_step(self, gradient, kl_new):
         """
         Perform the minimization step with the line minimization
         """
@@ -145,6 +161,7 @@ class Minimizer:
 
             # Enlarge the step
             self.step *= self.increment_step
+            np.savetxt("old_x.txt", self.old_x)
         else:
             # Proceed with the line minimization
 
@@ -159,9 +176,14 @@ class Minimizer:
             # and decrement the step if needed
             if (scalar < 0) or (kl_ratio < self.kl_ratio_thr):
                 self.step *= self.decrement_step
+
+                if self.verbose:
+                    print("Step too large, reducing to {}".format(self.step))
             else:
                 # The step is good, therefore next step perform a new direction
                 self.new_direction = True
+                if self.verbose:
+                    print("Good step found with {}, try increment".format(self.step))
         
         # Perform the minimiziation step
         self.current_x = self.old_x - self.step * self.direction
@@ -185,15 +207,19 @@ class Minimizer:
             dyn : CC.Phonons.Phonons
                 The updated dynamical matrix with the correct minimization step.
         """
-        assert new_kl_ratio <= 1, "Error, the kl_ratio is defined between (0, 1], {} given.".format(new_kl_ratio)
+        assert new_kl_ratio - 1 < __ERROR_THR__, "Error, the kl_ratio is defined between (0, 1], {} given.".format(new_kl_ratio)
 
-        current_dyn, = self.get_dyn_struct()
+        current_dyn, _  = self.get_dyn_struct()
 
         # Now we can obtain the gradient in the root representation
+        np.savetxt("current_dyn.txt", current_dyn[0, :, :])
         root_dyn, root_grad = get_root_dyn_grad(current_dyn, dyn_gradient, self.root_representation)
+        np.savetxt("root_dyn.txt", root_dyn[0, :, :])
 
         grad_vector = self.transform_gradients(root_grad, structure_gradient)
+        np.savetxt("grad_vector.txt", grad_vector)
         self.run_step(grad_vector, new_kl_ratio)
+        np.savetxt("new_dyn.txt", self.current_x)
 
         
 
@@ -255,6 +281,7 @@ def get_root_dyn_grad(dyn_q, grad_q, root_representation = "sqrt"):
     
     # Apply the diagonalization
     nq = np.shape(dyn_q)[0]
+    print("SHAPE:", np.shape(dyn_q))
     
     # Check if gradient and dyn_q have the same number of q points
     if nq != np.shape(grad_q)[0]:
