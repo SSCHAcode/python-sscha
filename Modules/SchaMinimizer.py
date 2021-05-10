@@ -1011,7 +1011,7 @@ WARNING, the preconditioning is activated together with a root representation.
         running = True
 
         # Prepare the minimizer
-        self.minimizer = sscha.Minimizer.Minimizer(self.minim_struct, root_representation = self.root_representation, verbose = verbosity >= 1)
+        self.minimizer = sscha.Minimizer.Minimizer(self.minim_struct, root_representation = self.root_representation, verbose = verbose >= 1)
         self.minimizer.init(self.dyn, self.ensemble.get_effective_sample_size() / self.ensemble.N)
         
         
