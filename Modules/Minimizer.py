@@ -45,7 +45,7 @@ class Minimizer:
         # Some parameter to optimize the evolution
 
         # Maximum step of the kl ratio for the minimization
-        self.kl_ratio_thr = 0.95
+        self.kl_ratio_thr = 0.9
 
         # The default combinations assures that 3 steps are required to decrement the same incremented step.
         # How much try to increase the step when a good step is found (must be > 1)
