@@ -32,6 +32,7 @@ import cellconstructor.Manipulate
 import cellconstructor.Settings
 
 import sscha.Parallel as Parallel
+from sscha.Parallel import pprint as print
 
 
 import SCHAModules
@@ -622,6 +623,10 @@ Error, the following stress files are missing from the ensemble:
         """
         A_TO_BOHR = 1.889725989
 
+
+        if not Parallel.am_i_the_master():
+            return
+
         # Check if the data dir exists
         if not os.path.exists(data_dir):
             os.makedirs(data_dir)
@@ -688,6 +693,10 @@ Error, the following stress files are missing from the ensemble:
                 The id of the population. This can be used to save
                 several ensembles in the same data_dir
         """
+
+
+        if not Parallel.am_i_the_master():
+            return
 
         # Check if the data dir exists
         if not os.path.exists(data_dir):

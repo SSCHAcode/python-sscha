@@ -16,6 +16,7 @@ import sscha.Utilities as Utilities
 import cellconstructor as CC
 import cellconstructor.symmetries
 
+from sscha.Parallel import pprint as print
 
 __EPSILON__ = 1e-5
 

@@ -1,6 +1,9 @@
 import numpy as np 
 import sys, os
 
+
+from sscha.Parallel import pprint as print
+
 __ERROR_THR__ = 1e-7
 
 class Minimizer:

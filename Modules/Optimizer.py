@@ -5,6 +5,9 @@ from __future__ import print_function
 import numpy as np
 import SCHAModules
 
+
+from sscha.Parallel import pprint as print
+
 __EPSILON__ = 1e-8
 
 class UC_OPTIMIZER:

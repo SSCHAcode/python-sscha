@@ -12,6 +12,9 @@ import cellconstructor as CC
 import cellconstructor.Phonons
 import numpy as np
 
+from sscha.Parallel import pprint as print
+import sscha.Parallel
+
 import pickle
 
 __UTILS_NAMESPACE__ = "utils"
@@ -455,6 +458,10 @@ class IOInfo:
                 If given, the file will be saved in the specified location.
                 Otherwise the default one is used (must be initialized by SetupSaving)
         """
+
+        if not sscha.Parallel.am_i_the_master():
+            return
+
         if fname is None:
             if self.__save_fname is None:
                 raise IOError("Error, a filename must be specified to save the frequencies.")
@@ -473,6 +480,10 @@ class IOInfo:
         
         It can be passed as custom_function_post to the run method of the SchaMinimizer.
         """
+
+
+        if not sscha.Parallel.am_i_the_master():
+            return
         
         # Get the weights if required
         if self.save_weights:
@@ -550,6 +561,10 @@ def save_binary(object, filename):
             The filename on which you want to save the binary data.
     """
 
+
+    if not sscha.Parallel.am_i_the_master():
+        return
+    
     pickle.dump(object, open(filename, "wb"))
 
 
