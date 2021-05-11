@@ -1211,6 +1211,8 @@ DETAILS OF ERROR:
         #print( "Time elapsed to update weights the sscha energies, forces and displacements:", t1 - t3, "s")
         print( "(of which to update the weights):", t1 - t2, "s")
         self.current_dyn = new_dynamical_matrix.Copy()
+        t2 = time.time()
+        print(" | to copy the dynamical matrix: {} s".format(t2-t1))
         
         
         if __DEBUG_RHO__:
@@ -3322,7 +3324,7 @@ DETAILS OF ERROR:
             energies[i0] = energy
             forces[nat3*i0 : nat3*i0 + nat3] = forces_.reshape( nat3 )
 
-            
+
             i0 += 1
             
             
