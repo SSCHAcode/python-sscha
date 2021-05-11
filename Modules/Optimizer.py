@@ -43,7 +43,7 @@ class UC_OPTIMIZER:
         self.uc_0_inv = np.linalg.inv(self.uc_0)
 
         # If true the line minimization is employed during the minimization
-        self.use_line_step = False
+        self.use_line_step = True
         
     def mat_to_line(self, matrix):
         """
