@@ -160,7 +160,6 @@ class Minimizer:
 
             # Enlarge the step
             self.step *= self.increment_step
-            np.savetxt("old_x.txt", self.old_x)
         else:
             # Proceed with the line minimization
 

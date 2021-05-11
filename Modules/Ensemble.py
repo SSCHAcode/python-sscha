@@ -1087,12 +1087,13 @@ Error, the following stress files are missing from the ensemble:
         
         t1 = time.time()
         # Get the frequencies of the original dynamical matrix
-        super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
+        super_struct0 = self.dyn_0.structure.generate_supercell(self.supercell)
+        #super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
 
         w, pols = self.dyn_0.DiagonalizeSupercell()#super_dyn.DyagDinQ(0)
         
         # Exclude translations
-        trans_original = CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array()) 
+        trans_original = CC.Methods.get_translations(pols, super_struct0.get_masses_array()) 
         w = w[~trans_original]
 
         # Convert from Ry to Ha and in fortran double precision
@@ -1102,11 +1103,12 @@ Error, the following stress files are missing from the ensemble:
         old_a = SCHAModules.thermodynamic.w_to_a(w, self.T0)
         
         # Now do the same for the new dynamical matrix
-        new_super_dyn = new_dynamical_matrix.GenerateSupercellDyn(self.supercell)
+        super_structure = new_dynamical_matrix.structure.generate_supercell(self.supercell)
+        #new_super_dyn = new_dynamical_matrix.GenerateSupercellDyn(self.supercell)
         
         w, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
 
-        trans_mask = CC.Methods.get_translations(pols, new_super_dyn.structure.get_masses_array()) 
+        trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array()) 
 
         # Check if the new dynamical matrix satisfies the sum rule
         if (np.sum(trans_mask.astype(int)) != 3) or (np.sum(trans_original.astype(int)) != 3):
@@ -1131,7 +1133,6 @@ DETAILS OF ERROR:
         w = np.array(w/2, dtype = np.float64)
         new_a = SCHAModules.thermodynamic.w_to_a(w, newT)
         
-        super_structure = new_super_dyn.structure
         Nat_sc = super_structure.N_atoms
         
         # Get the new displacements in the supercell
@@ -1139,7 +1140,7 @@ DETAILS OF ERROR:
         old_disps = np.zeros(np.shape(self.u_disps), dtype = np.double)
 
         self.u_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_structure.coords.ravel(), (self.N,1))
-        old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_dyn.structure.coords.ravel(), (self.N,1))
+        old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_struct0.coords.ravel(), (self.N,1))
 
         # for i in range(self.N):
         #     self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
@@ -1147,12 +1148,10 @@ DETAILS OF ERROR:
         #     old_disps[i,:] = (self.xats[i, :, :] - super_dyn.structure.coords).reshape( 3*Nat_sc )
             
         #     # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
-        self.sscha_energies[:], self.sscha_forces[:,:,:] = new_super_dyn.get_energy_forces(None, displacement = self.u_disps)
+        self.sscha_energies[:], self.sscha_forces[:,:,:] = new_dynamical_matrix.get_energy_forces(None, displacement = self.u_disps)
 
         t4 = time.time()
 
-        if update_q:
-            self.current_q = CC.Manipulate.GetQ_vectors(self.structures, new_super_dyn, self.u_disps) 
         
         # Convert the q vectors in the Hartree units
         #old_q = self.q_start * np.sqrt(np.float64(2)) * __A_TO_BOHR__
@@ -1171,8 +1170,8 @@ DETAILS OF ERROR:
         
         
         # Get the covariance matrices of the ensemble
-        ups_new = np.real(new_super_dyn.GetUpsilonMatrix(self.current_T))
-        ups_old = np.real(super_dyn.GetUpsilonMatrix(self.T0))
+        ups_new = np.real(new_dynamical_matrix.GetUpsilonMatrix(self.current_T))
+        ups_old = np.real(self.dyn_0.GetUpsilonMatrix(self.T0))
 
         # Get the normalization ratio
         #norm = np.sqrt(np.abs(np.linalg.det(ups_new) / np.linalg.det(ups_old))) 
@@ -1209,7 +1208,7 @@ DETAILS OF ERROR:
             #self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
             #self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
         t1 = time.time()
-        print( "Time elapsed to update weights the sscha energies, forces and displacements:", t1 - t3, "s")
+        #print( "Time elapsed to update weights the sscha energies, forces and displacements:", t1 - t3, "s")
         print( "(of which to update the weights):", t1 - t2, "s")
         self.current_dyn = new_dynamical_matrix.Copy()
         
