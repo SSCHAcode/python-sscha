@@ -3274,7 +3274,7 @@ DETAILS OF ERROR:
 
         # If an MPI istance is running, split the calculation
         i0 = 0
-        for i in range(rank, N_rand, step = size):
+        for i in range(rank, N_rand, size):
 
             # Avoid performing this calculation if already done
             if skip_computed:
