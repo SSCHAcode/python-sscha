@@ -138,7 +138,7 @@ class UC_OPTIMIZER:
         
         # Convert the stress tensor into the Free energy gradient with respect
         # to the unit cell
-        volume = np.linalg.det(unit_cell)
+        volume = np.abs(np.absnp.linalg.det(unit_cell))
         #uc_inv = np.linalg.inv(unit_cell)
         I = np.eye(3, dtype = np.float64)
         
