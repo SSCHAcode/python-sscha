@@ -54,7 +54,7 @@ def test_simple_relax(verbose = False):
 
     # We do not use the dyn1_population2 matrix (the fortran one) because it seems it has problem with the wyckoff minimization.
     # It is printing the structure slightly displaced
-    dyn_target = CC.Phonons.Phonons(os.path.join(DATA_PATH, "dyn_population2_"))
+    dyn_target = CC.Phonons.Phonons(os.path.join(DATA_PATH, "dyn1_population2"), full_name = True)
 
     
     
