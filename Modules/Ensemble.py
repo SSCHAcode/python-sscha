@@ -3270,8 +3270,8 @@ DETAILS OF ERROR:
             
 
         # If an MPI istance is running, split the calculation
-        for i0 in range(N_rand // size):
-            i = i0 + size * rank
+        i0 = 0
+        for i in range(rank, N_rand, step = size):
 
             # Avoid performing this calculation if already done
             if skip_computed:
@@ -3292,7 +3292,7 @@ DETAILS OF ERROR:
 
             # Print the status
             if rank == 0 and verbose:
-                print ("Computing configuration %d / %d" % (i0+1, N_rand / size))
+                print ("Computing configuration %d / %d" % (i, N_rand // size))
             
             # Avoid for errors
             run = True
@@ -3321,6 +3321,9 @@ DETAILS OF ERROR:
             # Copy into the ensemble array
             energies[i0] = energy
             forces[nat3*i0 : nat3*i0 + nat3] = forces_.reshape( nat3 )
+
+            
+            i0 += 1
             
             
 
