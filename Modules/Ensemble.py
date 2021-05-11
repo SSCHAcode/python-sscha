@@ -1179,6 +1179,7 @@ DETAILS OF ERROR:
 
         t2 = time.time()
         print( "Time elapsed to prepare the rho update:", t2 - t1, "s")
+        print (" (of which to diagonalize and prepare the structure: %.4f s)" % (t3-t1))
         print ( "(of which to update sscha energies and forces: %.4f s)" % (t4-t3))
         print ( "(of which computing the Upsilon matrix: %.4f s)" % (t2 - t4))
         
