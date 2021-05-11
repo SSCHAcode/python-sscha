@@ -3303,8 +3303,9 @@ DETAILS OF ERROR:
 
 
             # Print the status
-            if rank == 0 and verbose:
+            if Parallel.am_i_the_master() and verbose:
                 print ("Computing configuration %d / %d" % (i, N_rand // size))
+                sys.stdout.flush()
             
             # Avoid for errors
             run = True
