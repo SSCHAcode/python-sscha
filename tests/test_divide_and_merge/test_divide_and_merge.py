@@ -23,7 +23,7 @@ def test_divide_and_merge():
     
     # Load the original dynamical matrix
     dyn_start = CC.Phonons.Phonons(os.path.join(ENS_DIR, "dyn"))
-    dyn_end = CC.Phonons.Phonons(os.path.join(ENS_DIR, "dyn_population2_"))
+    dyn_end = CC.Phonons.Phonons(os.path.join(ENS_DIR, "dyn1_population2"), full_name = True)
 
     # Generate a random ensemble
     ens_original = sscha.Ensemble.Ensemble(dyn_start, T)

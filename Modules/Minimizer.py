@@ -275,7 +275,6 @@ def get_root_dyn_grad(dyn_q, grad_q, root_representation = "sqrt"):
     
     # Apply the diagonalization
     nq = np.shape(dyn_q)[0]
-    print("SHAPE:", np.shape(dyn_q))
     
     # Check if gradient and dyn_q have the same number of q points
     if nq != np.shape(grad_q)[0]:
