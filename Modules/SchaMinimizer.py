@@ -1292,7 +1292,7 @@ WARNING, the preconditioning is activated together with a root representation.
         # Check the KL
         kl = self.ensemble.get_effective_sample_size()
         
-        if kl / float(self.ensemble.N) < self.kong_liu_ratio:
+        if kl / float(self.ensemble.N) < self.kong_liu_ratio and self.minimizer.new_direction:
             self.__converged__ = False
             print ("KL:", kl, "KL/N:", kl / float(self.ensemble.N), "KL RAT:", self.kong_liu_ratio)
             print ("  According to your input criteria")

@@ -2464,8 +2464,8 @@ DETAILS OF ERROR:
                 If True the full hessian matrix is returned, if false, only the correction to
                 the SSCHA dynamical matrix is returned.
             verbose : bool
-                If True a lot things are written in output.
-                This is usefull for debugging purpouses.
+                If true, the third order force constant tensor is written in output [Ha/bohr^3 units].
+                This can be used to interpolate the result on a bigger mesh with cellconstructor. 
             use_symmetries : bool
                 If true, the d3 and d4 are symmetrized in real space.
                 It requires that spglib is installed to detect symmetries in the supercell correctly.
