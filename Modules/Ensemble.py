@@ -3268,6 +3268,7 @@ DETAILS OF ERROR:
         # Only for the master
         
         # Prepare the energy, forces and stress array
+        # TODO: Correctly setup the number of energies here
         energies = np.zeros( N_rand // size, dtype = np.float64)
         forces = np.zeros( ( N_rand // size) * nat3 , dtype = np.float64)
         if compute_stress:
@@ -3304,7 +3305,7 @@ DETAILS OF ERROR:
 
             # Print the status
             if Parallel.am_i_the_master() and verbose:
-                print ("Computing configuration %d / %d" % (i, N_rand // size))
+                print ("Computing configuration %d out of %d" % (i, N_rand))
                 sys.stdout.flush()
             
             # Avoid for errors

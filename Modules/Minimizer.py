@@ -208,6 +208,11 @@ class Minimizer:
             dyn : CC.Phonons.Phonons
                 The updated dynamical matrix with the correct minimization step.
         """
+        # Get things properly if the KL ratio is null
+        
+        if np.isnan(new_kl_ratio):
+            new_kl_ratio = 0
+
         assert new_kl_ratio - 1 < __ERROR_THR__, "Error, the kl_ratio is defined between (0, 1], {} given.".format(new_kl_ratio)
 
         current_dyn, _  = self.get_dyn_struct()
