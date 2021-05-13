@@ -329,6 +329,8 @@ def get_standard_dyn(root_dyn, root_representation):
             The kind of root representation
     """
 
+    nq, _, __ = root_dyn.shape
+
     new_dyn = root_dyn.copy()
     if root_representation != "normal":
         for iq in range(nq):

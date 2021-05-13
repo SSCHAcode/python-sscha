@@ -867,110 +867,110 @@ Error, the following stress files are missing from the ensemble:
 
         self.init_from_structures(structures)
         
-    def get_unwrapped_ensemble(self, subtract_sscha = True, verbose = True):
-        """
-        This subroutine gets the displacements, forces and stochastic weights of the ensemble
-        unwrapping with the symmetries: for each configuraiton, we add all other configurations equivalent by simmetries
+    # def get_unwrapped_ensemble(self, subtract_sscha = True, verbose = True):
+    #     """
+    #     This subroutine gets the displacements, forces and stochastic weights of the ensemble
+    #     unwrapping with the symmetries: for each configuraiton, we add all other configurations equivalent by simmetries
         
-        NOTE: it works only if SPGLIB is installed
+    #     NOTE: it works only if SPGLIB is installed
 
-        Parameter
-        ---------
-            subtract_sscha : bool
-                If true (default), instead of the forces, the method returns the forces subtracted by the
-                SCHA forces.
-            verbose : bool
-                If true, the method prints into stdout the timing.
+    #     Parameter
+    #     ---------
+    #         subtract_sscha : bool
+    #             If true (default), instead of the forces, the method returns the forces subtracted by the
+    #             SCHA forces.
+    #         verbose : bool
+    #             If true, the method prints into stdout the timing.
 
-        Returns
-        -------
-            u_disps : ndarray(size = (n_configs * n_syms, 3*nat), dtype = np.double)
-                The displacements of atomic configurations with respect to the average positions
-            forces : ndarray(size = (n_configs * n_syms, 3*nat), dtype = np.double)
-                The forces that acts on each configuration (subtracted by the SSCHA if requested)
-            weights : ndarray(size = n_configs * n_syms, dytpe = no.double)
-                The weights of the configurations
-        """
+    #     Returns
+    #     -------
+    #         u_disps : ndarray(size = (n_configs * n_syms, 3*nat), dtype = np.double)
+    #             The displacements of atomic configurations with respect to the average positions
+    #         forces : ndarray(size = (n_configs * n_syms, 3*nat), dtype = np.double)
+    #             The forces that acts on each configuration (subtracted by the SSCHA if requested)
+    #         weights : ndarray(size = n_configs * n_syms, dytpe = no.double)
+    #             The weights of the configurations
+    #     """
 
-        # First of all, we need to get the symmetries
+    #     # First of all, we need to get the symmetries
 
-        # Get the symmetries
-        if not __SPGLIB__:
-            raise ImportError("Error, get_unwrapped_ensemble mehtod requires spglib")
+    #     # Get the symmetries
+    #     if not __SPGLIB__:
+    #         raise ImportError("Error, get_unwrapped_ensemble mehtod requires spglib")
 
-        # Get the symmetries from spglib
-        super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
-        spglib_syms = spglib.get_symmetry(super_structure.get_ase_atoms())
+    #     # Get the symmetries from spglib
+    #     super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
+    #     spglib_syms = spglib.get_symmetry(super_structure.get_ase_atoms())
         
-        # Convert them into the cellconstructor format
-        cc_syms = CC.symmetries.GetSymmetriesFromSPGLIB(spglib_syms, False)
+    #     # Convert them into the cellconstructor format
+    #     cc_syms = CC.symmetries.GetSymmetriesFromSPGLIB(spglib_syms, False)
         
-        print("N syms:", len(cc_syms))
+    #     print("N syms:", len(cc_syms))
         
-        n_syms = len(cc_syms)
-        nat_sc = super_structure.N_atoms
-        new_N = n_syms * self.N
+    #     n_syms = len(cc_syms)
+    #     nat_sc = super_structure.N_atoms
+    #     new_N = n_syms * self.N
         
-        # Get the IRT atoms
-        irts = np.zeros( (n_syms, nat_sc), dtype = int)
-        for i in range(n_syms):
-            irts[i, :] = CC.symmetries.GetIRT(super_structure, cc_syms[i]) + 1 # Py -> Fortran indexing
+    #     # Get the IRT atoms
+    #     irts = np.zeros( (n_syms, nat_sc), dtype = int)
+    #     for i in range(n_syms):
+    #         irts[i, :] = CC.symmetries.GetIRT(super_structure, cc_syms[i]) + 1 # Py -> Fortran indexing
 
 
 
-        old_udisps = np.zeros( self.u_disps.shape, dtype = np.double)
-        old_forces = np.zeros( self.forces.shape, dtype = np.double)
-        new_udisps = np.zeros( (new_N, 3 * nat_sc), dtype = np.double)
-        new_forces = np.zeros( (new_N, 3 * nat_sc), dtype = np.double)
+    #     old_udisps = np.zeros( self.u_disps.shape, dtype = np.double)
+    #     old_forces = np.zeros( self.forces.shape, dtype = np.double)
+    #     new_udisps = np.zeros( (new_N, 3 * nat_sc), dtype = np.double)
+    #     new_forces = np.zeros( (new_N, 3 * nat_sc), dtype = np.double)
 
-        # Convert to crystal coordinates
-        t1 = time.time()
-        for i in range(self.N):
-            v = self.u_disps[i, :].reshape((nat_sc, 3))
-            old_udisps[i, :] = CC.Methods.cart_to_cryst(super_structure.unit_cell, v).ravel()
-
-
-            v = self.forces[i, :].reshape((nat_sc, 3))
-            if subtract_sscha:
-                v -= self.sscha_forces[i, :].reshape((nat_sc, 3))
-
-            old_forces[i, :] = CC.Methods.cart_to_cryst(super_structure.unit_cell, v).ravel()
-        t2 = time.time()
-
-        if verbose:
-            print("Time to convert everything to crystal coordinates: {} s".format(t2 - t1))
-
-        # Unwrap the ensemble
-        new_udisps[:,:] = SCHAMethods.unwrap_ensemble(old_udisps, cc_syms[:3, :3].astype(int), irts, nat_sc, n_syms)
-        new_forces[:,:] = SCHAMethods.unwrap_ensemble(old_forces, cc_syms[:3, :3].astype(int), irts, nat_sc, n_syms)
+    #     # Convert to crystal coordinates
+    #     t1 = time.time()
+    #     for i in range(self.N):
+    #         v = self.u_disps[i, :].reshape((nat_sc, 3))
+    #         old_udisps[i, :] = CC.Methods.cart_to_cryst(super_structure.unit_cell, v).ravel()
 
 
-        t3 = time.time()
-        if verbose:
-            print("Time to unwrap the ensemble: {} s".format(t3 - t2))
+    #         v = self.forces[i, :].reshape((nat_sc, 3))
+    #         if subtract_sscha:
+    #             v -= self.sscha_forces[i, :].reshape((nat_sc, 3))
 
-        # Convert to cartesian coordinates once more
-        v = new_udisps.reshape((new_N, nat_sc, 3))
-        new_udisps = CC.Methods.cryst_to_cart(super_structure.unit_cell, v).reshape((new_N, 3 * nat_sc))
+    #         old_forces[i, :] = CC.Methods.cart_to_cryst(super_structure.unit_cell, v).ravel()
+    #     t2 = time.time()
 
-        v = new_forces.reshape((new_N, nat_sc, 3))
-        new_forces = CC.Methods.cryst_to_cart(super_structure.unit_cell, v).reshape((new_N, 3*nat_sc))
+    #     if verbose:
+    #         print("Time to convert everything to crystal coordinates: {} s".format(t2 - t1))
 
-        t4 = time.time()
-        if verbose:
-            print("Time to convert back to cartesian: {} s".format(t4 - t3))
+    #     # Unwrap the ensemble
+    #     new_udisps[:,:] = SCHAMethods.unwrap_ensemble(old_udisps, cc_syms[:3, :3].astype(int), irts, nat_sc, n_syms)
+    #     new_forces[:,:] = SCHAMethods.unwrap_ensemble(old_forces, cc_syms[:3, :3].astype(int), irts, nat_sc, n_syms)
 
-        weights = np.zeros( (new_N), dtype = np.double)
-        for i in range(self.N):
-            weights[n_syms * i : n_syms * (i + 1)] = self.rho[i]
-        t5 = time.time()
 
-        if verbose:
-            print("Time to unwrap the weights: {} s".format(t5 - t4))
+    #     t3 = time.time()
+    #     if verbose:
+    #         print("Time to unwrap the ensemble: {} s".format(t3 - t2))
 
-            print("    overall time of get_unwrapped_ensemble: {} s".format(t5- t1))
+    #     # Convert to cartesian coordinates once more
+    #     v = new_udisps.reshape((new_N, nat_sc, 3))
+    #     new_udisps = CC.Methods.cryst_to_cart(super_structure.unit_cell, v).reshape((new_N, 3 * nat_sc))
 
-        return new_udisps, new_forces, weights
+    #     v = new_forces.reshape((new_N, nat_sc, 3))
+    #     new_forces = CC.Methods.cryst_to_cart(super_structure.unit_cell, v).reshape((new_N, 3*nat_sc))
+
+    #     t4 = time.time()
+    #     if verbose:
+    #         print("Time to convert back to cartesian: {} s".format(t4 - t3))
+
+    #     weights = np.zeros( (new_N), dtype = np.double)
+    #     for i in range(self.N):
+    #         weights[n_syms * i : n_syms * (i + 1)] = self.rho[i]
+    #     t5 = time.time()
+
+    #     if verbose:
+    #         print("Time to unwrap the weights: {} s".format(t5 - t4))
+
+    #         print("    overall time of get_unwrapped_ensemble: {} s".format(t5- t1))
+
+    #     return new_udisps, new_forces, weights
 
 
 
@@ -2619,422 +2619,6 @@ DETAILS OF ERROR:
         
         return dyn_hessian
 
-
-
-
-
-
-    def get_odd_correction(self, include_v4 = False, store_v3 = True, 
-            store_v4 = True, progress = False, frequencies = 0, smearing = 5e-5, v4_conv_thr = 1e-2,
-            return_only_correction = False, save_all = False, load_d3 = None, use_omp = False):
-        """
-        RAFFAELLO BIANCO'S ODD CORRECTION TESTING VERSION
-        =================================================
-
-        NOTE: THIS IS DEPRECATED! USE get_free_energy_hessian instead!
-        
-        This function returns the odd correction to the dynamical matrix. 
-        It can be used to get the free energy curvature, to study structure stability.
-        It contains also the static phonons (w -> 0). 
-        
-        .. math ::
-            
-            \\Phi^(F) = \\Phi^{(2)} + \\Phi^{(3)} \\Lambda (I - \\Phi^{(4)})^{-1} \\Lambda \\Phi^{(3)}
-        
-        where :math:`\\Phi^{(2)}` is the standard dynamical matrix, while :math:`\\Phi^{(n)}` are
-        the high order force constant matrices.
-        
-        See "Phys. Rev. B 96, 014111" for further details (consider also to cite it if
-        you use this method).
-        
-        Parameters
-        ----------
-            include_v4 : bool
-                If false (default) the :math:`\\Phi^{(4)} matrix is not computed and it is
-                considered as the null matrix. This speed up a lot the calculation,
-                and :math:`\\Phi^{(4)}` is found to give a neglectable contribution in many
-                systems.
-            store_v3 : bool
-                If true (default) the d3 matrix is stored in memory. This is much
-                cheaper from a computational point of view, but in large system can
-                require a lot of memory.
-            store_v4 : bool
-                If true (default) the v4 matrix is stored in memory. This is very fast, but
-                it can drain the memory.
-            progress : bool
-                If true (default false), shows a progress bar while computing 
-            frequencies : double or list
-                if different from zero (default = 0) it computes the dynamical correction.
-                If it is a list it will compute the correction for each frequency in the list.
-                In this case the returned quantity will be a list of self-energies.
-            smearing : double
-                This is the smearing applied only in the case of dynamical correction
-            return_only_correction: bool, optional
-                If true it returns only the correction behond the sscha matrix.
-            save_all : bool, default false
-                If true the self-energy in the supercell is saved for each w value. 
-                It is usefull if you want to analyze the results in a new run.
-            load_d3 : ndarray((n_modes, n_modes, n_modes), dtype = np.float64)
-                The d3 matrix. If None (default) it is recomputed.
-            use_omp : bool
-                If true the OpenMP parallelization is used to perform some calculation.
-                If you enable this flag be carefull to the scaling with the number of processors.
-                It can have a negative impact. You can select the number of threads
-                by using the OMP_NUM_THREADS variable before running the python command.
-        
-        Results
-        -------
-            new_dyn : ndarray(3xnat_sc, 3xnat_sc, dtype = float64)
-                The real dynamical matrix. Note, if return_only_correction = True, it
-                will be only the bubble (+ bubble chain) terms. 
-        """
-        # Check if freqiencies is an array
-        # And setup if it is a static or dynamic calcuation
-        is_dynamic = False
-        try:
-            N_w = len(frequencies)
-            is_dynamic = True
-        except:
-            N_w = 1
-            if np.abs(frequencies) < __EPSILON__:
-                is_dynamic = False
-        
-
-        # Setup the type of the calculation
-        __TYPE__ = np.float64
-        if is_dynamic:
-            __TYPE__ = np.complex128
-        
-        # Get the dynamical matrix in the supercell
-        super_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
-        w_sc, pols_sc = super_dyn.DyagDinQ(0)
-        
-        # Remove translations
-        no_trans_mask = ~CC.Methods.get_translations(pols_sc, super_dyn.structure.get_masses_array())
-        w_sc = w_sc[no_trans_mask]
-        pols_sc = pols_sc[:, no_trans_mask]
-        
-        # Check if the polarization vectors have an imaginary part
-        imag_part = np.sqrt(np.sum( np.imag(pols_sc)**2))
-        if imag_part > __EPSILON__:
-            print("Imaginary part of the polarization vectors:", imag_part)
-            raise ValueError("Error the imaginary part of the polarization vector exceeded the threshold.")
-            
-        pols_sc = np.real(pols_sc)
-        
-        nat_sc = super_dyn.structure.N_atoms
-        
-        # Get the masses array of the correct shape
-        _m_ = np.zeros( (3*nat_sc), dtype = __TYPE__)
-        _m_[:] = np.tile(super_dyn.structure.get_masses_array(), (3, 1)).T.ravel()
-        
-        n_modes_sc = len(w_sc)
-        
-        # Get the forces of the correct shape
-        _f_ = (self.forces - self.sscha_forces).reshape((self.N, 3*nat_sc))
-        
-        # Get the X and Y arrays
-        X = np.zeros( (n_modes_sc, self.N), dtype = __TYPE__)
-        Y = np.zeros( (n_modes_sc, self.N), dtype = __TYPE__)
-
-        # Get the Upsilon eigenvalue
-        w_ups = 2 * w_sc        
-        n_bos = 0 * w_sc
-        dn_dw = 0 * w_sc
-        if self.current_T > __EPSILON__:
-            n_bos = 1 / (np.exp(w_sc * __RyToK__ / self.current_T) - 1)
-            w_ups /=  1 + 2*n_bos
-            dn_dw = - n_bos**2 * np.exp(w_sc * __RyToK__ / self.current_T) * __RyToK__ / self.current_T
-            
-        X[:,:] = np.einsum("ab,ca,a,b -> bc", pols_sc, self.u_disps, np.sqrt(_m_), w_ups) * __A_TO_BOHR__
-        Y[:,:] = np.einsum("ab,ca,a,c -> bc", pols_sc, _f_, 1 / np.sqrt(_m_), self.rho) / __A_TO_BOHR__
-        N_eff = np.sum(self.rho)
-        
-        if save_all:
-            # Save the X and Y to file.
-            # This is for debugging.
-            np.save("X.npy", X)
-            np.save("Y.npy", Y)
-
-        # Get lambda matrix
-        if N_w > 1:
-            Lambdas = []
-
-        # Get the propagator at all the given frequencies
-        for i_lambda in range(N_w):
-            if N_w > 1:
-                frequency = frequencies[i_lambda]
-            else:
-                frequency = frequencies
-        
-            Lambda_G = np.zeros( (n_modes_sc, n_modes_sc), dtype = __TYPE__)
-            for mu in range(n_modes_sc):
-                w_mu = w_sc[mu]
-                n_mu = n_bos[mu]
-                
-                for nu in range(n_modes_sc):
-                    w_nu = w_sc[nu]
-                    n_nu = n_bos[nu]
-                    if abs(w_mu - w_nu) < __EPSILON__ and not is_dynamic:
-                        Lambda_G[mu, nu] = (2*n_nu + 1)/(2*w_nu) - dn_dw[nu]
-                    else:
-                        if not is_dynamic:
-                            Lambda_G[mu, nu] = (n_mu + n_nu + 1)/(w_mu + w_nu) - (n_mu - n_nu)/(w_mu - w_nu)
-                        else:
-                            Lambda_G[mu, nu] =(w_mu + w_nu)*(n_mu + n_nu + 1)/((w_mu + w_nu)**2 - (frequency + 1j*smearing)**2) - \
-                                (w_mu - w_nu)*(n_mu - n_nu)/((w_mu - w_nu)**2 - (frequency + 1j*smearing)**2)
-
-                    Lambda_G[mu, nu] /= - 4*w_mu*w_nu
-            if N_w > 1:
-                Lambdas.append(Lambda_G)
-                
-        #print ("Consistent check on Lambda:", np.sqrt(np.sum( (Lambda_G - Lambda_G.T)**2)))
-        
-        # Compute the odd3 correction
-
-        if N_w > 1:
-            odd_corrs = []
-        #odd_corr = np.zeros( (n_modes_sc, n_modes_sc), dtype = __TYPE__)
-        if store_v3:
-            if progress:
-                print("Computing v3...")
-            d3 = np.zeros( (n_modes_sc, n_modes_sc, n_modes_sc), dtype = np.float64, order = "C")
-            if load_d3 is None:
-                if not use_omp:
-                    # Compute the d3 using python
-                    d3 = np.einsum("ai,bi,ci", X, X, Y)
-                    d3 += np.einsum("ai,bi,ci", X, Y, X)
-                    d3 += np.einsum("ai,bi,ci", Y, X, X)
-                    d3 /= - 3 * N_eff
-                else:
-                    # Lets call the C code with openMP support
-                    # to compute the d3 faster
-
-                    if not _SSCHA_ODD_:
-                        raise ImportError("Error, sscha_HP_odd is required to use openmp, thid is deprecated. Pleas use get_free_energy_hessian instead.")
-
-                    sscha_HP_odd.GetV3(X, Y, n_modes_sc, self.N, d3)
-                    d3 *= self.N / N_eff
-            else:
-                d3 = load_d3
-            #d3 /= N_eff
-
-            print (type(d3[0,0,0]))
-            print ("N_eff:", N_eff)
-
-            #odd_corr[:,:] = np.einsum("abc,bc,de,def -> af", d3, Lambda_G, Lambda_G, d3)
-            if not include_v4:
-                if progress:
-                    print("Computing the bubble...")
-                for i_freq in range(N_w):
-                    if N_w > 1:
-                        Lambda_G = Lambdas[i_freq]
-                    odd_corr = np.einsum("abc,bc,bcd -> ad", d3, Lambda_G, d3)
-                    if N_w > 1: 
-                        odd_corrs.append(odd_corr)
-
-            if include_v4:
-
-                if store_v4:
-                    d4 = np.einsum("ai,bi,ci,di", X, X, X, Y)
-                    d4 += np.einsum("ai,bi,ci,di", X, X, Y, X)
-                    d4 += np.einsum("ai,bi,ci,di", X, Y, X, X)
-                    d4 += np.einsum("ai,bi,ci,di", Y, X, X, X)
-                    d4 /= -4 * N_eff
-
-                    print ("d3 = ", np.sqrt(np.sum(d3**2)))
-                    print ("d3 * Lambda = ", np.sqrt(np.sum(np.einsum("ab,abc", Lambda_G, d3)**2)))
-                    print ("d4 = ", np.sqrt(np.sum(d4**2)))
-                    print ("Lambda = ", np.sqrt(np.sum(Lambda_G**2)))
-                    print ("d4*Lambda =", np.sqrt(np.sum(np.einsum("ab, abxy", Lambda_G, d4)**2)))
-                    # Reshape Lambda d4
-
-                    # Get the dynamical response
-                    for i_freq in range(N_w):
-                        if N_w > 1:
-                            Lambda_G = Lambdas[i_freq]
-                        Ld4 = np.einsum("ab, abxy->abxy", Lambda_G, d4).reshape((n_modes_sc**2, n_modes_sc**2))
-                        print ("Ld4 spectrum:", np.linalg.eigvals(Ld4))
-
-                        # Get the solution
-                        Inv_mat = np.linalg.inv(np.eye(n_modes_sc**2) - Ld4)
-                        Inv_mat_4d = Inv_mat.reshape((n_modes_sc, n_modes_sc, n_modes_sc, n_modes_sc))
-                        New_Prop = np.einsum("abcd, cd->abcd", Inv_mat_4d, Lambda_G)
-                        odd_corr = np.einsum("xab, abcd, cdy", d3, New_Prop, d3)
-                        if N_w > 1:
-                            odd_corrs.append(odd_corr)
-                    """ 
-                    # Perform the cycle for the geometric sum
-                    old_odd = odd_corr.copy()
-                    new_corr = np.zeros( np.shape(old_odd), dtype = __TYPE__)
-                    running = True
-                    new_d3 = d3.copy()
-
-                    # Setup the biconjugate method
-                    R = np.einsum("xyab, ab, abz", d4, Lambda_G, d3)
-                    Rbar = R.copy()
-                    P = R.copy()
-                    Pbar = R.copy()
-                    
-                    while running:
-                        Ap = P - np.einsum("xyab, ab, abz", d4, Lambda_G, P)
-                        ATpbar = Pbar - np.einsum("abxy,xy, abz->xyz", d4, Lambda_G, Pbar)
-
-                        alpha = np.einsum("abc, abc->c", Rbar, R) / np.einsum("abc,abc->c", Pbar, Ap)
-                        new_d3 += np.einsum("c, abc->abc", alpha, P)
-                        Rnew = R - np.einsum("c, abc->abc", alpha, Ap)
-                        Rbarnew = Rbar - np.einsum("c, abc->abc", alpha, ATpbar)
-                        beta = np.einsum("abc,abc->c", Rbarnew, Rnew) / np.einsum("abc, abc->c", Rbar, R)
-                        P = R + np.einsum("c, abc->abc", beta, P)
-                        Pbar = Rbar + np.einsum("c, abc->abc", beta, Pbar)
-                        R = Rnew
-                        Rbar = Rbarnew
-
-                        rest_mod =np.sqrt(np.einsum("abc,abc", R, R))
-                        if progress:
-                            print("")
-                            print ("Rest: ", rest_mod)
-
-                        if rest_mod < v4_conv_thr:
-                            running = False   """
-                else:
-                    raise NotImplementedError("Not yet implemented")
-                    # We can do exactly the same as before
-                    # But performing the sum over I explicitely
-                    odd_dim = np.sum(odd_corr**2)
-                    old_odd = odd_corr.copy()
-                    new_corr = np.zeros(np.shape(old_odd), dtype = __TYPE__)
-                    running = True
-                    new_d3 = d3.copy()
-
-
-                    while running:
-                        for x in range( n_modes_sc):
-                            aux1 = new_d3[x, :, :] * Lambda_G
-                            new_d3[x, :, :] = np.einsum("ab,ai,bi,ci,di->cd", aux1, X, X, X, Y)
-                            new_d3[x, :, :] += np.einsum("ab,ai,bi,ci,di->cd", aux1, X, X, Y, X)
-                            new_d3[x, :, :] += np.einsum("ab,ai,bi,ci,di->cd", aux1, X, Y, X, X)
-                            new_d3[x, :, :] += np.einsum("ab,ai,bi,ci,di->cd", aux1, Y, X, X, X)
-                            new_d3[x, :, :] /= -4*N_eff
-                            aux2 = new_d3[x, :, :] * Lambda_G
-                            for y in range(x, n_modes_sc):
-                                new_corr[x,y] = np.sum(aux2 * d3[y, :, :])
-                                new_corr[y,x] = new_corr[x,y]
-                            
-                            if progress:
-                                sys.stdout.write("\r Computing v4 correction ... %d / %d" % (x+1, n_modes_sc))
-                        
-                        # Add the correction
-                        odd_corr += new_corr
-                        ratio = np.sum(new_corr**2) / np.sum(odd_corr**2)
-                        
-                        if progress:
-                            print("")
-                            print("Ratio: %.4e | Converged after: %.4e" % (ratio, v4_conv_thr))
-                            print("")
-                        if np.sqrt(ratio) < v4_conv_thr:
-                            running = False  
-
-
-                    # Do not store d4
-                    #raise NotImplementedError("Error, v4 not stored not implemented")
-            
-#            for b in range(len(w_sc)):
-#                for c in range(len(w_sc)):
-#                    odd_corr[:,:] += np.outer(d3[:, b, c], d3[b, c, :]) * Lambda_G[b,c]
-        else:
-            if progress:
-                print ("D3 correction computation:")
-                
-            
-            for a in range(n_modes_sc):
-                d3_a = np.einsum("i,bi,ci", X[a,:], X, Y)
-                d3_a += np.einsum("i,bi,ci", X[a,:], Y, X)
-                d3_a += np.einsum("i,bi,ci", Y[a,:], X, X)
-                d3_a /= - 3 * N_eff
-                for b in range(a, n_modes_sc):
-                    d3_b = d3_a
-                    if a != b:
-                        d3_b = np.einsum("i,bi,ci", X[a,:], X, Y)
-                        d3_b += np.einsum("i,bi,ci", X[a,:], Y, X)
-                        d3_b += np.einsum("i,bi,ci", Y[a,:], X, X)
-                        d3_b /= - 3 * N_eff
-                    
-                    odd_corr[a,b] = np.sum(d3_a * d3_b * Lambda_G)
-                    odd_corr[b,a] = odd_corr[a,b]
-                
-                if progress:
-                    sys.stdout.write("\r%2d %%" % (a * 100 / n_modes_sc))
-                    sys.stdout.flush()
-
-                if include_v4:
-                    raise NotImplementedError("Error, v4 without v3 stored not yet implemented.")
-
-                    
-            
-#                
-#            
-#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", X, X, Y, Lambda_G, X, X, Y)
-#            print ("1")
-#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", X, X, Y, Lambda_G, X, Y, X)
-#            print ("2")
-#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", X, X, Y, Lambda_G, Y, X, X)
-#            print ("3...")
-#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", X, Y, X, Lambda_G, X, X, Y)
-#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", X, Y, X, Lambda_G, X, Y, X)
-#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", X, Y, X, Lambda_G, Y, X, X)
-#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", Y, X, X, Lambda_G, X, X, Y)
-#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", Y, X, X, Lambda_G, X, Y, X)
-#            odd_corr[:,:] += np.einsum("ai,bi,ci,bc,bi,ci,di->ad", Y, X, X, Lambda_G, Y, X, X)
-#                
-#                
-#            for i in range(self.N):
-#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", X[:,i], X[:,i], Y[:,i], Lambda_G, X[:,i], X[:,i], Y[:,i])
-#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", X[:,i], X[:,i], Y[:,i], Lambda_G, X[:,i], Y[:,i], X[:,i])
-#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", X[:,i], X[:,i], Y[:,i], Lambda_G, Y[:,i], X[:,i], X[:,i])
-#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", X[:,i], Y[:,i], X[:,i], Lambda_G, X[:,i], X[:,i], Y[:,i])
-#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", X[:,i], Y[:,i], X[:,i], Lambda_G, X[:,i], Y[:,i], X[:,i])
-#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", X[:,i], Y[:,i], X[:,i], Lambda_G, Y[:,i], X[:,i], X[:,i])
-#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", Y[:,i], X[:,i], X[:,i], Lambda_G, X[:,i], X[:,i], Y[:,i])
-#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", Y[:,i], X[:,i], X[:,i], Lambda_G, X[:,i], Y[:,i], X[:,i])
-#                odd_corr[:,:] += np.einsum("a,b,c,bc,b,c,d->ad", Y[:,i], X[:,i], X[:,i], Lambda_G, Y[:,i], X[:,i], X[:,i])
-#      
-#                if progress:
-#                    if i % 10 == 0:
-#                        sys.stdout.write("\r%2d %%" % (i * 100 / self.N))
-#                        sys.stdout.flush()
-#            
-#            odd_corr /= (3 * self.N)**2
-            if progress:
-                print ()
-            #raise NotImplementedError("Error, the store_v3 = .false. has still not been implemented")
-        
-        # Get back in the cartesian basis
-        total_self_energies = []
-        total_self_energy = np.zeros((3*nat_sc, 3*nat_sc), dtype = __TYPE__)
-        for i_freq in range(N_w):
-            if N_w > 1:
-                odd_corr = odd_corrs[i_freq]
-            cart_odd_corr = np.einsum("ai,bj,ij -> ab", pols_sc, pols_sc, odd_corr)
-            cart_odd_corr *= np.outer(np.sqrt(_m_),  np.sqrt(_m_))
-
-
-            total_self_energy = cart_odd_corr 
-            if not return_only_correction:
-                if is_dynamic:
-                    total_self_energy += super_dyn.dynmats[0]
-                else:
-                    total_self_energy += np.real(super_dyn.dynmats[0])
-            if N_w >1:
-                total_self_energies.append(total_self_energy)
-            
-            if save_all:
-                np.save("odd_corr_%d.npy" % i_freq, cart_odd_corr)
-        
-        # Return the new dynamical matrix in the supercell
-        if N_w > 1:
-            return total_self_energies
-        return total_self_energy
 
 
     def compute_ensemble(self, calculator, compute_stress = True, stress_numerical = False,
