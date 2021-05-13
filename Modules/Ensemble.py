@@ -1804,7 +1804,7 @@ DETAILS OF ERROR:
         nat = super_dyn.structure.N_atoms 
         
         # Volume bohr^3
-        volume = np.linalg.det(super_dyn.structure.unit_cell) * __A_TO_BOHR__**3
+        volume = super_dyn.structure.get_volume() * __A_TO_BOHR__**3
             
         
         # Get the correctly shaped polarization vectors
