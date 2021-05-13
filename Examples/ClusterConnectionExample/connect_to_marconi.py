@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+from __future__ import print_function
 """
 This example uses the marconi cluster
 to submit a force and energy calculation of a subset of 10 configurations
@@ -57,8 +57,8 @@ module load mkl
 module load fftw"""
 
 
-print "Sending the ensemble for the calculation."
+print("Sending the ensemble for the calculation.")
 cluster.compute_ensemble(ens, calc)
 
 ens.save_bin(".")
-print "Ensemble saved."
+print("Ensemble saved.")
