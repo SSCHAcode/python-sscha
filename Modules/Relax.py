@@ -333,12 +333,14 @@ class SSCHA(object):
             if pop > self.max_pop:
                 running = False
                 
+
+        self.start_pop = pop
         return self.minim.is_converged()
     
     
     def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
-                 ensemble_loc = ".", start_pop = 1, stress_numerical = False,
+                 ensemble_loc = ".", start_pop = None, stress_numerical = False,
                  cell_relax_algorithm = "sd", fix_volume = False):
         """
         VARIABLE CELL RELAX
@@ -451,8 +453,10 @@ class SSCHA(object):
         # Initialize the bulk modulus
         # The gradient (stress) is in eV/A^3, we have the cell in Angstrom so the Hessian must be
         # in eV / A^6
-
-        pop = start_pop
+        if start_pop is not None:
+            pop = start_pop
+        else:
+            pop = self.start_pop
                 
         running = True
         while running:
@@ -601,6 +605,7 @@ class SSCHA(object):
             if pop > self.max_pop:
                 running = False
                 
+        self.start_pop = pop
         return (not running1) and (not running2)
 
 
