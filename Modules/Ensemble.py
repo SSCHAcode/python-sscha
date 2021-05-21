@@ -2906,7 +2906,7 @@ DETAILS OF ERROR:
 
             # Print the status
             if Parallel.am_i_the_master() and verbose:
-                print ("Computing configuration %d out of %d" % (i, N_rand))
+                print ("Computing configuration %d out of %d" % (i+1, stop))
                 sys.stdout.flush()
             
             # Avoid for errors

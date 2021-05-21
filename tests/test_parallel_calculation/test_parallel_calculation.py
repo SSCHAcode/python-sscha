@@ -17,11 +17,11 @@ except:
 def test_compute_ensemble_parallel(verbose = False):
     total_path = os.path.dirname(os.path.abspath(__file__))
     os.chdir(total_path)
-    np.random.seed(0)
+
 
     dyn = CC.Phonons.Phonons("dyn_eff", 3)
     ens = sscha.Ensemble.Ensemble(dyn, 250)
-    ens.generate(2)
+    ens.generate(10)
 
     # Setup a simple harmonic calculator
     calc = ff.Calculator.ToyModelCalculator(dyn, type_cal = "harmx")
