@@ -2832,11 +2832,10 @@ DETAILS OF ERROR:
                 nat3 = comm.bcast(self.current_dyn.structure.N_atoms* 3* np.prod(self.supercell), root = 0)
                 N_rand = comm.bcast(self.N, root=0)
 
-                self.u_disps = comm.bcast(self.u_disps, root = 0)
-                self.xats = comm.bcast(self.xats, root = 0)
 
                 if not Parallel.am_i_the_master():
                     self.structures = structures 
+                    self.init_from_structures(structures) # Enforce all the ensembles to have the same structures
                 
                 # Setup the label of the calculator
                 #ase_calculator = comm.bcast(ase_calculator, root = 0)   # This broadcasting seems causing some issues on some fortran codes called by python (which may interact with MPI)
