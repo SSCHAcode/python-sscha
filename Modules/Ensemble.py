@@ -2866,7 +2866,6 @@ DETAILS OF ERROR:
             
 
         # If an MPI istance is running, split the calculation
-        i0 = 0
         tot_configs = N_rand // size
         remainer = N_rand % size
 
@@ -2891,6 +2890,7 @@ DETAILS OF ERROR:
             total_forces = np.empty( N_rand * nat3, dtype = np.float64)
             total_stress = np.empty( N_rand * 9, dtype = np.float64)
 
+        i0 = 0
         for i in range(start, stop):
 
             # Avoid performing this calculation if already done

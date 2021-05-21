@@ -21,7 +21,7 @@ def test_compute_ensemble_parallel(verbose = False):
 
     dyn = CC.Phonons.Phonons("dyn_eff", 3)
     ens = sscha.Ensemble.Ensemble(dyn, 250)
-    ens.generate(10)
+    ens.generate(8)
 
     # Setup a simple harmonic calculator
     calc = ff.Calculator.ToyModelCalculator(dyn, type_cal = "harmx")
