@@ -2831,12 +2831,19 @@ DETAILS OF ERROR:
                 structures = comm.bcast(self.structures, root = 0)            
                 nat3 = comm.bcast(self.current_dyn.structure.N_atoms* 3* np.prod(self.supercell), root = 0)
                 N_rand = comm.bcast(self.N, root=0)
+
+                self.u_disps = comm.bcast(self.u_disps, root = 0)
+                self.xats = comm.bcast(self.xats, root = 0)
+
+                if not Parallel.am_i_the_master():
+                    self.structures = structures 
                 
                 # Setup the label of the calculator
                 #ase_calculator = comm.bcast(ase_calculator, root = 0)   # This broadcasting seems causing some issues on some fortran codes called by python (which may interact with MPI)
                 ase_calculator.set_label("esp_%d" % rank) # Avoid overwriting the same file
                 
                 compute_stress = comm.bcast(compute_stress, root = 0)
+
                 
                 # Check if the parallelization is correct        
                 if N_rand % size != 0:
@@ -2868,7 +2875,17 @@ DETAILS OF ERROR:
 
         # If an MPI istance is running, split the calculation
         i0 = 0
-        for i in range(rank, N_rand, size):
+        tot_configs = N_rand // size
+        remainer = N_rand % size
+
+        if rank < remainer:
+            start = rank * (tot_configs + 1)
+            stop = start + tot_configs + 1
+        else:
+            start = rank * tot_configs + remainer
+            stop = start + tot_configs
+
+        for i in range(start, stop):
 
             # Avoid performing this calculation if already done
             if skip_computed:
@@ -2935,6 +2952,11 @@ DETAILS OF ERROR:
             
             if compute_stress:
                 comm.Allgather([stress, MPI.DOUBLE], [total_stress, MPI.DOUBLE])
+
+            
+            self.update_weights(self.current_dyn, self.current_T)
+            CC.Settings.barrier()            
+
             
         else:
             self.energies = energies
