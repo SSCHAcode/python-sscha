@@ -44,6 +44,7 @@ class UC_OPTIMIZER:
         self.n_step = 0
         self.uc_0 = np.float64(starting_unit_cell.copy())
         self.uc_0_inv = np.linalg.inv(self.uc_0)
+        self.x_start = None
 
         # If true the line minimization is employed during the minimization
         self.use_line_step = True
@@ -79,6 +80,7 @@ class UC_OPTIMIZER:
         This function is in common for all the minimizer
         it implements the line minimization.
         """
+        good_step = True
         
         if self.n_step == 0:
             self.alpha0 = self.alpha
@@ -91,31 +93,49 @@ class UC_OPTIMIZER:
             # Regularization (avoid run away)
             if factor > 2:
                 factor = 2
+                good_step = False
 
             #factor = 1 + np.tanh( (factor - 1) )
             if factor < self.min_alpha_factor:
                 factor = self.min_alpha_factor
+                good_step = False
             self.alpha *= factor
             
             #if self.alpha < self.min_alpha_step * self.alpha0:
             #    self.alpha = self.min_alpha_step * self.alpha0
             #self.alpha *= factor
+            
+        return good_step
 
     def perform_step(self, x_old, grad):
         """
         The step, hierarchical structure.
         Here a standard steepest descent
         """
+        if self.x_start is None:
+            self.x_start = x_old.copy()
 
+        new_step = True
         if self.use_line_step:
-            self.get_line_step(grad)
+            new_step = self.get_line_step(grad)
 
-        self.last_direction = grad
-        self.last_grad = grad
 
-        x_new = x_old - grad * self.alpha
+        if new_step:
+            direction = self.get_new_direction(grad)
+            x_new = x_old - direction * self.alpha
+            self.x_start = x_new.copy()
+        else:
+            # Go back using the last direction selecting a smaller step
+            x_new = self.x_start - self.last_direction * self.alpha
+
         self.n_step += 1
         return x_new
+
+    def get_new_direction(self, grad):
+        # Steepest descent
+        self.last_direction = grad
+        self.last_grad = grad
+        return grad
 
             
     def UpdateCell(self, unit_cell, stress_tensor, fix_volume = False, verbose = False):
