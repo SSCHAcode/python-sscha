@@ -433,7 +433,7 @@ class SSCHA(object):
         
         
 
-        if static_bulk_modulus == "recalc":
+        if static_bulk_modulus != "recalc":
             # Rescale the static bulk modulus in eV / A^3
             static_bulk_modulus /= sscha.SchaMinimizer.__evA3_to_GPa__ 
 

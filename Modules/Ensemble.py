@@ -924,6 +924,10 @@ Error, the following stress files are missing from the ensemble:
         else:
             structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
 
+
+        # Enforce all the processors to share the same structures
+        structures = CC.Settings.broadcast(structures)
+
         self.init_from_structures(structures)
         
     # def get_unwrapped_ensemble(self, subtract_sscha = True, verbose = True):
@@ -2890,12 +2894,18 @@ DETAILS OF ERROR:
                 structures = comm.bcast(self.structures, root = 0)            
                 nat3 = comm.bcast(self.current_dyn.structure.N_atoms* 3* np.prod(self.supercell), root = 0)
                 N_rand = comm.bcast(self.N, root=0)
+
+
+                #if not Parallel.am_i_the_master():
+                #    self.structures = structures 
+                #    self.init_from_structures(structures) # Enforce all the ensembles to have the same structures
                 
                 # Setup the label of the calculator
                 #ase_calculator = comm.bcast(ase_calculator, root = 0)   # This broadcasting seems causing some issues on some fortran codes called by python (which may interact with MPI)
                 ase_calculator.set_label("esp_%d" % rank) # Avoid overwriting the same file
                 
                 compute_stress = comm.bcast(compute_stress, root = 0)
+
                 
                 # Check if the parallelization is correct        
                 if N_rand % size != 0:
@@ -2912,10 +2922,25 @@ DETAILS OF ERROR:
         
         # Prepare the energy, forces and stress array
         # TODO: Correctly setup the number of energies here
-        energies = np.zeros( N_rand // size, dtype = np.float64)
-        forces = np.zeros( ( N_rand // size) * nat3 , dtype = np.float64)
+            
+
+        # If an MPI istance is running, split the calculation
+        tot_configs = N_rand // size
+        remainer = N_rand % size
+
+        if rank < remainer:
+            start = rank * (tot_configs + 1)
+            stop = start + tot_configs + 1
+        else:
+            start = rank * tot_configs + remainer
+            stop = start + tot_configs
+
+        num_confs = stop - start
+
+        energies = np.zeros( num_confs, dtype = np.float64)
+        forces = np.zeros( ( num_confs) * nat3 , dtype = np.float64)
         if compute_stress:
-            stress = np.zeros( (N_rand // size) * 9, dtype = np.float64)
+            stress = np.zeros( num_confs * 9, dtype = np.float64)
 
         if rank == 0:
             total_forces = np.zeros( N_rand * nat3, dtype = np.float64)
@@ -2923,11 +2948,9 @@ DETAILS OF ERROR:
         else:
             total_forces = np.empty( N_rand * nat3, dtype = np.float64)
             total_stress = np.empty( N_rand * 9, dtype = np.float64)
-            
 
-        # If an MPI istance is running, split the calculation
         i0 = 0
-        for i in range(rank, N_rand, size):
+        for i in range(start, stop):
 
             # Avoid performing this calculation if already done
             if skip_computed:
@@ -2948,7 +2971,7 @@ DETAILS OF ERROR:
 
             # Print the status
             if Parallel.am_i_the_master() and verbose:
-                print ("Computing configuration %d out of %d" % (i, N_rand))
+                print ("Computing configuration %d out of %d" % (i+1, stop))
                 sys.stdout.flush()
             
             # Avoid for errors
@@ -2994,6 +3017,11 @@ DETAILS OF ERROR:
             
             if compute_stress:
                 comm.Allgather([stress, MPI.DOUBLE], [total_stress, MPI.DOUBLE])
+
+            
+            #self.update_weights(self.current_dyn, self.current_T)
+            CC.Settings.barrier()            
+
             
         else:
             self.energies = energies
