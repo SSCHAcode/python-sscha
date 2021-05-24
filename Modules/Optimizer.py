@@ -46,6 +46,9 @@ class UC_OPTIMIZER:
         self.x_start = None
         self.reset_strain = True
 
+        # Allowed keys are sd or cg
+        self.algorithm = "cg" 
+
         # If true the line minimization is employed during the minimization
         self.use_line_step = True
         
@@ -148,9 +151,31 @@ class UC_OPTIMIZER:
 
     def get_new_direction(self, grad):
         # Steepest descent
-        self.last_direction = grad
-        self.last_grad = grad
-        return grad
+        if self.algorithm == "sd":
+            direction = grad
+        elif self.algorithm == "cg":
+            if np.max(np.abs(self.last_direction)) < 1e-10:
+                # First step
+                direction = grad
+                self.last_direction = direction.copy()
+                self.last_grad = grad.copy()
+            else:
+                gamma = np.dot(grad - self.last_grad, grad)
+                gamma /= np.sum(self.last_grad **2)
+
+                direction = grad + gamma * self.last_direction
+                if direction.dot(grad) < 0:
+                    direction = grad
+                    self.last_direction = np.zeros(len(direction), np.double)
+                    self.last_grad = np.zeros(len(direction), np.double)
+                    print("[CELL] Reset CG algorithm to SD")
+                else:
+                    self.last_direction = direction.copy()
+                    self.last_grad = grad.copy()
+                    
+                
+
+        return direction
 
             
     def UpdateCell(self, unit_cell, stress_tensor, fix_volume = False, verbose = False):
