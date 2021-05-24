@@ -667,7 +667,7 @@ Error, the following stress files are missing from the ensemble:
             else:
                 struct.save_scf("%s/scf_population%d_%d.dat" % (data_dir, population, i+1))
 
-            u_disp = struct.get_displacement(super_dyn.structure)
+            u_disp = self.u_disps[i, :].reshape((struct.N_atoms, 3))# struct.get_displacement(super_dyn.structure)
             np.savetxt("%s/u_population%d_%d.dat" % (data_dir, population, i+1), u_disp * A_TO_BOHR)
             
             # Save the stress tensors if any
@@ -715,6 +715,65 @@ Error, the following stress files are missing from the ensemble:
             
             self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
         
+    def save_enhanced_xyz(self, filename, append_mode = True, stress_key = "virial", forces_key = "force", energy_key = "energy"):
+        """
+        Save the ensemble as an enhanced xyz.
+
+        This is the default format for training the GAP potentials with quippy.
+
+        Parameters
+        ----------
+            filename : string
+                Path to the xyz file in which to save.
+            append_mode : bool
+                If true, does not overwrite the previous existing file, but append the ensemble on the bottom.
+                This is the way to concatenate easily more ensembles.
+        """
+        # Save only if the current processor is the master
+        if Parallel.am_i_the_master():
+
+            lines = []
+            for i in range(self.N):
+                # Add the number of atoms
+                struct = self.structures[i]
+                lines.append("{:d}\n".format(struct.N_atoms))
+
+                # Prepare the enriched line of xyz with the description of the structure
+                info = 'pbc="T T T" ' # Periodic boundary conditions 
+                info += 'Lattice="{:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f}" '.format(*list(struct.unit_cell.ravel()))
+
+                # Add the energy
+                info += '{}={:.16f} '.format(energy_key, self.energies[i] * Rydberg)
+
+                # Add the virial stress
+                info += '{}="{:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f}" '.format(stress_key, *list(self.stresses[i].ravel()))
+
+                # Add the secription of the xyz format
+                info += 'Properties=species:S:1:pos:R:3:{}:R:3\n'.format(forces_key)
+
+                lines.append(info)
+
+                # Append the structure and the forces
+                for j in range(struct.N_atoms):
+                    line = "{}  ".format(struct.atoms[j])
+                    line += " {:20.16f} {:20.16f} {:20.16f}    ".format(*list(struct.coords[j, :]))
+                    line += " {:20.16f} {:20.16f} {:20.16f}\n".format(*list(self.forces[i, j, :] * Rydberg))
+                    lines.append(line)
+            
+            # Save the work
+            c = "a"
+            if not append_mode:
+                c = "w"
+            with open(filename, c) as fp:
+                fp.writelines(lines)
+        
+        # Force other processors to wait for the master
+        CC.Settings.barrier()
+
+
+
+        
+
     def load_bin(self, data_dir, population_id = 1, avoid_loading_dyn = False):
         """
         LOAD THE BINARY ENSEMBLE
