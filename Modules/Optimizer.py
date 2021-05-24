@@ -126,7 +126,7 @@ class UC_OPTIMIZER:
         if new_step:
             direction = self.get_new_direction(grad)
             x_new = x_old - direction * self.alpha
-            self.x_start = x_new.copy()
+            self.x_start = x_old.copy()
             self.reset_strain = True
             print("[CELL] New step:")
             print("[CELL]    X_OLD = {}   | ALPHA = {}".format(x_old, self.alpha))
