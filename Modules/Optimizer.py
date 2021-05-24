@@ -31,7 +31,6 @@ class UC_OPTIMIZER:
     # If true the strain is resetted each step
     # It should regolarize the minimization. 
     # If false the minimization will not go too far from the initial cell
-    reset_strain = True
     
     def __init__(self, starting_unit_cell):
         """
@@ -45,6 +44,7 @@ class UC_OPTIMIZER:
         self.uc_0 = np.float64(starting_unit_cell.copy())
         self.uc_0_inv = np.linalg.inv(self.uc_0)
         self.x_start = None
+        self.reset_strain = True
 
         # If true the line minimization is employed during the minimization
         self.use_line_step = True
@@ -127,6 +127,7 @@ class UC_OPTIMIZER:
             direction = self.get_new_direction(grad)
             x_new = x_old - direction * self.alpha
             self.x_start = x_new.copy()
+            self.reset_strain = True
             print("[CELL] New step:")
             print("[CELL]    X_OLD = {}   | ALPHA = {}".format(x_old, self.alpha))
             print("[CELL]    DIRECTION = {}".format(direction))
@@ -136,6 +137,7 @@ class UC_OPTIMIZER:
             print("[CELL] Step not good:")
             print("[CELL]    X_START = {}  | ALPHA = {}".format(self.x_start, self.alpha))
             print("[CELL]    DIRECTION = {}".format(self.last_direction))
+            self.reset_strain = False
 
         self.n_step += 1
         print("[CELL]    GRADIENT = {}".format(grad))
@@ -179,10 +181,6 @@ class UC_OPTIMIZER:
         I = np.eye(3, dtype = np.float64)
         
         
-        # If the strain is resetted, set the initial cell as this one
-        if self.reset_strain:
-            self.uc_0 = unit_cell.copy()
-            self.uc_0_inv = np.linalg.inv(self.uc_0)
         
         # Get the strain tensor up to know
         strain = np.transpose(self.uc_0_inv.dot(unit_cell) - I)
@@ -214,7 +212,7 @@ class UC_OPTIMIZER:
         x_new = self.perform_step(x_old, grad)
         
         strain_new  = self.line_to_mat(x_new)
-        
+
         if verbose:
             print ("NEW STRAIN:")
             print (strain_new)
@@ -227,6 +225,13 @@ class UC_OPTIMIZER:
         
         if verbose:
             print ("NEW VOLUME:", np.linalg.det(unit_cell))
+        
+
+        # If the strain is resetted, set the initial cell as this one
+        if self.reset_strain:
+            self.uc_0 = unit_cell.copy()
+            self.uc_0_inv = np.linalg.inv(self.uc_0)
+        
             
 
 class BFGS_UC(UC_OPTIMIZER):

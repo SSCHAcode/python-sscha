@@ -652,8 +652,12 @@ Error, the following stress files are missing from the ensemble:
         self.dyn_0.save_qe("dyn_start_population%d_" % population)
         self.current_dyn.save_qe("dyn_end_population%d_" % population)
 
+        # Save the displacements with the dynamical matrix used to generate the ensemble
+        # In this way the displacements are computed with the correct dynamical matrix
+        cd = self.current_dyn
+        self.update_weights(self.dyn_0, self.current_T)
         
-        super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
+        #super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
             
         for i in range(self.N):
             # Save the forces
@@ -674,6 +678,8 @@ Error, the following stress files are missing from the ensemble:
             if self.has_stress and self.stress_computed[i]:
                 np.savetxt("%s/pressures_population%d_%d.dat" % (data_dir, population, i+1), self.stresses[i,:,:])
             
+        # Return back to the old dynamical matrix
+        self.update_weights(cd, self.current_T)
         
 
     def save_bin(self, data_dir, population_id = 1):
