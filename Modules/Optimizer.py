@@ -172,6 +172,8 @@ class UC_OPTIMIZER:
                 else:
                     self.last_direction = direction.copy()
                     self.last_grad = grad.copy()
+        else:
+            raise NotImplementedError("Error, cell algorithm setted to {}, but only 'sd' and 'cg' supported.".format(self.algorithm))
                     
                 
 
