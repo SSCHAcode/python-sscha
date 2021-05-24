@@ -134,7 +134,7 @@ class UC_OPTIMIZER:
             # Go back using the last direction selecting a smaller step
             x_new = self.x_start - self.last_direction * self.alpha
             print("[CELL] Step not good:")
-            print("[CELL]    X_START = {}  | ALPHA = {}".format(self.alpha))
+            print("[CELL]    X_START = {}  | ALPHA = {}".format(self.x_start, self.alpha))
             print("[CELL]    DIRECTION = {}".format(self.last_direction))
 
         self.n_step += 1
