@@ -89,6 +89,8 @@ class UC_OPTIMIZER:
             y0 = self.last_direction.dot(self.last_grad)
             y1 =  self.last_direction.dot(grad)
             factor = y0 / (y0 - y1)
+
+            print("[CELL]  GRADIENT DOT DIRECTION = {}".format(factor))
             
             # Regularization (avoid run away)
             if factor > 2:
@@ -112,6 +114,7 @@ class UC_OPTIMIZER:
         The step, hierarchical structure.
         Here a standard steepest descent
         """
+        print()
         if self.x_start is None:
             self.x_start = x_old.copy()
 
@@ -124,11 +127,21 @@ class UC_OPTIMIZER:
             direction = self.get_new_direction(grad)
             x_new = x_old - direction * self.alpha
             self.x_start = x_new.copy()
+            print("[CELL] New step:")
+            print("[CELL]    X_OLD = {}   | ALPHA = {}".format(x_old, self.alpha))
+            print("[CELL]    DIRECTION = {}".format(direction))
         else:
             # Go back using the last direction selecting a smaller step
             x_new = self.x_start - self.last_direction * self.alpha
+            print("[CELL] Step not good:")
+            print("[CELL]    X_START = {}  | ALPHA = {}".format(self.alpha))
+            print("[CELL]    DIRECTION = {}".format(self.last_direction))
 
         self.n_step += 1
+        print("[CELL]    GRADIENT = {}".format(grad))
+        print("[CELL]    X_NEW = {}".format(x_new))
+        print("[CELL]  Step number = {}".format(self.n_step))
+        print()
         return x_new
 
     def get_new_direction(self, grad):
