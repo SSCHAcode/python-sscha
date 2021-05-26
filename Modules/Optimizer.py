@@ -173,6 +173,8 @@ class UC_OPTIMIZER:
         # Steepest descent
         if self.algorithm == "sd":
             direction = grad
+            self.last_direction = direction.copy()
+            self.last_grad = grad.copy()
         elif self.algorithm == "cg":
             if np.max(np.abs(self.last_direction)) < 1e-10:
                 # First step
@@ -195,7 +197,7 @@ class UC_OPTIMIZER:
         else:
             raise NotImplementedError("Error, cell algorithm setted to {}, but only 'sd' and 'cg' supported.".format(self.algorithm))
                     
-                
+            
 
         return direction
 
