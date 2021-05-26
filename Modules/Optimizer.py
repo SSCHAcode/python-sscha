@@ -4,6 +4,7 @@ Here the optimizer for the cell and the gradient
 from __future__ import print_function
 import numpy as np
 import SCHAModules
+import sys, os
 
 
 from sscha.Parallel import pprint as print
@@ -46,8 +47,10 @@ class UC_OPTIMIZER:
         self.x_start = None
         self.reset_strain = True
 
+        self.uc_old = None
+
         # Allowed keys are sd or cg
-        self.algorithm = "cg" 
+        self.algorithm = "sd" 
 
         # If true the line minimization is employed during the minimization
         self.use_line_step = True
@@ -91,10 +94,19 @@ class UC_OPTIMIZER:
         if self.n_step != 0:
             y0 = self.last_direction.dot(self.last_grad)
             y1 =  self.last_direction.dot(grad)
+
+            print("[CELL] y0 = {} | y1 = {}".format(y0, y1))
+            print("[CELL] grad = {}".format(grad))
+            print("[CELL] lastgrad = {}".format(self.last_grad))
+            sys.stdout.flush()
             factor = y0 / (y0 - y1)
+
+
+            sys.stdout.flush()
 
             print("[CELL]  GRADIENT DOT DIRECTION = {}".format(factor))
             
+            sys.stdout.flush()
             # Regularization (avoid run away)
             if factor > 2:
                 factor = 2
@@ -104,7 +116,13 @@ class UC_OPTIMIZER:
             if factor < self.min_alpha_factor:
                 factor = self.min_alpha_factor
                 good_step = False
+
+            if np.isnan(factor):
+                factor = self.min_alpha_factor
+                good_step = False
+                
             self.alpha *= factor
+        
             
             #if self.alpha < self.min_alpha_step * self.alpha0:
             #    self.alpha = self.min_alpha_step * self.alpha0
@@ -147,6 +165,8 @@ class UC_OPTIMIZER:
         print("[CELL]    X_NEW = {}".format(x_new))
         print("[CELL]  Step number = {}".format(self.n_step))
         print()
+
+        sys.stdout.flush()
         return x_new
 
     def get_new_direction(self, grad):
@@ -206,7 +226,12 @@ class UC_OPTIMIZER:
         volume = np.abs(np.linalg.det(unit_cell))
         #uc_inv = np.linalg.inv(unit_cell)
         I = np.eye(3, dtype = np.float64)
-        
+
+        uc_old = unit_cell.copy()
+        if self.uc_old is None:
+            self.uc_old = uc_old
+            
+
         
         
         # Get the strain tensor up to know
@@ -254,10 +279,13 @@ class UC_OPTIMIZER:
             print ("NEW VOLUME:", np.linalg.det(unit_cell))
         
 
+
         # If the strain is resetted, set the initial cell as this one
         if self.reset_strain:
-            self.uc_0 = unit_cell.copy()
-            self.uc_0_inv = np.linalg.inv(self.uc_0)
+            self.uc_0 = self.uc_old.copy()
+            self.uc_0_inv = np.linalg.inv(self.uc_old)
+            self.uc_old = uc_old
+        
         
             
 

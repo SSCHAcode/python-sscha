@@ -16,6 +16,8 @@ import sscha.Utilities as Utilities
 import cellconstructor as CC
 import cellconstructor.symmetries
 
+import sys, os
+
 from sscha.Parallel import pprint as print
 
 __EPSILON__ = 1e-5
@@ -571,6 +573,7 @@ class SSCHA(object):
             
             print ()
             print ("Check the symmetries in the new cell:")
+            sys.stdout.flush()
             qe_sym = CC.symmetries.QE_Symmetry(self.minim.dyn.structure)
             qe_sym.SetupQPoint(verbose = True)
             
