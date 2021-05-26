@@ -130,6 +130,34 @@ class UC_OPTIMIZER:
             
         return good_step
 
+    def reset(self, unit_cell):
+        """
+        Reset the optimizer with the given unit cell
+        (Usefull to reduce the numerical noise)
+        """
+
+        print("[CELL] resetting...")
+
+        self.last_grad = np.zeros(9, dtype = np.double)
+        self.last_direction = np.zeros(9, dtype = np.double)
+        
+        self.uc_0 = np.float64(unit_cell.copy())
+        self.uc_0_inv = np.linalg.inv(self.uc_0)
+        self.uc_old = self.uc_0.copy()
+        self.x_start = np.zeros(9, dtype = np.double)
+        self.reset_strain = False
+
+    def check_reset(self, good_cell, thr = 1):
+        """
+        If the given good cell is much different from the original unit cell,
+        reset the calculation.
+        """
+
+        if np.sqrt(np.sum( (self.uc_0 - good_cell)**2)) > thr:
+            self.reset(good_cell)
+
+        
+
     def perform_step(self, x_old, grad):
         """
         The step, hierarchical structure.
@@ -148,7 +176,7 @@ class UC_OPTIMIZER:
             direction = self.get_new_direction(grad)
             x_new = x_old - direction * self.alpha
             self.x_start = x_old.copy()
-            #self.reset_strain = True
+            self.reset_strain = True
             print("[CELL] New step:")
             print("[CELL]    X_OLD = {}   | ALPHA = {}".format(x_old, self.alpha))
             print("[CELL]    DIRECTION = {}".format(direction))
@@ -158,7 +186,7 @@ class UC_OPTIMIZER:
             print("[CELL] Step not good:")
             print("[CELL]    X_START = {}  | ALPHA = {}".format(self.x_start, self.alpha))
             print("[CELL]    DIRECTION = {}".format(self.last_direction))
-            #self.reset_strain = False
+            self.reset_strain = False
 
         self.n_step += 1
         print("[CELL]    GRADIENT = {}".format(grad))
@@ -282,12 +310,10 @@ class UC_OPTIMIZER:
         
 
 
-        # If the strain is resetted, set the initial cell as this one
+        # If the last step was good, check if the cell needs to be resetted.
         if self.reset_strain:
-            self.uc_0 = self.uc_old.copy()
-            self.uc_0_inv = np.linalg.inv(self.uc_old)
-            self.uc_old = uc_old
-        
+            self.check_reset(uc_old)
+            self.reset_strain = False
         
             
 
