@@ -45,7 +45,7 @@ class UC_OPTIMIZER:
         self.uc_0 = np.float64(starting_unit_cell.copy())
         self.uc_0_inv = np.linalg.inv(self.uc_0)
         self.x_start = None
-        self.reset_strain = True
+        self.reset_strain = False
 
         self.uc_old = None
 
@@ -148,7 +148,7 @@ class UC_OPTIMIZER:
             direction = self.get_new_direction(grad)
             x_new = x_old - direction * self.alpha
             self.x_start = x_old.copy()
-            self.reset_strain = True
+            #self.reset_strain = True
             print("[CELL] New step:")
             print("[CELL]    X_OLD = {}   | ALPHA = {}".format(x_old, self.alpha))
             print("[CELL]    DIRECTION = {}".format(direction))
@@ -158,7 +158,7 @@ class UC_OPTIMIZER:
             print("[CELL] Step not good:")
             print("[CELL]    X_START = {}  | ALPHA = {}".format(self.x_start, self.alpha))
             print("[CELL]    DIRECTION = {}".format(self.last_direction))
-            self.reset_strain = False
+            #self.reset_strain = False
 
         self.n_step += 1
         print("[CELL]    GRADIENT = {}".format(grad))
