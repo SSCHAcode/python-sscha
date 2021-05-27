@@ -165,8 +165,6 @@ ase_struct = struct.get_ase_atoms()
 cell_SD = sscha.Optimizer.UC_OPTIMIZER(struct.unit_cell)
 static_bulk_modulus /= sscha.SchaMinimizer.__evA3_to_GPa__ 
 cell_SD.alpha = 1 / (3 * static_bulk_modulus * np.linalg.det(struct.unit_cell))
-cell_SD.min_alpha_factor = 0.1
-cell_SD.reset_strain = True
 
 # Perform the optimization at fixed volume
 for i in range(start_ka, max_ka):
