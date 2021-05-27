@@ -219,8 +219,8 @@ class UC_OPTIMIZER:
                 direction = grad + gamma * self.last_direction
                 if direction.dot(grad) < 0:
                     direction = grad
-                    self.last_direction = np.zeros(len(direction), np.double)
-                    self.last_grad = np.zeros(len(direction), np.double)
+                    self.last_direction = grad.copy()
+                    self.last_grad = grad.copy()
                     print("[CELL] Reset CG algorithm to SD")
                 else:
                     self.last_direction = direction.copy()
