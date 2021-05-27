@@ -110,10 +110,13 @@ class UC_OPTIMIZER:
             # Regularization (avoid run away)
             if factor > 2:
                 factor = 2
-                good_step = False
-
-            #factor = 1 + np.tanh( (factor - 1) )
-            if factor < self.min_alpha_factor:
+                #good_step = False
+            elif factor < 0 and y1 > 0:
+                factor = 1
+                # The minimization seem to have a negative curvature, continue with constant step
+                print("[CELL] Warning: the cell minimization have a negative curvature.")
+                print("                I do not know how to improve the minimization step.")
+            elif factor < self.min_alpha_factor:
                 factor = self.min_alpha_factor
                 good_step = False
 

@@ -516,7 +516,11 @@ class SSCHA(object):
             if fix_volume:
                 mark_helmoltz = "<--"
             else:
-                mark_helmoltz = "<--"
+                mark_gibbs = "<--"
+
+            # Extract the bulk modulus from the cell minimization
+            new_bulkmodulus = 1 / (3 * BFGS.alpha * self.minim.dyn.structure.get_volume())
+            new_bulkmodulus *= sscha.SchaMinimizer.__evA3_to_GPa__ 
 
             # Print the enthalpic contribution
             message = """
@@ -528,9 +532,9 @@ class SSCHA(object):
 
  P V = {:.8e} eV
 
- Helmoltz Free energy = {:.8e} eV {}
- Gibbs Free energy = {:.8e} eV {}
- Zero energy = {:.8e} eV
+ Helmoltz Free energy = {:.10e} eV {}
+ Gibbs Free energy = {:.10e} eV {}
+ Zero energy = {:.10e} eV
 
  """.format(target_press , Vol,target_press_evA3 * Vol, helmoltz, mark_helmoltz, gibbs, mark_gibbs, self.minim.eq_energy)
             print(message)
@@ -564,7 +568,14 @@ class SSCHA(object):
             # Strain the structure and the q points preserving the symmetries
             self.minim.dyn.AdjustToNewCell(new_uc)
             #self.minim.dyn.structure.change_unit_cell(new_uc)
-            
+
+            message = """    
+ Currently estimated bulk modulus = {:8.3f} GPa
+ (Note: this is just indicative, do not use it for computing bulk modulus)
+ 
+ """.format(new_bulkmodulus)
+            print(message)
+
 
             print (" New unit cell:")
             print (" v1 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[0,0], new_uc[0,1], new_uc[0,2]))
