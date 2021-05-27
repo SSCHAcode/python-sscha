@@ -214,7 +214,7 @@ class UC_OPTIMIZER:
                 self.last_grad = grad.copy()
             else:
                 gamma = np.dot(grad - self.last_grad, grad)
-                gamma /= np.sum(self.last_grad **2)
+                gamma /= self.last_grad.dot(self.last_grad)
 
                 direction = grad + gamma * self.last_direction
                 if direction.dot(grad) < 0:
