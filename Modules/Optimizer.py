@@ -112,10 +112,12 @@ class UC_OPTIMIZER:
                 factor = 2
                 #good_step = False
             elif factor < 0 and y1 > 0:
-                factor = 1
+                factor = 1.15
                 # The minimization seem to have a negative curvature, continue with constant step
                 print("[CELL] Warning: the cell minimization have a negative curvature.")
                 print("                I do not know how to improve the minimization step.")
+                print("                incrementing by a 15 %")
+                
             elif factor < self.min_alpha_factor:
                 factor = self.min_alpha_factor
                 good_step = False
