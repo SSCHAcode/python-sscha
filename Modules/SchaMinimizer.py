@@ -1018,6 +1018,12 @@ WARNING, the preconditioning is activated together with a root representation.
         # Prepare the minimizer
         self.minimizer = sscha.Minimizer.Minimizer(self.minim_struct, root_representation = self.root_representation, verbose = verbose >= 1)
         self.minimizer.init(self.dyn, self.ensemble.get_effective_sample_size() / self.ensemble.N)
+
+        # Define the starting step as a weighted average on the step in the dynamical matrix a
+        self.minimizer.step = self.min_step_dyn
+        if self.minim_struc:
+            self.minimizer_step =+ self.min_step_struc
+            self.minimizer_step /= 2
         
         
         while running:

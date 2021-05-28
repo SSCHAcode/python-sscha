@@ -27,9 +27,9 @@ def test_lock_manyq():
     IO_freq.SetupSaving("frequencies_graphite.dat") # The frequencies will be saved at each step of the minimization
 
     minim = sscha.SchaMinimizer.SSCHA_Minimizer(ens)
-    minim.min_step_dyn = 0.1
+    minim.min_step_dyn = 0.02
     minim.meaningful_factor = 0.000001
-    minim.max_ka = 3
+    minim.max_ka = 20
 
     minim.init()
     minim.print_info()
