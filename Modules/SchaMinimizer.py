@@ -1022,8 +1022,10 @@ WARNING, the preconditioning is activated together with a root representation.
         # Define the starting step as a weighted average on the step in the dynamical matrix a
         self.minimizer.step = self.min_step_dyn
         if self.minim_struct:
-            self.minimizer.step =+ self.min_step_struc
+
+            self.minimizer.step += self.min_step_struc
             self.minimizer.step /= 2
+
         
         
         while running:
