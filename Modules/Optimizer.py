@@ -91,7 +91,7 @@ class UC_OPTIMIZER:
         if self.n_step == 0:
             self.alpha0 = self.alpha
         
-        if self.n_step != 0:
+        if self.n_step != 0 and np.max(np.abs(self.last_direction)) > 1e-10:
             y0 = self.last_direction.dot(self.last_grad)
             y1 =  self.last_direction.dot(grad)
 
