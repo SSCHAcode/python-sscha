@@ -433,6 +433,7 @@ class SSCHA_Minimizer(object):
         is_diag_ok = False
         diag_error_counter = 0
         while not is_diag_ok:
+            is_diag_ok = True
             self.minimizer.update_dyn(new_kl_ratio, dyn_grad, struct_grad)
 
             # Get the new dynamical matrix and strucure after the step
@@ -451,6 +452,12 @@ class SSCHA_Minimizer(object):
             # Update the structure
             if self.minim_struct:
                 self.dyn.structure.coords[:,:] = new_struct
+
+            # If we have imaginary frequencies, force the kl ratio to zero
+            if self.check_imaginary_frequencies():
+                print("Immaginary frequencies found! Redoing the step.")
+                new_kl_ratio = 0
+                is_diag_ok = False
             
 
             # Update the ensemble
@@ -463,9 +470,6 @@ class SSCHA_Minimizer(object):
                 new_kl_ratio = 0 # Force step reduction
                 is_diag_ok = False 
                 diag_error_counter += 1
-            else:
-                # No error? Go on
-                is_diag_ok = True 
             
             if diag_error_counter >= __MAX_DIAG_ERROR_COUNTER__:
                 ERROR_MSG = """
@@ -1014,6 +1018,14 @@ WARNING, the preconditioning is activated together with a root representation.
         # Prepare the minimizer
         self.minimizer = sscha.Minimizer.Minimizer(self.minim_struct, root_representation = self.root_representation, verbose = verbose >= 1)
         self.minimizer.init(self.dyn, self.ensemble.get_effective_sample_size() / self.ensemble.N)
+
+        # Define the starting step as a weighted average on the step in the dynamical matrix a
+        self.minimizer.step = self.min_step_dyn
+        if self.minim_struct:
+
+            self.minimizer.step += self.min_step_struc
+            self.minimizer.step /= 2
+
         
         
         while running:
