@@ -141,7 +141,7 @@ class UC_OPTIMIZER:
         (Usefull to reduce the numerical noise)
         """
 
-        print("[CELL] resetting...")
+        print("[CELL] resetting... (automatically diminish the alpha) ")
 
         self.last_grad = np.zeros(9, dtype = np.double)
         self.last_direction = np.zeros(9, dtype = np.double)
@@ -151,6 +151,8 @@ class UC_OPTIMIZER:
         self.uc_old = self.uc_0.copy()
         self.x_start = np.zeros(9, dtype = np.double)
         self.reset_strain = False
+
+        self.alpha /= 2
 
     def check_reset(self, good_cell, thr = 10):
         """
