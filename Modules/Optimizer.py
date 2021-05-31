@@ -150,7 +150,7 @@ class UC_OPTIMIZER:
         self.x_start = np.zeros(9, dtype = np.double)
         self.reset_strain = False
 
-    def check_reset(self, good_cell, thr = 1):
+    def check_reset(self, good_cell, thr = 10):
         """
         If the given good cell is much different from the original unit cell,
         reset the calculation.
