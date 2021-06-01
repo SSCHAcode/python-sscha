@@ -237,7 +237,7 @@ class UC_OPTIMIZER:
         return direction
 
             
-    def UpdateCell(self, unit_cell, stress_tensor, fix_volume = False, verbose = False):
+    def UpdateCell(self, unit_cell, stress_tensor, fix_volume = False, verbose = True):
         """
         PERFORM THE CELL UPDATE
         =======================
@@ -275,10 +275,10 @@ class UC_OPTIMIZER:
         strain = np.transpose(self.uc_0_inv.dot(unit_cell) - I)
         
         if verbose:
-            print ("ALPHA:", self.alpha)
-            print ("VOLUME:", volume)
-            
-            print ("CURRENT STRAIN:")
+            print ("[CELL] VOLUME:", volume)
+            print ("[CELL] unit_cell:")
+            print(unit_cell)
+            print ("[CELL] CURRENT STRAIN:")
             print (strain)
         
         # Get the gradient with respect to the strain
