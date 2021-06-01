@@ -281,8 +281,9 @@ class UC_OPTIMIZER:
             print ("[CELL] CURRENT STRAIN:")
             print (strain)
         
-        # Get the gradient with respect to the strain
-        grad_mat =  - volume * stress_tensor.dot(np.linalg.inv(I + strain.transpose()))
+        # Get the gradient with respect to the strain        
+        #grad_mat =  - volume * stress_tensor.dot(np.linalg.inv(I + strain.transpose()))
+        grad_mat =  - volume * stress_tensor.dot(I + strain)
         
         # Modify the gradient if you need to fix the volume, in order to cancel the mean strain
         if fix_volume:
