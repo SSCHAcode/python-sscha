@@ -207,7 +207,7 @@ for i in range(start_ka, max_ka):
         qe_sym.ApplySymmetryToMatrix(stress)
     
     cell = new_struct.unit_cell.copy()
-    cell_SD.UpdateCell(cell, stress, fix_volume = fix_volume, verbose = False)
+    cell_SD.UpdateCell(cell, stress, fix_volume = fix_volume)
     new_struct.change_unit_cell(cell)
     ase_struct = new_struct.get_ase_atoms()
     
