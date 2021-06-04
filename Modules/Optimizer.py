@@ -274,20 +274,26 @@ class UC_OPTIMIZER:
         # Get the strain tensor up to know
         strain = np.transpose(self.uc_0_inv.dot(unit_cell) - I)
         
+        # Get the gradient with respect to the strain        
+        #grad_mat =  - volume * stress_tensor.dot(np.linalg.inv(I + strain.transpose()))
+        new_stress = stress_tensor.copy()
+
+        if fix_volume:
+            new_stress -= I * np.trace(new_stress) / np.float64(3)
+
         if verbose:
             print ("[CELL] VOLUME:", volume)
             print ("[CELL] unit_cell:")
             print(unit_cell)
             print ("[CELL] CURRENT STRAIN:")
             print (strain)
+            print("[CELL] NEW STRESS:")
+            print(new_stress)
         
-        # Get the gradient with respect to the strain        
-        #grad_mat =  - volume * stress_tensor.dot(np.linalg.inv(I + strain.transpose()))
-        grad_mat =  - volume * stress_tensor.dot(I + strain)
+
+        grad_mat =  - volume * new_stress.dot(I + strain)
         
         # Modify the gradient if you need to fix the volume, in order to cancel the mean strain
-        if fix_volume:
-            grad_mat -= I * np.trace(grad_mat) / np.float64(3)
         
         #grad_mat = - volume * np.transpose(uc_inv).dot(stress_tensor)
 
