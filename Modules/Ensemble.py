@@ -1430,7 +1430,7 @@ DETAILS OF ERROR:
         force = np.einsum("i, iab ->ab", self.rho, eforces) / np.sum(self.rho)
         if get_error:
             f2 = np.einsum("i, iab ->ab", self.rho, (eforces)**2) / np.sum(self.rho)
-            err = np.sqrt( f2 - force**2 )
+            err = np.sqrt( (f2 - force**2) / np.sum(self.rho) )
             return force, err
         return force
     
