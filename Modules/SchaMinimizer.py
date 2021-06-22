@@ -400,19 +400,10 @@ class SSCHA_Minimizer(object):
                 #qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
                 #print "SECOND DIAG:", np.linalg.eigvalsh(dyn_grad[0, :, :])
             
-            # Append the gradient modulus to the minimization info
-            self.__gw__.append(np.sqrt( np.sum(struct_grad**2)))
-            self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
-        
             
             # Perform the step for the structure
             #print "min step:", self.min_step_struc
             #self.dyn.structure.coords -= self.min_step_struc * struct_grad
-        else:
-
-            # Append the gradient modulus to the minimization info
-            self.__gw__.append(0)
-            self.__gw_err__.append(0)
 
 
         # Perform the gradient restriction
@@ -420,6 +411,13 @@ class SSCHA_Minimizer(object):
             custom_function_gradient(dyn_grad, struct_grad)    
             
 
+        # Append the gradient modulus to the minimization info
+        if self.minim_struct:
+            self.__gw__.append(np.sqrt( np.sum(struct_grad**2)))
+            self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
+        else:
+            self.__gw__.append(0)
+            self.__gw_err__.append(0)
 
         
         # Store the gradient in the minimization

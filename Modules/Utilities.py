@@ -292,8 +292,8 @@ class ModeProjection:
         # Prepare the projector on the structure
         for mu in range(index_mode_start, index_mode_end):
             pvec = np.real(self.pols[:, mu, 0])
-            #pvec /= pvec.dot(pvec)
-            self.proj_vec[:,:] += np.outer(pvec, pvec)
+            pvec /= np.sqrt(pvec.dot(pvec))
+            self.proj_vec[:,:] += np.outer(pvec / _msq_, pvec * _msq_)
                 
 
         # Impose the sum rule 
@@ -316,7 +316,7 @@ class ModeProjection:
 
         # Project the structure in the polarization vectors
         struct_grad_new = self.proj_vec.dot(struct_grad.ravel())
-        struct_grad = struct_grad_new.reshape((self.nat, 3))
+        struct_grad[:,:] = struct_grad_new.reshape((self.nat, 3))
 
         _m_ = np.tile(self.masses, (3, 1)).T.ravel()
 
