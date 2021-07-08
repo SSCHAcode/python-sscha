@@ -12,6 +12,9 @@ import cellconstructor as CC
 import cellconstructor.Phonons
 import numpy as np
 
+from sscha.Parallel import pprint as print
+import sscha.Parallel
+
 import pickle
 
 __UTILS_NAMESPACE__ = "utils"
@@ -289,8 +292,8 @@ class ModeProjection:
         # Prepare the projector on the structure
         for mu in range(index_mode_start, index_mode_end):
             pvec = np.real(self.pols[:, mu, 0])
-            #pvec /= pvec.dot(pvec)
-            self.proj_vec[:,:] += np.outer(pvec, pvec)
+            pvec /= np.sqrt(pvec.dot(pvec))
+            self.proj_vec[:,:] += np.outer(pvec / _msq_, pvec * _msq_)
                 
 
         # Impose the sum rule 
@@ -313,7 +316,7 @@ class ModeProjection:
 
         # Project the structure in the polarization vectors
         struct_grad_new = self.proj_vec.dot(struct_grad.ravel())
-        struct_grad = struct_grad_new.reshape((self.nat, 3))
+        struct_grad[:,:] = struct_grad_new.reshape((self.nat, 3))
 
         _m_ = np.tile(self.masses, (3, 1)).T.ravel()
 
@@ -455,6 +458,10 @@ class IOInfo:
                 If given, the file will be saved in the specified location.
                 Otherwise the default one is used (must be initialized by SetupSaving)
         """
+
+        if not sscha.Parallel.am_i_the_master():
+            return
+
         if fname is None:
             if self.__save_fname is None:
                 raise IOError("Error, a filename must be specified to save the frequencies.")
@@ -473,6 +480,10 @@ class IOInfo:
         
         It can be passed as custom_function_post to the run method of the SchaMinimizer.
         """
+
+
+        if not sscha.Parallel.am_i_the_master():
+            return
         
         # Get the weights if required
         if self.save_weights:
@@ -550,6 +561,10 @@ def save_binary(object, filename):
             The filename on which you want to save the binary data.
     """
 
+
+    if not sscha.Parallel.am_i_the_master():
+        return
+    
     pickle.dump(object, open(filename, "wb"))
 
 

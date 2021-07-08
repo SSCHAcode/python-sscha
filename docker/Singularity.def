@@ -1,0 +1,33 @@
+Bootstrap: docker
+From: ubuntu:20.04
+Stage: spython-base
+
+%post
+
+apt-get update \
+&& DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+build-essential pkg-config gfortran libblas-dev liblapack-dev liblapacke-dev \
+git python3-dev mpich python3-pip python3-numpy python3-scipy libopenmpi-dev libjpeg-dev \
+&& rm -rf /var/lib/apt/lists/*
+
+# Clone CellConstructor
+cd /home
+
+pip install --upgrade pip setuptools wheel
+pip install mpi4py
+
+git clone https://github.com/SSCHAcode/CellConstructor.git
+pip install -r CellConstructor/requirements.txt
+cd CellConstructor && python3 setup.py install && cd ..
+git clone https://github.com/SSCHAcode/python-sscha.git
+cd python-sscha && python3 setup.py install && cd ..
+
+
+%environment
+export DEBIAN_FRONTEND=noninteractive
+%runscript
+cd /home
+exec /bin/bash "$@"
+%startscript
+cd /home
+exec /bin/bash "$@"

@@ -39,6 +39,9 @@ import warnings
 import sys, os
 
 import sscha.Ensemble as Ensemble
+import sscha.Minimizer
+
+from sscha.Parallel import pprint as print
 
 # Rydberg to cm-1 and meV conversion factor
 __RyToCm__  = 109691.40235
@@ -94,6 +97,8 @@ __SCHA_ALLOWED_KEYS__ = [__SCHA_LAMBDA_A__, __SCHA_ISBIN__,
 __SCHA_MANDATORY_KEYS__ = [__SCHA_FILDYN__, __SCHA_NQIRR__, __SCHA_NQIRR__,
                            __SCHA_T__]
 
+__MAX_DIAG_ERROR_COUNTER__ = 5
+
 class SSCHA_Minimizer(object):
     
     def __init__(self, ensemble = None, root_representation = "normal",
@@ -148,7 +153,9 @@ class SSCHA_Minimizer(object):
         self.dyn = dyn
         self.dyn_path = "dyn"
         self.population = 0
-        
+
+        self.minimizer = None# 
+
         # Projection. This is chosen to fix some constraint on the minimization
         self.projector_dyn = None
         self.projector_struct = None
@@ -361,6 +368,7 @@ class SSCHA_Minimizer(object):
         
             
         # If the structure must be minimized perform the step
+        struct_grad = np.zeros(self.dyn.structure.coords.shape, dtype = np.double, order = "C")
         if self.minim_struct:
             t1 = time.time()
             # Get the gradient of the free-energy respect to the structure
@@ -387,52 +395,91 @@ class SSCHA_Minimizer(object):
                 #qe_sym.SymmetrizeVector(struct_grad_err)
                 struct_grad_err /= np.sqrt(qe_sym.QE_nsym)
 
-            # Perform the gradient restriction
-            if custom_function_gradient is not None:
-                custom_function_gradient(dyn_grad, struct_grad)    
                 
                 #print "applying sum rule and symmetries:"
                 #qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
                 #print "SECOND DIAG:", np.linalg.eigvalsh(dyn_grad[0, :, :])
             
-            # Append the gradient modulus to the minimization info
-            self.__gw__.append(np.sqrt( np.sum(struct_grad**2)))
-            self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
-        
             
             # Perform the step for the structure
             #print "min step:", self.min_step_struc
-            self.dyn.structure.coords -= self.min_step_struc * struct_grad
-        else:
+            #self.dyn.structure.coords -= self.min_step_struc * struct_grad
 
-            # Prepare the gradient imposing the constraints
-            if custom_function_gradient is not None:
-                custom_function_gradient(dyn_grad, np.zeros((self.dyn.structure.N_atoms, 3))) 
-             
-            # Append the gradient modulus to the minimization info
+
+        # Perform the gradient restriction
+        if custom_function_gradient is not None:
+            custom_function_gradient(dyn_grad, struct_grad)    
+            
+
+        # Append the gradient modulus to the minimization info
+        if self.minim_struct:
+            self.__gw__.append(np.sqrt( np.sum(struct_grad**2)))
+            self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
+        else:
             self.__gw__.append(0)
             self.__gw_err__.append(0)
-
 
         
         # Store the gradient in the minimization
         self.__gc__.append( np.sqrt(np.sum( np.abs(dyn_grad)**2)))
         self.__gc_err__.append( np.sqrt(np.sum( np.abs(err)**2)))
 
-        # Perform the step for the dynamical matrix respecting the root representation
-        new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
-                                  self.min_step_dyn, root_representation = self.root_representation,
-                                  minimization_algorithm = self.minimization_algorithm)
-        
-        # Update the dynamical matrix
-        for iq in range(len(self.dyn.q_tot)):
-            self.dyn.dynmats[iq] = new_dyn[iq, : ,: ]
-        
-        #self.dyn.save_qe("Prova")
-        
+        # Perform the minimization step (with the chosen minimization algorithm)
+        new_kl_ratio = self.ensemble.get_effective_sample_size() / self.ensemble.N
 
-        # Update the ensemble
-        self.update()
+        # Here a cycle to avoid diagonalization issues
+        is_diag_ok = False
+        diag_error_counter = 0
+        while not is_diag_ok:
+            is_diag_ok = True
+            self.minimizer.update_dyn(new_kl_ratio, dyn_grad, struct_grad)
+
+            # Get the new dynamical matrix and strucure after the step
+            new_dyn, new_struct = self.minimizer.get_dyn_struct()
+
+            # Perform the step for the dynamical matrix respecting the root representation
+            #new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
+            #                          self.min_step_dyn, root_representation = self.root_representation,
+            #                          minimization_algorithm = self.minimization_algorithm)
+            
+            # Update the dynamical matrix
+            for iq in range(len(self.dyn.q_tot)):
+                self.dyn.dynmats[iq] = new_dyn[iq, : ,: ]
+            
+
+            # Update the structure
+            if self.minim_struct:
+                self.dyn.structure.coords[:,:] = new_struct
+
+            # If we have imaginary frequencies, force the kl ratio to zero
+            if self.check_imaginary_frequencies():
+                print("Immaginary frequencies found! Redoing the step.")
+                new_kl_ratio = 0
+                is_diag_ok = False
+            
+
+            # Update the ensemble
+            try:
+                self.update()
+            except np.linalg.LinAlgError as error:
+                print("Diagonalization error:")
+                print(error)
+                print("Reducing the minimization step...")
+                new_kl_ratio = 0 # Force step reduction
+                is_diag_ok = False 
+                diag_error_counter += 1
+            
+            if diag_error_counter >= __MAX_DIAG_ERROR_COUNTER__:
+                ERROR_MSG = """
+Error, exceeded the maximum number of diagonalization error. 
+       something is very wrong with the dynamical matrix.
+       I'm saving the dynamical matrix as error_dyn, 
+       if you want to check it or restart the calculation from there.
+"""
+                print(ERROR_MSG)
+                self.dyn.save_qe("error_dyn")
+                raise ValueError(ERROR_MSG)
+
         
         # Save the ensemble [TODO: IT IS DEBUG]
         #print "SAVING RHO...."
@@ -965,6 +1012,18 @@ WARNING, the preconditioning is activated together with a root representation.
         # TODO: Activate a new pipe to avoid to stop the execution of the python 
         #       code when running the minimization. This allows for interactive plots
         running = True
+
+        # Prepare the minimizer
+        self.minimizer = sscha.Minimizer.Minimizer(self.minim_struct, root_representation = self.root_representation, verbose = verbose >= 1)
+        self.minimizer.init(self.dyn, self.ensemble.get_effective_sample_size() / self.ensemble.N)
+
+        # Define the starting step as a weighted average on the step in the dynamical matrix a
+        self.minimizer.step = self.min_step_dyn
+        if self.minim_struct:
+
+            self.minimizer.step += self.min_step_struc
+            self.minimizer.step /= 2
+
         
         
         while running:
@@ -1245,7 +1304,7 @@ WARNING, the preconditioning is activated together with a root representation.
         # Check the KL
         kl = self.ensemble.get_effective_sample_size()
         
-        if kl / float(self.ensemble.N) < self.kong_liu_ratio:
+        if kl / float(self.ensemble.N) < self.kong_liu_ratio and self.minimizer.new_direction:
             self.__converged__ = False
             print ("KL:", kl, "KL/N:", kl / float(self.ensemble.N), "KL RAT:", self.kong_liu_ratio)
             print ("  According to your input criteria")
