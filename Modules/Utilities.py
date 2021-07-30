@@ -258,20 +258,42 @@ class ModeProjection:
 
 
         self.testing = False
+        self.constrain = False
+        self.select_q_points = None
 
         self.initialized = False
 
-    def SetupFreeModes(self, index_mode_start, index_mode_end):
+
+    def SetupFreeModes(self, index_mode_start, index_mode_end, select_q_points = None, constrain = False):
         """
-        SETUP FREE MODES
-        ================
+        SETUP FREE (or constrained) MODES
+        =================================
 
         Constrain the minimization only in the modes between index_modes_start and
-        index_mdoe_end in all the q points.
+        index_mdoe_end in all the q points. Also the opposite is possible, 
+        by setting the constrain flag to True.
 
         For each q points only modes between these indices will be minimized.
+        The select_q_points options allows to select only some q points to be constrained.
+
+
+        Parameters
+        ----------
+            index_mode_start : int
+                The index of the first mode
+            index_mode_end : int
+                The index of the last mode
+            select_q_points : list of int
+                The index of the q points affected. 
+                If None (default) all q points are affected.
+            constrain : bool
+                If True, the specified range of modes is constrained while all the other are free.
+
+
         """
         self.initialized = True
+        self.constrain = constrain
+        self.select_q_points = select_q_points
 
         self.mu_start = index_mode_start 
         self.mu_end = index_mode_end
@@ -282,6 +304,10 @@ class ModeProjection:
         
         # Setup the projector on the dynamical matrix
         for iq in range(self.nq):
+            if select_q_points is not None:
+                # Skip the q points not in select_q_points
+                if not iq in select_q_points:
+                    continue
             for mu in range(index_mode_start, index_mode_end):
                 pvec = self.pols[:, mu, iq].copy()
                 
@@ -294,6 +320,12 @@ class ModeProjection:
             pvec = np.real(self.pols[:, mu, 0])
             pvec /= np.sqrt(pvec.dot(pvec))
             self.proj_vec[:,:] += np.outer(pvec / _msq_, pvec * _msq_)
+        
+        # If the constrain is chosen, reverse the projectors
+        if constrain:
+            self.proj_vec = np.eye(self.nmodes) - self.proj_vec
+            self.projector = np.eye(self.nmodes) - self.projector
+            self.projectorH = np.eye(self.nmodes) - self.projectorH
                 
 
         # Impose the sum rule 
@@ -322,6 +354,10 @@ class ModeProjection:
 
         # Do the same for the matrix
         for iq in range(self.nq):
+            # Skip the q points not in the list
+            if self.select_q_points is not None:
+                if not iq in self.select_q_points:
+                    continue
 
             # remove the masses from the gradient
             grad_nomass = dyn_grad[iq, :, :] / np.sqrt( np.outer(_m_, _m_))
@@ -333,6 +369,11 @@ class ModeProjection:
             projected_grad = np.zeros(grad_polbasis.shape, dtype = np.complex128)
             #print("MU START:", self.mu_start, "MU END:", self.mu_end)
             projected_grad[self.mu_start:self.mu_end, self.mu_start:self.mu_end] = grad_polbasis[self.mu_start:self.mu_end, self.mu_start:self.mu_end] 
+
+            # Reverse the projection if needed
+            if self.constrain:
+                projected_grad[:,:] = grad_polbasis[:,:] - projected_grad[:,:]
+
 
             # Go back in cartesian coordinates
             projected_grad_cart = self.pols[:,:, iq].dot(projected_grad.dot(np.conj(self.pols[:,:,iq]).T))
