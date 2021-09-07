@@ -1252,14 +1252,14 @@ WARNING, the preconditioning is activated together with a root representation.
 
             old_n_trans = np.sum((~trans_mask).astype(int))
 
-           if old_n_trans != current_n_trans:
+            if old_n_trans != current_n_trans:
                 ERR_MSG = """
 Error, the number of translational modes before and after the step is different.
     original translational modes: {}
     new translational modes: {}
 
-    You can try to fix this error setting the {} variable of {} class to True.
-""".format(old_n_trans, current_n_trans, "enforce_sum_rule", self.__class__.__name__)
+You can try to fix this error setting the {} variable of {} class to True.
+    """.format(old_n_trans, current_n_trans, "enforce_sum_rule", self.__class__.__name__)
                 print(ERR_MSG)
                 if not self.enforce_sum_rule:
                     raise ValueError(ERR_MSG)
