@@ -186,6 +186,9 @@ class SSCHA_Minimizer(object):
         # If true use spglib to impose symmetries
         # NOTE: It is slower, but it enables using supercells
         self.use_spglib = False
+
+        # If True, enforce the symmetrization and the sum rule after each step
+        self.enforce_sum_rule = False
         
         
         # Setup the statistical threshold
@@ -450,6 +453,10 @@ class SSCHA_Minimizer(object):
             # Update the structure
             if self.minim_struct:
                 self.dyn.structure.coords[:,:] = new_struct
+
+            # Check if we must enforce the symmetries and the sum rule:
+            if self.enforce_sum_rule and (not self.neglect_symmetries):
+                self.dyn.Symmetrize(use_spglib = self.use_spglib)
 
             # If we have imaginary frequencies, force the kl ratio to zero
             if self.check_imaginary_frequencies():
