@@ -458,6 +458,7 @@ class SSCHA_Minimizer(object):
             if self.enforce_sum_rule and (not self.neglect_symmetries):
                 self.dyn.Symmetrize(use_spglib = self.use_spglib)
 
+
             # If we have imaginary frequencies, force the kl ratio to zero
             if self.check_imaginary_frequencies():
                 print("Immaginary frequencies found! Redoing the step.")
@@ -1226,11 +1227,14 @@ WARNING, the preconditioning is activated together with a root representation.
         """
 
         # Get the frequencies
-        superdyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
-        w, pols = superdyn.DyagDinQ(0)
+        #superdyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
+        w, pols = self.dyn.DiagonalizeSupercell()#.DyagDinQ(0)
+        ss = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
 
         # Get translations
-        trans_mask = ~CC.Methods.get_translations(pols, superdyn.structure.get_masses_array())
+        trans_mask = ~CC.Methods.get_translations(pols, ss.get_masses_array())
+
+        current_n_trans = np.sum(trans_mask.astype(int))
 
         # Remove translations
         w = w[trans_mask]
@@ -1239,10 +1243,26 @@ WARNING, the preconditioning is activated together with a root representation.
         # Frequencies are ordered, check if the first one is negative.
         if w[0] < 0:
             print ("Total frequencies (excluding translations):")
-            superdyn0 = self.ensemble.dyn_0.GenerateSupercellDyn(self.ensemble.supercell)
-            wold, pold = superdyn0.DyagDinQ(0)
+            #superdyn0 = self.ensemble.dyn_0.GenerateSupercellDyn(self.ensemble.supercell)
+            wold, pold = self.ensemble.dyn_0.DiagonalizeSupercell()# superdyn0.DyagDinQ(0)
+
+            ss0 = self.ensemble.dyn_0.structure.generate_supercell(self.dyn.GetSupercell())
             
-            trans_mask = ~CC.Methods.get_translations(pold, superdyn0.structure.get_masses_array())
+            trans_mask = ~CC.Methods.get_translations(pold, ss0.get_masses_array())
+
+            old_n_trans = np.sum(trans_mask.astype(int))
+
+            if old_n_trans != current_n_trans:
+                ERR_MSG = """
+Error, the number of translational modes before and after the step is different.
+       original translational modes: {}
+       new translational modes: {}
+
+       You can try to fix this error setting the {} variable of {} class to True.
+""".format(old_n_trans, current_n_trans, "enforce_sum_rule", self.__class__.__name__)
+                print(ERR_MSG)
+                raise ValueError(ERR_MSG)
+                
             wold = wold[trans_mask] * __RyToCm__
             pold = pold[:, trans_mask]
             total_mask = list(range(len(w)))
