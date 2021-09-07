@@ -156,6 +156,8 @@ class SSCHA_Minimizer(object):
 
         self.minimizer = None# 
 
+        self.max_diag_error_counter = __MAX_DIAG_ERROR_COUNTER__
+
         # Projection. This is chosen to fix some constraint on the minimization
         self.projector_dyn = None
         self.projector_struct = None
@@ -477,7 +479,7 @@ class SSCHA_Minimizer(object):
                     is_diag_ok = False 
                     diag_error_counter += 1
             
-            if diag_error_counter >= __MAX_DIAG_ERROR_COUNTER__:
+            if diag_error_counter >= self.max_diag_error_counter:
                 ERROR_MSG = """
 Error, exceeded the maximum number of diagonalization error. 
        something is very wrong with the dynamical matrix.
