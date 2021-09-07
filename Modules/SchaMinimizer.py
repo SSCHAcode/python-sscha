@@ -464,18 +464,18 @@ class SSCHA_Minimizer(object):
                 print("Immaginary frequencies found! Redoing the step.")
                 new_kl_ratio = 0
                 is_diag_ok = False
-            
-
-            # Update the ensemble
-            try:
-                self.update()
-            except np.linalg.LinAlgError as error:
-                print("Diagonalization error:")
-                print(error)
-                print("Reducing the minimization step...")
-                new_kl_ratio = 0 # Force step reduction
-                is_diag_ok = False 
-                diag_error_counter += 1
+                diag_error_counter += 1            
+            else:
+                # Update the ensemble
+                try:
+                    self.update()
+                except np.linalg.LinAlgError as error:
+                    print("Diagonalization error:")
+                    print(error)
+                    print("Reducing the minimization step...")
+                    new_kl_ratio = 0 # Force step reduction
+                    is_diag_ok = False 
+                    diag_error_counter += 1
             
             if diag_error_counter >= __MAX_DIAG_ERROR_COUNTER__:
                 ERROR_MSG = """
