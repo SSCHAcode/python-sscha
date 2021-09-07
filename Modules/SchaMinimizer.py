@@ -487,6 +487,7 @@ Error, exceeded the maximum number of diagonalization error.
        if you want to check it or restart the calculation from there.
 """
                 print(ERROR_MSG)
+                sys.stdout.flush()
                 self.dyn.save_qe("error_dyn")
                 raise ValueError(ERROR_MSG)
 
