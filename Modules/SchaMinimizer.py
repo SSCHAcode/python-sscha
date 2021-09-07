@@ -1234,7 +1234,7 @@ WARNING, the preconditioning is activated together with a root representation.
         # Get translations
         trans_mask = ~CC.Methods.get_translations(pols, ss.get_masses_array())
 
-        current_n_trans = np.sum(trans_mask.astype(int))
+        current_n_trans = np.sum((~trans_mask).astype(int))
 
         # Remove translations
         w = w[trans_mask]
@@ -1250,7 +1250,7 @@ WARNING, the preconditioning is activated together with a root representation.
             
             trans_mask = ~CC.Methods.get_translations(pold, ss0.get_masses_array())
 
-            old_n_trans = np.sum(trans_mask.astype(int))
+            old_n_trans = np.sum((~trans_mask).astype(int))
 
             if old_n_trans != current_n_trans:
                 ERR_MSG = """
@@ -1262,7 +1262,7 @@ Error, the number of translational modes before and after the step is different.
 """.format(old_n_trans, current_n_trans, "enforce_sum_rule", self.__class__.__name__)
                 print(ERR_MSG)
                 raise ValueError(ERR_MSG)
-                
+
             wold = wold[trans_mask] * __RyToCm__
             pold = pold[:, trans_mask]
             total_mask = list(range(len(w)))
