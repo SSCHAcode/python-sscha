@@ -481,8 +481,11 @@ class SSCHA_Minimizer(object):
             
             if diag_error_counter >= self.max_diag_error_counter:
                 ERROR_MSG = """
-Error, exceeded the maximum number of diagonalization error. 
-       something is very wrong with the dynamical matrix.
+Error, exceeded the maximum number of diagonalization error. (or imaginary steps)
+
+       you can get rid of this error by increasing max_diag_error_counter variable.
+
+       Something is very wrong with the dynamical matrix.
        I'm saving the dynamical matrix as error_dyn, 
        if you want to check it or restart the calculation from there.
 """
