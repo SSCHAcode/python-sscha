@@ -98,6 +98,12 @@ class SSCHA(object):
         self.target_pressure = 0
         self.fix_volume = False
 
+        # Options for the cell relaxation
+        # If true the cell shape is fixed in a variable-cell relaxation
+        # even if the symmetries allows for more degrees of freedom in the cell shape.
+        # Usefull (for example) if you want to enfoce a cubic cell even if the structure brakes the symmetries
+        self.fix_cell_shape = False  
+
 
         # Setup the attribute control
         self.__total_attributes__ = [item for item in self.__dict__.keys()]
@@ -351,7 +357,10 @@ class SSCHA(object):
         This function performs a variable cell SCHA relaxation at constant pressure,
         It is similar to the relax calculation, but the unit cell is updated according
         to the anharmonic stress tensor at each new population. 
-        The cell optimization is performed with the BFGS algorithm. 
+
+        By default, all the degrees of freedom compatible with the symmetry group are relaxed in the cell.
+        You can constrain the cell to keep the same shape by setting fix_cell_shape = True.
+
         
         NOTE: 
             remember to setup the stress_offset variable of the SCHA_Minimizer,
@@ -360,6 +369,7 @@ class SSCHA(object):
             stress tensor difference between a single very high-cutoff calculation and a
             single low-cutoff (the one you use), this difference will be added at the final
             stress tensor to get a better estimation of the true stress.
+
         
         Parameters
         ----------
@@ -393,7 +403,8 @@ class SSCHA(object):
                 does not support it by default)
             cell_relax_algorithm : string
                 This identifies the stress algorithm. It can be both sd (steepest-descent),
-                cg (conjugate-gradient) or bfgs (Quasi-newton)
+                cg (conjugate-gradient) or bfgs (Quasi-newton).
+                The most robust one is SD. Do not change if you are not sure what you are doing.
             fix_volume : bool, optional
                 If true (default False) the volume is fixed, therefore only the cell shape is relaxed.
                 
@@ -558,7 +569,11 @@ class SSCHA(object):
             # print ""
         
             # Perform the cell step
-            cell_gradient = (stress_tensor - I *target_press_evA3)
+            if self.fix_cell_shape:
+                # Use a isotropic stress tensor to keep the same cell shape
+                cell_gradient = I * (Press - target_press_evA3)
+            else:
+                cell_gradient = (stress_tensor - I *target_press_evA3)
             
             new_uc = self.minim.dyn.structure.unit_cell.copy()
             BFGS.UpdateCell(new_uc,  cell_gradient, fix_volume)

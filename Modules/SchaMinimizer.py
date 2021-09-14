@@ -160,6 +160,8 @@ class SSCHA_Minimizer(object):
 
         self.minimizer = None# 
 
+        self.max_diag_error_counter = __MAX_DIAG_ERROR_COUNTER__
+
         # Projection. This is chosen to fix some constraint on the minimization
         self.projector_dyn = None
         self.projector_struct = None
@@ -190,6 +192,9 @@ class SSCHA_Minimizer(object):
         # If true use spglib to impose symmetries
         # NOTE: It is slower, but it enables using supercells
         self.use_spglib = False
+
+        # If True, enforce the symmetrization and the sum rule after each step
+        self.enforce_sum_rule = False
         
         
         # Setup the statistical threshold
@@ -461,32 +466,41 @@ class SSCHA_Minimizer(object):
             if self.minim_struct:
                 self.dyn.structure.coords[:,:] = new_struct
 
+            # Check if we must enforce the symmetries and the sum rule:
+            if self.enforce_sum_rule and (not self.neglect_symmetries):
+                self.dyn.Symmetrize(use_spglib = self.use_spglib)
+
+
             # If we have imaginary frequencies, force the kl ratio to zero
             if self.check_imaginary_frequencies():
                 print("Immaginary frequencies found! Redoing the step.")
                 new_kl_ratio = 0
                 is_diag_ok = False
+                diag_error_counter += 1            
+            else:
+                # Update the ensemble
+                try:
+                    self.update()
+                except np.linalg.LinAlgError as error:
+                    print("Diagonalization error:")
+                    print(error)
+                    print("Reducing the minimization step...")
+                    new_kl_ratio = 0 # Force step reduction
+                    is_diag_ok = False 
+                    diag_error_counter += 1
             
-
-            # Update the ensemble
-            try:
-                self.update()
-            except np.linalg.LinAlgError as error:
-                print("Diagonalization error:")
-                print(error)
-                print("Reducing the minimization step...")
-                new_kl_ratio = 0 # Force step reduction
-                is_diag_ok = False 
-                diag_error_counter += 1
-            
-            if diag_error_counter >= __MAX_DIAG_ERROR_COUNTER__:
+            if diag_error_counter >= self.max_diag_error_counter:
                 ERROR_MSG = """
-Error, exceeded the maximum number of diagonalization error. 
-       something is very wrong with the dynamical matrix.
+Error, exceeded the maximum number of diagonalization error. (or imaginary steps)
+
+       you can get rid of this error by increasing max_diag_error_counter variable.
+
+       Something is very wrong with the dynamical matrix.
        I'm saving the dynamical matrix as error_dyn, 
        if you want to check it or restart the calculation from there.
 """
                 print(ERROR_MSG)
+                sys.stdout.flush()
                 self.dyn.save_qe("error_dyn")
                 raise ValueError(ERROR_MSG)
 
@@ -1227,11 +1241,14 @@ WARNING, the preconditioning is activated together with a root representation.
         """
 
         # Get the frequencies
-        superdyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
-        w, pols = superdyn.DyagDinQ(0)
+        #superdyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
+        w, pols = self.dyn.DiagonalizeSupercell()#.DyagDinQ(0)
+        ss = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
 
         # Get translations
-        trans_mask = ~CC.Methods.get_translations(pols, superdyn.structure.get_masses_array())
+        trans_mask = ~CC.Methods.get_translations(pols, ss.get_masses_array())
+
+        current_n_trans = np.sum((~trans_mask).astype(int))
 
         # Remove translations
         w = w[trans_mask]
@@ -1240,10 +1257,30 @@ WARNING, the preconditioning is activated together with a root representation.
         # Frequencies are ordered, check if the first one is negative.
         if w[0] < 0:
             print ("Total frequencies (excluding translations):")
-            superdyn0 = self.ensemble.dyn_0.GenerateSupercellDyn(self.ensemble.supercell)
-            wold, pold = superdyn0.DyagDinQ(0)
+            #superdyn0 = self.ensemble.dyn_0.GenerateSupercellDyn(self.ensemble.supercell)
+            wold, pold = self.ensemble.dyn_0.DiagonalizeSupercell()# superdyn0.DyagDinQ(0)
+
+            ss0 = self.ensemble.dyn_0.structure.generate_supercell(self.dyn.GetSupercell())
             
-            trans_mask = ~CC.Methods.get_translations(pold, superdyn0.structure.get_masses_array())
+            trans_mask = ~CC.Methods.get_translations(pold, ss0.get_masses_array())
+
+            old_n_trans = np.sum((~trans_mask).astype(int))
+
+            if old_n_trans != current_n_trans:
+                ERR_MSG = """
+Error, the number of translational modes before and after the step is different.
+    original translational modes: {}
+    new translational modes: {}
+
+You can try to fix this error setting the {} variable of {} class to True.
+    """.format(old_n_trans, current_n_trans, "enforce_sum_rule", self.__class__.__name__)
+                print(ERR_MSG)
+                if not self.enforce_sum_rule:
+                    raise ValueError(ERR_MSG)
+                else:
+                    return True
+
+
             wold = wold[trans_mask] * __RyToCm__
             pold = pold[:, trans_mask]
             total_mask = list(range(len(w)))
