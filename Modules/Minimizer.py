@@ -1,5 +1,6 @@
 import numpy as np 
 import sys, os
+import difflib
 
 
 from sscha.Parallel import pprint as print
@@ -7,7 +8,7 @@ from sscha.Parallel import pprint as print
 __ERROR_THR__ = 1e-7
 
 class Minimizer:
-    def __init__(self, minim_struct = True, algorithm = "sdes", root_representation = "normal", step = 1, verbose = True):
+    def __init__(self, minim_struct = True, algorithm = "sdes", root_representation = "normal", step = 1, verbose = True, fixed_step = False, struct_step_ratio = 1):
         """
         This class is a minimizer that performs the optimization given the gradient of the dynamical matrix.
 
@@ -23,12 +24,18 @@ class Minimizer:
                 one of the root of the force constant matrix.
             step : double
                 The initial step of the minimization
+            fixed_step : bool
+                If True, skip the line minimization and keep the step fixed during the whole minimization.
+            struct_step_ratio : float
+                Default 1. It is a manual precondition to slow down or accelerate the minimization of the structure with
+                respect to the dynamical matrix. If bigger than 1, the structure minimization has a bigger step, and vice versa.
+                It must be positive
         """
 
         self.minim_struct = minim_struct
         self.algorithm = algorithm
         self.step = step
-        self.setp_index = 0 # The index of the minimization
+        self.step_index = 0 # The index of the minimization
         self.root_representation = root_representation
         self.verbose = verbose
 
@@ -41,8 +48,11 @@ class Minimizer:
         self.dyn = None
         self.nq = 0
         self.n_modes = 0
+        self.fixed_step = fixed_step
+        self.struct_step_ratio = struct_step_ratio  #
 
         self.new_direction = True
+        self.direction = None
 
 
         # Some parameter to optimize the evolution
@@ -55,6 +65,40 @@ class Minimizer:
         self.increment_step = 1.5 
         # How much decrease the step when it is too big (must be < 1)
         self.decrement_step = .87358046475 
+
+
+        # Setup the attribute control
+        self.__total_attributes__ = [item for item in self.__dict__.keys()]
+        self.fixed_attributes = True # This must be the last attribute to be setted
+
+
+
+    def __setattr__(self, name, value):
+        """
+        This method is used to set an attribute.
+        It will raise an exception if the attribute does not exists (with a suggestion of similar entries)
+        """
+
+        
+        if "fixed_attributes" in self.__dict__:
+            if name in self.__total_attributes__:
+                super(self.__class__, self).__setattr__(name, value)
+            elif self.fixed_attributes:
+                similar_objects = str( difflib.get_close_matches(name, self.__total_attributes__))
+                ERROR_MSG = """
+        Error, the attribute '{}' is not a member of '{}'.
+        Suggested similar attributes: {} ?
+        """.format(name, type(self).__name__,  similar_objects)
+
+                raise AttributeError(ERROR_MSG)
+        else:
+            super(self.__class__, self).__setattr__(name, value)
+
+        # Check the constrains in some of the attributes
+        if name == "step":
+            assert value >= 0, "Error, the step must be positive, value = {}".format(value)
+        if name == "struct_step_ratio":
+            assert value > 0, "Error, {} must be positive, value = {}".format(name, value)
         
 
     def init(self, dyn, kl_ratio):
@@ -122,7 +166,7 @@ class Minimizer:
         if not self.minim_struct:
             return dyn_gradient.ravel()
         
-        return np.concatenate( (dyn_gradient.ravel(), structure_gradient.ravel()) )
+        return np.concatenate( (dyn_gradient.ravel(), structure_gradient.ravel() * self.struct_step_ratio) )
 
     def get_dyn_struct(self):
         """
@@ -148,7 +192,13 @@ class Minimizer:
         Perform the minimization step with the line minimization
         """
         # Check consistency
-        assert self.increment_step > 1 and self.decrement_step < 1
+        ERR="""
+Error, increment must be bigger than 1 and decrement lower than 1. 
+       If you want to fix the step set fixed_step = True.
+"""
+        assert self.increment_step > 1 and self.decrement_step < 1, ERR
+        if self.fixed_step:
+            self.new_direction = True
 
         if self.new_direction:
             # A new direction, update the position with the last one
@@ -162,7 +212,8 @@ class Minimizer:
             self.new_direction = False 
 
             # Enlarge the step
-            self.step *= self.increment_step
+            if not self.fixed_step:
+                self.step *= self.increment_step
         else:
             # Proceed with the line minimization
 
@@ -185,7 +236,7 @@ class Minimizer:
                 self.new_direction = True
                 if self.verbose:
                     print("Good step found with {}, try increment".format(self.step))
-        
+
         # Perform the minimiziation step
         self.current_x = self.old_x - self.step * self.direction
 

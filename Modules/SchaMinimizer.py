@@ -145,6 +145,10 @@ class SSCHA_Minimizer(object):
         # The minimization step
         self.min_step_dyn = lambda_a
         self.min_step_struc = 1
+
+        # Set fixed step to true if you do not want the line minimization
+        # Usefull if you are close to the minimum and you prefer to speedup the minimization with a fixed step.
+        self.fixed_step = False 
         
         dyn = None
         if ensemble is not None:
@@ -246,6 +250,12 @@ class SSCHA_Minimizer(object):
                 raise AttributeError(ERROR_MSG)
         else:
             super(SSCHA_Minimizer, self).__setattr__(name, value)
+
+
+        # Here check the consistency of the input
+        if "min_step" in name:
+            if value < 0:
+                raise ValueError("Error, the step attribute {} must be positive ({} given)".format(name, value))
         
         
     def set_ensemble(self, ensemble):
@@ -1014,15 +1024,13 @@ WARNING, the preconditioning is activated together with a root representation.
         running = True
 
         # Prepare the minimizer
-        self.minimizer = sscha.Minimizer.Minimizer(self.minim_struct, root_representation = self.root_representation, verbose = verbose >= 1)
+        self.minimizer = sscha.Minimizer.Minimizer(self.minim_struct, fixed_step= self.fixed_step, root_representation = self.root_representation, verbose = verbose >= 1)
         self.minimizer.init(self.dyn, self.ensemble.get_effective_sample_size() / self.ensemble.N)
 
         # Define the starting step as a weighted average on the step in the dynamical matrix a
         self.minimizer.step = self.min_step_dyn
         if self.minim_struct:
-
-            self.minimizer.step += self.min_step_struc
-            self.minimizer.step /= 2
+            self.minimizer.struct_step_ratio = self.min_step_struc / self.min_step_dyn
 
         
         

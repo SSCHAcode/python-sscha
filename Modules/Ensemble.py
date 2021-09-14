@@ -836,6 +836,12 @@ Error, the following stress files are missing from the ensemble:
 
         # Setup the initial weights
         self.rho = np.ones(self.N, dtype = np.float64)
+
+
+        # Setup that both forces and stresses are not computed
+        self.stress_computed = np.ones(self.N, dtype = bool)
+        self.force_computed = np.ones(self.N, dtype = bool)
+        
         
 
     def init_from_structures(self, structures):
