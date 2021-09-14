@@ -39,6 +39,9 @@ import warnings
 import sys, os
 
 import sscha.Ensemble as Ensemble
+import sscha.Minimizer
+
+from sscha.Parallel import pprint as print
 
 # Rydberg to cm-1 and meV conversion factor
 __RyToCm__  = 109691.40235
@@ -94,6 +97,8 @@ __SCHA_ALLOWED_KEYS__ = [__SCHA_LAMBDA_A__, __SCHA_ISBIN__,
 __SCHA_MANDATORY_KEYS__ = [__SCHA_FILDYN__, __SCHA_NQIRR__, __SCHA_NQIRR__,
                            __SCHA_T__]
 
+__MAX_DIAG_ERROR_COUNTER__ = 5
+
 class SSCHA_Minimizer(object):
     
     def __init__(self, ensemble = None, root_representation = "normal",
@@ -140,6 +145,10 @@ class SSCHA_Minimizer(object):
         # The minimization step
         self.min_step_dyn = lambda_a
         self.min_step_struc = 1
+
+        # Set fixed step to true if you do not want the line minimization
+        # Usefull if you are close to the minimum and you prefer to speedup the minimization with a fixed step.
+        self.fixed_step = False 
         
         dyn = None
         if ensemble is not None:
@@ -148,7 +157,11 @@ class SSCHA_Minimizer(object):
         self.dyn = dyn
         self.dyn_path = "dyn"
         self.population = 0
-        
+
+        self.minimizer = None# 
+
+        self.max_diag_error_counter = __MAX_DIAG_ERROR_COUNTER__
+
         # Projection. This is chosen to fix some constraint on the minimization
         self.projector_dyn = None
         self.projector_struct = None
@@ -179,6 +192,9 @@ class SSCHA_Minimizer(object):
         # If true use spglib to impose symmetries
         # NOTE: It is slower, but it enables using supercells
         self.use_spglib = False
+
+        # If True, enforce the symmetrization and the sum rule after each step
+        self.enforce_sum_rule = False
         
         
         # Setup the statistical threshold
@@ -239,6 +255,12 @@ class SSCHA_Minimizer(object):
                 raise AttributeError(ERROR_MSG)
         else:
             super(SSCHA_Minimizer, self).__setattr__(name, value)
+
+
+        # Here check the consistency of the input
+        if "min_step" in name:
+            if value < 0:
+                raise ValueError("Error, the step attribute {} must be positive ({} given)".format(name, value))
         
         
     def set_ensemble(self, ensemble):
@@ -361,6 +383,7 @@ class SSCHA_Minimizer(object):
         
             
         # If the structure must be minimized perform the step
+        struct_grad = np.zeros(self.dyn.structure.coords.shape, dtype = np.double, order = "C")
         if self.minim_struct:
             t1 = time.time()
             # Get the gradient of the free-energy respect to the structure
@@ -387,52 +410,100 @@ class SSCHA_Minimizer(object):
                 #qe_sym.SymmetrizeVector(struct_grad_err)
                 struct_grad_err /= np.sqrt(qe_sym.QE_nsym)
 
-            # Perform the gradient restriction
-            if custom_function_gradient is not None:
-                custom_function_gradient(dyn_grad, struct_grad)    
                 
                 #print "applying sum rule and symmetries:"
                 #qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
                 #print "SECOND DIAG:", np.linalg.eigvalsh(dyn_grad[0, :, :])
             
-            # Append the gradient modulus to the minimization info
-            self.__gw__.append(np.sqrt( np.sum(struct_grad**2)))
-            self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
-        
             
             # Perform the step for the structure
             #print "min step:", self.min_step_struc
-            self.dyn.structure.coords -= self.min_step_struc * struct_grad
-        else:
+            #self.dyn.structure.coords -= self.min_step_struc * struct_grad
 
-            # Prepare the gradient imposing the constraints
-            if custom_function_gradient is not None:
-                custom_function_gradient(dyn_grad, np.zeros((self.dyn.structure.N_atoms, 3))) 
-             
-            # Append the gradient modulus to the minimization info
+
+        # Perform the gradient restriction
+        if custom_function_gradient is not None:
+            custom_function_gradient(dyn_grad, struct_grad)    
+            
+
+        # Append the gradient modulus to the minimization info
+        if self.minim_struct:
+            self.__gw__.append(np.sqrt( np.sum(struct_grad**2)))
+            self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
+        else:
             self.__gw__.append(0)
             self.__gw_err__.append(0)
-
 
         
         # Store the gradient in the minimization
         self.__gc__.append( np.sqrt(np.sum( np.abs(dyn_grad)**2)))
         self.__gc_err__.append( np.sqrt(np.sum( np.abs(err)**2)))
 
-        # Perform the step for the dynamical matrix respecting the root representation
-        new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
-                                  self.min_step_dyn, root_representation = self.root_representation,
-                                  minimization_algorithm = self.minimization_algorithm)
-        
-        # Update the dynamical matrix
-        for iq in range(len(self.dyn.q_tot)):
-            self.dyn.dynmats[iq] = new_dyn[iq, : ,: ]
-        
-        #self.dyn.save_qe("Prova")
-        
+        # Perform the minimization step (with the chosen minimization algorithm)
+        new_kl_ratio = self.ensemble.get_effective_sample_size() / self.ensemble.N
 
-        # Update the ensemble
-        self.update()
+        # Here a cycle to avoid diagonalization issues
+        is_diag_ok = False
+        diag_error_counter = 0
+        while not is_diag_ok:
+            is_diag_ok = True
+            self.minimizer.update_dyn(new_kl_ratio, dyn_grad, struct_grad)
+
+            # Get the new dynamical matrix and strucure after the step
+            new_dyn, new_struct = self.minimizer.get_dyn_struct()
+
+            # Perform the step for the dynamical matrix respecting the root representation
+            #new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
+            #                          self.min_step_dyn, root_representation = self.root_representation,
+            #                          minimization_algorithm = self.minimization_algorithm)
+            
+            # Update the dynamical matrix
+            for iq in range(len(self.dyn.q_tot)):
+                self.dyn.dynmats[iq] = new_dyn[iq, : ,: ]
+            
+
+            # Update the structure
+            if self.minim_struct:
+                self.dyn.structure.coords[:,:] = new_struct
+
+            # Check if we must enforce the symmetries and the sum rule:
+            if self.enforce_sum_rule and (not self.neglect_symmetries):
+                self.dyn.Symmetrize(use_spglib = self.use_spglib)
+
+
+            # If we have imaginary frequencies, force the kl ratio to zero
+            if self.check_imaginary_frequencies():
+                print("Immaginary frequencies found! Redoing the step.")
+                new_kl_ratio = 0
+                is_diag_ok = False
+                diag_error_counter += 1            
+            else:
+                # Update the ensemble
+                try:
+                    self.update()
+                except np.linalg.LinAlgError as error:
+                    print("Diagonalization error:")
+                    print(error)
+                    print("Reducing the minimization step...")
+                    new_kl_ratio = 0 # Force step reduction
+                    is_diag_ok = False 
+                    diag_error_counter += 1
+            
+            if diag_error_counter >= self.max_diag_error_counter:
+                ERROR_MSG = """
+Error, exceeded the maximum number of diagonalization error. (or imaginary steps)
+
+       you can get rid of this error by increasing max_diag_error_counter variable.
+
+       Something is very wrong with the dynamical matrix.
+       I'm saving the dynamical matrix as error_dyn, 
+       if you want to check it or restart the calculation from there.
+"""
+                print(ERROR_MSG)
+                sys.stdout.flush()
+                self.dyn.save_qe("error_dyn")
+                raise ValueError(ERROR_MSG)
+
         
         # Save the ensemble [TODO: IT IS DEBUG]
         #print "SAVING RHO...."
@@ -965,6 +1036,16 @@ WARNING, the preconditioning is activated together with a root representation.
         # TODO: Activate a new pipe to avoid to stop the execution of the python 
         #       code when running the minimization. This allows for interactive plots
         running = True
+
+        # Prepare the minimizer
+        self.minimizer = sscha.Minimizer.Minimizer(self.minim_struct, fixed_step= self.fixed_step, root_representation = self.root_representation, verbose = verbose >= 1)
+        self.minimizer.init(self.dyn, self.ensemble.get_effective_sample_size() / self.ensemble.N)
+
+        # Define the starting step as a weighted average on the step in the dynamical matrix a
+        self.minimizer.step = self.min_step_dyn
+        if self.minim_struct:
+            self.minimizer.struct_step_ratio = self.min_step_struc / self.min_step_dyn
+
         
         
         while running:
@@ -1160,11 +1241,14 @@ WARNING, the preconditioning is activated together with a root representation.
         """
 
         # Get the frequencies
-        superdyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
-        w, pols = superdyn.DyagDinQ(0)
+        #superdyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
+        w, pols = self.dyn.DiagonalizeSupercell()#.DyagDinQ(0)
+        ss = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
 
         # Get translations
-        trans_mask = ~CC.Methods.get_translations(pols, superdyn.structure.get_masses_array())
+        trans_mask = ~CC.Methods.get_translations(pols, ss.get_masses_array())
+
+        current_n_trans = np.sum((~trans_mask).astype(int))
 
         # Remove translations
         w = w[trans_mask]
@@ -1173,10 +1257,30 @@ WARNING, the preconditioning is activated together with a root representation.
         # Frequencies are ordered, check if the first one is negative.
         if w[0] < 0:
             print ("Total frequencies (excluding translations):")
-            superdyn0 = self.ensemble.dyn_0.GenerateSupercellDyn(self.ensemble.supercell)
-            wold, pold = superdyn0.DyagDinQ(0)
+            #superdyn0 = self.ensemble.dyn_0.GenerateSupercellDyn(self.ensemble.supercell)
+            wold, pold = self.ensemble.dyn_0.DiagonalizeSupercell()# superdyn0.DyagDinQ(0)
+
+            ss0 = self.ensemble.dyn_0.structure.generate_supercell(self.dyn.GetSupercell())
             
-            trans_mask = ~CC.Methods.get_translations(pold, superdyn0.structure.get_masses_array())
+            trans_mask = ~CC.Methods.get_translations(pold, ss0.get_masses_array())
+
+            old_n_trans = np.sum((~trans_mask).astype(int))
+
+            if old_n_trans != current_n_trans:
+                ERR_MSG = """
+Error, the number of translational modes before and after the step is different.
+    original translational modes: {}
+    new translational modes: {}
+
+You can try to fix this error setting the {} variable of {} class to True.
+    """.format(old_n_trans, current_n_trans, "enforce_sum_rule", self.__class__.__name__)
+                print(ERR_MSG)
+                if not self.enforce_sum_rule:
+                    raise ValueError(ERR_MSG)
+                else:
+                    return True
+
+
             wold = wold[trans_mask] * __RyToCm__
             pold = pold[:, trans_mask]
             total_mask = list(range(len(w)))
@@ -1245,7 +1349,7 @@ WARNING, the preconditioning is activated together with a root representation.
         # Check the KL
         kl = self.ensemble.get_effective_sample_size()
         
-        if kl / float(self.ensemble.N) < self.kong_liu_ratio:
+        if kl / float(self.ensemble.N) < self.kong_liu_ratio and self.minimizer.new_direction:
             self.__converged__ = False
             print ("KL:", kl, "KL/N:", kl / float(self.ensemble.N), "KL RAT:", self.kong_liu_ratio)
             print ("  According to your input criteria")

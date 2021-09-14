@@ -16,6 +16,9 @@ import sscha.Utilities as Utilities
 import cellconstructor as CC
 import cellconstructor.symmetries
 
+import sys, os
+
+from sscha.Parallel import pprint as print
 
 __EPSILON__ = 1e-5
 
@@ -94,6 +97,12 @@ class SSCHA(object):
         self.bulk_modulus = 15
         self.target_pressure = 0
         self.fix_volume = False
+
+        # Options for the cell relaxation
+        # If true the cell shape is fixed in a variable-cell relaxation
+        # even if the symmetries allows for more degrees of freedom in the cell shape.
+        # Usefull (for example) if you want to enfoce a cubic cell even if the structure brakes the symmetries
+        self.fix_cell_shape = False  
 
 
         # Setup the attribute control
@@ -332,12 +341,14 @@ class SSCHA(object):
             if pop > self.max_pop:
                 running = False
                 
+
+        self.start_pop = pop
         return self.minim.is_converged()
     
     
     def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
-                 ensemble_loc = ".", start_pop = 1, stress_numerical = False,
+                 ensemble_loc = None, start_pop = None, stress_numerical = False,
                  cell_relax_algorithm = "sd", fix_volume = False):
         """
         VARIABLE CELL RELAX
@@ -346,7 +357,10 @@ class SSCHA(object):
         This function performs a variable cell SCHA relaxation at constant pressure,
         It is similar to the relax calculation, but the unit cell is updated according
         to the anharmonic stress tensor at each new population. 
-        The cell optimization is performed with the BFGS algorithm. 
+
+        By default, all the degrees of freedom compatible with the symmetry group are relaxed in the cell.
+        You can constrain the cell to keep the same shape by setting fix_cell_shape = True.
+
         
         NOTE: 
             remember to setup the stress_offset variable of the SCHA_Minimizer,
@@ -355,6 +369,7 @@ class SSCHA(object):
             stress tensor difference between a single very high-cutoff calculation and a
             single low-cutoff (the one you use), this difference will be added at the final
             stress tensor to get a better estimation of the true stress.
+
         
         Parameters
         ----------
@@ -388,7 +403,8 @@ class SSCHA(object):
                 does not support it by default)
             cell_relax_algorithm : string
                 This identifies the stress algorithm. It can be both sd (steepest-descent),
-                cg (conjugate-gradient) or bfgs (Quasi-newton)
+                cg (conjugate-gradient) or bfgs (Quasi-newton).
+                The most robust one is SD. Do not change if you are not sure what you are doing.
             fix_volume : bool, optional
                 If true (default False) the volume is fixed, therefore only the cell shape is relaxed.
                 
@@ -430,18 +446,16 @@ class SSCHA(object):
         
         
 
-        if static_bulk_modulus == "recalc":
+        if static_bulk_modulus != "recalc":
             # Rescale the static bulk modulus in eV / A^3
             static_bulk_modulus /= sscha.SchaMinimizer.__evA3_to_GPa__ 
 
         # initilaize the cell minimizer
         #BFGS = sscha.Optimizer.BFGS_UC(self.minim.dyn.structure.unit_cell, static_bulk_modulus)
-        if kind_minimizer == "SD":
+        if kind_minimizer in ["SD", "CG"] :
             BFGS = sscha.Optimizer.UC_OPTIMIZER(self.minim.dyn.structure.unit_cell)
-            BFGS.alpha = 1 / (3 * static_bulk_modulus * np.linalg.det(self.minim.dyn.structure.unit_cell))
-        if kind_minimizer == "CG":
-            BFGS = sscha.Optimizer.CG_UC(self.minim.dyn.structure.unit_cell)
-            BFGS.alpha = 1 / (3 * static_bulk_modulus * np.linalg.det(self.minim.dyn.structure.unit_cell))
+            BFGS.alpha = 1 / (3 * static_bulk_modulus * self.minim.dyn.structure.get_volume())
+            BFGS.algorithm = kind_minimizer.lower()
         elif kind_minimizer == "PSD":
             BFGS = sscha.Optimizer.SD_PREC_UC(self.minim.dyn.structure.unit_cell, static_bulk_modulus)
         elif kind_minimizer == "BFGS":
@@ -450,8 +464,10 @@ class SSCHA(object):
         # Initialize the bulk modulus
         # The gradient (stress) is in eV/A^3, we have the cell in Angstrom so the Hessian must be
         # in eV / A^6
-
-        pop = start_pop
+        if start_pop is not None:
+            pop = start_pop
+        else:
+            pop = self.start_pop
                 
         running = True
         while running:
@@ -495,7 +511,7 @@ class SSCHA(object):
             Press = np.trace(stress_tensor) / 3
             
             # Get the volume
-            Vol = np.linalg.det(self.minim.dyn.structure.unit_cell)
+            Vol = self.minim.dyn.structure.get_volume()
             
             # Get the Helmoltz-Gibbs free energy
             helmoltz = self.minim.get_free_energy() * sscha.SchaMinimizer.__RyToev__
@@ -509,7 +525,11 @@ class SSCHA(object):
             if fix_volume:
                 mark_helmoltz = "<--"
             else:
-                mark_helmoltz = "<--"
+                mark_gibbs = "<--"
+
+            # Extract the bulk modulus from the cell minimization
+            new_bulkmodulus = 1 / (3 * BFGS.alpha * self.minim.dyn.structure.get_volume())
+            new_bulkmodulus *= sscha.SchaMinimizer.__evA3_to_GPa__ 
 
             # Print the enthalpic contribution
             message = """
@@ -521,9 +541,9 @@ class SSCHA(object):
 
  P V = {:.8e} eV
 
- Helmoltz Free energy = {:.8e} eV {}
- Gibbs Free energy = {:.8e} eV {}
- Zero energy = {:.8e} eV
+ Helmoltz Free energy = {:.10e} eV {}
+ Gibbs Free energy = {:.10e} eV {}
+ Zero energy = {:.10e} eV
 
  """.format(target_press , Vol,target_press_evA3 * Vol, helmoltz, mark_helmoltz, gibbs, mark_gibbs, self.minim.eq_energy)
             print(message)
@@ -549,7 +569,11 @@ class SSCHA(object):
             # print ""
         
             # Perform the cell step
-            cell_gradient = (stress_tensor - I *target_press_evA3)
+            if self.fix_cell_shape:
+                # Use a isotropic stress tensor to keep the same cell shape
+                cell_gradient = I * (Press - target_press_evA3)
+            else:
+                cell_gradient = (stress_tensor - I *target_press_evA3)
             
             new_uc = self.minim.dyn.structure.unit_cell.copy()
             BFGS.UpdateCell(new_uc,  cell_gradient, fix_volume)
@@ -557,7 +581,14 @@ class SSCHA(object):
             # Strain the structure and the q points preserving the symmetries
             self.minim.dyn.AdjustToNewCell(new_uc)
             #self.minim.dyn.structure.change_unit_cell(new_uc)
-            
+
+            message = """    
+ Currently estimated bulk modulus = {:8.3f} GPa
+ (Note: this is just indicative, do not use it for computing bulk modulus)
+ 
+ """.format(new_bulkmodulus)
+            print(message)
+
 
             print (" New unit cell:")
             print (" v1 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[0,0], new_uc[0,1], new_uc[0,2]))
@@ -566,6 +597,7 @@ class SSCHA(object):
             
             print ()
             print ("Check the symmetries in the new cell:")
+            sys.stdout.flush()
             qe_sym = CC.symmetries.QE_Symmetry(self.minim.dyn.structure)
             qe_sym.SetupQPoint(verbose = True)
             
@@ -600,6 +632,7 @@ class SSCHA(object):
             if pop > self.max_pop:
                 running = False
                 
+        self.start_pop = pop
         return (not running1) and (not running2)
 
 

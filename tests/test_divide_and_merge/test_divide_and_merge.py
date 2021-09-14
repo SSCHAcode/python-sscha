@@ -9,7 +9,7 @@ import sscha, sscha.Ensemble
 import sys, os
 
 ENS_DIR = "../../Examples/ensemble_data_test"
-N_RANDOM = 100
+N_RANDOM = 4
 T = 0
 __EPS__ = 1e-8
 
@@ -23,7 +23,7 @@ def test_divide_and_merge():
     
     # Load the original dynamical matrix
     dyn_start = CC.Phonons.Phonons(os.path.join(ENS_DIR, "dyn"))
-    dyn_end = CC.Phonons.Phonons(os.path.join(ENS_DIR, "dyn_population2_"))
+    dyn_end = CC.Phonons.Phonons(os.path.join(ENS_DIR, "dyn1_population2"), full_name = True)
 
     # Generate a random ensemble
     ens_original = sscha.Ensemble.Ensemble(dyn_start, T)
@@ -66,7 +66,8 @@ def test_divide_and_merge():
 
     # Merge them back
     ens_original.merge(new_ensemble)
-
+    
+    
     assert np.max(np.abs(ens_original.rho - all_rhos)) < __EPS__, "Error during merging the ensembles"
 
     # Test the merging when loading
@@ -80,8 +81,12 @@ def test_divide_and_merge():
     other2 = sscha.Ensemble.Ensemble(dyn_start, T)
     other2.load("data", population = 1, N = N_RANDOM // 2, load_noncomputed_ensemble = False)
 
+
     other2.merge(other_ensemble)
     other2.update_weights(dyn_end, T)
+    
+
+    assert np.max(np.abs(other2.xats - ens_original.xats)) < __EPS__, "Error during merging the ensembles in the structure."
 
     assert np.max(np.abs(other2.rho - all_rhos)) < __EPS__, "Error during merging the loaded ensemble"
 

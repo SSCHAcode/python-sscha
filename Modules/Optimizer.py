@@ -4,6 +4,10 @@ Here the optimizer for the cell and the gradient
 from __future__ import print_function
 import numpy as np
 import SCHAModules
+import sys, os
+
+
+from sscha.Parallel import pprint as print
 
 __EPSILON__ = 1e-8
 
@@ -28,7 +32,6 @@ class UC_OPTIMIZER:
     # If true the strain is resetted each step
     # It should regolarize the minimization. 
     # If false the minimization will not go too far from the initial cell
-    reset_strain = True
     
     def __init__(self, starting_unit_cell):
         """
@@ -41,9 +44,16 @@ class UC_OPTIMIZER:
         self.n_step = 0
         self.uc_0 = np.float64(starting_unit_cell.copy())
         self.uc_0_inv = np.linalg.inv(self.uc_0)
+        self.x_start = None
+        self.reset_strain = False
+
+        self.uc_old = None
+
+        # Allowed keys are sd or cg
+        self.algorithm = "sd" 
 
         # If true the line minimization is employed during the minimization
-        self.use_line_step = False
+        self.use_line_step = True
         
     def mat_to_line(self, matrix):
         """
@@ -76,43 +86,158 @@ class UC_OPTIMIZER:
         This function is in common for all the minimizer
         it implements the line minimization.
         """
+        good_step = True
         
         if self.n_step == 0:
             self.alpha0 = self.alpha
         
-        if self.n_step != 0:
+        if self.n_step != 0 and np.max(np.abs(self.last_direction)) > 1e-10:
             y0 = self.last_direction.dot(self.last_grad)
             y1 =  self.last_direction.dot(grad)
+
+            print("[CELL] y0 = {} | y1 = {}".format(y0, y1))
+            print("[CELL] grad = {}".format(grad))
+            print("[CELL] lastgrad = {}".format(self.last_grad))
+            sys.stdout.flush()
             factor = y0 / (y0 - y1)
+
+
+            sys.stdout.flush()
+
+            print("[CELL]  GRADIENT DOT DIRECTION = {}".format(factor))
             
+            sys.stdout.flush()
             # Regularization (avoid run away)
-            factor = 1 + np.tanh( (factor - 1) )
-            if factor < self.min_alpha_factor:
+            if factor > 2:
+                factor = 2
+                #good_step = False
+            elif factor < 0 and y1 > 0:
+                factor = 1.15
+                # The minimization seem to have a negative curvature, continue with constant step
+                print("[CELL] Warning: the cell minimization have a negative curvature.")
+                print("                I do not know how to improve the minimization step.")
+                print("                incrementing by a 15 %")
+                
+            elif factor < self.min_alpha_factor:
                 factor = self.min_alpha_factor
+                good_step = False
+
+            if np.isnan(factor):
+                factor = self.min_alpha_factor
+                good_step = False
+                
             self.alpha *= factor
+        
             
-            if self.alpha < self.min_alpha_step * self.alpha0:
-                self.alpha = self.min_alpha_step * self.alpha0
+            #if self.alpha < self.min_alpha_step * self.alpha0:
+            #    self.alpha = self.min_alpha_step * self.alpha0
             #self.alpha *= factor
+            
+        return good_step
+
+    def reset(self, unit_cell):
+        """
+        Reset the optimizer with the given unit cell
+        (Usefull to reduce the numerical noise)
+        """
+
+        print("[CELL] resetting... (automatically diminish the alpha) ")
+
+        self.last_grad = np.zeros(9, dtype = np.double)
+        self.last_direction = np.zeros(9, dtype = np.double)
+        
+        self.uc_0 = np.float64(unit_cell.copy())
+        self.uc_0_inv = np.linalg.inv(self.uc_0)
+        self.uc_old = self.uc_0.copy()
+        self.x_start = np.zeros(9, dtype = np.double)
+        self.reset_strain = False
+
+        self.alpha /= 2
+
+    def check_reset(self, good_cell, thr = 10):
+        """
+        If the given good cell is much different from the original unit cell,
+        reset the calculation.
+        """
+
+        if np.sqrt(np.sum( (self.uc_0 - good_cell)**2)) > thr:
+            self.reset(good_cell)
+
+        
 
     def perform_step(self, x_old, grad):
         """
         The step, hierarchical structure.
         Here a standard steepest descent
         """
+        print()
+        if self.x_start is None:
+            self.x_start = x_old.copy()
 
+        new_step = True
         if self.use_line_step:
-            self.get_line_step(grad)
+            new_step = self.get_line_step(grad)
 
-        self.last_direction = grad
-        self.last_grad = grad
 
-        x_new = x_old - grad * self.alpha
+        if new_step:
+            direction = self.get_new_direction(grad)
+            x_new = x_old - direction * self.alpha
+            self.x_start = x_old.copy()
+            self.reset_strain = True
+            print("[CELL] New step:")
+            print("[CELL]    X_OLD = {}   | ALPHA = {}".format(x_old, self.alpha))
+            print("[CELL]    DIRECTION = {}".format(direction))
+        else:
+            # Go back using the last direction selecting a smaller step
+            x_new = self.x_start - self.last_direction * self.alpha
+            print("[CELL] Step not good:")
+            print("[CELL]    X_START = {}  | ALPHA = {}".format(self.x_start, self.alpha))
+            print("[CELL]    DIRECTION = {}".format(self.last_direction))
+            self.reset_strain = False
+
         self.n_step += 1
+        print("[CELL]    GRADIENT = {}".format(grad))
+        print("[CELL]    X_NEW = {}".format(x_new))
+        print("[CELL]  Step number = {}".format(self.n_step))
+        print()
+
+        sys.stdout.flush()
         return x_new
 
+    def get_new_direction(self, grad):
+        # Steepest descent
+        if self.algorithm == "sd":
+            direction = grad
+            self.last_direction = direction.copy()
+            self.last_grad = grad.copy()
+        elif self.algorithm == "cg":
+            if np.max(np.abs(self.last_direction)) < 1e-10:
+                # First step
+                direction = grad
+                self.last_direction = direction.copy()
+                self.last_grad = grad.copy()
+            else:
+                gamma = np.dot(grad - self.last_grad, grad)
+                gamma /= self.last_grad.dot(self.last_grad)
+
+                direction = grad + gamma * self.last_direction
+                if direction.dot(grad) < 0:
+                    direction = grad
+                    self.last_direction = grad.copy()
+                    self.last_grad = grad.copy()
+                    print("[CELL] Reset CG algorithm to SD")
+                else:
+                    self.last_direction = direction.copy()
+                    self.last_grad = grad.copy()
+        else:
+            raise NotImplementedError("Error, cell algorithm setted to {}, but only 'sd' and 'cg' supported.".format(self.algorithm))
+                    
             
-    def UpdateCell(self, unit_cell, stress_tensor, fix_volume = False, verbose = False):
+
+        return direction
+
+            
+    def UpdateCell(self, unit_cell, stress_tensor, fix_volume = False, verbose = True):
         """
         PERFORM THE CELL UPDATE
         =======================
@@ -135,32 +260,40 @@ class UC_OPTIMIZER:
         
         # Convert the stress tensor into the Free energy gradient with respect
         # to the unit cell
-        volume = np.linalg.det(unit_cell)
+        volume = np.abs(np.linalg.det(unit_cell))
         #uc_inv = np.linalg.inv(unit_cell)
         I = np.eye(3, dtype = np.float64)
+
+        uc_old = unit_cell.copy()
+        if self.uc_old is None:
+            self.uc_old = uc_old
+            
+
         
-        
-        # If the strain is resetted, set the initial cell as this one
-        if self.reset_strain:
-            self.uc_0 = unit_cell.copy()
-            self.uc_0_inv = np.linalg.inv(self.uc_0)
         
         # Get the strain tensor up to know
         strain = np.transpose(self.uc_0_inv.dot(unit_cell) - I)
         
+        # Get the gradient with respect to the strain        
+        #grad_mat =  - volume * stress_tensor.dot(np.linalg.inv(I + strain.transpose()))
+        new_stress = stress_tensor.copy()
+
+        if fix_volume:
+            new_stress -= I * np.trace(new_stress) / np.float64(3)
+
         if verbose:
-            print ("ALPHA:", self.alpha)
-            print ("VOLUME:", volume)
-            
-            print ("CURRENT STRAIN:")
+            print ("[CELL] VOLUME:", volume)
+            print ("[CELL] unit_cell:")
+            print(unit_cell)
+            print ("[CELL] CURRENT STRAIN:")
             print (strain)
+            print("[CELL] NEW STRESS:")
+            print(new_stress)
         
-        # Get the gradient with respect to the strain
-        grad_mat =  - volume * stress_tensor.dot(np.linalg.inv(I + strain.transpose()))
+
+        grad_mat =  - volume * new_stress.dot(I + strain)
         
         # Modify the gradient if you need to fix the volume, in order to cancel the mean strain
-        if fix_volume:
-            grad_mat -= I * np.trace(grad_mat) / np.float64(3)
         
         #grad_mat = - volume * np.transpose(uc_inv).dot(stress_tensor)
 
@@ -175,7 +308,7 @@ class UC_OPTIMIZER:
         x_new = self.perform_step(x_old, grad)
         
         strain_new  = self.line_to_mat(x_new)
-        
+
         if verbose:
             print ("NEW STRAIN:")
             print (strain_new)
@@ -188,6 +321,14 @@ class UC_OPTIMIZER:
         
         if verbose:
             print ("NEW VOLUME:", np.linalg.det(unit_cell))
+        
+
+
+        # If the last step was good, check if the cell needs to be resetted.
+        if self.reset_strain:
+            self.check_reset(uc_old)
+            self.reset_strain = False
+        
             
 
 class BFGS_UC(UC_OPTIMIZER):

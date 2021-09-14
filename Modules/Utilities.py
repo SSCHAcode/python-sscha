@@ -12,6 +12,9 @@ import cellconstructor as CC
 import cellconstructor.Phonons
 import numpy as np
 
+from sscha.Parallel import pprint as print
+import sscha.Parallel
+
 import pickle
 
 __UTILS_NAMESPACE__ = "utils"
@@ -255,20 +258,42 @@ class ModeProjection:
 
 
         self.testing = False
+        self.constrain = False
+        self.select_q_points = None
 
         self.initialized = False
 
-    def SetupFreeModes(self, index_mode_start, index_mode_end):
+
+    def SetupFreeModes(self, index_mode_start, index_mode_end, select_q_points = None, constrain = False):
         """
-        SETUP FREE MODES
-        ================
+        SETUP FREE (or constrained) MODES
+        =================================
 
         Constrain the minimization only in the modes between index_modes_start and
-        index_mdoe_end in all the q points.
+        index_mdoe_end in all the q points. Also the opposite is possible, 
+        by setting the constrain flag to True.
 
         For each q points only modes between these indices will be minimized.
+        The select_q_points options allows to select only some q points to be constrained.
+
+
+        Parameters
+        ----------
+            index_mode_start : int
+                The index of the first mode
+            index_mode_end : int
+                The index of the last mode
+            select_q_points : list of int
+                The index of the q points affected. 
+                If None (default) all q points are affected.
+            constrain : bool
+                If True, the specified range of modes is constrained while all the other are free.
+
+
         """
         self.initialized = True
+        self.constrain = constrain
+        self.select_q_points = select_q_points
 
         self.mu_start = index_mode_start 
         self.mu_end = index_mode_end
@@ -279,6 +304,10 @@ class ModeProjection:
         
         # Setup the projector on the dynamical matrix
         for iq in range(self.nq):
+            if select_q_points is not None:
+                # Skip the q points not in select_q_points
+                if not iq in select_q_points:
+                    continue
             for mu in range(index_mode_start, index_mode_end):
                 pvec = self.pols[:, mu, iq].copy()
                 
@@ -289,8 +318,14 @@ class ModeProjection:
         # Prepare the projector on the structure
         for mu in range(index_mode_start, index_mode_end):
             pvec = np.real(self.pols[:, mu, 0])
-            #pvec /= pvec.dot(pvec)
-            self.proj_vec[:,:] += np.outer(pvec, pvec)
+            pvec /= np.sqrt(pvec.dot(pvec))
+            self.proj_vec[:,:] += np.outer(pvec / _msq_, pvec * _msq_)
+        
+        # If the constrain is chosen, reverse the projectors
+        if constrain:
+            self.proj_vec = np.eye(self.nmodes) - self.proj_vec
+            self.projector = np.eye(self.nmodes) - self.projector
+            self.projectorH = np.eye(self.nmodes) - self.projectorH
                 
 
         # Impose the sum rule 
@@ -313,12 +348,16 @@ class ModeProjection:
 
         # Project the structure in the polarization vectors
         struct_grad_new = self.proj_vec.dot(struct_grad.ravel())
-        struct_grad = struct_grad_new.reshape((self.nat, 3))
+        struct_grad[:,:] = struct_grad_new.reshape((self.nat, 3))
 
         _m_ = np.tile(self.masses, (3, 1)).T.ravel()
 
         # Do the same for the matrix
         for iq in range(self.nq):
+            # Skip the q points not in the list
+            if self.select_q_points is not None:
+                if not iq in self.select_q_points:
+                    continue
 
             # remove the masses from the gradient
             grad_nomass = dyn_grad[iq, :, :] / np.sqrt( np.outer(_m_, _m_))
@@ -330,6 +369,11 @@ class ModeProjection:
             projected_grad = np.zeros(grad_polbasis.shape, dtype = np.complex128)
             #print("MU START:", self.mu_start, "MU END:", self.mu_end)
             projected_grad[self.mu_start:self.mu_end, self.mu_start:self.mu_end] = grad_polbasis[self.mu_start:self.mu_end, self.mu_start:self.mu_end] 
+
+            # Reverse the projection if needed
+            if self.constrain:
+                projected_grad[:,:] = grad_polbasis[:,:] - projected_grad[:,:]
+
 
             # Go back in cartesian coordinates
             projected_grad_cart = self.pols[:,:, iq].dot(projected_grad.dot(np.conj(self.pols[:,:,iq]).T))
@@ -455,6 +499,10 @@ class IOInfo:
                 If given, the file will be saved in the specified location.
                 Otherwise the default one is used (must be initialized by SetupSaving)
         """
+
+        if not sscha.Parallel.am_i_the_master():
+            return
+
         if fname is None:
             if self.__save_fname is None:
                 raise IOError("Error, a filename must be specified to save the frequencies.")
@@ -473,6 +521,10 @@ class IOInfo:
         
         It can be passed as custom_function_post to the run method of the SchaMinimizer.
         """
+
+
+        if not sscha.Parallel.am_i_the_master():
+            return
         
         # Get the weights if required
         if self.save_weights:
@@ -550,6 +602,10 @@ def save_binary(object, filename):
             The filename on which you want to save the binary data.
     """
 
+
+    if not sscha.Parallel.am_i_the_master():
+        return
+    
     pickle.dump(object, open(filename, "wb"))
 
 

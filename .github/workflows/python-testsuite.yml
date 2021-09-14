@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [2.7, 3.8]
+        python-version: [3.8]
 
     steps:
     - uses: actions/checkout@v2
@@ -40,7 +40,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install git gfortran libblas-dev liblapack-dev
         git clone https://github.com/mesonepigreco/CellConstructor.git
-        cd cellconstructor
+        cd CellConstructor
         python setup.py install --user
         cd ..
         
