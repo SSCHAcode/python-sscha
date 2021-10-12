@@ -181,7 +181,7 @@ class SSCHA_Minimizer(object):
         self.fake_precond = False
         
         # The stopping criteria on which gradient is evaluated
-        self.gradi_op = "gc"
+        self.gradi_op = "all"
         
         # Define the stress offset
         self.stress_offset = np.zeros((3,3), dtype = np.float64, order = "F")
