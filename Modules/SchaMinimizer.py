@@ -1037,6 +1037,9 @@ WARNING, the preconditioning is activated together with a root representation.
         #       code when running the minimization. This allows for interactive plots
         running = True
 
+        if not self.minim_struct:
+            self.gradi_op = "gc"
+
         # Prepare the minimizer
         self.minimizer = sscha.Minimizer.Minimizer(self.minim_struct, fixed_step= self.fixed_step, root_representation = self.root_representation, verbose = verbose >= 1)
         self.minimizer.init(self.dyn, self.ensemble.get_effective_sample_size() / self.ensemble.N)
