@@ -183,7 +183,7 @@ class SSCHA_Minimizer(object):
         self.fake_precond = False
         
         # The stopping criteria on which gradient is evaluated
-        self.gradi_op = "gc"
+        self.gradi_op = "all"
         
         # Define the stress offset
         self.stress_offset = np.zeros((3,3), dtype = np.float64, order = "F")
@@ -1066,6 +1066,9 @@ WARNING, the preconditioning is activated together with a root representation.
         # TODO: Activate a new pipe to avoid to stop the execution of the python 
         #       code when running the minimization. This allows for interactive plots
         running = True
+
+        if not self.minim_struct:
+            self.gradi_op = "gc"
 
         # Prepare the minimizer
         self.minimizer = sscha.Minimizer.Minimizer(self.minim_struct, fixed_step= self.fixed_step, root_representation = self.root_representation, verbose = verbose >= 1)
