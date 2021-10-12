@@ -172,6 +172,9 @@ class Ensemble:
         self.force_computed = None 
         self.stress_computed = None
 
+        # Get the extra quantities
+        self.extra_quantities = {}
+
     def convert_units(self, new_units):
         """
         CONVERT ALL THE VARIABLE IN A COHERENT UNIT OF MEASUREMENTS

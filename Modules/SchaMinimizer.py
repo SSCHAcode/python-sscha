@@ -98,6 +98,7 @@ __SCHA_MANDATORY_KEYS__ = [__SCHA_FILDYN__, __SCHA_NQIRR__, __SCHA_NQIRR__,
                            __SCHA_T__]
 
 __MAX_DIAG_ERROR_COUNTER__ = 5
+__MAX_IMAG_ERROR_COUNTER__ = 50
 
 class SSCHA_Minimizer(object):
     
@@ -161,6 +162,7 @@ class SSCHA_Minimizer(object):
         self.minimizer = None# 
 
         self.max_diag_error_counter = __MAX_DIAG_ERROR_COUNTER__
+        self.max_imag_freq_counter = __MAX_IMAG_ERROR_COUNTER__
 
         # Projection. This is chosen to fix some constraint on the minimization
         self.projector_dyn = None
@@ -263,6 +265,17 @@ class SSCHA_Minimizer(object):
                 raise ValueError("Error, the step attribute {} must be positive ({} given)".format(name, value))
         
         
+    def set_minimization_step(self, step):
+        """
+        Set an uniform minimization step for both the dynamical matrix and the structure minimization.
+
+        Try to always use this function unless you specifically want two difference speed between the structure and the dynamical matrix minimization.
+        """
+
+        self.min_step_dyn = step
+        self.min_step_struc = step
+
+
     def set_ensemble(self, ensemble):
         """Provide an ensemble to the minimizer object"""
 
@@ -445,6 +458,7 @@ class SSCHA_Minimizer(object):
         # Here a cycle to avoid diagonalization issues
         is_diag_ok = False
         diag_error_counter = 0
+        imag_freq_counter = 0
         while not is_diag_ok:
             is_diag_ok = True
             self.minimizer.update_dyn(new_kl_ratio, dyn_grad, struct_grad)
@@ -476,7 +490,7 @@ class SSCHA_Minimizer(object):
                 print("Immaginary frequencies found! Redoing the step.")
                 new_kl_ratio = 0
                 is_diag_ok = False
-                diag_error_counter += 1            
+                imag_freq_counter += 1            
             else:
                 # Update the ensemble
                 try:
@@ -491,14 +505,30 @@ class SSCHA_Minimizer(object):
             
             if diag_error_counter >= self.max_diag_error_counter:
                 ERROR_MSG = """
-Error, exceeded the maximum number of diagonalization error. (or imaginary steps)
+Error, exceeded the maximum number of diagonalization error. 
 
        you can get rid of this error by increasing max_diag_error_counter variable.
 
-       Something is very wrong with the dynamical matrix.
+       Something is very wrong with the dynamical matrix.self.minimizer
        I'm saving the dynamical matrix as error_dyn, 
        if you want to check it or restart the calculation from there.
 """
+                print(ERROR_MSG)
+                sys.stdout.flush()
+                self.dyn.save_qe("error_dyn")
+                raise ValueError(ERROR_MSG)
+            elif imag_freq_counter >= self.max_imag_freq_counter:
+                ERROR_MSG = """
+Error, exceeded the maximum number of step with an imaginary frequency ({}).
+       it is possible that something wrong is happening with the original dynamical matrix.
+       This error may be caused by a wrong imposition of acoustic sum rule or
+       the presence of 0 frequency modes.
+
+       Final dynamical matrix saved into error_dyn.
+       
+       If you believe this is not a problem, you can try to increase max_imag_freq_counter
+       from the '{}' object or reduce the 'min_step_dyn'
+""".format(self.max_imag_freq_counter, self.__class__.__name__) 
                 print(ERROR_MSG)
                 sys.stdout.flush()
                 self.dyn.save_qe("error_dyn")

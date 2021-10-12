@@ -450,7 +450,10 @@ class IOInfo:
 
         self.total_freqs = []
         self.__save_fname = None
+        self.__save_atoms_fname = None
+        self.save_atomic_positions = False
         self.__save_each_step = False
+        self.current_struct = None
 
     def Reset(self):
         """
@@ -472,6 +475,16 @@ class IOInfo:
         self.weights_file = fname
         self.save_weights = True
         self.__save_each_step = save_each_step
+
+    def SetupAtomicPositions(self, fname, save_each_step = True):
+        """
+        Setup the saving of the data on atomic position along with the minimization
+        """
+
+        self.__save_atoms_fname = fname
+        self.save_atomic_positions = True 
+        self.__save_each_step = save_each_step
+
 
     def SetupSaving(self, fname, save_each_step = True):
         """
@@ -513,6 +526,12 @@ class IOInfo:
             
         if self.save_weights:
             np.savetxt(self.weights_file, np.transpose(self.weights), header = "Each row is a step containing all the weights of the configurations")
+
+        if self.save_atomic_positions:
+            text = self.current_struct.save_scf(filename = None, get_text = True)
+            with open(self.__save_atoms_fname, "a") as fp:
+                fp.write(text)
+            
             
         
     def CFP_SaveAll(self, minim):
@@ -532,6 +551,9 @@ class IOInfo:
             
         if self.save_dynmats:
             minim.dyn.save_qe(self.save_dyn_prefix + "_ka%05d_" % self.ka)
+        
+        if self.save_atomic_positions:
+            self.current_struct = minim.dyn.structure.copy()
             
         # This perform also the saving
         self.CFP_SaveFrequencies(minim)
