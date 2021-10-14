@@ -128,6 +128,9 @@ class Ensemble:
         
         self.sscha_energies = []
         self.sscha_forces = []
+
+        # If True the frequency smaller than CC.Phonons.__EPSILON_W__ are ignored
+        self.ignore_small_w = False
         
         # The original dynamical matrix used to generate the ensemble
         self.dyn_0 = dyn0.Copy()
@@ -924,7 +927,7 @@ Error, the following stress files are missing from the ensemble:
 
         structures = []
         if evenodd:
-            structs = self.dyn_0.ExtractRandomStructures(N // 2, self.T0, project_on_vectors = project_on_modes)
+            structs = self.dyn_0.ExtractRandomStructures(N // 2, self.T0, project_on_vectors = project_on_modes, lock_low_w = self.ignore_small_w)
 
 
 
@@ -935,7 +938,7 @@ Error, the following stress files are missing from the ensemble:
                 new_s.coords = super_struct.coords - new_s.get_displacement(super_struct)
                 structures.append(new_s)
         else:
-            structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes)
+            structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes, lock_low_w = self.ignore_small_w)
 
 
         # Enforce all the processors to share the same structures
@@ -1178,7 +1181,11 @@ Error, the following stress files are missing from the ensemble:
         w, pols = self.dyn_0.DiagonalizeSupercell()#super_dyn.DyagDinQ(0)
         
         # Exclude translations
-        trans_original = CC.Methods.get_translations(pols, super_struct0.get_masses_array()) 
+        if not self.ignore_small_w:
+            trans_original = CC.Methods.get_translations(pols, super_struct0.get_masses_array()) 
+        else:
+            trans_original = np.abs(w) < CC.Phonons.__EPSILON_W__
+
         w = w[~trans_original]
 
         # Convert from Ry to Ha and in fortran double precision
@@ -1193,10 +1200,19 @@ Error, the following stress files are missing from the ensemble:
         
         w, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
 
-        trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array()) 
+        if not self.ignore_small_w:
+            trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
+        else:
+            trans_mask = np.abs(w) < CC.Phonons.__EPSILON_W__
+
 
         # Check if the new dynamical matrix satisfies the sum rule
-        if (np.sum(trans_mask.astype(int)) != 3) or (np.sum(trans_original.astype(int)) != 3):
+        violating_sum_rule = (np.sum(trans_mask.astype(int)) != 3) or (np.sum(trans_original.astype(int)) != 3)
+        if self.ignore_small_w:
+            violating_sum_rule = np.sum(trans_mask.astype(int)) != np.sum(trans_original.astype(int))
+
+
+        if violating_sum_rule:
             ERR_MSG = """
 ERROR WHILE UPDATING THE WEIGHTS
     
@@ -2821,6 +2837,7 @@ DETAILS OF ERROR:
         ens.energies[:] = self.energies[split_mask]
         ens.forces[:, :, :] = self.forces[split_mask, :, :]
         ens.has_stress = self.has_stress
+        ens.ignore_small_w = self.ignore_small_w
         if self.has_stress:
             ens.stresses[:, :, :] = self.stresses[split_mask, :, :]
 

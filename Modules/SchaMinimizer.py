@@ -1279,7 +1279,10 @@ WARNING, the preconditioning is activated together with a root representation.
         ss = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
 
         # Get translations
-        trans_mask = ~CC.Methods.get_translations(pols, ss.get_masses_array())
+        if not self.ensemble.ignore_small_w:
+            trans_mask = ~CC.Methods.get_translations(pols, ss.get_masses_array())
+        else:
+            trans_mask = np.abs(w) > CC.Phonons.__EPSILON_W__
 
         current_n_trans = np.sum((~trans_mask).astype(int))
 
