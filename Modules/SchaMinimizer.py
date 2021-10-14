@@ -410,7 +410,7 @@ class SSCHA_Minimizer(object):
             
             # Preconditionate the gradient for the wyckoff minimization
             if self.precond_wyck:
-                struct_precond = GetStructPrecond(self.ensemble.current_dyn)
+                struct_precond = GetStructPrecond(self.ensemble.current_dyn, ignore_small_w = self.ensemble.ignore_small_w)
                 struct_grad_precond = struct_precond.dot(struct_grad_reshaped)
                 struct_grad = struct_grad_precond.reshape( (self.dyn.structure.N_atoms, 3))
             
@@ -1298,7 +1298,10 @@ WARNING, the preconditioning is activated together with a root representation.
 
             ss0 = self.ensemble.dyn_0.structure.generate_supercell(self.dyn.GetSupercell())
             
-            trans_mask = ~CC.Methods.get_translations(pold, ss0.get_masses_array())
+            if not self.ensemble.ignore_small_w:
+                trans_mask = ~CC.Methods.get_translations(pold, ss0.get_masses_array())
+            else:
+                trans_mask = np.abs(wold) > CC.Phonons.__EPSILON_W__
 
             old_n_trans = np.sum((~trans_mask).astype(int))
 
@@ -1781,7 +1784,7 @@ def ApplyFCPrecond(current_dyn, matrix, T = 0):
     
 
 
-def GetStructPrecond(current_dyn):
+def GetStructPrecond(current_dyn, ignore_small_w = False):
     r"""
     GET THE PRECONDITIONER FOR THE STRUCTURE MINIMIZATION
     =====================================================
@@ -1824,7 +1827,10 @@ def GetStructPrecond(current_dyn):
     _msi_ = 1 / np.sqrt(_m_)
     
     # Select translations
-    not_trans = ~CC.Methods.get_translations(pols, mass)
+    if not ignore_small_w:
+        not_trans = ~CC.Methods.get_translations(pols, mass)
+    else:
+        not_trans = np.abs(w) > CC.Phonons.__EPSILON_W__
     
     # Delete the translations from the dynamical matrix
     w = w[not_trans]

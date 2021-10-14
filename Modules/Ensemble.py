@@ -1706,7 +1706,12 @@ DETAILS OF ERROR:
         
         # Dyagonalize
         w, pols = supercell_dyn.DyagDinQ(0)
-        trans = CC.Methods.get_translations(pols, supercell_dyn.structure.get_masses_array())
+
+        if not self.ignore_small_w:
+            trans = CC.Methods.get_translations(pols, supercell_dyn.structure.get_masses_array())
+        else:
+            trans = np.abs(w) < CC.Phonons.__EPSILON_W__
+
         ityp = supercell_dyn.structure.get_ityp() + 1 # Py to fortran convertion
         mass = np.array(list(supercell_dyn.structure.masses.values()))
         
@@ -1893,7 +1898,12 @@ DETAILS OF ERROR:
         # Get frequencies and polarization vectors
         super_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
         wr, pols = super_dyn.DyagDinQ(0)
-        trans = ~ CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())
+
+        if not self.ignore_small_w:
+            trans = ~ CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())
+        else:
+            trans = np.abs(wr) > CC.Phonons.__EPSILON_W__
+
         wr = np.real( wr[trans])
         pols = np.real( pols[:, trans])
         
@@ -2606,7 +2616,10 @@ DETAILS OF ERROR:
         
 
         # Get the translational modes
-        trans = CC.Methods.get_translations(pols, dyn_supercell.structure.get_masses_array())
+        if not self.ignore_small_w:
+            trans = CC.Methods.get_translations(pols, dyn_supercell.structure.get_masses_array())
+        else:
+            trans = np.abs(w) < CC.Phonons.__EPSILON_W__
 
 
         # Get the atomic types
