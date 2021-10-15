@@ -3052,7 +3052,8 @@ DETAILS OF ERROR:
                     count_fails += 1
                     if count_fails >= 5:
                         run = False
-                        sys.stderr.write("Error in the ASE calculator for more than 5 times\n")
+                        struct.save_scf("error_struct.scf")
+                        sys.stderr.write("Error in the ASE calculator for more than 5 times\n     while computing 'error_struct.scf'")
                         raise
             
 
