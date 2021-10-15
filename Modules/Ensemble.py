@@ -3034,6 +3034,18 @@ DETAILS OF ERROR:
             while run:
                 try:
                     energy = atms.get_total_energy() / Rydberg # eV => Ry
+                    # Get energy, forces (and stress)
+                    energy = atms.get_total_energy() / Rydberg # eV => Ry
+                    forces_ = atms.get_forces() / Rydberg # eV / A => Ry / A
+                    if compute_stress:
+                        if not stress_numerical:
+                            stress[9*i0 : 9*i0 + 9] = -atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
+                        else:
+                            stress[9*i0 : 9*i0 + 9] = -ase_calculator.calculate_numerical_stress(atms, voigt = False).ravel()* Bohr**3 / Rydberg 
+                            
+                    # Copy into the ensemble array
+                    energies[i0] = energy
+                    forces[nat3*i0 : nat3*i0 + nat3] = forces_.reshape( nat3 )
                     run = False
                 except:
                     print ("Rerun the job %d" % i)
@@ -3043,18 +3055,6 @@ DETAILS OF ERROR:
                         sys.stderr.write("Error in the ASE calculator for more than 5 times\n")
                         raise
             
-            # Get energy, forces (and stress)
-            energy = atms.get_total_energy() / Rydberg # eV => Ry
-            forces_ = atms.get_forces() / Rydberg # eV / A => Ry / A
-            if compute_stress:
-                if not stress_numerical:
-                    stress[9*i0 : 9*i0 + 9] = -atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
-                else:
-                    stress[9*i0 : 9*i0 + 9] = -ase_calculator.calculate_numerical_stress(atms, voigt = False).ravel()* Bohr**3 / Rydberg 
-            
-            # Copy into the ensemble array
-            energies[i0] = energy
-            forces[nat3*i0 : nat3*i0 + nat3] = forces_.reshape( nat3 )
 
 
             i0 += 1
