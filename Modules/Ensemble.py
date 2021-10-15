@@ -3025,7 +3025,7 @@ DETAILS OF ERROR:
 
             # Print the status
             if Parallel.am_i_the_master() and verbose:
-                print ("Computing configuration %d out of %d" % (i+1, stop))
+                print ("Computing configuration %d out of %d (nat = %d)" % (i+1, stop, struct.N_atoms))
                 sys.stdout.flush()
             
             # Avoid for errors
