@@ -1184,7 +1184,7 @@ Error, the following stress files are missing from the ensemble:
         if not self.ignore_small_w:
             trans_original = CC.Methods.get_translations(pols_original, super_struct0.get_masses_array()) 
         else:
-            trans_original = np.abs(w) < CC.Phonons.__EPSILON_W__
+            trans_original = np.abs(w_original) < CC.Phonons.__EPSILON_W__
 
         w = w_original[~trans_original]
 
