@@ -1178,15 +1178,15 @@ Error, the following stress files are missing from the ensemble:
         super_struct0 = self.dyn_0.structure.generate_supercell(self.supercell)
         #super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
 
-        w, pols = self.dyn_0.DiagonalizeSupercell()#super_dyn.DyagDinQ(0)
+        w_original, pols_original = self.dyn_0.DiagonalizeSupercell()#super_dyn.DyagDinQ(0)
         
         # Exclude translations
         if not self.ignore_small_w:
-            trans_original = CC.Methods.get_translations(pols, super_struct0.get_masses_array()) 
+            trans_original = CC.Methods.get_translations(pols_original, super_struct0.get_masses_array()) 
         else:
             trans_original = np.abs(w) < CC.Phonons.__EPSILON_W__
 
-        w = w[~trans_original]
+        w = w_original[~trans_original]
 
         # Convert from Ry to Ha and in fortran double precision
         w = np.array(w/2, dtype = np.float64)
@@ -1198,12 +1198,12 @@ Error, the following stress files are missing from the ensemble:
         super_structure = new_dynamical_matrix.structure.generate_supercell(self.supercell)
         #new_super_dyn = new_dynamical_matrix.GenerateSupercellDyn(self.supercell)
         
-        w, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
+        w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
 
         if not self.ignore_small_w:
             trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
         else:
-            trans_mask = np.abs(w) < CC.Phonons.__EPSILON_W__
+            trans_mask = np.abs(w_new) < CC.Phonons.__EPSILON_W__
 
 
         # Check if the new dynamical matrix satisfies the sum rule
@@ -1230,7 +1230,7 @@ DETAILS OF ERROR:
             print(ERR_MSG)
             raise ValueError(ERR_MSG)
 
-        w = w[~trans_mask]
+        w= w_new[~trans_mask]
         w = np.array(w/2, dtype = np.float64)
         new_a = SCHAModules.thermodynamic.w_to_a(w, newT)
         
@@ -1249,7 +1249,7 @@ DETAILS OF ERROR:
         #     old_disps[i,:] = (self.xats[i, :, :] - super_dyn.structure.coords).reshape( 3*Nat_sc )
             
         #     # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
-        self.sscha_energies[:], self.sscha_forces[:,:,:] = new_dynamical_matrix.get_energy_forces(None, displacement = self.u_disps)
+        self.sscha_energies[:], self.sscha_forces[:,:,:] = new_dynamical_matrix.get_energy_forces(None, displacement = self.u_disps, w_pols = (w_new, pols))
 
         t4 = time.time()
 
@@ -1271,8 +1271,8 @@ DETAILS OF ERROR:
         
         
         # Get the covariance matrices of the ensemble
-        ups_new = np.real(new_dynamical_matrix.GetUpsilonMatrix(self.current_T))
-        ups_old = np.real(self.dyn_0.GetUpsilonMatrix(self.T0))
+        ups_new = np.real(new_dynamical_matrix.GetUpsilonMatrix(self.current_T, w_pols = (w_new, pols)))
+        ups_old = np.real(self.dyn_0.GetUpsilonMatrix(self.T0, w_pols = (w_original, pols_original)))
 
         # Get the normalization ratio
         #norm = np.sqrt(np.abs(np.linalg.det(ups_new) / np.linalg.det(ups_old))) 
@@ -1755,11 +1755,22 @@ DETAILS OF ERROR:
         if verbose:
             print (" [GRADIENT] Time to call the fortran code:", t2 - t1, "s")
     
-        # Perform the fourier transform
-        q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
-                                                   self.current_dyn.structure, supercell_dyn.structure)
-        q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
-                                                       self.current_dyn.structure, supercell_dyn.structure)
+        # If we are at gamma, we can skip this part
+        # Which makes the code faster
+        if np.prod(self.dyn_0.GetSupercell()) > 1:
+
+            # Perform the fourier transform
+            q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+                                                    self.current_dyn.structure, supercell_dyn.structure)
+            q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, supercell_dyn.structure)
+        else:
+            nat3, _ = grad.shape
+            q_grad = np.zeros( (1, nat3, nat3), dtype = np.double)
+            q_grad_err = np.zeros_like(q_grad)
+            q_grad[0, :, :] = grad 
+            q_grad_err[0, :, :] = grad_err
+
         t1 = time.time()
         if verbose:
             print (" [GRADIENT] Time to get back in fourier space:", t1 - t2, "s")
