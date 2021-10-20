@@ -104,7 +104,7 @@ class SSCHA_Minimizer(object):
     
     def __init__(self, ensemble = None, root_representation = "normal",
                  kong_liu_ratio = 0.5, meaningful_factor = 1,
-                 minimization_algorithm = "sdes", lambda_a = 1):
+                 minimization_algorithm = "sdes", lambda_a = 1, **kwargs):
         """
         This class create a minimizer to perform the sscha minimization.
         It performs the sscha minimization.
@@ -134,6 +134,7 @@ class SSCHA_Minimizer(object):
                 NOTE: Only sdes is currently implemented.
             lambda_a : float
                 The force constant minimization step.
+            **kwargs : any other attribute of this class
         """
         
         self.ensemble = ensemble
@@ -235,6 +236,10 @@ class SSCHA_Minimizer(object):
         # Setup the attribute control
         self.__total_attributes__ = [item for item in self.__dict__.keys()]
         self.fixed_attributes = True # This must be the last attribute to be setted
+
+        # Setup any other keyword given in input (raising the error if not already defined)
+        for key in kwargs:
+            self.__setattr__(key, kwargs[key])
 
 
     def __setattr__(self, name, value):

@@ -34,6 +34,7 @@ import cellconstructor.Settings
 import sscha.Parallel as Parallel
 from sscha.Parallel import pprint as print
 
+import difflib
 
 import SCHAModules
 #import sscha_HP_odd
@@ -98,7 +99,7 @@ SUPPORTED_UNITS = [UNITS_DEFAULT, UNITS_HARTREE]
 class Ensemble:
     __debug_index__ = 0
     
-    def __init__(self, dyn0, T0, supercell = None):
+    def __init__(self, dyn0, T0, supercell = None, **kwargs):
         """
         PREPARE THE ENSEMBLE
         ====================
@@ -115,6 +116,7 @@ class Ensemble:
                 The temperature used to generate the ensemble.
             supercell: optional, list of int
                 The supercell dimension. If not provided, it will be determined by dyn0
+            **kwargs : any other attribute of the ensemble
         """
         
         # N is the number of element in the ensemble
@@ -177,6 +179,39 @@ class Ensemble:
 
         # Get the extra quantities
         self.extra_quantities = {}
+
+
+        # Setup the attribute control
+        self.__total_attributes__ = [item for item in self.__dict__.keys()]
+        self.fixed_attributes = True # This must be the last attribute to be setted
+
+
+        # Setup any other keyword given in input (raising the error if not already defined)
+        for key in kwargs:
+            self.__setattr__(key, kwargs[key])
+
+
+    def __setattr__(self, name, value):
+        """
+        This method is used to set an attribute.
+        It will raise an exception if the attribute does not exists (with a suggestion of similar entries)
+        """
+
+        
+        if "fixed_attributes" in self.__dict__:
+            if name in self.__total_attributes__:
+                super(Ensemble, self).__setattr__(name, value)
+            elif self.fixed_attributes:
+                similar_objects = str( difflib.get_close_matches(name, self.__total_attributes__))
+                ERROR_MSG = """
+        Error, the attribute '{}' is not a member of '{}'.
+        Suggested similar attributes: {} ?
+        """.format(name, type(self).__name__,  similar_objects)
+
+                raise AttributeError(ERROR_MSG)
+        else:
+            super(Ensemble, self).__setattr__(name, value)
+
 
     def convert_units(self, new_units):
         """
