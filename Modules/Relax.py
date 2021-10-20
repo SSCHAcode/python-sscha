@@ -47,7 +47,7 @@ __ALLOWED_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__, __RELAX_MAX_POP__,
 class SSCHA(object):
     
     def __init__(self, minimizer = None, ase_calculator=None, N_configs=1, max_pop = 20, 
-                 save_ensemble = False, cluster = None):
+                 save_ensemble = False, cluster = None, **kwargs):
         """
         This module initialize the relaxer. It may perform
         constant volume or pressure relaxation using fully anharmonic potentials.
@@ -69,6 +69,7 @@ class SSCHA(object):
             cluster : Cluster.Cluster, optional
                 If different from None, the ensemble force and energy calculations
                 will be runned in the provided cluster.
+            **kwargs : any other keyword that matches an object of this structure
         """
         
         if minimizer == None:
@@ -85,7 +86,7 @@ class SSCHA(object):
         # If the ensemble must be saved at each iteration.
         # 
         self.save_ensemble = save_ensemble
-        self.data_dir = ""
+        self.data_dir = "data"
         
         
 
@@ -108,6 +109,11 @@ class SSCHA(object):
         # Setup the attribute control
         self.__total_attributes__ = [item for item in self.__dict__.keys()]
         self.fixed_attributes = True # This must be the last attribute to be setted
+
+
+        # Setup any other keyword given in input (raising the error if not already defined)
+        for key in kwargs:
+            self.__setattr__(key, kwargs[key])
 
     def __setattr__(self, name, value):
         """
