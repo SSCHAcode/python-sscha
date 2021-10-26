@@ -178,6 +178,10 @@ class Cluster(object):
         self.timeout = 1000
         self.use_timeout = False
 
+        # Check the status of the job every TOT seconds
+        self.check_timeout = 300
+        self.nonblocking_command = False # True if you use a different version of slurm that does not accept blocking commands
+
         # This is the number of configurations to be computed for each jub submitted
         # This times the self.batch_size is the total amount of configurations submitted toghether
         self.job_number = 1
@@ -322,6 +326,8 @@ class Cluster(object):
         if return_output:
             return success, output
         return success
+    
+    
             
 
     def set_timeout(self, timeout):
@@ -544,7 +550,16 @@ class Cluster(object):
         # Run the simulation
         cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, 
                                                    self.workdir, label+ "_" + str(indices[0]))
-        cp_res = self.ExecuteCMD(cmd, False)
+        submission_output = self.ExecuteCMD(cmd, False)
+
+        # If the command for submission is non blocking, we need to check periodically wether the calculation has been completed
+        if self.nonblocking_command:
+            job_id = self.get_job_id_from_submission_output(submission_output)
+            time.sleep(self.check_timeout)
+
+            while not self.check_job_finished(job_id):
+                time.sleep(self.check_timeout)
+
 #        cp_res = os.system(cmd + " > /dev/null")
 #        if cp_res != 0:
 #            print "Error while executing:", cmd
@@ -578,7 +593,46 @@ class Cluster(object):
                 pass
         
         return results
+
+    def get_job_id_from_submission_output(output):
+        """
+        GET THE JOB ID
+
+        Retreive the job id from the output of the submission. 
+        This depends on the software employed. It works for slurm.
+
+        Returns None if the output contains an error
+        """
+
+        try:
+            id = output.split()[-1]
+            return id
+        except:
+            print("Error, expected a standard output, but the result of the submission was: {}".foramt(output))
+            return None
         
+    def check_job_finished(job_id):
+        """
+        Check if the job identified by the job_id is finished
+
+        Parameters
+        ----------
+            job_id : string
+                The string that identifies uniquely the job
+        """
+
+        output = self.ExecuteCMD("squeue -u $USER")
+        lines = output.split("\n")
+        if len(lines):
+            for l in lines:
+                data = l.strip().split()
+                if data[0] == job_id:
+                    return False
+            
+            # If I'm here it means I did not find the job, but the command returned at least 1 line (so it was correctly executed).
+            return True
+        return False
+
             
     def run_atoms(self, ase_calc, ase_atoms, label="ESP", 
                   in_extension = ".pwi", out_extension=".pwo",
@@ -1125,7 +1179,7 @@ class Cluster(object):
         # Run until some work has not finished
         recalc = 0
         while np.sum(np.array(success, dtype = int) - 1) != 0:
-            threads = []
+            threads = []batch_submission
             
             # Get the remaining jobs
             false_mask = np.array(success) == False
