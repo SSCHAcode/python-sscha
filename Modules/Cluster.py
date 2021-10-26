@@ -598,7 +598,7 @@ class Cluster(object):
         
         return results
 
-    def get_job_id_from_submission_output(output):
+    def get_job_id_from_submission_output(self, output):
         """
         GET THE JOB ID
 
@@ -615,7 +615,7 @@ class Cluster(object):
             print("Error, expected a standard output, but the result of the submission was: {}".foramt(output))
             return None
         
-    def check_job_finished(job_id):
+    def check_job_finished(self, job_id):
         """
         Check if the job identified by the job_id is finished
 
