@@ -304,7 +304,7 @@ Error, you must specify where to save the ensembles.
             if not os.path.exists(ensemble_loc):
                 os.makedirs(ensemble_loc)
             else:
-                if not os.isdir(ensemble_loc):
+                if not os.path.isdir(ensemble_loc):
                     ERR_MSG = """
 Error, the specified location to save the ensemble:
        '{}' 
