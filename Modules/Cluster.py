@@ -13,6 +13,7 @@ except:
     pass
 
 import numpy as np
+import time, datetime
 
 from ase.units import Rydberg, Bohr
 import ase, ase.io
@@ -268,7 +269,7 @@ class Cluster(object):
         
         
         
-    def ExecuteCMD(self, cmd, raise_error = True, return_output = False):
+    def ExecuteCMD(self, cmd, raise_error = True, return_output = False, on_cluster = False):
         """
         EXECUTE THE CMD ON THE CLUSTER
         ==============================
@@ -285,6 +286,8 @@ class Cluster(object):
             return_output : bool, optional
                 If True (default False) the output of the command is 
                 returned as second value.
+            on_cluster : bool
+                If true, the command is executed directly on the cluster through ssh
                 
         Returns
         -------
@@ -294,6 +297,9 @@ class Cluster(object):
             output : string
                 Returned only if return_output is True
         """
+
+        if on_cluster:
+            cmd = self.sshcmd + " {} '{}'".format(self.hostname, cmd)
         
         success = False
         output = ""
@@ -547,18 +553,22 @@ class Cluster(object):
         if not cp_res:
             print ("Error while executing:", cmd)
             print ("Return code:", cp_res)
-            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
+            sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
             return results#[None] * N_structs
         
         
         # Run the simulation
         cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, 
                                                    self.workdir, label+ "_" + str(indices[0]))
-        submission_output = self.ExecuteCMD(cmd, False)
+        status, submission_output = self.ExecuteCMD(cmd, True, return_output = True)
 
         # If the command for submission is non blocking, we need to check periodically wether the calculation has been completed
         if self.nonblocking_command:
             job_id = self.get_job_id_from_submission_output(submission_output)
+
+            now = datetime.datetime.now()
+            sys.stderr.write("{}/{}/{} - {}:{} | submitted job id {} ({})\n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id, submission_output))
+            sys.stderr.flush()
             time.sleep(self.check_timeout)
 
             while not self.check_job_finished(job_id):
@@ -612,10 +622,10 @@ class Cluster(object):
             id = output.split()[-1]
             return id
         except:
-            print("Error, expected a standard output, but the result of the submission was: {}".foramt(output))
+            print("Error, expected a standard output, but the result of the submission was: {}".format(output))
             return None
         
-    def check_job_finished(self, job_id):
+    def check_job_finished(self, job_id, verbose = True):
         """
         Check if the job identified by the job_id is finished
 
@@ -625,16 +635,28 @@ class Cluster(object):
                 The string that identifies uniquely the job
         """
 
-        output = self.ExecuteCMD("squeue -u $USER")
+        status, output = self.ExecuteCMD("squeue -u $USER", False, return_output = True, on_cluster = True, )
         lines = output.split("\n")
         if len(lines):
             for l in lines:
                 data = l.strip().split()
                 if data[0] == job_id:
+                    if verbose:
+                        now = datetime.datetime.now()
+                        sys.stderr.write("{}/{}/{} - {}:{}:{} | job {} still running\n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id))
+                        sys.stderr.flush()
                     return False
             
             # If I'm here it means I did not find the job, but the command returned at least 1 line (so it was correctly executed).
+            if verbose:
+                now = datetime.datetime.now()
+                sys.stderr.write("{}/{}/{} - {}:{}:{} | job {} finished\n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id))
+                sys.stderr.flush()
             return True
+        if verbose:
+            now = datetime.datetime.now()
+            sys.stderr.write("{}/{}/{} - {}:{}:{} | error while interrogating the cluster for job {}\n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id))
+            sys.stderr.flush()
         return False
 
             
