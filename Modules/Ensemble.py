@@ -82,6 +82,7 @@ except:
     Bohr = 1/__A_TO_BOHR__
     __RyToK__ = 157887.32400374097
 
+__GPa__ = 14710.50763554043
 
 __DEBUG_RHO__ = False
 
@@ -813,6 +814,69 @@ Error, the following stress files are missing from the ensemble:
                 c = "w"
             with open(filename, c) as fp:
                 fp.writelines(lines)
+        
+        # Force other processors to wait for the master
+        CC.Settings.barrier()
+
+    def save_raw(self, root_directory, type_dict = None):
+        """
+        Save the ensemble as a set of raw files.
+
+        This is the default format for training with deepmd
+
+        Parameters
+        ----------
+            filename : string
+                The directory on which to save the ensemble. If it does not exist, it is create.
+                NOTE: this will overwrite any other ensemble saved in raw format in that directory
+            type_dict : dict
+                The dictionary between integers and atomic types. If not provided, it is generated on the spot and returned.
+        
+        Returns
+        -------
+            type_dict : dict
+                The dictionary of the parameters
+        """
+        nat = self.current_dyn.structure.N_atoms * np.prod(self.current_dyn.GetSupercell())
+
+        if type_dict is None:
+            atm = np.unique(self.current_dyn.structure.atoms)
+            type_dict = {x : i for i, x in enumerate(atm)}
+        
+        inv_dict = {i : x for x, i in type_dict.items()}
+
+
+        # Save only if the current processor is the master
+        if Parallel.am_i_the_master():
+            if not os.path.exist(root_directory):
+                os.makedirs(root_directory)
+            
+            if not os.isdir(root_directory):
+                raise IOError("Error, save_raw expects a directory, but '{}' is not a directory.".format(root_directory))
+
+            # Save the energies
+            np.savetxt(os.path.join(root_directory, "energy.raw"), self.energies * Rydberg)
+
+            # Save the positions
+            np.savetxt(os.path.join(root_directory, "coord.raw"), self.xats.reshape(self.N, 3 * nat))
+
+            # Save the box
+            np.savetxt(os.path.join(root_directory, "box.raw"), np.tile(self.current_dyn.structure.unit_cell.ravel(), (self.N, 1))
+
+            # Save the forces
+            np.savetxt(os.path.join(root_directory, "force.raw"), self.forces.reshape(self.N, 3*nat) * Rydberg)
+
+            # Save the stress
+            np.savetxt(os.path.join(root_directory, "virial.raw"), self.stresses.reshape(self.N, 9) * __GPa__ * 10000)
+
+            # Save the types
+            ss = self.current_dyn.structure.generate_supercell(self.current_dyn.GetSupercell())
+            np.savetxt(os.path.join(root_directory, "type.raw"), [type_dict[x] for x in ss.atoms])
+
+            with open(os.path.join(root_directory, "type_map.raw"), "w") as fp:
+                line = " ".join([inv_dict[x] for x in arange(len(type_dict))])
+                fp.write(line + "\n")
+                
         
         # Force other processors to wait for the master
         CC.Settings.barrier()
