@@ -858,16 +858,16 @@ Error, the following stress files are missing from the ensemble:
             np.savetxt(os.path.join(root_directory, "energy.raw"), self.energies * Rydberg)
 
             # Save the positions
-            np.savetxt(os.path.join(root_directory, "coord.raw"), self.xats.reshape(self.N, 3 * nat))
+            np.savetxt(os.path.join(root_directory, "coord.raw"), self.xats.reshape((self.N, 3 * nat)))
 
             # Save the box
-            np.savetxt(os.path.join(root_directory, "box.raw"), np.tile(self.current_dyn.structure.unit_cell.ravel(), (self.N, 1))
+            np.savetxt(os.path.join(root_directory, "box.raw"), np.tile(self.current_dyn.structure.unit_cell.ravel(), (self.N, 1)))
 
             # Save the forces
-            np.savetxt(os.path.join(root_directory, "force.raw"), self.forces.reshape(self.N, 3*nat) * Rydberg)
+            np.savetxt(os.path.join(root_directory, "force.raw"), self.forces.reshape((self.N, 3*nat)) * Rydberg)
 
             # Save the stress
-            np.savetxt(os.path.join(root_directory, "virial.raw"), self.stresses.reshape(self.N, 9) * __GPa__ * 10000)
+            np.savetxt(os.path.join(root_directory, "virial.raw"), self.stresses.reshape((self.N, 9)) * __GPa__ * 10000)
 
             # Save the types
             ss = self.current_dyn.structure.generate_supercell(self.current_dyn.GetSupercell())
