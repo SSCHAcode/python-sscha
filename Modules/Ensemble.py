@@ -848,10 +848,10 @@ Error, the following stress files are missing from the ensemble:
 
         # Save only if the current processor is the master
         if Parallel.am_i_the_master():
-            if not os.path.exist(root_directory):
+            if not os.path.exists(root_directory):
                 os.makedirs(root_directory)
             
-            if not os.isdir(root_directory):
+            if not os.path.isdir(root_directory):
                 raise IOError("Error, save_raw expects a directory, but '{}' is not a directory.".format(root_directory))
 
             # Save the energies
@@ -871,11 +871,15 @@ Error, the following stress files are missing from the ensemble:
 
             # Save the types
             ss = self.current_dyn.structure.generate_supercell(self.current_dyn.GetSupercell())
-            np.savetxt(os.path.join(root_directory, "type.raw"), [type_dict[x] for x in ss.atoms])
 
             with open(os.path.join(root_directory, "type_map.raw"), "w") as fp:
-                line = " ".join([inv_dict[x] for x in arange(len(type_dict))])
+                line = " ".join([inv_dict[x] for x in np.arange(len(type_dict))])
                 fp.write(line + "\n")
+
+            with open(os.path.join(root_directory, "type.raw"), "w") as fp:
+                line = " ".join([str(type_dict[x]) for x in ss.atoms])
+                fp.write(line + "\n")
+
                 
         
         # Force other processors to wait for the master
