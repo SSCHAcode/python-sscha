@@ -414,16 +414,19 @@ class SSCHA_Minimizer(object):
             struct_grad, struct_grad_err =  self.ensemble.get_average_forces(True)
             #print "SHAPE:", np.shape(struct_grad)
             struct_grad_reshaped = - struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
-            t2 = time.time()
-            
-            print ("Time elapsed to compute the structure gradient:", t2 - t1, "s")
             
             
             # Preconditionate the gradient for the wyckoff minimization
             if self.precond_wyck:
-                struct_precond = GetStructPrecond(self.ensemble.current_dyn, ignore_small_w = self.ensemble.ignore_small_w)
+                w_pols = None
+                if len(self.q_tot) == 1:
+                    w_pols = (self.ensemble.current_w, self.ensemble.current_pols)
+                struct_precond = GetStructPrecond(self.ensemble.current_dyn, ignore_small_w = self.ensemble.ignore_small_w, w_pols = w_pols)
                 struct_grad_precond = struct_precond.dot(struct_grad_reshaped)
                 struct_grad = struct_grad_precond.reshape( (self.dyn.structure.N_atoms, 3))
+            t2 = time.time()
+            
+            print ("Time elapsed to compute the structure gradient:", t2 - t1, "s")
             
             
             # Apply the symmetries to the forces
@@ -497,22 +500,23 @@ class SSCHA_Minimizer(object):
 
 
             # If we have imaginary frequencies, force the kl ratio to zero
+        
+            # Update the ensemble
+            try:
+                self.update()
+            except np.linalg.LinAlgError as error:
+                print("Diagonalization error:")
+                print(error)
+                print("Reducing the minimization step...")
+                new_kl_ratio = 0 # Force step reduction
+                is_diag_ok = False 
+                diag_error_counter += 1
+            
             if self.check_imaginary_frequencies():
                 print("Immaginary frequencies found! Redoing the step.")
                 new_kl_ratio = 0
                 is_diag_ok = False
                 imag_freq_counter += 1            
-            else:
-                # Update the ensemble
-                try:
-                    self.update()
-                except np.linalg.LinAlgError as error:
-                    print("Diagonalization error:")
-                    print(error)
-                    print("Reducing the minimization step...")
-                    new_kl_ratio = 0 # Force step reduction
-                    is_diag_ok = False 
-                    diag_error_counter += 1
             
             if diag_error_counter >= self.max_diag_error_counter:
                 ERROR_MSG = """
@@ -1809,7 +1813,7 @@ def ApplyFCPrecond(current_dyn, matrix, T = 0):
     
 
 
-def GetStructPrecond(current_dyn, ignore_small_w = False):
+def GetStructPrecond(current_dyn, ignore_small_w = False, w_pols = None):
     r"""
     GET THE PRECONDITIONER FOR THE STRUCTURE MINIMIZATION
     =====================================================
@@ -1830,6 +1834,8 @@ def GetStructPrecond(current_dyn, ignore_small_w = False):
     ----------
         current_dyn : Phonons()
             The current dynamical matrix
+        w_pols : 
+            If given, do not diagonalize the gradient
         
     Returns
     -------
@@ -1839,7 +1845,11 @@ def GetStructPrecond(current_dyn, ignore_small_w = False):
     """
     
     # Dyagonalize the current dynamical matrix
-    w, pols = current_dyn.DyagDinQ(0)
+    if w_pols:
+        w = w_pols[0].copy()
+        pols = w_pols[1].copy()
+    else:
+        w, pols = current_dyn.DyagDinQ(0)
     
     # Get some usefull array
     mass = current_dyn.structure.get_masses_array()
