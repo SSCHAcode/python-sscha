@@ -419,7 +419,7 @@ class SSCHA_Minimizer(object):
             # Preconditionate the gradient for the wyckoff minimization
             if self.precond_wyck:
                 w_pols = None
-                if len(self.q_tot) == 1:
+                if len(self.dyn.q_tot) == 1:
                     w_pols = (self.ensemble.current_w, self.ensemble.current_pols)
                 struct_precond = GetStructPrecond(self.ensemble.current_dyn, ignore_small_w = self.ensemble.ignore_small_w, w_pols = w_pols)
                 struct_grad_precond = struct_precond.dot(struct_grad_reshaped)
