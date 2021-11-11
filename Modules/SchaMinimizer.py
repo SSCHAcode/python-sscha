@@ -1270,9 +1270,13 @@ WARNING, the preconditioning is activated together with a root representation.
                                                   self.dyn.structure.coords[i,2]))
             print ()
             print (" ==== FINAL FREQUENCIES [cm-1] ==== ")
-            super_dyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
-            w, pols = super_dyn.DyagDinQ(0)
-            trans = CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())
+            #super_dyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
+            super_struct = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
+            w = self.ensemble.current_w.copy()
+            pols = self.ensemble.current_pols.copy()
+
+            #w, pols = super_dyn.DyagDinQ(0)
+            trans = CC.Methods.get_translations(pols, super_struct.get_masses_array())
             
             for i in range(len(w)):
                 print ("Mode %5d:   freq %16.8f cm-1  | is translation? " % (i+1, w[i] * __RyToCm__), trans[i])
@@ -1280,16 +1284,21 @@ WARNING, the preconditioning is activated together with a root representation.
             print ()
         
             
-
     def check_imaginary_frequencies(self):
         """
         The following subroutine check if the current matrix has imaginary frequency. In this case
         the minimization is stopped.
         """
 
+        # Avoid the check if the dynamical matrix has been computed.
+        if not self.minim_dyn:
+            return False 
+
         # Get the frequencies
         #superdyn = self.dyn.GenerateSupercellDyn(self.ensemble.supercell)
-        w, pols = self.dyn.DiagonalizeSupercell()#.DyagDinQ(0)
+        w = self.ensemble.current_w.copy()
+        pols = self.ensemble.current_pols.copy()
+        #w, pols = self.dyn.DiagonalizeSupercell()#.DyagDinQ(0)
         ss = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
 
         # Get translations
@@ -1308,7 +1317,9 @@ WARNING, the preconditioning is activated together with a root representation.
         if w[0] < 0:
             print ("Total frequencies (excluding translations):")
             #superdyn0 = self.ensemble.dyn_0.GenerateSupercellDyn(self.ensemble.supercell)
-            wold, pold = self.ensemble.dyn_0.DiagonalizeSupercell()# superdyn0.DyagDinQ(0)
+            wold = self.ensemble.w_0.copy()
+            pold = self.ensemble.pols_0.copy()
+            #wold, pold = self.ensemble.dyn_0.DiagonalizeSupercell()# superdyn0.DyagDinQ(0)
 
             ss0 = self.ensemble.dyn_0.structure.generate_supercell(self.dyn.GetSupercell())
             

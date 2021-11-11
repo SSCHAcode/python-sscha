@@ -129,7 +129,8 @@ class Ensemble:
         self.units = UNITS_DEFAULT
         self.w_0 = None
         self.pols_0 = None
-
+        self.current_w = None
+        self.current_pols = None
         
         self.sscha_energies = []
         self.sscha_forces = []
@@ -1227,6 +1228,8 @@ Error, the following stress files are missing from the ensemble:
 
         if changed_dyn:
             w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
+            self.current_w = w_new.copy()
+            self.current_pols = pols.copy()
         else:
             w_new = self.w_0.copy()
             pols = self.pols_0.copy()
