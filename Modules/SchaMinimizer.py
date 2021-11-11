@@ -898,6 +898,9 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
             delete_previous_data : bool
                 If true, it will clean previous minimizations from the free energies, gradients...
         """
+
+        if (not self.minim_dyn) and (not self.minim_struct):
+            raise ValueError("Error, either one of minim_dyn or minim_struct should be True.")
         
         # Check the ensemble size
         if not self.ensemble.structures:
