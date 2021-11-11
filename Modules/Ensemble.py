@@ -218,6 +218,9 @@ class Ensemble:
 
         if name == "dyn_0":
             self.w_0, self.pols_0 = value.DiagonalizeSupercell()
+            self.current_dyn = value.Copy()
+            self.current_w = self.w_0.copy()
+            self.current_pols = self.pols_0.copy()
 
 
     def convert_units(self, new_units):
