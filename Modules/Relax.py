@@ -47,7 +47,7 @@ __ALLOWED_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__, __RELAX_MAX_POP__,
 class SSCHA(object):
     
     def __init__(self, minimizer = None, ase_calculator=None, N_configs=1, max_pop = 20, 
-                 save_ensemble = False, cluster = None):
+                 save_ensemble = False, cluster = None, **kwargs):
         """
         This module initialize the relaxer. It may perform
         constant volume or pressure relaxation using fully anharmonic potentials.
@@ -69,6 +69,7 @@ class SSCHA(object):
             cluster : Cluster.Cluster, optional
                 If different from None, the ensemble force and energy calculations
                 will be runned in the provided cluster.
+            **kwargs : any other keyword that matches an object of this structure
         """
         
         if minimizer == None:
@@ -85,7 +86,7 @@ class SSCHA(object):
         # If the ensemble must be saved at each iteration.
         # 
         self.save_ensemble = save_ensemble
-        self.data_dir = ""
+        self.data_dir = "data"
         
         
 
@@ -108,6 +109,11 @@ class SSCHA(object):
         # Setup the attribute control
         self.__total_attributes__ = [item for item in self.__dict__.keys()]
         self.fixed_attributes = True # This must be the last attribute to be setted
+
+
+        # Setup any other keyword given in input (raising the error if not already defined)
+        for key in kwargs:
+            self.__setattr__(key, kwargs[key])
 
     def __setattr__(self, name, value):
         """
@@ -271,8 +277,7 @@ class SSCHA(object):
                 with some ase calculator)
             ensemble_loc : string
                 Where the ensemble of each population is saved on the disk. If none, it will
-                use the content of self.data_dir. If also self.data_dir is None, 
-                the ensemble will not not be saved (useful to avoid disk I/O for force fields)
+                use the content of self.data_dir. It is just a way to override the variable self.data_dir
             start_pop : int, optional
                 The starting index for the population, used only for saving the ensemble and the dynamical 
                 matrix. If None, the content of self.start_pop will be used.
@@ -286,6 +291,27 @@ class SSCHA(object):
 
         if ensemble_loc is None:
             ensemble_loc = self.data_dir
+
+        if (not ensemble_loc) and self.save_ensemble:
+            ERR_MSG = """
+Error, you must specify where to save the ensembles.
+       this can be done either passing ensemble_loc = "path/to/dir" 
+       for the ensemble, or by setting the data_dir attribute of this object.
+"""
+            raise IOError(ERR_MSG)
+        
+        if self.save_ensemble:
+            if not os.path.exists(ensemble_loc):
+                os.makedirs(ensemble_loc)
+            else:
+                if not os.isdir(ensemble_loc):
+                    ERR_MSG = """
+Error, the specified location to save the ensemble:
+       '{}' 
+       already exists and it is not a directory.
+""".format(ensemble_loc)
+                    raise IOError(ERR_MSG)
+
         
         if start_pop is None:
             start_pop = self.start_pop
