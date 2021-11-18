@@ -35,19 +35,24 @@ def test_gradient_comparison(verbose = False):
     minim.meaningful_factor = 1e-10
     minim.max_ka = 5
 
-    ka = 0
-    def compare_gradients(dyn_grad, struct_grad):
-        if not os.path.exists("grad_{}.dat".format(ka)):
-            np.savetxt("grad_{}.dat".format(ka), dyn_grad[0,:,:])
-        else:
-            correct_grad = np.loadtxt("grad_{}.dat".format(ka))
-            diff = np.max(np.abs(dyn_grad - correct_grad))
-            print("KA = {} | difference = {}".format(ka, diff))
+    class CG:
+        def __init__(self):
+            self.ka = 0
+        def compare_gradients(self, dyn_grad, struct_grad):
+            ka = self.ka
             
+            if not os.path.exists("grad_{}.dat".format(ka)):
+                np.savetxt("grad_{}.dat".format(ka), dyn_grad[0,:,:])
+            else:
+                correct_grad = np.loadtxt("grad_{}.dat".format(ka))
+                diff = np.max(np.abs(dyn_grad - correct_grad))
+                print("KA = {} | difference = {}".format(ka, diff))
+            self.ka += 1
 
+    cg = CG()
     
     minim.init()
-    minim.run(custom_function_gradient = compare_gradients)
+    minim.run(custom_function_gradient = cg.compare_gradients)
     minim.finalize()
 
     
