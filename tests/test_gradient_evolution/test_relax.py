@@ -29,10 +29,11 @@ def test_gradient_comparison(verbose = False):
     ens.load(DATA_PATH, 2, 1000)
 
     minim = sscha.SchaMinimizer.SSCHA_Minimizer(ens)
-    minim.minim_struct = True
+    minim.minim_struct = False
     minim.min_step_dyn = 0.5
     minim.min_step_struc = 0.5
     minim.meaningful_factor = 1e-10
+    minim.neglect_symmetries = True
     minim.max_ka = 5
 
     class CG:

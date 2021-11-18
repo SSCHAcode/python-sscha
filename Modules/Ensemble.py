@@ -1218,7 +1218,8 @@ Error, the following stress files are missing from the ensemble:
 
         # Check if the dynamical matrix has changed
         changed_dyn = np.max([np.max(np.abs(self.current_dyn.dynmats[i] - new_dynamical_matrix.dynmats[i])) for i in range(len(self.current_dyn.q_tot))])
-        changed_dyn = changed_dyn > 1e-8
+        print("DYN CHANGED BY:", changed_dyn)
+        changed_dyn = changed_dyn > 1e-30
 
         # Prepare the new displacements
         super_struct0 = self.dyn_0.structure.generate_supercell(self.supercell)
@@ -1234,9 +1235,11 @@ Error, the following stress files are missing from the ensemble:
             self.current_w = w_new.copy()
             self.current_pols = pols.copy()
         else:
-            w_new = self.w_0.copy()
-            pols = self.pols_0.copy()
-
+            w_new = self.current_w.copy()
+            pols  = self.current_pols.copy()
+            #w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
+            #self.current_w = w_new.copy()
+            #self.current_pols = pols.copy()
         # Update sscha energies and forces
         self.sscha_energies[:], self.sscha_forces[:,:,:] = new_dynamical_matrix.get_energy_forces(None, displacement = self.u_disps, w_pols = (w_new, pols))
 
