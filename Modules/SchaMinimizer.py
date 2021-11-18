@@ -1136,7 +1136,7 @@ WARNING, the preconditioning is activated together with a root representation.
             self.__fe__.append(np.real(fe))
             self.__fe_err__.append(np.real(err))
             
-            harm_fe = self.dyn.GetHarmonicFreeEnergy(self.ensemble.current_T, w_pols = (self.ensemble.current_w, self.ensemble.current_pols) / np.prod(self.ensemble.supercell)
+            harm_fe = self.dyn.GetHarmonicFreeEnergy(self.ensemble.current_T, w_pols = (self.ensemble.current_w, self.ensemble.current_pols)) / np.prod(self.ensemble.supercell)
             anharm_fe = np.real(fe - harm_fe)
             
             # Compute the KL ratio
