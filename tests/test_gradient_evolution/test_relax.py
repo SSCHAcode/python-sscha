@@ -38,15 +38,18 @@ def test_gradient_comparison(verbose = False):
     class CG:
         def __init__(self):
             self.ka = 0
-        def compare_gradients(self, dyn_grad, struct_grad):
+        def compare_gradients(self, dyn_grad, struct_grad, minim):
             ka = self.ka
             
             if not os.path.exists("grad_{}.dat".format(ka)):
                 np.savetxt("grad_{}.dat".format(ka), dyn_grad[0,:,:])
+                np.savetxt("dyn_{}.dat".format(ka), minim.dyn.dynmats[0])
             else:
                 correct_grad = np.loadtxt("grad_{}.dat".format(ka))
+                correct_dyn = np.loadtxt("dyn_{}.dat".format(ka))
                 diff = np.max(np.abs(dyn_grad - correct_grad))
-                print("KA = {} | difference = {}".format(ka, diff))
+                diffd = np.max(np.abs(minim.dyn.dynmats[0] - correct_dyn))
+                print("KA = {} | Delta g  = {} | Delta d = {}".format(ka, diff, diffd))
             self.ka += 1
 
     cg = CG()

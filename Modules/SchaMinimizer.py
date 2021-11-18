@@ -450,7 +450,10 @@ class SSCHA_Minimizer(object):
 
         # Perform the gradient restriction
         if custom_function_gradient is not None:
-            custom_function_gradient(dyn_grad, struct_grad)    
+            try:
+                custom_function_gradient(dyn_grad, struct_grad, self)
+            except:    
+                custom_function_gradient(dyn_grad, struct_grad)    
             
 
         # Append the gradient modulus to the minimization info
