@@ -231,8 +231,8 @@ Error, increment must be bigger than 1 and decrement lower than 1.
 
                 if self.verbose:
                     print("Step too large (scalar = {} | kl_ratio = {}), reducing to {}".format(scalar, kl_ratio, self.step))
-                    print("Direction: ", self.direction)
-                    print("Gradient: ", gradient)
+                    #print("Direction: ", self.direction)
+                    #print("Gradient: ", gradient)
             else:
                 # The step is good, therefore next step perform a new direction
                 self.new_direction = True
