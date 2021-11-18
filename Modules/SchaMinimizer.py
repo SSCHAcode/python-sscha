@@ -474,6 +474,8 @@ class SSCHA_Minimizer(object):
             is_diag_ok = True
             self.minimizer.update_dyn(new_kl_ratio, dyn_grad, struct_grad)
 
+            
+
             # Get the new dynamical matrix and strucure after the step
             new_dyn, new_struct = self.minimizer.get_dyn_struct()
 
