@@ -1558,7 +1558,7 @@ DETAILS OF ERROR:
                 The free energy in the current dynamical matrix and at the ensemble temperature
         """
         
-        free_energy = self.current_dyn.GetHarmonicFreeEnergy(self.current_T)
+        free_energy = self.current_dyn.GetHarmonicFreeEnergy(self.current_T, w_pols = (self.current_w, self.current_pols))
         
         # We got the F_0 
         # Now we can compute the free energy difference
