@@ -184,6 +184,12 @@ class Cluster(object):
         self.n_together_def = 1
         self.use_multiple_submission = False
 
+        # If true, add the set -x option at the beggining of the script
+        # This options makes the system print on stdout all executed commands.
+        # Very usefull to debug if something goes wrong.
+        # On some clusters may cause malfunctions.
+        self.add_set_minus_x = True
+
 
         # This is a set of lines to be runned before the calculation
         # It can be used to load the needed modules in the cluster
@@ -521,7 +527,8 @@ class Cluster(object):
 
         
         # Add the set -x option
-        submission += "set -x\n"
+        if self.add_set_minus_x:
+            submission += "set -x\n"
         
         # Add the loading of the modules
         submission += self.load_modules + "\n"
