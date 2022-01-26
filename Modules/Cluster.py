@@ -189,6 +189,12 @@ class Cluster(object):
         self.n_together_def = 1
         self.use_multiple_submission = False
 
+        # If true, add the set -x option at the beggining of the script
+        # This options makes the system print on stdout all executed commands.
+        # Very usefull to debug if something goes wrong.
+        # On some clusters may cause malfunctions.
+        self.add_set_minus_x = True
+
 
         # This is a set of lines to be runned before the calculation
         # It can be used to load the needed modules in the cluster
@@ -227,6 +233,11 @@ class Cluster(object):
         # The new jobs will be submitted only after a batch is compleated
         # Useful if the cluster has a limit for the maximum number of jobs allowed.
         self.batch_size = 1000
+
+        # This could be a function that generates for each input file additional
+        # text in the submission file.
+        # Usefull if you want to copy things in a different directory to run the calculation on the cluster.
+        self.additional_script_parameters = None
 
 
         # Allow to setup additional custom extra parameters
@@ -438,9 +449,11 @@ class Cluster(object):
         new_mpicmd  = self.mpi_cmd.replace("NPROC", str(self.n_cpu))
         results = [None] * N_structs
         submitted = []
+        submission_labels = []
         for i in range(N_structs):
             # Prepare a typical label
             lbl = label + "_" + str(indices[i])
+            submission_labels.append(lbl)
             
             atm = list_of_structures[i].get_ase_atoms()
             atm.set_calculator(calc)
@@ -530,17 +543,28 @@ class Cluster(object):
 
         
         # Add the set -x option
-        submission += "set -x\n"
+        if self.add_set_minus_x:
+            submission += "set -x\n"
         
         # Add the loading of the modules
         submission += self.load_modules + "\n"
         
         # Go to the working directory
         submission += "cd " + self.workdir + "\n"
+
+        # If any, apply the extra text before and after the calculation
+        other_input = ""
+        other_output = ""
+        if self.additional_script_parameters is not None:
+            other_input, other_output = self.additional_script_parameters(submission_labels)
+
+        submission += other_input
         
         # Use the xargs trick
         #submission += "xargs -d " + r"'\n'" + " -L1 -P%d -a %s -- bash -c\n" % (n_togheder, 
         submission += app_list 
+
+        submission += other_output
         
         # Copy the submission script
         sub_fpath = "%s/%s.sh" % (self.local_workdir, label + "_" + str(indices[0]))

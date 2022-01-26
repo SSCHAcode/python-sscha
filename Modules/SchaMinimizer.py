@@ -177,6 +177,7 @@ class SSCHA_Minimizer(object):
         self.precond_dyn = True
         
         self.minim_struct = True
+        self.minim_dyn = True
         
         # This is a debugging flag
         # If true the preconditioning of the original ensemble
@@ -318,10 +319,14 @@ class SSCHA_Minimizer(object):
         #dyn_grad, err = self.ensemble.get_free_energy_gradient_respect_to_dyn()
         #dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
         #dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
-        if self.precond_dyn:
-            dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=1)
+        if self.minim_dyn:
+            if self.precond_dyn:
+                dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=1)
+            else:
+                dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=0)
         else:
-            dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=0)
+            dyn_grad = np.zeros( (len(self.dyn.q_tot), 3 * self.dyn.structure.N_atoms, 3 * self.dyn.structure.N_atoms), dtype = np.complex128)
+            err = np.zeros_like(dyn_grad)
 
         
         # Perform the symmetrization
@@ -330,45 +335,46 @@ class SSCHA_Minimizer(object):
 #        qe_sym.ImposeSumRule(err)
 #        qe_sym.SymmetrizeDynQ(err, np.array([0,0,0]))
         t1 = time.time()
-        if not self.neglect_symmetries:
-            # Check if the symmetries must be applied in the supercell
-            if self.use_spglib:
-                # Check if we have a supercell
-                supercell = self.dyn.GetSupercell()
-                n_cell = np.prod(supercell)
-                if n_cell == 1:
-                    # Only gamma, apply the symmetries
-                    qe_sym.ApplySymmetriesToV2(dyn_grad[0, :, :])
+        if self.minim_dyn:
+            if not self.neglect_symmetries:
+                # Check if the symmetries must be applied in the supercell
+                if self.use_spglib:
+                    # Check if we have a supercell
+                    supercell = self.dyn.GetSupercell()
+                    n_cell = np.prod(supercell)
+                    if n_cell == 1:
+                        # Only gamma, apply the symmetries
+                        qe_sym.ApplySymmetriesToV2(dyn_grad[0, :, :])
 
-                    #qe_sym.ApplySymmetriesToV2(err)
-                    #CC.symmetries.CustomASR(err)
+                        #qe_sym.ApplySymmetriesToV2(err)
+                        #CC.symmetries.CustomASR(err)
+                    else:
+                        # We have a supercell, we must generate the dynamical matrix in the supercell
+                        super_structure = self.dyn.structure.generate_supercell(supercell)
+                        fc_supercell = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot), \
+                            self.dyn.structure, super_structure)
+
+                        # Lets generate a new symmetries for the supercell
+                        qe_sym_supcell = CC.symmetries.QE_Symmetry(super_structure)
+                        qe_sym_supcell.SetupFromSPGLIB()
+
+                        # Apply the symmetries to the fc_supercell matrix
+                        qe_sym_supcell.ApplySymmetriesToV2(fc_supercell)
+
+                        # Convert back to Q space
+                        dyn_grad = CC.Phonons.GetDynQFromFCSupercell(fc_supercell, np.array(self.dyn.q_tot), \
+                            self.dyn.structure, super_structure)
+                    
+                    # Apply the sum rule at gamma
+                    CC.symmetries.CustomASR(dyn_grad[0,:,:])
                 else:
-                    # We have a supercell, we must generate the dynamical matrix in the supercell
-                    super_structure = self.dyn.structure.generate_supercell(supercell)
-                    fc_supercell = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot), \
-                        self.dyn.structure, super_structure)
-
-                    # Lets generate a new symmetries for the supercell
-                    qe_sym_supcell = CC.symmetries.QE_Symmetry(super_structure)
-                    qe_sym_supcell.SetupFromSPGLIB()
-
-                    # Apply the symmetries to the fc_supercell matrix
-                    qe_sym_supcell.ApplySymmetriesToV2(fc_supercell)
-
-                    # Convert back to Q space
-                    dyn_grad = CC.Phonons.GetDynQFromFCSupercell(fc_supercell, np.array(self.dyn.q_tot), \
-                        self.dyn.structure, super_structure)
+                    qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
+                    #qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "custom")
                 
-                # Apply the sum rule at gamma
-                CC.symmetries.CustomASR(dyn_grad[0,:,:])
+                # Just divide the error by the square root the number of symmetries
+                err /= np.sqrt(qe_sym.QE_nsym * np.prod(self.ensemble.supercell))
             else:
-                qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
-                #qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "custom")
-            
-            # Just divide the error by the square root the number of symmetries
-            err /= np.sqrt(qe_sym.QE_nsym * np.prod(self.ensemble.supercell))
-        else:
-            CC.symmetries.CustomASR(dyn_grad[0, :,:])
+                CC.symmetries.CustomASR(dyn_grad[0, :,:])
         t2 = time.time()
         print ("Time elapsed to symmetrize the gradient:", t2 - t1, "s")
         
@@ -467,6 +473,8 @@ class SSCHA_Minimizer(object):
         while not is_diag_ok:
             is_diag_ok = True
             self.minimizer.update_dyn(new_kl_ratio, dyn_grad, struct_grad)
+
+            
 
             # Get the new dynamical matrix and strucure after the step
             new_dyn, new_struct = self.minimizer.get_dyn_struct()
@@ -892,6 +900,9 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
             delete_previous_data : bool
                 If true, it will clean previous minimizations from the free energies, gradients...
         """
+
+        if (not self.minim_dyn) and (not self.minim_struct):
+            raise ValueError("Error, either one of minim_dyn or minim_struct should be True.")
         
         # Check the ensemble size
         if not self.ensemble.structures:
