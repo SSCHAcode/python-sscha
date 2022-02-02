@@ -3026,6 +3026,7 @@ DETAILS OF ERROR:
         ----------
             ase_calculator : ase.calculator
                 The ASE interface to the calculator to run the calculation.
+                also a CellConstructor calculator is accepted
             compute_stress : bool
                 If true, the stress is requested from the ASE calculator. Be shure
                 that the calculator you provide supports stress calculation
@@ -3120,10 +3121,10 @@ DETAILS OF ERROR:
             
             
             struct = structures[i]
-            atms = struct.get_ase_atoms()
+            #atms = struct.get_ase_atoms()
             
             # Setup the ASE calculator
-            atms.set_calculator(ase_calculator)
+            #atms.set_calculator(ase_calculator)
 
 
             # Print the status
@@ -3136,15 +3137,21 @@ DETAILS OF ERROR:
             count_fails = 0
             while run:
                 try:
-                    energy = atms.get_total_energy() / Rydberg # eV => Ry
-                    # Get energy, forces (and stress)
-                    energy = atms.get_total_energy() / Rydberg # eV => Ry
-                    forces_ = atms.get_forces() / Rydberg # eV / A => Ry / A
+                    results = CC.calculators.get_results(ase_calculator, struct, get_stress = compute_stress)
+                    energy = results["energy"] / Rydberg # eV => Ry
+                    forces_ = results["forces"] / Rydberg
+
                     if compute_stress:
-                        if not stress_numerical:
-                            stress[9*i0 : 9*i0 + 9] = -atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
-                        else:
-                            stress[9*i0 : 9*i0 + 9] = -ase_calculator.calculate_numerical_stress(atms, voigt = False).ravel()* Bohr**3 / Rydberg 
+                        stress[9*i0 : 9*i0 + 9] = -results["stress"].reshape(9)* Bohr**3 / Rydberg
+                    #energy = atms.get_total_energy() / Rydberg # eV => Ry
+                    # Get energy, forces (and stress)
+                    #energy = atms.get_total_energy() / Rydberg # eV => Ry
+                    #forces_ = atms.get_forces() / Rydberg # eV / A => Ry / A
+                    #if compute_stress:
+                    #    if not stress_numerical:
+                    #        stress[9*i0 : 9*i0 + 9] = -atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
+                    #    else:
+                    #        stress[9*i0 : 9*i0 + 9] = -ase_calculator.calculate_numerical_stress(atms, voigt = False).ravel()* Bohr**3 / Rydberg 
                             
                     # Copy into the ensemble array
                     energies[i0] = energy
