@@ -583,13 +583,15 @@ class Cluster(object):
                 It is what returned from self.ExecuteCMD(cmd, False)
         """
         
-        cmd = "{ssh} {host} '{submit_cmd} {script}'"
-        if self.use_active_shell:
-            cmd = "{ssh} {host} -t '{shell} --login -c \"{submit_cmd} {script}\"'".format(shell = self.terminal)
-        
-        
-        cmd = cmd.format(ssh = self.sshcmd, host = self.hostname, 
+        cmd = "{ssh} {host} '{submit_cmd} {script}'".format(ssh = self.sshcmd, host = self.hostname, 
                          submit_cmd = self.submit_name, script = script_location) 
+        if self.use_active_shell:
+            cmd = "{ssh} {host} -t '{shell} --login -c \"{submit_cmd} {script}\"'".format(ssh = self.sshcmd, 
+                         host = self.hostname, 
+                         submit_cmd = self.submit_name, script = script_location, 
+                         shell = self.terminal)
+        
+        
 
         #cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, 
         #                                           self.workdir, label+ "_" + str(indices[0]))
