@@ -4,6 +4,7 @@ import sys, os
 import subprocess
 import threading
 import copy
+import time, datetime
 
 __DIFFLIB__ = False
 try:
@@ -233,6 +234,7 @@ class Cluster(object):
         # text in the submission file.
         # Usefull if you want to copy things in a different directory to run the calculation on the cluster.
         self.additional_script_parameters = None
+
 
 
         # Allow to setup additional custom extra parameters
@@ -550,7 +552,7 @@ class Cluster(object):
 
         .. code ::
 
-            return self.ExecuteCMD(cmd, False)
+            return self.ExecuteCMD(cmd, True, return_output=True)
 
         
 
@@ -576,9 +578,8 @@ class Cluster(object):
 
         #cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, 
         #                                           self.workdir, label+ "_" + str(indices[0]))
-        cp_res = self.ExecuteCMD(cmd, False)
-        return cp_res
-
+       
+        return self.ExecuteCMD(cmd, True, return_output=True)
 
     def batch_submission(self, list_of_structures, calc, indices, 
                          in_extension, out_extension,
@@ -679,14 +680,19 @@ class Cluster(object):
         
         # Run the simulation
         sub_script_loc = os.path.join(self.workdir, label + "_" + str(indices[0]) + ".sh")
-        cp_res = self.submit(sub_script_loc)
+        cp_res, submission_output = self.submit(sub_script_loc)
         
-#        cp_res = os.system(cmd + " > /dev/null")
-#        if cp_res != 0:
-#            print "Error while executing:", cmd
-#            print "Return code:", cp_res
-#            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
-#            
+        if self.nonblocking_command:
+            job_id = self.get_job_id_from_submission_output(submission_output)
+
+            now = datetime.datetime.now()
+            sys.stderr.write("{}/{}/{} - {}:{} | submitted job id {} ({})\n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id, submission_output))
+            sys.stderr.flush()
+            time.sleep(self.check_timeout)
+
+            while not self.check_job_finished(job_id):
+                time.sleep(self.check_timeout)
+
         
         # Collect the output back
         for i in submitted:
