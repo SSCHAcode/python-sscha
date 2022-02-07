@@ -546,7 +546,24 @@ class Cluster(object):
         SUBMIT THE CALCULATION
         ======================
 
-        Submit the calculation
+        Submit the calculation. Compose the command into a cmd variable, then submit it through:
+
+        .. code ::
+
+            return self.ExecuteCMD(cmd, False)
+
+        
+
+        Parameters
+        ----------
+            script_localtion : string
+                Path to the submission script inside the cluster.
+        
+        Results
+        -------
+            success : bool
+                Result of the execution of the submission command. 
+                It is what returned from self.ExecuteCMD(cmd, False)
         """
         
         cmd = "{ssh} {host} '{submit_cmd} {script}'"
@@ -557,7 +574,10 @@ class Cluster(object):
         cmd = cmd.format(ssh = self.sshcmd, host = self.hostname, 
                          submit_cmd = self.submit_name, script = script_location) 
 
-        return cmd
+        #cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, 
+        #                                           self.workdir, label+ "_" + str(indices[0]))
+        cp_res = self.ExecuteCMD(cmd, False)
+        return cp_res
 
 
     def batch_submission(self, list_of_structures, calc, indices, 
@@ -658,9 +678,9 @@ class Cluster(object):
         
         
         # Run the simulation
-        cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, 
-                                                   self.workdir, label+ "_" + str(indices[0]))
-        cp_res = self.ExecuteCMD(cmd, False)
+        sub_script_loc = os.path.join(self.workdir, label + "_" + str(indices[0]) + ".sh")
+        cp_res = self.submit(sub_script_loc)
+        
 #        cp_res = os.system(cmd + " > /dev/null")
 #        if cp_res != 0:
 #            print "Error while executing:", cmd
