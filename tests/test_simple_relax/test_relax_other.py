@@ -69,7 +69,7 @@ def test_simple_relax(verbose = False):
     minim.min_step_struc = 0.5
     minim.meaningful_factor = 1e-10
     minim.init()
-    minim.run()
+    minim.run(verbose = 0)
     minim.finalize()
 
     # Check the differences in the atomic positions
