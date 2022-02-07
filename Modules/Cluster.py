@@ -584,11 +584,11 @@ class Cluster(object):
         """
         
         cmd = "{ssh} {host} '{submit_cmd} {script}'".format(ssh = self.sshcmd, host = self.hostname, 
-                         submit_cmd = self.submit_name, script = script_location) 
+                         submit_cmd = self.submit_command, script = script_location) 
         if self.use_active_shell:
             cmd = "{ssh} {host} -t '{shell} --login -c \"{submit_cmd} {script}\"'".format(ssh = self.sshcmd, 
                          host = self.hostname, 
-                         submit_cmd = self.submit_name, script = script_location, 
+                         submit_cmd = self.submit_command, script = script_location, 
                          shell = self.terminal)
         
         
