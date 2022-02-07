@@ -184,6 +184,9 @@ class Cluster(object):
         self.check_timeout = 300
         self.nonblocking_command = False # True if you use a different version of slurm that does not accept blocking commands
 
+        # Enforce ssh to open a shell for each command in the cluster
+        self.use_active_shell = False
+
         # This is the number of configurations to be computed for each jub submitted
         # This times the self.batch_size is the total amount of configurations submitted toghether
         self.job_number = 1
