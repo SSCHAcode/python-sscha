@@ -442,10 +442,15 @@ class Cluster(object):
 
         # Append the additional parameters
         for add_parameter in self.custom_params:
+
+            adder_string = "--{}".format(add_parameter)
+            if add_parameter.startswith("-"):
+                adder_string = add_parameter
+
             if self.custom_params[add_parameter] is None:
-                submission += "#{} --{}\n".format(self.submit_name, add_parameter)
+                submission += "#{} {}\n".format(self.submit_name, adder_string)
             else:
-                submission += "#{} --{}={}\n".format(self.submit_name, add_parameter, self.custom_params[add_parameter])
+                submission += "#{} {}={}\n".format(self.submit_name, adder_string, self.custom_params[add_parameter])
 
         
         # Add the set -x option

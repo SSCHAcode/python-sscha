@@ -271,7 +271,7 @@ class UC_OPTIMIZER:
 
         
         
-        # Get the strain tensor up to know
+        # Get the strain tensor up to now
         strain = np.transpose(self.uc_0_inv.dot(unit_cell) - I)
         
         # Get the gradient with respect to the strain        
