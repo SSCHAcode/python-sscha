@@ -377,20 +377,22 @@ class ModeProjection:
 
             # Go back in cartesian coordinates
             projected_grad_cart = self.pols[:,:, iq].dot(projected_grad.dot(np.conj(self.pols[:,:,iq]).T))
-
-            # Put the masses again and overwrite the gradient
-            new_dyngrad = projected_grad_cart * np.sqrt( np.outer(_m_, _m_))
+            
 
             # Check if the grad increased 
             if self.testing:
-                norm_old = np.sum(np.abs(dyn_grad[iq, :, :])**2)
-                norm_new = np.sum(np.abs(new_dyngrad)**2) 
+                norm_old = np.linalg.norm(grad_nomass)
+                norm_new = np.linalg.norm(projected_grad_cart)
 
                 if norm_new > norm_old:
                     print("Error on q = {}".format(iq))
                     print("Old norm: {} | New norm: {}".format(norm_old, norm_new)) 
                 
                 assert norm_new < norm_old
+                
+            # Put the masses again and overwrite the gradient
+            new_dyngrad = projected_grad_cart * np.sqrt( np.outer(_m_, _m_))
+
 
             dyn_grad[iq, :, :] = new_dyngrad
                     
