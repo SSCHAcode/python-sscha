@@ -34,6 +34,8 @@ import cellconstructor.Settings
 import sscha.Parallel as Parallel
 from sscha.Parallel import pprint as print
 
+import json
+
 import difflib
 
 import SCHAModules
@@ -95,7 +97,11 @@ It is used to Load and Save info about the ensemble.
 UNITS_DEFAULT = "default"
 UNITS_HARTREE = "hartree"
 SUPPORTED_UNITS = [UNITS_DEFAULT, UNITS_HARTREE]
-
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
 class Ensemble:
     __debug_index__ = 0
@@ -127,6 +133,7 @@ class Ensemble:
         self.forces = []
         self.stresses = []
         self.xats = []
+        self.all_properties = []
         self.units = UNITS_DEFAULT
         
         self.sscha_energies = []
@@ -762,6 +769,10 @@ Error, the following stress files are missing from the ensemble:
                 np.save("%s/stresses_pop%d.npy" % (data_dir, population_id), self.stresses)
             
             self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
+
+        if len(self.all_properties):
+            with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
+                json.dump({"properties" : self.all_properties}, fp)
         
     def save_enhanced_xyz(self, filename, append_mode = True, stress_key = "virial", forces_key = "force", energy_key = "energy"):
         """

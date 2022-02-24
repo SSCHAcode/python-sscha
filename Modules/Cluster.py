@@ -532,10 +532,14 @@ class Cluster(object):
         """
 
         # Prepare the input file
-        atm = structure.get_ase_atoms()
-        atm.set_calculator(calc)
-        ase.io.write("%s/%s.pwi"% (self.local_workdir, label),
-                        atm, **calc.parameters)
+        calc.set_directory(self.local_workdir)
+        calc.set_label(label)
+        calc.write_input(structure)
+
+        print("LBL: {} | PREFIX: {}".format(label, calc.input_data["control"]["prefix"]))
+
+        #ase.io.write("%s/%s.pwi"% (self.local_workdir, label),
+        #                atm, **calc.parameters)
         
         
             
@@ -602,6 +606,25 @@ class Cluster(object):
         #                                           self.workdir, label+ "_" + str(indices[0]))
        
         return self.ExecuteCMD(cmd, True, return_output=True)
+
+    def get_output_path(self, label):
+        """
+        Given the label of the submission, retrive the path of all the output files of that calculation
+        """
+
+        out_filename = os.path.join(self.workdir, label + ".pwo") 
+        return [out_filename]
+
+    def read_results(self, calc, label):
+        """
+        Return a dictionary of the computed property for the given calculation label
+        """
+
+        #calc.set_label("%s/%s" % (self.local_workdir, label))
+        calc.set_directory(self.local_workdir)
+        calc.set_label(label)
+        calc.read_results()
+        return copy.deepcopy(calc.results)
 
     def batch_submission(self, list_of_structures, calc, indices, 
                          in_extension, out_extension,
@@ -722,24 +745,24 @@ class Cluster(object):
         for i in submitted:
             # Prepare a typical label
             lbl = label + "_" + str(indices[i])
-            out_filename = "%s/%s%s"% (self.workdir, lbl, out_extension)
+            out_fnames = self.get_output_path(lbl)
+            #out_filename = "%s/%s%s"% (self.workdir, lbl, out_extension)
             
-            # Get the response
-            cmd = self.scpcmd + " %s:%s %s/" % (self.hostname, out_filename,
-                                                self.local_workdir)
-            cp_res = self.ExecuteCMD(cmd, False)
-            #cp_res = os.system(cmd + " > /dev/null")
-            if not cp_res:
-                #print "Error while executing:", cmd
-                #print "Return code:", cp_res
-                #sys.stderr.write(cmd + ": exit with code " + str(cp_res))
-                continue
+            for out in out_fnames:
+                # Get the response
+                cmd = self.scpcmd + " %s:%s %s/" % (self.hostname, out,
+                                                    self.local_workdir)
+                cp_res = self.ExecuteCMD(cmd, False)
+                #cp_res = os.system(cmd + " > /dev/null")
+                if not cp_res:
+                    #print "Error while executing:", cmd
+                    #print "Return code:", cp_res
+                    #sys.stderr.write(cmd + ": exit with code " + str(cp_res))
+                    continue
             
             # Get the results
             try:
-                calc.set_label("%s/%s" % (self.local_workdir, lbl))
-                calc.read_results()
-                results[i] = copy.deepcopy(calc.results)
+                results[i] = self.read_results(calc, lbl) 
             except:
                 pass
         
@@ -1208,6 +1231,7 @@ class Cluster(object):
         
         # Setup if the ensemble has the stress
         ensemble.has_stress = get_stress
+        ensemble.all_properties = [None] * ensemble.N
         
         # Check if the working directory exists
         if not os.path.isdir(self.local_workdir):
@@ -1225,15 +1249,14 @@ class Cluster(object):
             
             for i, res in enumerate(results):
                 num = jobs_id[i]
+
+                if res is None:
+                    continue
                 
                 # Check if the run was good
-                try:
-                    resk = res.keys()
-                except:
-                    continue
-                check_e = "energy" in resk
-                check_f = "forces" in resk
-                check_s = "stress" in resk
+                check_e = "energy" in res
+                check_f = "forces" in res
+                check_s = "stress" in res
                 
                 is_success =  check_e and check_f
                 if get_stress:
@@ -1242,6 +1265,7 @@ class Cluster(object):
                 if not is_success:
                     continue
                 
+                ensemble.all_properties[num] = copy.deepcopy(res)
                 ensemble.energies[num] = res["energy"] / units["Ry"]
                 ensemble.forces[num, :, :] = res["forces"] / units["Ry"]
                 if get_stress:
