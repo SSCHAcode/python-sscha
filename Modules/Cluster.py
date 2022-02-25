@@ -1206,9 +1206,11 @@ class Cluster(object):
         if self.use_active_shell:
             cmd = "{ssh} {host} -t '{shell} --login -c \"echo {string}\"'".format(ssh = self.sshcmd, 
                          host = self.hostname, 
-                         string = string, 
+                         string = string.replace("$", "\$"), 
                          shell = self.terminal)
         #print cmd
+
+        #print(cmd)
         
         status, output = self.ExecuteCMD(cmd, return_output = True)
 #        
