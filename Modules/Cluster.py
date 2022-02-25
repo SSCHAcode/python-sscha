@@ -1202,6 +1202,12 @@ class Cluster(object):
         # Open a pipe with the server
         # Use single ' to avoid string parsing by the local terminal
         cmd = "%s %s 'echo \"%s\"'" % (self.sshcmd, self.hostname, string)
+
+        if self.use_active_shell:
+            cmd = "{ssh} {host} -t '{shell} --login -c \"echo {string}\"'".format(ssh = self.sshcmd, 
+                         host = self.hostname, 
+                         string = string, 
+                         shell = self.terminal)
         #print cmd
         
         status, output = self.ExecuteCMD(cmd, return_output = True)
