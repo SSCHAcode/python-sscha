@@ -326,8 +326,12 @@ class Cluster(object):
             if not isinstance(output, str):
                 try:
                     output = str(output.decode("utf-8"))
-                except:
-                    pass
+                except Exception as e:
+                    sys.stderr.write("Error in the following command:\n")
+                    sys.stderr.write(e)
+                    sys.stderr.write("\n")
+                    sys.stderr.flush()
+                    
             output = output.strip()
             status = p.wait()
             if not err is None:
@@ -766,6 +770,8 @@ class Cluster(object):
             except Exception as e:
                 sys.stderr.write("JOB {} | {} resulted in error:\n".format(i, lbl))
                 sys.stderr.write(e)
+                sys.stderr.write("\n")
+                sys.stderr.flush()
                 
         
         return results
