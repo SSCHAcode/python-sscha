@@ -763,8 +763,10 @@ class Cluster(object):
             # Get the results
             try:
                 results[i] = self.read_results(calc, lbl) 
-            except:
-                pass
+            except Exception as e:
+                sys.stderr.write("JOB {} | {} resulted in error:\n".format(i, lbl))
+                sys.stderr.write(e)
+                
         
         return results
 
