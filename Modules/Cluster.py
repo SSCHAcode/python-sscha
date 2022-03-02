@@ -326,8 +326,12 @@ class Cluster(object):
             if not isinstance(output, str):
                 try:
                     output = str(output.decode("utf-8"))
-                except:
-                    pass
+                except Exception as e:
+                    sys.stderr.write("Error in the following command:\n")
+                    sys.stderr.write(e)
+                    sys.stderr.write("\n")
+                    sys.stderr.flush()
+                    
             output = output.strip()
             status = p.wait()
             if not err is None:
@@ -763,8 +767,12 @@ class Cluster(object):
             # Get the results
             try:
                 results[i] = self.read_results(calc, lbl) 
-            except:
-                pass
+            except Exception as e:
+                sys.stderr.write("JOB {} | {} resulted in error:\n".format(i, lbl))
+                sys.stderr.write(e)
+                sys.stderr.write("\n")
+                sys.stderr.flush()
+                
         
         return results
 
@@ -1202,7 +1210,15 @@ class Cluster(object):
         # Open a pipe with the server
         # Use single ' to avoid string parsing by the local terminal
         cmd = "%s %s 'echo \"%s\"'" % (self.sshcmd, self.hostname, string)
+
+        if self.use_active_shell:
+            cmd = "{ssh} {host} -t '{shell} --login -c \"echo {string}\"'".format(ssh = self.sshcmd, 
+                         host = self.hostname, 
+                         string = string.replace("$", "\$"), 
+                         shell = self.terminal)
         #print cmd
+
+        #print(cmd)
         
         status, output = self.ExecuteCMD(cmd, return_output = True)
 #        
