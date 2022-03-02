@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 import sys, os
+import warnings
 import numpy as np
 import time
 
@@ -33,6 +34,7 @@ import cellconstructor.Settings
 
 import sscha.Parallel as Parallel
 from sscha.Parallel import pprint as print
+from sscha.Tools import NumpyEncoder
 
 import json
 
@@ -133,7 +135,6 @@ class Ensemble:
         self.forces = []
         self.stresses = []
         self.xats = []
-        self.all_properties = []
         self.units = UNITS_DEFAULT
         
         self.sscha_energies = []
@@ -186,7 +187,7 @@ class Ensemble:
         self.stress_computed = None
 
         # Get the extra quantities
-        self.extra_quantities = {}
+        self.all_properties = []
 
 
         # Setup the attribute control
@@ -770,9 +771,9 @@ Error, the following stress files are missing from the ensemble:
             
             self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
 
-        if len(self.all_properties):
-            with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
-                json.dump({"properties" : self.all_properties}, fp)
+            if len(self.all_properties):
+                with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
+                    json.dump({"properties" : self.all_properties}, fp, cls=NumpyEncoder)
         
     def save_enhanced_xyz(self, filename, append_mode = True, stress_key = "virial", forces_key = "force", energy_key = "energy"):
         """
@@ -960,6 +961,16 @@ Error, the following stress files are missing from the ensemble:
         # Setup that both forces and stresses are not computed
         self.stress_computed = np.ones(self.N, dtype = bool)
         self.force_computed = np.ones(self.N, dtype = bool)
+
+        all_prop_fname = os.path.join(data_dir, "all_properties_pop%d.json" % population_id)
+        if os.path.exists(all_prop_fname):
+            with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
+                props= json.load(fp)
+                if "properties" in props:
+                    self.all_properties = props["properties"]
+                else:
+                    warnings.warn("WARNING: found file {} but not able to load the properties keyword.".format(all_prop_fname))
+                    
         
 
     def init_from_structures(self, structures):
