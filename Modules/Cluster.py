@@ -97,6 +97,37 @@ __CLUSTER_KEYS__ = [__CLUSTER_NAMELIST__, __CLUSTER_TEMPLATE__, __CLUSTER_HOST__
                     __CLUSTER_ATTEMPTS__, __CLUSTER_PORT__]
 
 
+SPECIAL_SYMBOLS = ["$", ";", "|"]
+
+
+def parse_symbols(string):
+    r"""
+    REPLACE SPECIAL SYMBOLS
+    =======================
+
+    In a string that must be used on a shell command, replace all the special symbols
+    in a way that they are correctly passed through the SHELL.
+
+    for example $USER  => \$USER  
+    
+    Parameters
+    ----------
+        string : str
+            The string to be parsed
+    
+    Results
+    -------
+        output : str
+            The string after the symbols are replaced
+    """
+    new_str = string
+    for symbol in SPECIAL_SYMBOLS:
+        new_str = new_str.replace(symbol, "\\" + symbol)
+    return new_str
+
+
+
+
 class Cluster(object):
     
     def __init__(self, hostname=None, pwd=None, extra_options="", workdir = "",
@@ -1214,7 +1245,7 @@ class Cluster(object):
         if self.use_active_shell:
             cmd = "{ssh} {host} -t '{shell} --login -c \"echo {string}\"'".format(ssh = self.sshcmd, 
                          host = self.hostname, 
-                         string = string.replace("$", "\$"), 
+                         string = parse_symbols(string), 
                          shell = self.terminal)
         #print cmd
 
