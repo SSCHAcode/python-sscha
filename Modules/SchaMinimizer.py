@@ -1232,7 +1232,25 @@ WARNING, the preconditioning is activated together with a root representation.
                                                                     self.__gw_err__[-1] * __RyTomev__))
         print ("Kong-Liu effective sample size = ", self.ensemble.get_effective_sample_size())
         print ()
-        
+
+        # Print the total force on the structure
+        print("Total force on the centroids [eV/A]:")
+        forces, err = self.ensembe.get_average_forces()
+        # Apply the symmetries
+        if not self.neglect_symmetries:
+            qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+            if self.use_spglib:
+                qe_sym.SetupFromSPGLIB()
+            else:
+                qe_sym.SetupQPoint()
+            qe_sym.SymmetrizeVector(forces)
+            qe_sym.SymmetrizeVector(err)
+            err /= np.sqrt(qe_sym.QE_nsym)
+
+        for i in range(self.dyn.structure.N_atoms):
+            print("{:4d}) {:14.6f}{:14.6f}{:14.6f}  +- {:14.6f}{:14.6f}{:14.6f}".format(*list([i] + list(forces[i, :] * CC.Units.RY_TO_EV) + list(err[i,:] * CC.Units.RY_TO_EV)))
+        print()
+
         if self.ensemble.has_stress and verbose >= 1:
             print ()
             print (" ==== STRESS TENSOR [GPa] ==== ")
