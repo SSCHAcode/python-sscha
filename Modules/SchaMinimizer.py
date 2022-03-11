@@ -1387,9 +1387,9 @@ You can try to fix this error setting the {} variable of {} class to True.
             print ()
             print ("The gw gradient satisfy the convergence condition.")
         
-        if self.gradi_op == "gc":
+        if self.gradi_op == "gc" or not self.minim_struc:
             total_cond = gc_cond
-        elif self.gradi_op == "gw":
+        elif self.gradi_op == "gw" or not self.minim_dyn:
             total_cond = gw_cond
         elif self.gradi_op == "all":
             total_cond = gc_cond and gw_cond
