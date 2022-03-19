@@ -441,6 +441,33 @@ Error, the specified location to save the ensemble:
                 True if the minimization converged, False if the maximum number of 
                 populations has been reached.
         """
+
+        # Prepare the saving directory
+        if ensemble_loc is None:
+            ensemble_loc = self.data_dir
+
+        if (not ensemble_loc) and self.save_ensemble:
+            ERR_MSG = """
+Error, you must specify where to save the ensembles.
+       this can be done either passing ensemble_loc = "path/to/dir" 
+       for the ensemble, or by setting the data_dir attribute of this object.
+"""
+            raise IOError(ERR_MSG)
+        
+        if self.save_ensemble:
+            if not os.path.exists(ensemble_loc):
+                os.makedirs(ensemble_loc)
+            else:
+                if not os.path.isdir(ensemble_loc):
+                    ERR_MSG = """
+Error, the specified location to save the ensemble:
+       '{}' 
+       already exists and it is not a directory.
+""".format(ensemble_loc)
+                    raise IOError(ERR_MSG)
+
+        
+
         # Rescale the target pressure in eV / A^3
         target_press_evA3 = target_press / sscha.SchaMinimizer.__evA3_to_GPa__
         I = np.eye(3, dtype = np.float64)
