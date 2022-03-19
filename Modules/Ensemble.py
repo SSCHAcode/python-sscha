@@ -873,7 +873,8 @@ Error, the following stress files are missing from the ensemble:
             np.savetxt(os.path.join(root_directory, "coord.raw"), self.xats.reshape((self.N, 3 * nat)))
 
             # Save the box
-            np.savetxt(os.path.join(root_directory, "box.raw"), np.tile(self.current_dyn.structure.unit_cell.ravel(), (self.N, 1)))
+            #Prepare an array with all the unit cells
+            np.savetxt(os.path.join(root_directory, "box.raw"), np.array([s.unit_cell.ravel() for s in self.structures]))
 
             # Save the forces
             np.savetxt(os.path.join(root_directory, "force.raw"), self.forces.reshape((self.N, 3*nat)) * Rydberg)
