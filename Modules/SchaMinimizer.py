@@ -1248,7 +1248,7 @@ WARNING, the preconditioning is activated together with a root representation.
             err /= np.sqrt(qe_sym.QE_nsym)
 
         for i in range(self.dyn.structure.N_atoms):
-            print("{:4d}) {:14.6f}{:14.6f}{:14.6f}  +- {:14.6f}{:14.6f}{:14.6f}".format(*list([i] + list(forces[i, :] * CC.Units.RY_TO_EV) + list(err[i,:] * CC.Units.RY_TO_EV)))
+            print("{:4d}) {:14.6f}{:14.6f}{:14.6f}  +- {:14.6f}{:14.6f}{:14.6f}".format(*list([i] + list(forces[i, :] * CC.Units.RY_TO_EV) + list(err[i,:] * CC.Units.RY_TO_EV))))
         print()
 
         if self.ensemble.has_stress and verbose >= 1:
