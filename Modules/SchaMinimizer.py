@@ -1235,7 +1235,7 @@ WARNING, the preconditioning is activated together with a root representation.
 
         # Print the total force on the structure
         print("Total force on the centroids [eV/A]:")
-        forces, err = self.ensemble.get_average_forces()
+        forces, err = self.ensemble.get_average_forces(True)
         # Apply the symmetries
         if not self.neglect_symmetries:
             qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
