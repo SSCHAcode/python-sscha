@@ -148,7 +148,8 @@ minim.finalize(2)
 
 # Save the final dynamical matrix
 print ("Saving the final dynamical matrix in %s" % (minim.dyn_path + "_popuation%d_" % minim.population))
-minim.dyn.save_qe(minim.dyn_path + "_population%d_" % minim.population)
+minim.dyn.save_qe('final_sscha_dyn_pop%d' % minim.population)
+minim.dyn.structure.save_scf('final_sscha_structure_pop%d.scf' % minim.population)
 
 # Plot the results
 minim.plot_results(args.save_data, args.plot)
