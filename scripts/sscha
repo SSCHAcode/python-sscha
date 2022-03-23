@@ -34,7 +34,7 @@ import sscha.Utilities
 import argparse
 
 PROG_NAME = "sscha"
-VERSION = "SSCHA, alpha version, not yet released."
+VERSION = "1.1"
 DESCRIPTION = r"""
 
 
@@ -49,12 +49,13 @@ DESCRIPTION = r"""
 
 
 Wellcome to the SSCHA code. 
-This script will start a SSCHA minimization 
+This stand-alone script performs SSCHA minimization 
 according to the options parsed from the input file.
-Note, you can also use the SSCHA utilities directly 
-by programming small and easy python scripts. 
-Refer to the documentation for more details.
+Note, you can also run the SSCHA with the python-APIs. 
+The python-APIs give access to much more customizable options,
+not available with the stand-alone app.
 
+Refer to the documentation for more details.
 
 
 """
@@ -147,7 +148,9 @@ print ("Minimization ended.")
 minim.finalize(2)
 
 # Save the final dynamical matrix
-print ("Saving the final dynamical matrix in %s" % (minim.dyn_path + "_popuation%d_" % minim.population))
+print ("Saving the final dynamical matrix in %s" % ('final_sscha_dyn_pop%d' % minim.population))
+print ('Saving the final centroids into {}'.format('final_sscha_structure_pop%d.scf' % minim.population))
+print ()
 minim.dyn.save_qe('final_sscha_dyn_pop%d' % minim.population)
 minim.dyn.structure.save_scf('final_sscha_structure_pop%d.scf' % minim.population)
 
