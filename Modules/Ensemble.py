@@ -618,7 +618,7 @@ Error, the following stress files are missing from the ensemble:
 
             # Get the stress if any
             try:
-                stress = ase_struct.get_stress(voigt=False)
+                stress = - ase_struct.get_stress(voigt=False) 
                 # eV/A^3 -> Ry/bohr^3
                 stress /= Rydberg / Bohr**3
                 count_stress += 1

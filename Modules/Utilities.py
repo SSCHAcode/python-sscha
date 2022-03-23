@@ -546,22 +546,24 @@ class IOInfo:
 
         if not sscha.Parallel.am_i_the_master():
             return
-        
-        # Get the weights if required
-        if self.save_weights:
-            self.weights.append(minim.ensemble.rho[:])
+
+        if minim.minimizer.new_direction:
             
-        if self.save_dynmats:
-            minim.dyn.save_qe(self.save_dyn_prefix + "_ka%05d_" % self.ka)
-        
-        if self.save_atomic_positions:
-            self.current_struct = minim.dyn.structure.copy()
+            # Get the weights if required
+            if self.save_weights:
+                self.weights.append(minim.ensemble.rho[:])
+                
+            if self.save_dynmats:
+                minim.dyn.save_qe(self.save_dyn_prefix + "_ka%05d_" % self.ka)
             
-        # This perform also the saving
-        self.CFP_SaveFrequencies(minim)
-        
-        # Update the step
-        self.ka += 1
+            if self.save_atomic_positions:
+                self.current_struct = minim.dyn.structure.copy()
+                
+            # This perform also the saving
+            self.CFP_SaveFrequencies(minim)
+            
+            # Update the step
+            self.ka += 1
 
 
     def CFP_SaveFrequencies(self, minim):
@@ -569,16 +571,17 @@ class IOInfo:
         This custom method stores the total frequencies updating an exeternal file
         """
         
-        # Generate the supercell in real space
-        dyn_sc = minim.dyn.GenerateSupercellDyn( minim.ensemble.supercell )
+        # Generate the supercell in real space (Do it only if the frequency changes)
+        if minim.minimizer.new_direction:
+            dyn_sc = minim.dyn.GenerateSupercellDyn( minim.ensemble.supercell )
 
-        # Dyagonalize
-        w, pols = dyn_sc.DyagDinQ(0)
-        self.total_freqs.append(w)
-        
+            # Dyagonalize
+            w, pols = dyn_sc.DyagDinQ(0)
+            self.total_freqs.append(w)
+            
 
-        if self.__save_each_step:
-            self.Save()
+            if self.__save_each_step:
+                self.Save()
 
 
 

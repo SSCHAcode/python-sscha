@@ -231,6 +231,7 @@ class SSCHA_Minimizer(object):
         self.__gw__ = []
         self.__gw_err__ = []
         self.__KL__ = []
+        self.__good_kasteps__ = []
 
 
 
@@ -554,6 +555,10 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
         
         # Update the previous gradient
         self.prev_grad = dyn_grad
+
+        # If the step is good, pass chose it
+        if self.minimizer.new_direction:
+            self.__good_kasteps__.append(len(self.__fe__) - 1)
         
     def setup_from_namelist(self, input_file):
         """
@@ -1483,18 +1488,18 @@ You can try to fix this error setting the {} variable of {} class to True.
     
             self.__gc__.append(self.__gc__[-1])
             self.__gc_err__.append(self.__gc_err__[-1])
+
+        fe = np.array(self.__fe__)[self.__good_kasteps__] * __RyTomev__
+        fe_err = np.array(self.__fe_err__)[self.__good_kasteps__] * __RyTomev__
         
-        # Convert the data in numpy arrays
-        fe = np.array(self.__fe__) * __RyTomev__
-        fe_err = np.array(self.__fe_err__) * __RyTomev__
         
-        gc = np.array(self.__gc__) * __RyTomev__
-        gc_err = np.array(self.__gc_err__) * __RyTomev__
+        gc = np.array(self.__gc__)[self.__good_kasteps__] * __RyTomev__
+        gc_err = np.array(self.__gc_err__)[self.__good_kasteps__] * __RyTomev__
         
-        gw = np.array(self.__gw__) * __RyTomev__
-        gw_err = np.array(self.__gw_err__) * __RyTomev__
+        gw = np.array(self.__gw__)[self.__good_kasteps__] * __RyTomev__
+        gw_err = np.array(self.__gw_err__)[self.__good_kasteps__] * __RyTomev__
         
-        kl = np.array(self.__KL__, dtype = np.float64)
+        kl = np.array(self.__KL__, dtype = np.float64)[self.__good_kasteps__]
         
         steps = np.arange(len(fe))
     
@@ -1507,6 +1512,7 @@ You can try to fix this error setting the {} variable of {} class to True.
             np.savetxt(save_filename, np.real(np.transpose(save_data)),
                        header = "Steps; Free energy +- error [meV]; FC gradient +- error [bohr^2]; Structure gradient +- error [meV / A]; Kong-Liu N_eff")
             print ("Minimization data saved in %s." % save_filename)
+            print('Good steps at {}'.format(self.__good_kasteps__))
         
         
         # Plot
