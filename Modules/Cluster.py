@@ -348,6 +348,7 @@ class Cluster(object):
 
         if on_cluster:
             cmd = self.sshcmd + " {} '{}'".format(self.hostname, cmd)
+
         
         success = False
         output = ""
@@ -366,6 +367,9 @@ class Cluster(object):
                     
             output = output.strip()
             status = p.wait()
+
+
+            print('THREAD {} EXECUTE COMMAND: {}'.format(threading.get_native_id(), cmd))
             if not err is None:
                 sys.stderr.write(err)
             
@@ -639,8 +643,9 @@ class Cluster(object):
             tar_file = os.path.join(self.local_workdir, tar_name)
             cmd = 'tar -cf {} -C {}'.format(tar_file, self.local_workdir)
 
-            # Remove the old tar file and the old input/output files
-            rm_cmd = 'rm -f {}; '.format(os.path.join(self.workdir, tar_name))
+            # Remove the old tar file and the old input/output files\
+            rm_cmd = ''
+            #rm_cmd = 'rm -f {}; '.format(os.path.join(self.workdir, tar_name))
 
             for i, fname in enumerate(list_of_input):
                 cmd += ' ' +  fname
@@ -733,7 +738,9 @@ Error while connecting to the cluster to copy the files:
 
             # Extract the tar file
             os.system('tar xf {} -C {}'.format(os.path.join(self.local_workdir, tar_name), self.local_workdir))
-            os.remove(os.path.join(self.local_workdir, tar_name))
+            #os.remove(os.path.join(self.local_workdir, tar_name))
+
+            return cp_res
 
             
         
@@ -895,7 +902,11 @@ Error while connecting to the cluster to copy the files:
         # Collect back the output
         if not self.copy_files(input_files, output_files, to_server = False):
             # Submission failed
+            print('[SUBMISSION {}] FAILED RETRIVING OUTPUT'.format(threading.get_native_id()))
             return results
+
+
+        print('[SUBMISSION {}] GOT OUTPUT'.format(threading.get_native_id(), results))
 
         # Read the output files
         for i in submitted:
@@ -911,6 +922,8 @@ Error while connecting to the cluster to copy the files:
                 sys.stderr.write("\n")
                 sys.stderr.flush()
                 
+
+        print('[SUBMISSION {}] GOT RESULTS:\n{}'.format(threading.get_native_id(), results))
         
         return results
 
@@ -1402,6 +1415,7 @@ Error while connecting to the cluster to copy the files:
                                             ".pwo", "ESP", n_together)
             
             for i, res in enumerate(results):
+                print("[THREADS {}] ADDING RESULT {} = {}".format(threading.get_native_id(), jobs_id[i], res))
                 num = jobs_id[i]
 
                 if res is None:
@@ -1441,6 +1455,9 @@ Error while connecting to the cluster to copy the files:
         recalc = 0
         while np.sum(np.array(success, dtype = int) - 1) != 0:
             threads = []
+
+            print("[CYCLE] SUCCESS: ", success)
+            print("[CYCLE] STOPPING CONDITION:", np.sum(np.array(success, dtype = int) - 1))
             
             # Get the remaining jobs
             false_mask = np.array(success) == False
@@ -1463,6 +1480,9 @@ Error while connecting to the cluster to copy the files:
             for t in threads:
                 t.join(timeout)
             
+            print("[CYCLE] [END] SUCCESS: ", success)
+            print("[CYCLE] [END] STOPPING CONDITION:", np.sum(np.array(success, dtype = int) - 1))
+
             recalc += 1
             if recalc > num_batch_offset + self.max_recalc:
                 print ("Expected batch ordinary resubmissions:", num_batch_offset)
