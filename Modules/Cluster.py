@@ -5,6 +5,7 @@ import subprocess
 import threading
 import copy
 import time, datetime
+import tarfile
 
 __DIFFLIB__ = False
 try:
@@ -546,7 +547,7 @@ class Cluster(object):
             tmt_str = "timeout %d " % self.timeout
         return "%s%s %s\n" % (tmt_str, new_mpicmd, binary)
 
-    def prepare_input_file(self, structure, calc, label):
+    def prepare_input_file(self, structures, calc, labels):
         """
         PREPARE THE INPUT FILE
         ======================
@@ -554,52 +555,177 @@ class Cluster(object):
         This is specific for quantum espresso and must be inherit and replaced for 
         other calculators.
 
-        This crates the input file and copy it in the working directory.
+        This crates the input files in the local working directory 
+        self.local_workdir and it returns the list of all the files generated.
+
 
         Parameters
         ----------
-            structure : CellConstructor.Structure.Structure
-                The atomic structure on which to run the calculation
+            structures : List of cellconstructor.Structure.Structure
+                The atomic structures.
             calc : the ASE or CellConstructor calculator.
                 In this case, it works with quantum espresso
-            label : string
+            labels : List of strings
                 The unique name of this calculation
+
+        Returns
+        -------
+            List_of_input : list
+                List of strings containing all the input files
+            List_of_output : list
+                List of strings containing the output files expected
+                for the calculation
         """
 
         # Prepare the input file
-        calc.set_directory(self.local_workdir)
-        calc.set_label(label)
-        calc.write_input(structure)
+        list_of_inputs = []
+        list_of_outputs = []
+        for i, (label, structure) in enumerate(zip(labels, structures)):
+            calc.set_directory(self.local_workdir)
+            calc.set_label(label)
+            calc.write_input(structure)
 
-        print("LBL: {} | PREFIX: {}".format(label, calc.input_data["control"]["prefix"]))
+            print("LBL: {} | PREFIX: {}".format(label, calc.input_data["control"]["prefix"]))
 
-        #ase.io.write("%s/%s.pwi"% (self.local_workdir, label),
-        #                atm, **calc.parameters)
-        
-        
+            #ase.io.write("%s/%s.pwi"% (self.local_workdir, label),
+            #                atm, **calc.parameters)
+
+            input_file = '{}.pwi'.format(label)
+            output_file = '{}.pwo'.format(label)
+
+            list_of_inputs.append(input_file)     
+            list_of_outputs.append(output_file)            
             
-        # First of all clean eventually input/output file of this very same calculation
-        cmd = self.sshcmd + " %s 'rm -f %s/%s%s %s/%s%s'" % (self.hostname, 
-                                                                self.workdir, label, ".pwi",
-                                                                self.workdir, label, ".pwo")
-        self.ExecuteCMD(cmd, False)
+        
+        return list_of_inputs, list_of_outputs
+
+    def copy_files(self, list_of_input, list_of_output, to_server):
+        """
+        COPY INPUT/OUTPUT FILES FROM/TO THE SERVER
+        ==========================================
+
+        This function copies the input files toward the HPC if to_server is True
+        or retrive the output files from the HPC if to_server is False
+
+        Parameters
+        ----------
+            list_of_input : list
+                List of the path to the input files to be copied into the server.
+            list_of_output : list
+                List of the output files to be copied from the HPC server.
+                It is needed also when submitting the input file from the server,
+                as files that are named in the same way will be cleaned.
+                (No risk to mistake them with the actual result of the calculation)
+            to_server : bool
+                If true, we copy the input files into the server from the local machine.
+                If false, we copy the output files from the server to the local machine.
+        """
+
+        thread_id = threading.get_native_id()
+
+        if to_server:
+            # Compress the files
+            tar_name = 'inputs_id{}.tar'.format(thread_id)
+            tar_file = os.path.join(self.local_workdir, tar_name)
+            cmd = 'tar -cf {} -C {}'.format(tar_file, self.local_workdir)
+
+            # Remove the old tar file and the old input/output files
+            rm_cmd = 'rm -f {}; '.format(os.path.join(self.workdir, tar_name))
+
+            for i, fname in enumerate(list_of_input):
+                cmd += ' ' +  fname
+                
+                # Remove all the previous output files on cluster
+                rm_cmd = 'rm -f {}; '.format(os.path.join(self.workdir, fname))
+
+
+            
+            os.system(cmd)
+
+            if not os.path.exists(tar_file):
+                raise IOError("""
+Error, for some reason I'm unable to generate the tar.
+       command = {}
+""".format(cmd))
+
+            for fname in list_of_output:
+                rm_cmd += 'rm -f {}; '.format(os.path.join(self.workdir, fname))
+
+                # Check if the output files are already present.
+                # In this case, remove them to avoid conflict
+                if os.path.exists(os.path.join(self.local_workdir, fname)):
+                    os.remove(os.path.join(self.local_workdir, fname))
+
+        
+            # Clean eventually input/output file of this very same calculation
+            cmd = self.sshcmd + " %s '{}'" % (self.hostname, rm_cmd)
+            self.ExecuteCMD(cmd, False)
 #            cp_res = os.system(cmd + " > /dev/null")
 #            if cp_res != 0:
 #                print "Error while executing:", cmd
 #                print "Return code:", cp_res
 #                sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
 #            
-        # Copy the file into the cluster
-        cmd = self.scpcmd + " %s/%s%s %s:%s/" % (self.local_workdir, label, 
-                                                ".pwi", self.hostname, 
-                                                self.workdir)
-        cp_res = self.ExecuteCMD(cmd, False)
-        if not cp_res:
-            print ("Error while executing:", cmd)
-            print ("Return code:", cp_res)
-            sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
-        return cp_res
-        #cp_res = os.system(cmd + " > /dev/null")
+
+            # Copy the file into the cluster
+            cmd = self.scpcmd + " %s %s:%s/" % (tar_file, self.hostname, self.workdir)
+            cp_res = self.ExecuteCMD(cmd, False)
+            if not cp_res:
+                print ("Error while executing:", cmd)
+                print ("Return code:", cp_res)
+                sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
+                print("""
+Error while connecting to the cluster to copy the files:
+{}
+""".format(list_of_input))
+                return cp_res
+
+            # Unpack the input files and remove the archive
+            cmd = 'cd {}; tar xf {}; rm -f {}'.format(self.workdir, tar_name, tar_name)
+            cmd = self.sshcmd + " %s '{}'" % (self.hostname, cmd)
+            cp_res = self.ExecuteCMD(cmd, False)
+            if not cp_res:
+                print ("Error while executing:", cmd)
+                print ("Return code:", cp_res)
+                sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
+            return cp_res
+            #cp_res = os.system(cmd + " > /dev/null")
+        else:
+            # Compress all the output files at once
+            tar_name = 'outputs_id{}.tar'.format(thread_id)
+            tar_command = 'tar cf {} '
+            for output in list_of_output:
+                tar_command += ' ' + output
+            
+            compress_cmd = 'cd {}; {}'.format(self.workdir, tar_command)
+
+            cmd = self.sshcmd + " %s '{}'" % (self.hostname, cmd)
+            self.ExecuteCMD(cmd, False)
+            if not cp_res:
+                print ("Error while compressing the outputs:", cmd)
+                print(list_of_output)
+                print ("Return code:", cp_res)
+                return cp_res
+
+            
+            # Copy the tar and unpack
+            cmd = self.scpcmd + "%s:%s %s/" % (self.hostname, os.path.join(self.workdir, tar_name), self.local_workdir)
+            cp_res = self.ExecuteCMD(cmd, False)
+            if not cp_res:
+                print ("Error while executing:", cmd)
+                print ("Return code:", cp_res)
+                sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
+                print("""
+Error while connecting to the cluster to copy the files:
+{}
+""".format(list_of_input))
+                return cp_res
+
+            # Extract the tar file
+            os.system('tar xf {} -C {}'.format(os.path.join(self.local_workdir, tar_name), self.local_workdir))
+            os.remove(os.path.join(self.local_workdir, tar_name))
+
+            
         
 
     def submit(self, script_location):
@@ -713,55 +839,36 @@ class Cluster(object):
         results = [None] * N_structs
         submitted = []
         submission_labels = []
+
+        
+
         for i in range(N_structs):
             # Prepare a typical label
             lbl = label + "_" + str(indices[i])
             submission_labels.append(lbl)
-            
-            # Create the input file and copy it into the cluster
-            if not self.prepare_input_file(list_of_structures[i], calc, lbl):
-                continue
-
-            submitted.append(i)
-            
-        # Save the app list and copy it to the destination
-        #app_list_name = "%s_app.list" % (label + "_" + str(indices[0]))
-        #app_list_path = "%s/%s" % (self.local_workdir, app_list_name)
-        #f = file(app_list_path, "w")
-        #f.write(app_list)
-        #f.close()
         
-#        # Copy the app_list into the destination
-#        cmd = self.scpcmd + " %s %s:%s" % (app_list_path, self.hostname, 
-#                                           self.workdir)
-#        cp_res = os.system(cmd)
-#        if cp_res != 0:
-#            print "Error while executing:", cmd
-#            print "Return code:", cp_res
-#            sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
-#            return results #[None] * N_structs
-        
+            
+        # Create the input files 
+        input_files, output_files =  self.prepare_input_file(list_of_structures, calc, submission_labels)
 
+        # Create the submission script
         submission = self.create_submission_script(submission_labels)
         
-        # Copy the submission script
-        sub_fpath = "%s/%s.sh" % (self.local_workdir, label + "_" + str(indices[0]))
+        # Add the submission script to the input files
+        sub_name =  label + "_" + str(indices[0]) + '.sh'
+        sub_fpath = os.path.join(self.local_workdir, sub_name)
         f = open(sub_fpath, "w")
         f.write(submission)
         f.close()
-        cmd = self.scpcmd + " %s %s:%s" % (sub_fpath, self.hostname, self.workdir)
-        cp_res = self.ExecuteCMD(cmd, False)
-        #cp_res = os.system(cmd  + " > /dev/null")
-        if not cp_res:
-            print ("Error while executing:", cmd)
-            print ("Return code:", cp_res)
-            sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
-            return results#[None] * N_structs
+        input_files.append(sub_name)
+        
+        if not self.copy_files(input_files, output_files, to_server = True):
+            # Submission failed
+            return results
         
         
         # Run the simulation
-
-        sub_script_loc = os.path.join(self.workdir, label + "_" + str(indices[0]) + ".sh")
+        sub_script_loc = os.path.join(self.workdir, sub_name)
         cp_res, submission_output = self.submit(sub_script_loc)
         
         if self.nonblocking_command:
@@ -775,25 +882,15 @@ class Cluster(object):
             while not self.check_job_finished(job_id):
                 time.sleep(self.check_timeout)
 
-        
-        # Collect the output back
+        # Collect back the output
+        if not self.copy_files(input_files, output_files, to_server = False):
+            # Submission failed
+            return results
+
+        # Read the output files
         for i in submitted:
             # Prepare a typical label
             lbl = label + "_" + str(indices[i])
-            out_fnames = self.get_output_path(lbl)
-            #out_filename = "%s/%s%s"% (self.workdir, lbl, out_extension)
-            
-            for out in out_fnames:
-                # Get the response
-                cmd = self.scpcmd + " %s:%s %s/" % (self.hostname, out,
-                                                    self.local_workdir)
-                cp_res = self.ExecuteCMD(cmd, False)
-                #cp_res = os.system(cmd + " > /dev/null")
-                if not cp_res:
-                    #print "Error while executing:", cmd
-                    #print "Return code:", cp_res
-                    #sys.stderr.write(cmd + ": exit with code " + str(cp_res))
-                    continue
             
             # Get the results
             try:
