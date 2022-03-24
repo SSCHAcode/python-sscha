@@ -703,14 +703,14 @@ Error while connecting to the cluster to copy the files:
         else:
             # Compress all the output files at once
             tar_name = 'outputs_id{}.tar'.format(thread_id)
-            tar_command = 'tar cf {} '
+            tar_command = 'tar cf {} '.format(tar_name)
             for output in list_of_output:
                 tar_command += ' ' + output
             
             compress_cmd = 'cd {}; {}'.format(self.workdir, tar_command)
 
             cmd = self.sshcmd + " %s '%s'" % (self.hostname, compress_cmd)
-            self.ExecuteCMD(cmd, False)
+            cp_res = self.ExecuteCMD(cmd, False)
             if not cp_res:
                 print ("Error while compressing the outputs:", cmd)
                 print(list_of_output)
