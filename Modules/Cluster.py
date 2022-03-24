@@ -797,7 +797,7 @@ Error while connecting to the cluster to copy the files:
         """
         Return a dictionary of the computed property for the given calculation label
         """
-
+        print("[READ RESULTS] THREAD ID {} ENTERED".format(threading.get_native_id()))
         #calc.set_label("%s/%s" % (self.local_workdir, label))
         calc.set_directory(self.local_workdir)
         calc.set_label(label)
@@ -863,6 +863,7 @@ Error while connecting to the cluster to copy the files:
             # Prepare a typical label
             lbl = label + "_" + str(indices[i])
             submission_labels.append(lbl)
+            submitted.append(i)
         
             
         # Create the input files 
@@ -906,7 +907,7 @@ Error while connecting to the cluster to copy the files:
             return results
 
 
-        print('[SUBMISSION {}] GOT OUTPUT'.format(threading.get_native_id(), results))
+        print('[SUBMISSION {}] GOT OUTPUT'.format(threading.get_native_id()))
 
         # Read the output files
         for i in submitted:
