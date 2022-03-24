@@ -599,6 +599,16 @@ class Cluster(object):
         
         return list_of_inputs, list_of_outputs
 
+    def clean_localworkdir(self):
+        """
+        CLEAN THE LOCAL WORKDIR FROM ALL INPUT/OUTPUT FILES IN TAR
+        ===================================================
+        """
+
+        all_files = [x for x in os.listdir(self.local_workdir) if x.startswith('input') and x.endswith('.tar')]
+        for f in all_files:
+            os.remove(os.path.join(self.local_workdir, f))
+
     def copy_files(self, list_of_input, list_of_output, to_server):
         """
         COPY INPUT/OUTPUT FILES FROM/TO THE SERVER
@@ -658,7 +668,7 @@ Error, for some reason I'm unable to generate the tar.
 
         
             # Clean eventually input/output file of this very same calculation
-            cmd = self.sshcmd + " %s '{}'" % (self.hostname, rm_cmd)
+            cmd = self.sshcmd + " %s '%s'" % (self.hostname, rm_cmd)
             self.ExecuteCMD(cmd, False)
 #            cp_res = os.system(cmd + " > /dev/null")
 #            if cp_res != 0:
@@ -681,8 +691,8 @@ Error while connecting to the cluster to copy the files:
                 return cp_res
 
             # Unpack the input files and remove the archive
-            cmd = 'cd {}; tar xf {}; rm -f {}'.format(self.workdir, tar_name, tar_name)
-            cmd = self.sshcmd + " %s '{}'" % (self.hostname, cmd)
+            decompress = 'cd {}; tar xf {};'.format(self.workdir, tar_name)
+            cmd = self.sshcmd + " %s '%s'" % (self.hostname, decompress)
             cp_res = self.ExecuteCMD(cmd, False)
             if not cp_res:
                 print ("Error while executing:", cmd)
@@ -699,7 +709,7 @@ Error while connecting to the cluster to copy the files:
             
             compress_cmd = 'cd {}; {}'.format(self.workdir, tar_command)
 
-            cmd = self.sshcmd + " %s '{}'" % (self.hostname, cmd)
+            cmd = self.sshcmd + " %s '%s'" % (self.hostname, compress_cmd)
             self.ExecuteCMD(cmd, False)
             if not cp_res:
                 print ("Error while compressing the outputs:", cmd)
