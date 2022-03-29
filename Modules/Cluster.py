@@ -280,6 +280,8 @@ class Cluster(object):
         # Allow to setup additional custom extra parameters
         self.custom_params = {}
 
+        self.lock = None  # Use to lock the threads
+
         # Fix the attributes
 
         # Setup the attribute control
@@ -585,6 +587,9 @@ class Cluster(object):
         list_of_inputs = []
         list_of_outputs = []
         for i, (label, structure) in enumerate(zip(labels, structures)):
+            # Avoid thread conflict
+            self.lock.acquire()
+            
             calc.set_directory(self.local_workdir)
             calc.set_label(label)
             calc.write_input(structure)
@@ -598,7 +603,10 @@ class Cluster(object):
             output_file = '{}.pwo'.format(label)
 
             list_of_inputs.append(input_file)     
-            list_of_outputs.append(output_file)            
+            list_of_outputs.append(output_file)
+
+            # Release the lock on the threads
+            self.lock.release()            
             
         
         return list_of_inputs, list_of_outputs
@@ -799,10 +807,16 @@ Error while connecting to the cluster to copy the files:
         """
         print("[READ RESULTS] THREAD ID {} ENTERED".format(threading.get_native_id()))
         #calc.set_label("%s/%s" % (self.local_workdir, label))
+
+        # Perform a safe thread read of the results
+        self.lock.acquire()
         calc.set_directory(self.local_workdir)
         calc.set_label(label)
         calc.read_results()
-        return copy.deepcopy(calc.results)
+        results = copy.deepcopy(calc.results)
+        results["structure"] = calc.structure.copy()  # Report also the structure to check consistency
+        self.lock.release()
+        return results
 
     def batch_submission(self, list_of_structures, calc, indices, 
                          in_extension, out_extension,
@@ -1415,8 +1429,10 @@ Error while connecting to the cluster to copy the files:
             results = self.batch_submission(structures, calc, jobs_id, ".pwi",
                                             ".pwo", "ESP", n_together)
             
+            # Thread safe operation
+            self.lock.acquire()
             for i, res in enumerate(results):
-                print("[THREADS {}] ADDING RESULT {} = {}".format(threading.get_native_id(), jobs_id[i], res))
+                print("[THREAD {}] ADDING RESULT {} = {}".format(threading.get_native_id(), jobs_id[i], res))
                 num = jobs_id[i]
 
                 if res is None:
@@ -1426,6 +1442,21 @@ Error while connecting to the cluster to copy the files:
                 check_e = "energy" in res
                 check_f = "forces" in res
                 check_s = "stress" in res
+
+                # Check the structure
+                if "structure" in res:
+                    error_struct = np.linalg.norm(structures[i].coords.ravel() - res["structure"].coords.ravel())
+                    if error_struct > 1e-7:
+                        print("ERROR IDENTIFYING STRUCTURE!")
+                        MSG = """
+Error in thread {}.
+     Displacement between the expected structure {} and the one readed from the calculator
+     is of {} A.
+""".format(threading.get_native_id(), jobs_id[i], error_struct)
+                        print(MSG)
+                        raise ValueError(MSG)
+                else:
+                    print("[WARNING] no check on the structure.")
                 
                 is_success =  check_e and check_f
                 if get_stress:
@@ -1451,9 +1482,12 @@ Error while connecting to the cluster to copy the files:
                     # Remember, ase has a very strange definition of the stress
                     ensemble.stresses[num, :, :] = -stress * units["Bohr"]**3 / units["Ry"]
                 success[num] = is_success
+
+            self.lock.release()
         
         # Run until some work has not finished
         recalc = 0
+        self.lock = threading.Lock()
         while np.sum(np.array(success, dtype = int) - 1) != 0:
             threads = []
 
