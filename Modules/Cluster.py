@@ -814,6 +814,7 @@ Error while connecting to the cluster to copy the files:
         calc.set_label(label)
         calc.read_results()
         results = copy.deepcopy(calc.results)
+        results["structure"] = calc.structure.copy()  # Report also the structure to check consistency
         self.lock.release()
         return results
 
@@ -1427,8 +1428,10 @@ Error while connecting to the cluster to copy the files:
             results = self.batch_submission(structures, calc, jobs_id, ".pwi",
                                             ".pwo", "ESP", n_together)
             
+            # Thread safe operation
+            self.lock.acquire()
             for i, res in enumerate(results):
-                print("[THREADS {}] ADDING RESULT {} = {}".format(threading.get_native_id(), jobs_id[i], res))
+                print("[THREAD {}] ADDING RESULT {} = {}".format(threading.get_native_id(), jobs_id[i], res))
                 num = jobs_id[i]
 
                 if res is None:
@@ -1438,6 +1441,21 @@ Error while connecting to the cluster to copy the files:
                 check_e = "energy" in res
                 check_f = "forces" in res
                 check_s = "stress" in res
+
+                # Check the structure
+                if "structure" in res:
+                    error_struct = np.linalg.norm(structures[i].coords.ravel() - res["structure"].coords.ravel())
+                    if error_struct > 1e-7:
+                        print("ERROR IDENTIFYING STRUCTURE!")
+                        MSG = """
+Error in thread {}.
+     Displacement between the expected structure {} and the one readed from the calculator
+     is of {} A.
+""".format(threading.get_native_id(), jobs_id[i], error_struct)
+                        print(MSG)
+                        raise ValueError(MSG)
+                else:
+                    print("[WARNING] no check on the structure.")
                 
                 is_success =  check_e and check_f
                 if get_stress:
@@ -1463,6 +1481,8 @@ Error while connecting to the cluster to copy the files:
                     # Remember, ase has a very strange definition of the stress
                     ensemble.stresses[num, :, :] = -stress * units["Bohr"]**3 / units["Ry"]
                 success[num] = is_success
+
+            self.lock.release()
         
         # Run until some work has not finished
         recalc = 0
