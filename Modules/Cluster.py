@@ -280,6 +280,8 @@ class Cluster(object):
         # Allow to setup additional custom extra parameters
         self.custom_params = {}
 
+        self.lock = None  # Use to lock the threads
+
         # Fix the attributes
 
         # Setup the attribute control
@@ -585,6 +587,9 @@ class Cluster(object):
         list_of_inputs = []
         list_of_outputs = []
         for i, (label, structure) in enumerate(zip(labels, structures)):
+            # Avoid thread conflict
+            self.lock.acquire()
+            
             calc.set_directory(self.local_workdir)
             calc.set_label(label)
             calc.write_input(structure)
@@ -598,7 +603,10 @@ class Cluster(object):
             output_file = '{}.pwo'.format(label)
 
             list_of_inputs.append(input_file)     
-            list_of_outputs.append(output_file)            
+            list_of_outputs.append(output_file)
+
+            # Release the lock on the threads
+            self.lock.release()            
             
         
         return list_of_inputs, list_of_outputs
@@ -799,10 +807,15 @@ Error while connecting to the cluster to copy the files:
         """
 
         #calc.set_label("%s/%s" % (self.local_workdir, label))
+
+        # Perform a safe thread read of the results
+        self.lock.acquire()
         calc.set_directory(self.local_workdir)
         calc.set_label(label)
         calc.read_results()
-        return copy.deepcopy(calc.results)
+        results = copy.deepcopy(calc.results)
+        self.lock.release()
+        return results
 
     def batch_submission(self, list_of_structures, calc, indices, 
                          in_extension, out_extension,
@@ -1453,6 +1466,7 @@ Error while connecting to the cluster to copy the files:
         
         # Run until some work has not finished
         recalc = 0
+        self.lock = threading.Lock()
         while np.sum(np.array(success, dtype = int) - 1) != 0:
             threads = []
 
