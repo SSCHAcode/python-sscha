@@ -536,6 +536,10 @@ Error, the specified location to save the ensemble:
             self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
             if pop != start_pop or not restart_from_ens:
                 self.minim.ensemble.generate(self.N_configs)
+
+                # Save also the generation
+                if ensemble_loc is not None and self.save_ensemble:
+                    self.minim.ensemble.save_bin(ensemble_loc, pop)
             
                 # Compute energies and forces
                 self.minim.ensemble.compute_ensemble(self.calc, True, stress_numerical,
