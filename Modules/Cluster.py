@@ -1424,7 +1424,7 @@ Error while connecting to the cluster to copy the files:
         num_batch_offset = int(ensemble.N / self.batch_size)
         
         def compute_single_jobarray(jobs_id, calc):
-            structures = [ensemble.structures[i] for i in jobs_id]
+            structures = [ensemble.structures[i].copy() for i in jobs_id]
             n_together = min(len(structures), self.n_together_def)
             results = self.batch_submission(structures, calc, jobs_id, ".pwi",
                                             ".pwo", "ESP", n_together)
@@ -1445,7 +1445,7 @@ Error while connecting to the cluster to copy the files:
 
                 # Check the structure
                 if "structure" in res:
-                    error_struct = np.linalg.norm(structures[i].coords.ravel() - res["structure"].coords.ravel())
+                    error_struct = np.linalg.norm(ensemble.structures[jobs_id[i]].coords.ravel() - res["structure"].coords.ravel())
                     if error_struct > 1e-7:
                         print("ERROR IDENTIFYING STRUCTURE!")
                         MSG = """
@@ -1454,6 +1454,10 @@ Error in thread {}.
      is of {} A.
 """.format(threading.get_native_id(), jobs_id[i], error_struct)
                         print(MSG)
+                        ensemble.structures[jobs_id[i]].save_scf('t_{}_error_struct_generated_{}.scf'.format(threading.get_native_id(), jobs_id[i]))
+                        structures[i].save_scf('t_{}_error_struct_cmp_local_{}.scf'.format(threading.get_native_id(), jobs_id[i]))
+                        res["structure"].save_scf('t_{}_error_struct_readed_{}.scf'.format(threading.get_native_id(), jobs_id[i]))
+
                         raise ValueError(MSG)
                 else:
                     print("[WARNING] no check on the structure.")
