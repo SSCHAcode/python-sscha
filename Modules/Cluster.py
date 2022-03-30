@@ -1458,7 +1458,7 @@ Error in thread {}.
                         structures[i].save_scf('t_{}_error_struct_cmp_local_{}.scf'.format(threading.get_native_id(), jobs_id[i]))
                         res["structure"].save_scf('t_{}_error_struct_readed_{}.scf'.format(threading.get_native_id(), jobs_id[i]))
 
-                        raise ValueError(MSG)
+                        continue
                 else:
                     print("[WARNING] no check on the structure.")
                 
