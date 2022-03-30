@@ -1446,7 +1446,7 @@ Error while connecting to the cluster to copy the files:
                 # Check the structure
                 if "structure" in res:
                     error_struct = np.linalg.norm(ensemble.structures[jobs_id[i]].coords.ravel() - res["structure"].coords.ravel())
-                    if error_struct > 1e-7:
+                    if error_struct > 1e-2:
                         print("ERROR IDENTIFYING STRUCTURE!")
                         MSG = """
 Error in thread {}.
