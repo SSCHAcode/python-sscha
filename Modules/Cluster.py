@@ -812,8 +812,10 @@ Error while connecting to the cluster to copy the files:
         calc.set_directory(self.local_workdir)
         calc.set_label(label)
         calc.read_results()
+        calc.structure.save_scf("thread_{}_justreaded_{}.scf".format(threading.get_native_id(), label))
         results = copy.deepcopy(calc.results)
         results["structure"] = calc.structure.copy()  # Report also the structure to check consistency
+
         return results
 
     def batch_submission(self, list_of_structures, calc, indices, 
