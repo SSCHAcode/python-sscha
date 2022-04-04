@@ -896,7 +896,7 @@ Error while connecting to the cluster to copy the files:
         
         if not self.copy_files(input_files, output_files, to_server = True):
             # Submission failed
-            return results
+            return submitted, indices, label
         
         
         # Run the simulation
@@ -918,12 +918,21 @@ Error while connecting to the cluster to copy the files:
         if not self.copy_files(input_files, output_files, to_server = False):
             # Submission failed
             print('[SUBMISSION {}] FAILED RETRIVING OUTPUT'.format(threading.get_native_id()))
-            return results
+        else:
+            print('[SUBMISSION {}] GOT OUTPUT'.format(threading.get_native_id()))
 
+        
+        return submitted, indices, label
 
-        print('[SUBMISSION {}] GOT OUTPUT'.format(threading.get_native_id()))
-
+    def collect_results(self, calc, submitted, indices, label):
+        """ 
+        Collect back all the results from the submitted data.
+        This operation needs to be performed in thread safe mode
+        (all threads must be locked between this operation and when the results are actually assigned to the ensemble
+        to avoid conflicts)
+        """
         # Read the output files
+        results = [None] * len(submitted)
         for i in submitted:
             # Prepare a typical label
             lbl = label + "_" + str(indices[i])
@@ -939,7 +948,6 @@ Error while connecting to the cluster to copy the files:
                 
 
         print('[SUBMISSION {}] GOT RESULTS:\n{}'.format(threading.get_native_id(), results))
-        
         return results
 
     def get_job_id_from_submission_output(self, output):
@@ -1402,7 +1410,7 @@ Error while connecting to the cluster to copy the files:
         
         return str(output)
             
-    def compute_ensemble_batch(self, ensemble, ase_calc, get_stress = True, timeout=None):
+    def compute_ensemble_batch(self, ensemble, cellconstructor_calc, get_stress = True, timeout=None):
         """
         RUN THE ENSEMBLE WITH BATCH SUBMISSION
         ======================================
@@ -1426,11 +1434,14 @@ Error while connecting to the cluster to copy the files:
         def compute_single_jobarray(jobs_id, calc):
             structures = [ensemble.structures[i].copy() for i in jobs_id]
             n_together = min(len(structures), self.n_together_def)
-            results = self.batch_submission(structures, calc, jobs_id, ".pwi",
+            subs, indices, labels = self.batch_submission(structures, calc, jobs_id, ".pwi",
                                             ".pwo", "ESP", n_together)
             
             # Thread safe operation
             self.lock.acquire()
+            print("[THREAD {}] submitted calculations: {}".format(threading.get_native_id(), indices))
+            results = self.collect_results(calc, subs, indices, labels)
+
             for i, res in enumerate(results):
                 print("[THREAD {}] ADDING RESULT {} = {}".format(threading.get_native_id(), jobs_id[i], res))
                 num = jobs_id[i]
@@ -1505,12 +1516,14 @@ Error in thread {}.
             count = 0
             # Submit in parallel
             jobs = [false_id[i : i + self.job_number] for i in range(0, len(false_id), self.job_number)]
+            # Create a local copy of the calculator for each thread, to avoid conflicting modifications
+            calculators = [cellconstructor_calc.copy() for i in range(0, len(jobs))]
             
-            for job in jobs:
+            for k_th, job in enumerate(jobs):
                 # Submit only the batch size
                 if count >= self.batch_size:
                     break
-                t = threading.Thread(target = compute_single_jobarray, args=(job, ase_calc, ))
+                t = threading.Thread(target = compute_single_jobarray, args=(job, calculators[k_th], ))
                 t.start()
                 threads.append(t)
                 count += 1
