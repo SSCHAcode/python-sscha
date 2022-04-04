@@ -809,13 +809,11 @@ Error while connecting to the cluster to copy the files:
         #calc.set_label("%s/%s" % (self.local_workdir, label))
 
         # Perform a safe thread read of the results
-        self.lock.acquire()
         calc.set_directory(self.local_workdir)
         calc.set_label(label)
         calc.read_results()
         results = copy.deepcopy(calc.results)
         results["structure"] = calc.structure.copy()  # Report also the structure to check consistency
-        self.lock.release()
         return results
 
     def batch_submission(self, list_of_structures, calc, indices, 
