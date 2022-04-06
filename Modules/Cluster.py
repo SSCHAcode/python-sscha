@@ -194,7 +194,7 @@ class Cluster(object):
         self.mpi_cmd = mpi_cmd
 
         self.workdir=r""
-        self.submit_command="sbatch --wait"
+        self.submit_command="sbatch"
         self.submit_name="SBATCH"
         self.terminal="/bin/bash"
         self.v_nodes="-N "
@@ -214,7 +214,7 @@ class Cluster(object):
 
         # Check the status of the job every TOT seconds
         self.check_timeout = 300
-        self.nonblocking_command = False # True if you use a different version of slurm that does not accept blocking commands
+        self.nonblocking_command = True # True if you use a different version of slurm that does not accept blocking commands
 
         # Enforce ssh to open a shell for each command in the cluster
         self.use_active_shell = False
@@ -590,20 +590,26 @@ class Cluster(object):
             # Avoid thread conflict
             self.lock.acquire()
             
-            calc.set_directory(self.local_workdir)
-            calc.set_label(label)
-            calc.write_input(structure)
+            try:
+                calc.set_directory(self.local_workdir)
+                calc.set_label(label)
+                calc.write_input(structure)
 
-            print("LBL: {} | PREFIX: {}".format(label, calc.input_data["control"]["prefix"]))
+                print("[THREAD {}] LBL: {} | PREFIX: {}".format(threading.get_native_id(), label, calc.input_data["control"]["prefix"]))
 
-            #ase.io.write("%s/%s.pwi"% (self.local_workdir, label),
-            #                atm, **calc.parameters)
+                #ase.io.write("%s/%s.pwi"% (self.local_workdir, label),
+                #                atm, **calc.parameters)
 
-            input_file = '{}.pwi'.format(label)
-            output_file = '{}.pwo'.format(label)
+                input_file = '{}.pwi'.format(label)
+                output_file = '{}.pwo'.format(label)
 
-            list_of_inputs.append(input_file)     
-            list_of_outputs.append(output_file)
+                list_of_inputs.append(input_file)     
+                list_of_outputs.append(output_file)
+            except:
+                MSG = '''
+Error while writing input file {}.
+'''.format(label)
+                print(MSG)
 
             # Release the lock on the threads
             self.lock.release()            
@@ -780,7 +786,7 @@ Error while connecting to the cluster to copy the files:
         
         cmd = "{ssh} {host} '{submit_cmd} {script}'".format(ssh = self.sshcmd, host = self.hostname, 
                          submit_cmd = self.submit_command, script = script_location) 
-        if self.use_active_shell:
+        if self.use_active_shell:   
             cmd = "{ssh} {host} -t '{shell} --login -c \"{submit_cmd} {script}\"'".format(ssh = self.sshcmd, 
                          host = self.hostname, 
                          submit_cmd = self.submit_command, script = script_location, 
@@ -907,7 +913,7 @@ Error while connecting to the cluster to copy the files:
             job_id = self.get_job_id_from_submission_output(submission_output)
 
             now = datetime.datetime.now()
-            sys.stderr.write("{}/{}/{} - {}:{} | submitted job id {} ({})\n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id, submission_output))
+            sys.stderr.write("{}/{}/{} - {}:{}:{} | submitted job id {} ({})\n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id, submission_output))
             sys.stderr.flush()
             time.sleep(self.check_timeout)
 
@@ -959,9 +965,13 @@ Error while connecting to the cluster to copy the files:
 
         Returns None if the output contains an error
         """
+        print('INSIDE GET JOB ID WITH {}'.format(output))
+
 
         try:
             id = output.split()[-1]
+
+            print('Understanding output "{}" => {}'.format(output, id))    
             return id
         except:
             print("Error, expected a standard output, but the result of the submission was: {}".format(output))
