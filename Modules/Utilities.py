@@ -492,10 +492,15 @@ class IOInfo:
         """
         Setup the system to save the data each time the function is called.
 
+        By default, the system will save frequencies and minimization info (like free energy, gradients and kong liu)
+        The files are
+        .freqs   for the frequencies
+        .dat     for the minimization info
+
         Parameters
         ----------
             fname : string 
-                path to the file to save the frequencies vs time
+                path to the file to save the files
             save_each_step : bool
                 If true the file is saved (and updated) each time step.
 
@@ -518,9 +523,12 @@ class IOInfo:
         if not sscha.Parallel.am_i_the_master():
             return
 
+        freq_name = fname + '.freqs'
+        data_name = fname + '.dat'
+
         if fname is None:
             if self.__save_fname is None:
-                raise IOError("Error, a filename must be specified to save the frequencies.")
+                raise IOError("Error, a filename must be specified to save the data.")
             np.savetxt(self.__save_fname, self.total_freqs, header = "Time vs Frequencies")
         else:
             np.savetxt(fname, self.total_freqs, header = "Time vs Frequencies")

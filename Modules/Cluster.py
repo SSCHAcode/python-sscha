@@ -946,10 +946,13 @@ Error while connecting to the cluster to copy the files:
             # Get the results
             try:
                 results[i] = self.read_results(calc, lbl) 
+            except FileNotFoundError:
+                sys.stderr.write("JOB {} | {} resulted in error:\n".format(i, lbl))
+                sys.stderr.write('File not found!\n')
+                sys.stderr.flush()
             except Exception as e:
                 sys.stderr.write("JOB {} | {} resulted in error:\n".format(i, lbl))
-                sys.stderr.write(e)
-                sys.stderr.write("\n")
+                print(e, file=sys.stderr)
                 sys.stderr.flush()
                 
 
