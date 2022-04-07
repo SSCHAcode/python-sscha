@@ -510,7 +510,7 @@ class IOInfo:
         self.__save_fname = fname
         self.__save_each_step = save_each_step
 
-    def Save(self, fname= None):
+    def Save(self, fname = None):
         """
         Save the data on a file
         
@@ -524,17 +524,22 @@ class IOInfo:
         if not sscha.Parallel.am_i_the_master():
             return
 
-        if fname is None:
-            fname = self.__save_fname
+        root_name = fname
+        
+        if root_name is None:
+            root_name = self.__save_fname
 
-        if fname is None:
+        if root_name is None:
             raise IOError("Error, a filename must be specified to save the data.")
 
-        freq_name = fname + '.freqs'
-        data_name = fname + '.dat'
+        print("ROOT  NAME:", root_name)
+        print("SAVE  NAME:", self.__save_fname)
+        print("FNAME NAME:", fname)
+        freq_name = root_name + '.freqs'
+        data_name = root_name + '.dat'
 
-        np.savetxt(fname, self.total_freqs, header = "Time vs Frequencies")
-        np.savetxt(fname, self.minim_data, header = '# Free energy [meV] +- error; FC gradient +- error; Structure gradient +- error; Kong-Liu effective sample size')
+        np.savetxt(freq_name, self.total_freqs, header = "Time vs Frequencies")
+        np.savetxt(data_name, self.minim_data, header = '# Free energy [meV] +- error; FC gradient +- error; Structure gradient +- error; Kong-Liu effective sample size')
             
             
         if self.save_weights:
