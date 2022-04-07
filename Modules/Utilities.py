@@ -456,6 +456,7 @@ class IOInfo:
         self.save_atomic_positions = False
         self.__save_each_step = False
         self.current_struct = None
+        self.minim_data = []
 
     def Reset(self):
         """
@@ -523,15 +524,17 @@ class IOInfo:
         if not sscha.Parallel.am_i_the_master():
             return
 
+        if fname is None:
+            fname = self.__save_fname
+
+        if fname is None:
+            raise IOError("Error, a filename must be specified to save the data.")
+
         freq_name = fname + '.freqs'
         data_name = fname + '.dat'
 
-        if fname is None:
-            if self.__save_fname is None:
-                raise IOError("Error, a filename must be specified to save the data.")
-            np.savetxt(self.__save_fname, self.total_freqs, header = "Time vs Frequencies")
-        else:
-            np.savetxt(fname, self.total_freqs, header = "Time vs Frequencies")
+        np.savetxt(fname, self.total_freqs, header = "Time vs Frequencies")
+        np.savetxt(fname, self.minim_data, header = '# Free energy [meV] +- error; FC gradient +- error; Structure gradient +- error; Kong-Liu effective sample size')
             
             
         if self.save_weights:
@@ -566,6 +569,17 @@ class IOInfo:
             
             if self.save_atomic_positions:
                 self.current_struct = minim.dyn.structure.copy()
+
+            # Get the minimization data
+            fe = minim.__fe__[-1] * sscha.SchaMinimizer.__RyTomev__
+            fe_err = minim.__fe_err__[-1] * sscha.SchaMinimizer.__RyTomev__
+            gc = minim.__gc__[-1] * sscha.SchaMinimizer.__RyTomev__
+            gc_err = minim.__gc_err__[-1] * sscha.SchaMinimizer.__RyTomev__
+            gw = minim.__gw__[-1] * sscha.SchaMinimizer.__RyTomev__
+            gw_err = minim.__gw_err__[-1] * sscha.SchaMinimizer.__RyTomev__
+            kl =  minim.__KL__[-1]
+
+            self.minim_data.append([fe, fe_err, gc, gc_err, gw, gw_err, kl])
                 
             # This perform also the saving
             self.CFP_SaveFrequencies(minim)
