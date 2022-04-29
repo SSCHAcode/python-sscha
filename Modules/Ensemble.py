@@ -2694,7 +2694,7 @@ DETAILS OF ERROR:
 
 
     def get_free_energy_hessian(self, include_v4 = False, get_full_hessian = True, verbose = False, \
-        use_symmetries = True):
+        use_symmetries = True, return_d3 = False):
         """
         GET THE FREE ENERGY ODD CORRECTION
         ==================================
@@ -2719,11 +2719,16 @@ DETAILS OF ERROR:
             use_symmetries : bool
                 If true, the d3 and d4 are symmetrized in real space.
                 It requires that spglib is installed to detect symmetries in the supercell correctly.
+            return_d3 : bool
+                If true, returns also the tensor of three phonon scattering.
 
         Returns
         -------
             phi_sc : Phonons()
                 The dynamical matrix of the free energy hessian in (Ry/bohr^2)
+            d3 : ndarray (size = (3*nat_sc, 3*nat_sc, 3*nat_sc), Optional
+                Return the three-phonon-scattering tensor (in Ry atomic units).
+                Only if return_d3 is True. 
         """
         # For now the v4 is not implemented
         #     if include_v4:
@@ -2859,6 +2864,8 @@ DETAILS OF ERROR:
                 dyn_hessian.dynmats[iq] = dynq_odd[iq, :, :] 
 
         
+        if return_d3:
+            return dyn_hessian, d3* 2.0 # Ha to Ry
         return dyn_hessian
 
 
