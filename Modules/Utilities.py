@@ -563,7 +563,7 @@ class IOInfo:
         if not sscha.Parallel.am_i_the_master():
             return
 
-        if minim.minimizer.new_direction:
+        if minim.minimizer.is_new_direction():
             
             # Get the weights if required
             if self.save_weights:
