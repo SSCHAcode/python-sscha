@@ -675,7 +675,7 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
             
             # Symmetrize the dynmat if requested
             if not self.neglect_symmetries:
-                self.dyn.Symmetrize()
+                self.dyn.Symmetrize(use_spglib = self.use_spglib)
             
             if not __SCHA_DATADIR__ in keys:
                 self.ensemble = Ensemble.Ensemble(self.dyn, 0)
