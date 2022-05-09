@@ -1865,7 +1865,7 @@ DETAILS OF ERROR:
             # Perform the fourier transform
             if return_error:
                 q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
-                                                    self.current_dyn.structure, supercell_dyn.structure,grad_err)
+                                                    self.current_dyn.structure, supercell_dyn.structure,fc2=grad_err)
             else:
                 q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
                                                     self.current_dyn.structure, supercell_dyn.structure)
