@@ -1863,10 +1863,14 @@ DETAILS OF ERROR:
         if np.prod(self.dyn_0.GetSupercell()) > 1:
 
             # Perform the fourier transform
-            q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+            if return_error:
+                q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+                                                    self.current_dyn.structure, supercell_dyn.structure,grad_err)
+            else:
+                q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
                                                     self.current_dyn.structure, supercell_dyn.structure)
-            q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
-                                                        self.current_dyn.structure, supercell_dyn.structure)
+            #q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
+             #                                           self.current_dyn.structure, supercell_dyn.structure)
         else:
             nat3, _ = grad.shape
             q_grad = np.zeros( (1, nat3, nat3), dtype = np.double)
