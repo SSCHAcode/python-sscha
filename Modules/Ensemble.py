@@ -1625,6 +1625,9 @@ DETAILS OF ERROR:
         This is a trick to interpolate the free energy in the
         infinite volume limit.
 
+        Note, this function report the free eenrgy in the primitive cell, while the method get_free_energy
+        returns the energy in the supercell.
+
         Parameters
         ----------
             target_supercell : list (N, N, N)
@@ -1659,12 +1662,14 @@ DETAILS OF ERROR:
 
         
         # Interpolate the dynamical matrix
-        new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
-                                                target_supercell,
-                                                support_dyn_coarse,
-                                                support_dyn_fine)
+        if support_dyn_fine is not None:
+            new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
+                                                    target_supercell,
+                                                    support_dyn_coarse,
+                                                    support_dyn_fine)
+        else:
+            new_dyn = self.current_dyn.InterpolateMesh(target_supercell)
 
-        # TODO: Allow double interpolation in case of support dyn
         
         # Get the new harmonic free energy
         harm_fe = new_dyn.GetHarmonicFreeEnergy(self.current_T,
