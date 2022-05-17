@@ -680,7 +680,7 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
             
             # Symmetrize the dynmat if requested
             if not self.neglect_symmetries:
-                self.dyn.Symmetrize()
+                self.dyn.Symmetrize(use_spglib = self.use_spglib)
             
             if not __SCHA_DATADIR__ in keys:
                 self.ensemble = Ensemble.Ensemble(self.dyn, 0)
@@ -1426,8 +1426,8 @@ You can try to fix this error setting the {} variable of {} class to True.
         
         # Check the KL
         kl = self.ensemble.get_effective_sample_size()
-        
-        if kl / float(self.ensemble.N) < self.kong_liu_ratio and self.minimizer.new_direction:
+
+        if kl / float(self.ensemble.N) < self.kong_liu_ratio and self.minimizer.is_new_direction():
             self.__converged__ = False
             print ("KL:", kl, "KL/N:", kl / float(self.ensemble.N), "KL RAT:", self.kong_liu_ratio)
             print ("  According to your input criteria")

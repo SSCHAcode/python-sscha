@@ -1639,6 +1639,39 @@ DETAILS OF ERROR:
             return free_energy, error
         return free_energy
 
+    def get_entropy(self, return_error = False):
+        r"""
+        GET THE ENTROPY
+        ===============
+
+        Get the total anharmonic entropy.
+
+        The equation implemented is the analytical derivative of the free energy,
+        and assumes that the SSCHA free energy is minimized.
+
+        .. math::
+
+            S = - \frac{dF}{dT}
+
+            S = S_{harm} - \left<V - {\mathcal V}\right>\sum_\mu \frac{1}{1 + 2n_\mu} \frac{dn_\mu}{dT}
+
+
+        where :math:`S_{harm}` is the 'harmonic' entropy computed from the dynamucal matrix, 
+        plus a correction accounting for the ensemble anharmonicity.
+
+        
+        Parameters
+        ----------
+            return_error : bool
+                If true, returns also the error
+
+        Results
+        -------
+            entropy, error : float
+                Returns the entropy and [optionally] the stochastic error.
+        """
+        raise NotImplementedError("Error, to be implemented")
+
 
     def get_free_energy_interpolating(self, target_supercell, support_dyn_coarse = None, support_dyn_fine = None, error_on_imaginary_frequency = True, return_error = False):
         """
@@ -2694,7 +2727,7 @@ DETAILS OF ERROR:
 
 
     def get_free_energy_hessian(self, include_v4 = False, get_full_hessian = True, verbose = False, \
-        use_symmetries = True):
+        use_symmetries = True, return_d3 = False):
         """
         GET THE FREE ENERGY ODD CORRECTION
         ==================================
@@ -2719,11 +2752,16 @@ DETAILS OF ERROR:
             use_symmetries : bool
                 If true, the d3 and d4 are symmetrized in real space.
                 It requires that spglib is installed to detect symmetries in the supercell correctly.
+            return_d3 : bool
+                If true, returns also the tensor of three phonon scattering.
 
         Returns
         -------
             phi_sc : Phonons()
                 The dynamical matrix of the free energy hessian in (Ry/bohr^2)
+            d3 : ndarray (size = (3*nat_sc, 3*nat_sc, 3*nat_sc), Optional
+                Return the three-phonon-scattering tensor (in Ry atomic units).
+                Only if return_d3 is True. 
         """
         # For now the v4 is not implemented
         #     if include_v4:
@@ -2859,6 +2897,8 @@ DETAILS OF ERROR:
                 dyn_hessian.dynmats[iq] = dynq_odd[iq, :, :] 
 
         
+        if return_d3:
+            return dyn_hessian, d3* 2.0 # Ha to Ry
         return dyn_hessian
 
 
