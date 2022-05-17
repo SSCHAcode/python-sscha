@@ -46,6 +46,9 @@ class UC_OPTIMIZER:
         self.uc_0_inv = np.linalg.inv(self.uc_0)
         self.x_start = None
         self.reset_strain = False
+        
+        # A control parameter for the line minimization (avoid failures)
+        self.last_factor = 0  
 
         self.uc_old = None
 
@@ -105,7 +108,8 @@ class UC_OPTIMIZER:
             sys.stdout.flush()
 
             print("[CELL]  GRADIENT DOT DIRECTION = {}".format(factor))
-            
+            failure_lmin = False
+
             sys.stdout.flush()
             # Regularization (avoid run away)
             if factor > 2:
@@ -119,20 +123,36 @@ class UC_OPTIMIZER:
                 print("                incrementing by a 15 %")
                 
             elif factor < self.min_alpha_factor:
+                # Check if the last time was good
+                if self.last_factor != 0:
+                    if factor < self.last_factor:
+                        print("[CELL] Warning: reduced step and got worse; restarting line minimization with a good step.")
+                        failure_lmin = True
+                self.last_factor = factor
                 factor = self.min_alpha_factor
                 good_step = False
 
             if np.isnan(factor):
+                self.last_factor = 0
                 factor = self.min_alpha_factor
                 good_step = False
-                
-            self.alpha *= factor
+
+            # Check if the line minimization got contradditing result
+            # In this case stop the line minimization and proceed with a standard gradient descend.
+            if failure_lmin:
+                good_step = True
+            else:  
+                self.alpha *= factor
         
             
             #if self.alpha < self.min_alpha_step * self.alpha0:
             #    self.alpha = self.min_alpha_step * self.alpha0
             #self.alpha *= factor
             
+        # Reset the check on the line minimization if this is a good step
+        if good_step:
+            self.last_factor = 0
+
         return good_step
 
     def reset(self, unit_cell):
@@ -271,7 +291,7 @@ class UC_OPTIMIZER:
 
         
         
-        # Get the strain tensor up to know
+        # Get the strain tensor up to now
         strain = np.transpose(self.uc_0_inv.dot(unit_cell) - I)
         
         # Get the gradient with respect to the strain        
