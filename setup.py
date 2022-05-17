@@ -94,7 +94,7 @@ setup( name = "python-sscha",
        url = "https://github.com/mesonepigreco/python-sscha",
        packages = ["sscha"],
        package_dir = {"sscha": "Modules"},
-       install_requires = ["numpy", "ase", "scipy", "cellconstructor", "spglib", "matplotlib"],
+       setup_requires = ["numpy", "ase", "scipy", "cellconstructor", "spglib", "matplotlib"],
        ext_modules = [SCHAModules], # odd_HP
        scripts = ["scripts/sscha", "scripts/cluster_check.x", "scripts/plot_frequencies.py",
                   "scripts/sscha-plot-data.py",

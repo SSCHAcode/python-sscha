@@ -1681,6 +1681,9 @@ DETAILS OF ERROR:
         This is a trick to interpolate the free energy in the
         infinite volume limit.
 
+        Note, this function report the free eenrgy in the primitive cell, while the method get_free_energy
+        returns the energy in the supercell.
+
         Parameters
         ----------
             target_supercell : list (N, N, N)
@@ -1715,12 +1718,14 @@ DETAILS OF ERROR:
 
         
         # Interpolate the dynamical matrix
-        new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
-                                                target_supercell,
-                                                support_dyn_coarse,
-                                                support_dyn_fine)
+        if support_dyn_fine is not None:
+            new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
+                                                    target_supercell,
+                                                    support_dyn_coarse,
+                                                    support_dyn_fine)
+        else:
+            new_dyn = self.current_dyn.InterpolateMesh(target_supercell)
 
-        # TODO: Allow double interpolation in case of support dyn
         
         # Get the new harmonic free energy
         harm_fe = new_dyn.GetHarmonicFreeEnergy(self.current_T,
@@ -1919,10 +1924,14 @@ DETAILS OF ERROR:
         if np.prod(self.dyn_0.GetSupercell()) > 1:
 
             # Perform the fourier transform
-            q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+            if return_error:
+                q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+                                                    self.current_dyn.structure, supercell_dyn.structure,fc2=grad_err)
+            else:
+                q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
                                                     self.current_dyn.structure, supercell_dyn.structure)
-            q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
-                                                        self.current_dyn.structure, supercell_dyn.structure)
+            #q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
+             #                                           self.current_dyn.structure, supercell_dyn.structure)
         else:
             nat3, _ = grad.shape
             q_grad = np.zeros( (1, nat3, nat3), dtype = np.double)

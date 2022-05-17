@@ -9,6 +9,7 @@ import cellconstructor.Phonons
 
 import sscha, sscha.Ensemble
 import sscha.SchaMinimizer
+import pytest
 
 """
 This test makes a simple relaxation of the sample ensemble
@@ -44,7 +45,9 @@ def test_update_weights(verbose = False):
             
     assert delta_rho < 2e-5
 
-def test_simple_relax(verbose = False):
+    
+@pytest.mark.parametrize('fixed', [False, True])
+def test_simple_relax(fixed, verbose = False):
     total_path = os.path.dirname(os.path.abspath(__file__))
     os.chdir(total_path)
 
@@ -65,6 +68,7 @@ def test_simple_relax(verbose = False):
 
     minim = sscha.SchaMinimizer.SSCHA_Minimizer(ens)
     minim.minim_struct = True
+    minim.fixed_step = fixed
     minim.min_step_dyn = 0.5
     minim.min_step_struc = 0.5
     minim.meaningful_factor = 1e-10
@@ -93,6 +97,7 @@ def test_simple_relax(verbose = False):
 
 
 
+
 if __name__ == "__main__":
     test_update_weights(True)
-    test_simple_relax(True)
+    test_simple_relax(False, True)
