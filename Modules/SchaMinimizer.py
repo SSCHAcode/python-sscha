@@ -103,7 +103,7 @@ __MAX_IMAG_ERROR_COUNTER__ = 50
 class SSCHA_Minimizer(object):
     
     def __init__(self, ensemble = None, root_representation = "normal",
-                 kong_liu_ratio = 0.5, meaningful_factor = 1,
+                 kong_liu_ratio = 0.5, meaningful_factor = 0.2,
                  minimization_algorithm = "sdes", lambda_a = 1, **kwargs):
         """
         This class create a minimizer to perform the sscha minimization.
