@@ -1,5 +1,152 @@
-Customizing the SSCHA
-=====================
+RUN THE SSCHA
+=============
+
+
+The python-sscha code can be runned both as a stand-alone application with an input file and as a python library, writing a python script.
+
+We will cover the python scripting as it is more general.
+
+The SSCHA calculation is divided into 3 main steps:
+ - The generation of a random ensemble of ionic configurations
+ - Calculations of energies and forces on the ensemble
+ - The SSCHA free energy minimization
+
+Then this steps are iterated until convergence is achieved.
+This iteration can either be done manually or automatically by the code.
+
+It is always suggested to use the automatic way, however, for completness, here we cover both aspects.
+
+Manual submission
+-----------------
+
+The manual submission means that the user manually computes the energies and forces of all the configurations in the ensemble. The code stops after generating the random ensemble, and the user is requested to provide data files that contain the forces and total energies for each configuration.
+
+Thus, the code works in two steps.
+In the first step we generate the ensemble. Here is the code
+
+.. code-block:: python
+
+   import sscha, sscha.Ensemble, sscha.SchaMinimizer
+   import cellconstructor as CC, cellconstructor.Phonons
+   
+   # Load the harmonic dynamical matrix
+   dyn = CC.Phonons.Phonons('dyn', nqirr = 4)
+   
+   # If the dynamical matrix contains imaginary frequencies
+   # we get rid of them with
+   dyn.ForcePositiveDefinite()
+
+   # Now we initialize the ensemble at the target temperature
+   TEMPERATURE = 300 # Kelvin
+   ensemble = sscha.Ensemble.Ensemble(dyn, TEMPERATURE)
+
+   # We generate the random ensemble with N_CONFIGS configurations
+   N_CONFIGS = 1000
+   ensemble.generate(N_CONFIGS)
+
+   # We save the ensemble on the disk (inside directory data)
+   # We specify an integer 'population' which distinguish several ensembles
+   # inside the same directory
+   ensemble.save('data', population = 1)
+
+   
+
+To start, we need an initial guess of the dynamical matrix (the dyn file).
+The default format is the one of Quantum ESPRESSO, but also phonopy and
+ASE formats are supported (refer to the CellConstructor documentation to load these formats). Here we assume that the dynamical matrices are 4 (4 irreducible q points) called 'dyn1', 'dyn2', 'dyn3' and 'dyn4', as the standard quantum espresso format.
+
+The dynamical matrix contain both the information about the atomic structure
+and the ionic fluctuations. These can be obtained with a linear response
+calculation from DFT.
+
+The previous code generates the ensemble which is stored in the disk.
+Inside the data directory you will find a lot of files
+
+The files named 'scf_population1_X.dat' with X going over all the configurations contain the atomic structure in cartesian coordinates. It uses the standard espresso formalism.
+
+You need to compute total energies and forces of each configuration, with your favourite code.
+The total energies are written in column inside the file 'total_energies_population1.dat', in Rydberg atomic units and ordered with the index of the configurations.
+The forces for each configuration should be inside 'forces_population1_X.dat' in Ry/Borh (Rydberg atomic units).
+
+When you compute energies and forces, you can load them and run the SSCHA minimization:
+
+.. code-block:: python
+
+   import sscha, sscha.Ensemble, sscha.SchaMinimizer
+   import cellconstructor as CC, cellconstructor.Phonons
+   
+   # Load the harmonic dynamical matrix
+   dyn = CC.Phonons.Phonons('dyn', nqirr = 4)
+   
+   # If the dynamical matrix contains imaginary frequencies
+   # we get rid of them with
+   dyn.ForcePositiveDefinite()
+
+   # Now we initialize the ensemble at the target temperature
+   TEMPERATURE = 300 # Kelvin
+   ensemble = sscha.Ensemble.Ensemble(dyn, TEMPERATURE)
+
+   # We load the ensemble
+   N_CONFIGS = 1000
+   ensemble.load('data', population = 1, N = N_CONFIGS)
+
+   # Now we can run the sscha minimization
+   minim = sscha.SchaMinimizer.SSCHA_Minimizer(ensemble)
+   minim.init()
+   minim.run()
+
+   # Print on stdout the final results
+   minim.finalize()
+
+   # Save the output dynamical matrix
+   minim.dyn.save_qe('final_dyn')
+   
+
+And that's it. You run your first manual calculation.
+
+
+Keep track of free energy, gradients and frequencies during minimization
+------------------------------------------------------------------------
+
+It is convenient to store on the file the information during the minimization, as the Free Energy, its gradient values and the frequencies.
+
+To do this, we need to tell the code to save them into a file.
+
+Let us replace the 'minim.run()' line in the previous example with the following code:
+
+.. code-block:: python
+
+   import sscha.Utilities
+   IO = sscha.Utilities.IOinfo()
+   IO.SetupSaving('minim_data')
+
+   minim.run(custom_function_post = IO.CFP_SaveAll)
+
+
+If you run it again, the code produces (starting from verison 1.2) two data files: minim_data.dat and minim_data.freqs.
+You can plot all the minimization path (frequencies, free energy, gradients) calling the program:
+
+.. code-block:: bash
+
+   $ sscha-plot-data.py minim_data
+
+The sscha-plot-data.py script is automatically installed within the SSCHA code.
+
+
+Automatic submission
+--------------------
+
+TODO
+
+
+Cluster configuration
+---------------------
+
+TODO
+
+
+Employ a custom function
+------------------------
 
 An interesting feature provided by the SSCHA code is the customization of the algorithm. The user has access to all the variables at each iteration of the minimization. 
 In this way, the user can print on files additional info or introduce constraints on the structure or on the dynamical matrix.
