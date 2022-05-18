@@ -997,7 +997,13 @@ Error while connecting to the cluster to copy the files:
         if len(lines):
             for l in lines:
                 data = l.strip().split()
-                if data[0] == job_id:
+                if len(data) == 0:
+                    if verbose:
+                        now = datetime.datetime.now()
+                        sys.stderr.write("{}/{}/{} - {}:{}:{} | job {}: No response from the server \n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id))
+                        sys.stderr.flush()
+                    return False
+                elif data[0] == job_id:
                     if verbose:
                         now = datetime.datetime.now()
                         sys.stderr.write("{}/{}/{} - {}:{}:{} | job {} still running\n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id))
