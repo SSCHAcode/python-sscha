@@ -4,6 +4,8 @@ import sys, os
 import subprocess
 import threading
 import copy
+import time, datetime
+import tarfile
 
 __DIFFLIB__ = False
 try:
@@ -96,6 +98,37 @@ __CLUSTER_KEYS__ = [__CLUSTER_NAMELIST__, __CLUSTER_TEMPLATE__, __CLUSTER_HOST__
                     __CLUSTER_ATTEMPTS__, __CLUSTER_PORT__]
 
 
+SPECIAL_SYMBOLS = ["$", ";", "|"]
+
+
+def parse_symbols(string):
+    r"""
+    REPLACE SPECIAL SYMBOLS
+    =======================
+
+    In a string that must be used on a shell command, replace all the special symbols
+    in a way that they are correctly passed through the SHELL.
+
+    for example $USER  => \$USER  
+    
+    Parameters
+    ----------
+        string : str
+            The string to be parsed
+    
+    Results
+    -------
+        output : str
+            The string after the symbols are replaced
+    """
+    new_str = string
+    for symbol in SPECIAL_SYMBOLS:
+        new_str = new_str.replace(symbol, "\\" + symbol)
+    return new_str
+
+
+
+
 class Cluster(object):
     
     def __init__(self, hostname=None, pwd=None, extra_options="", workdir = "",
@@ -161,9 +194,9 @@ class Cluster(object):
         self.mpi_cmd = mpi_cmd
 
         self.workdir=r""
-        self.submit_command="sbatch --wait"
+        self.submit_command="sbatch"
         self.submit_name="SBATCH"
-        self.terminal="#!/bin/bash"
+        self.terminal="/bin/bash"
         self.v_nodes="-N "
         self.use_nodes = True
         self.v_cpu="-n "
@@ -181,7 +214,10 @@ class Cluster(object):
 
         # Check the status of the job every TOT seconds
         self.check_timeout = 300
-        self.nonblocking_command = False # True if you use a different version of slurm that does not accept blocking commands
+        self.nonblocking_command = True # True if you use a different version of slurm that does not accept blocking commands
+
+        # Enforce ssh to open a shell for each command in the cluster
+        self.use_active_shell = False
 
         # This is the number of configurations to be computed for each jub submitted
         # This times the self.batch_size is the total amount of configurations submitted toghether
@@ -240,8 +276,11 @@ class Cluster(object):
         self.additional_script_parameters = None
 
 
+
         # Allow to setup additional custom extra parameters
         self.custom_params = {}
+
+        self.lock = None  # Use to lock the threads
 
         # Fix the attributes
 
@@ -311,6 +350,7 @@ class Cluster(object):
 
         if on_cluster:
             cmd = self.sshcmd + " {} '{}'".format(self.hostname, cmd)
+
         
         success = False
         output = ""
@@ -321,10 +361,17 @@ class Cluster(object):
             if not isinstance(output, str):
                 try:
                     output = str(output.decode("utf-8"))
-                except:
-                    pass
+                except Exception as e:
+                    sys.stderr.write("Error in the following command:\n")
+                    sys.stderr.write(e)
+                    sys.stderr.write("\n")
+                    sys.stderr.flush()
+                    
             output = output.strip()
             status = p.wait()
+
+
+            print('THREAD {} EXECUTE COMMAND: {}'.format(threading.get_native_id(), cmd))
             if not err is None:
                 sys.stderr.write(err)
             
@@ -396,7 +443,389 @@ class Cluster(object):
             return False
         
         return True
-    
+
+    def create_submission_script(self, labels):
+        """
+        CREATE THE SUBMISSION SCRIPT
+        ===========================================
+
+        This is a function that is general and does not depend on the specific
+        calculator. It is usefull to create the header of the submission script.
+
+        Parameters
+        ----------
+            labels : list 
+                It is a list of the labels of the calculations to be done.
+        
+        Returns
+        -------
+            submission_header : string
+                The text of the submission header.
+        """
+
+        # prepare the submission script
+        submission = "#!" + self.terminal + "\n"
+        
+        
+
+        # Add the submission options
+        if self.use_nodes:
+            submission += "#%s %s%d\n" % (self.submit_name, self.v_nodes, self.n_nodes)
+        if self.use_cpu:
+            submission += "#%s %s%d\n" % (self.submit_name, self.v_cpu, self.n_cpu)
+        if self.use_time:
+            submission += "#%s %s%s\n" % (self.submit_name, self.v_time, self.time)
+        if self.use_account:
+            submission += "#%s %s%s\n" % (self.submit_name, self.v_account, self.account_name)
+        if self.use_memory:
+            submission += "#%s %s%s\n" % (self.submit_name, self.v_memory, self.ram)
+        if self.use_partition:
+            submission += "#%s %s%s\n" % (self.submit_name, self.v_partition, self.partition_name)
+
+        # Append the additional parameters
+        for add_parameter in self.custom_params:
+
+            adder_string = "--{}".format(add_parameter)
+            if add_parameter.startswith("-"):
+                adder_string = add_parameter
+
+            if self.custom_params[add_parameter] is None:
+                submission += "#{} {}\n".format(self.submit_name, adder_string)
+            else:
+                submission += "#{} {}={}\n".format(self.submit_name, adder_string, self.custom_params[add_parameter])
+
+        
+        # Add the set -x option
+        if self.add_set_minus_x:
+            submission += "set -x\n"
+        
+        # Add the loading of the modules
+        submission += self.load_modules + "\n"
+        
+        # Go to the working directory
+        submission += "cd " + self.workdir + "\n"
+
+        # If any, apply the extra text before and after the calculation
+        other_input = ""
+        other_output = ""
+        if (self.additional_script_parameters is not None):
+            other_input, other_output = self.additional_script_parameters(labels)
+
+        submission += other_input
+        
+        # Use the xargs trick
+        #submission += "xargs -d " + r"'\n'" + " -L1 -P%d -a %s -- bash -c\n" % (n_togheder, 
+        for i, lbl in enumerate(labels):
+            submission += self.get_execution_command(lbl)
+
+
+        submission += other_output
+
+        return submission
+
+    def get_execution_command(self, label):
+        """
+        GET THE EXECUTION COMMAND
+        =========================
+
+        Return the command used in the submission script to actually execute the calculation.
+
+        Parameters
+        ----------
+            label : string
+                The label of the calculation
+
+        Returns
+        -------
+            commnad : string
+                The command to be appended to the submission script
+        """
+
+        # Get the MPI command replacing NPROC
+        new_mpicmd  = self.mpi_cmd.replace("NPROC", str(self.n_cpu))
+        
+        # Replace the NPOOL variable and the PREFIX in the binary
+        binary = self.binary.replace("NPOOL", str(self.n_pool)).replace("PREFIX", label)
+
+
+        tmt_str = ""
+        if self.use_timeout:
+            tmt_str = "timeout %d " % self.timeout
+        return "%s%s %s\n" % (tmt_str, new_mpicmd, binary)
+
+    def prepare_input_file(self, structures, calc, labels):
+        """
+        PREPARE THE INPUT FILE
+        ======================
+
+        This is specific for quantum espresso and must be inherit and replaced for 
+        other calculators.
+
+        This crates the input files in the local working directory 
+        self.local_workdir and it returns the list of all the files generated.
+
+
+        Parameters
+        ----------
+            structures : List of cellconstructor.Structure.Structure
+                The atomic structures.
+            calc : the ASE or CellConstructor calculator.
+                In this case, it works with quantum espresso
+            labels : List of strings
+                The unique name of this calculation
+
+        Returns
+        -------
+            List_of_input : list
+                List of strings containing all the input files
+            List_of_output : list
+                List of strings containing the output files expected
+                for the calculation
+        """
+
+        # Prepare the input file
+        list_of_inputs = []
+        list_of_outputs = []
+        for i, (label, structure) in enumerate(zip(labels, structures)):
+            # Avoid thread conflict
+            self.lock.acquire()
+            
+            try:
+                calc.set_directory(self.local_workdir)
+                calc.set_label(label)
+                calc.write_input(structure)
+
+                print("[THREAD {}] LBL: {} | PREFIX: {}".format(threading.get_native_id(), label, calc.input_data["control"]["prefix"]))
+
+                #ase.io.write("%s/%s.pwi"% (self.local_workdir, label),
+                #                atm, **calc.parameters)
+
+                input_file = '{}.pwi'.format(label)
+                output_file = '{}.pwo'.format(label)
+
+                list_of_inputs.append(input_file)     
+                list_of_outputs.append(output_file)
+            except:
+                MSG = '''
+Error while writing input file {}.
+'''.format(label)
+                print(MSG)
+
+            # Release the lock on the threads
+            self.lock.release()            
+            
+        
+        return list_of_inputs, list_of_outputs
+
+    def clean_localworkdir(self):
+        """
+        CLEAN THE LOCAL WORKDIR FROM ALL INPUT/OUTPUT FILES IN TAR
+        ===================================================
+        """
+
+        all_files = [x for x in os.listdir(self.local_workdir) if x.startswith('input') and x.endswith('.tar')]
+        for f in all_files:
+            os.remove(os.path.join(self.local_workdir, f))
+
+    def copy_files(self, list_of_input, list_of_output, to_server):
+        """
+        COPY INPUT/OUTPUT FILES FROM/TO THE SERVER
+        ==========================================
+
+        This function copies the input files toward the HPC if to_server is True
+        or retrive the output files from the HPC if to_server is False
+
+        Parameters
+        ----------
+            list_of_input : list
+                List of the path to the input files to be copied into the server.
+            list_of_output : list
+                List of the output files to be copied from the HPC server.
+                It is needed also when submitting the input file from the server,
+                as files that are named in the same way will be cleaned.
+                (No risk to mistake them with the actual result of the calculation)
+            to_server : bool
+                If true, we copy the input files into the server from the local machine.
+                If false, we copy the output files from the server to the local machine.
+        """
+
+        thread_id = threading.get_native_id()
+
+        if to_server:
+            # Compress the files
+            tar_name = 'inputs_id{}.tar'.format(thread_id)
+            tar_file = os.path.join(self.local_workdir, tar_name)
+            cmd = 'tar -cf {} -C {}'.format(tar_file, self.local_workdir)
+
+            # Remove the old tar file and the old input/output files\
+            rm_cmd = ''
+            #rm_cmd = 'rm -f {}; '.format(os.path.join(self.workdir, tar_name))
+
+            for i, fname in enumerate(list_of_input):
+                cmd += ' ' +  fname
+                
+                # Remove all the previous output files on cluster
+                rm_cmd = 'rm -f {}; '.format(os.path.join(self.workdir, fname))
+
+
+            
+            os.system(cmd)
+
+            if not os.path.exists(tar_file):
+                raise IOError("""
+Error, for some reason I'm unable to generate the tar.
+       command = {}
+""".format(cmd))
+
+            for fname in list_of_output:
+                rm_cmd += 'rm -f {}; '.format(os.path.join(self.workdir, fname))
+
+                # Check if the output files are already present.
+                # In this case, remove them to avoid conflict
+                if os.path.exists(os.path.join(self.local_workdir, fname)):
+                    os.remove(os.path.join(self.local_workdir, fname))
+
+        
+            # Clean eventually input/output file of this very same calculation
+            cmd = self.sshcmd + " %s '%s'" % (self.hostname, rm_cmd)
+            self.ExecuteCMD(cmd, False)
+#            cp_res = os.system(cmd + " > /dev/null")
+#            if cp_res != 0:
+#                print "Error while executing:", cmd
+#                print "Return code:", cp_res
+#                sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
+#            
+
+            # Copy the file into the cluster
+            cmd = self.scpcmd + " %s %s:%s/" % (tar_file, self.hostname, self.workdir)
+            cp_res = self.ExecuteCMD(cmd, False)
+            if not cp_res:
+                print ("Error while executing:", cmd)
+                print ("Return code:", cp_res)
+                sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
+                print("""
+Error while connecting to the cluster to copy the files:
+{}
+""".format(list_of_input))
+                return cp_res
+
+            # Unpack the input files and remove the archive
+            decompress = 'cd {}; tar xf {};'.format(self.workdir, tar_name)
+            cmd = self.sshcmd + " %s '%s'" % (self.hostname, decompress)
+            cp_res = self.ExecuteCMD(cmd, False)
+            if not cp_res:
+                print ("Error while executing:", cmd)
+                print ("Return code:", cp_res)
+                sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
+            return cp_res
+            #cp_res = os.system(cmd + " > /dev/null")
+        else:
+            # Compress all the output files at once
+            tar_name = 'outputs_id{}.tar'.format(thread_id)
+            tar_command = 'tar cf {} '.format(tar_name)
+            for output in list_of_output:
+                tar_command += ' ' + output
+            
+            compress_cmd = 'cd {}; {}'.format(self.workdir, tar_command)
+
+            cmd = self.sshcmd + " %s '%s'" % (self.hostname, compress_cmd)
+            cp_res = self.ExecuteCMD(cmd, False)
+            if not cp_res:
+                print ("Error while compressing the outputs:", cmd)
+                print(list_of_output)
+                print ("Return code:", cp_res)
+                return cp_res
+
+            
+            # Copy the tar and unpack
+            cmd = self.scpcmd + "%s:%s %s/" % (self.hostname, os.path.join(self.workdir, tar_name), self.local_workdir)
+            cp_res = self.ExecuteCMD(cmd, False)
+            if not cp_res:
+                print ("Error while executing:", cmd)
+                print ("Return code:", cp_res)
+                sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
+                print("""
+Error while connecting to the cluster to copy the files:
+{}
+""".format(list_of_input))
+                return cp_res
+
+            # Extract the tar file
+            os.system('tar xf {} -C {}'.format(os.path.join(self.local_workdir, tar_name), self.local_workdir))
+            #os.remove(os.path.join(self.local_workdir, tar_name))
+
+            return cp_res
+
+            
+        
+
+    def submit(self, script_location):
+        """
+        SUBMIT THE CALCULATION
+        ======================
+
+        Submit the calculation. Compose the command into a cmd variable, then submit it through:
+
+        .. code ::
+
+            return self.ExecuteCMD(cmd, True, return_output=True)
+
+        
+
+        Parameters
+        ----------
+            script_localtion : string
+                Path to the submission script inside the cluster.
+        
+        Results
+        -------
+            success : bool
+                Result of the execution of the submission command. 
+                It is what returned from self.ExecuteCMD(cmd, False)
+        """
+        
+        cmd = "{ssh} {host} '{submit_cmd} {script}'".format(ssh = self.sshcmd, host = self.hostname, 
+                         submit_cmd = self.submit_command, script = script_location) 
+        if self.use_active_shell:   
+            cmd = "{ssh} {host} -t '{shell} --login -c \"{submit_cmd} {script}\"'".format(ssh = self.sshcmd, 
+                         host = self.hostname, 
+                         submit_cmd = self.submit_command, script = script_location, 
+                         shell = self.terminal)
+        
+        
+
+        #cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, 
+        #                                           self.workdir, label+ "_" + str(indices[0]))
+       
+        return self.ExecuteCMD(cmd, True, return_output=True)
+
+    def get_output_path(self, label):
+        """
+        Given the label of the submission, retrive the path of all the output files of that calculation
+        """
+
+        out_filename = os.path.join(self.workdir, label + ".pwo") 
+        return [out_filename]
+
+    def read_results(self, calc, label):
+        """
+        Return a dictionary of the computed property for the given calculation label
+        """
+        print("[READ RESULTS] THREAD ID {} ENTERED".format(threading.get_native_id()))
+        #calc.set_label("%s/%s" % (self.local_workdir, label))
+
+        # Perform a safe thread read of the results
+        calc.set_directory(self.local_workdir)
+        calc.set_label(label)
+        calc.read_results()
+        #calc.structure.save_scf("thread_{}_justreaded_{}.scf".format(threading.get_native_id(), label))
+        results = copy.deepcopy(calc.results)
+
+        if results is not None:
+            results["structure"] = calc.structure.copy()  # Report also the structure to check consistency
+
+        return results
+
     def batch_submission(self, list_of_structures, calc, indices, 
                          in_extension, out_extension,
                          label = "ESP", n_togheder=1):
@@ -446,190 +875,90 @@ class Cluster(object):
         # Prepare the input atoms
         app_list = ""
         new_ncpu = self.n_cpu * n_togheder
-        new_mpicmd  = self.mpi_cmd.replace("NPROC", str(self.n_cpu))
         results = [None] * N_structs
         submitted = []
         submission_labels = []
+
+        
+
         for i in range(N_structs):
             # Prepare a typical label
             lbl = label + "_" + str(indices[i])
             submission_labels.append(lbl)
-            
-            atm = list_of_structures[i].get_ase_atoms()
-            atm.set_calculator(calc)
-            ase.io.write("%s/%s%s"% (self.local_workdir, lbl, in_extension),
-                         atm,**calc.parameters)
-            
-            
-            # Add the file in the applist
-            binary = self.binary.replace("NPOOL", str(self.n_pool)).replace("PREFIX", lbl)
-            
-                
-            # First of all clean eventually input/output file of this very same calculation
-            cmd = self.sshcmd + " %s 'rm -f %s/%s%s %s/%s%s'" % (self.hostname, 
-                                                                 self.workdir, lbl, in_extension,
-                                                                 self.workdir, lbl, out_extension)
-            self.ExecuteCMD(cmd, False)
-#            cp_res = os.system(cmd + " > /dev/null")
-#            if cp_res != 0:
-#                print "Error while executing:", cmd
-#                print "Return code:", cp_res
-#                sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
-#            
-            # Copy the file into the cluster
-            cmd = self.scpcmd + " %s/%s%s %s:%s/" % (self.local_workdir, lbl, 
-                                                    in_extension, self.hostname, 
-                                                    self.workdir)
-            cp_res = self.ExecuteCMD(cmd, False)
-            
-            #cp_res = os.system(cmd + " > /dev/null")
-            if not cp_res:
-                print ("Error while executing:", cmd)
-                print ("Return code:", cp_res)
-                sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
-                continue
-            
-            tmt_str = ""
-            if self.use_timeout:
-                tmt_str = "timeout %d " % self.timeout
-            app_list += "%s%s %s\n" % (tmt_str, new_mpicmd, binary)
             submitted.append(i)
+        
             
-        # Save the app list and copy it to the destination
-        #app_list_name = "%s_app.list" % (label + "_" + str(indices[0]))
-        #app_list_path = "%s/%s" % (self.local_workdir, app_list_name)
-        #f = file(app_list_path, "w")
-        #f.write(app_list)
-        #f.close()
-        
-#        # Copy the app_list into the destination
-#        cmd = self.scpcmd + " %s %s:%s" % (app_list_path, self.hostname, 
-#                                           self.workdir)
-#        cp_res = os.system(cmd)
-#        if cp_res != 0:
-#            print "Error while executing:", cmd
-#            print "Return code:", cp_res
-#            sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
-#            return results #[None] * N_structs
-        
-        
-        # prepare the submission script
-        submission = self.terminal + "\n"
-        
-        # Add the submission options
-        if self.use_nodes:
-            submission += "#%s %s%d\n" % (self.submit_name, self.v_nodes, self.n_nodes)
-        if self.use_cpu:
-            submission += "#%s %s%d\n" % (self.submit_name, self.v_cpu, new_ncpu)
-        if self.use_time:
-            submission += "#%s %s%s\n" % (self.submit_name, self.v_time, self.time)
-        if self.use_account:
-            submission += "#%s %s%s\n" % (self.submit_name, self.v_account, self.account_name)
-        if self.use_memory:
-            submission += "#%s %s%s\n" % (self.submit_name, self.v_memory, self.ram)
-        if self.use_partition:
-            submission += "#%s %s%s\n" % (self.submit_name, self.v_partition, self.partition_name)
+        # Create the input files 
+        input_files, output_files =  self.prepare_input_file(list_of_structures, calc, submission_labels)
 
-        # Append the additional parameters
-        for add_parameter in self.custom_params:
-            adder_string = "--{}".format(add_parameter)
-            if add_parameter.startswith("-"):
-                adder_string = add_parameter
-
-            if self.custom_params[add_parameter] is None:
-                submission += "#{} {}\n".format(self.submit_name, adder_string)
-            else:
-                submission += "#{} {}={}\n".format(self.submit_name, adder_string, self.custom_params[add_parameter])
-
+        # Create the submission script
+        submission = self.create_submission_script(submission_labels)
         
-        # Add the set -x option
-        if self.add_set_minus_x:
-            submission += "set -x\n"
-        
-        # Add the loading of the modules
-        submission += self.load_modules + "\n"
-        
-        # Go to the working directory
-        submission += "cd " + self.workdir + "\n"
-
-        # If any, apply the extra text before and after the calculation
-        other_input = ""
-        other_output = ""
-        if self.additional_script_parameters is not None:
-            other_input, other_output = self.additional_script_parameters(submission_labels)
-
-        submission += other_input
-        
-        # Use the xargs trick
-        #submission += "xargs -d " + r"'\n'" + " -L1 -P%d -a %s -- bash -c\n" % (n_togheder, 
-        submission += app_list 
-
-        submission += other_output
-        
-        # Copy the submission script
-        sub_fpath = "%s/%s.sh" % (self.local_workdir, label + "_" + str(indices[0]))
+        # Add the submission script to the input files
+        sub_name =  label + "_" + str(indices[0]) + '.sh'
+        sub_fpath = os.path.join(self.local_workdir, sub_name)
         f = open(sub_fpath, "w")
         f.write(submission)
         f.close()
-        cmd = self.scpcmd + " %s %s:%s" % (sub_fpath, self.hostname, self.workdir)
-        cp_res = self.ExecuteCMD(cmd, False)
-        #cp_res = os.system(cmd  + " > /dev/null")
-        if not cp_res:
-            print ("Error while executing:", cmd)
-            print ("Return code:", cp_res)
-            sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
-            return results#[None] * N_structs
+        input_files.append(sub_name)
+        
+        if not self.copy_files(input_files, output_files, to_server = True):
+            # Submission failed
+            return submitted, indices, label
         
         
         # Run the simulation
-        cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, 
-                                                   self.workdir, label+ "_" + str(indices[0]))
-        status, submission_output = self.ExecuteCMD(cmd, True, return_output = True)
-
-        # If the command for submission is non blocking, we need to check periodically wether the calculation has been completed
+        sub_script_loc = os.path.join(self.workdir, sub_name)
+        cp_res, submission_output = self.submit(sub_script_loc)
+        
         if self.nonblocking_command:
             job_id = self.get_job_id_from_submission_output(submission_output)
 
             now = datetime.datetime.now()
-            sys.stderr.write("{}/{}/{} - {}:{} | submitted job id {} ({})\n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id, submission_output))
+            sys.stderr.write("{}/{}/{} - {}:{}:{} | submitted job id {} ({})\n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id, submission_output))
             sys.stderr.flush()
             time.sleep(self.check_timeout)
 
             while not self.check_job_finished(job_id):
                 time.sleep(self.check_timeout)
 
-#        cp_res = os.system(cmd + " > /dev/null")
-#        if cp_res != 0:
-#            print "Error while executing:", cmd
-#            print "Return code:", cp_res
-#            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
-#            
+        # Collect back the output
+        if not self.copy_files(input_files, output_files, to_server = False):
+            # Submission failed
+            print('[SUBMISSION {}] FAILED RETRIVING OUTPUT'.format(threading.get_native_id()))
+        else:
+            print('[SUBMISSION {}] GOT OUTPUT'.format(threading.get_native_id()))
+
         
-        # Collect the output back
+        return submitted, indices, label
+
+    def collect_results(self, calc, submitted, indices, label):
+        """ 
+        Collect back all the results from the submitted data.
+        This operation needs to be performed in thread safe mode
+        (all threads must be locked between this operation and when the results are actually assigned to the ensemble
+        to avoid conflicts)
+        """
+        # Read the output files
+        results = [None] * len(submitted)
         for i in submitted:
             # Prepare a typical label
             lbl = label + "_" + str(indices[i])
-            out_filename = "%s/%s%s"% (self.workdir, lbl, out_extension)
-            
-            # Get the response
-            cmd = self.scpcmd + " %s:%s %s/" % (self.hostname, out_filename,
-                                                self.local_workdir)
-            cp_res = self.ExecuteCMD(cmd, False)
-            #cp_res = os.system(cmd + " > /dev/null")
-            if not cp_res:
-                #print "Error while executing:", cmd
-                #print "Return code:", cp_res
-                #sys.stderr.write(cmd + ": exit with code " + str(cp_res))
-                continue
             
             # Get the results
             try:
-                calc.set_label("%s/%s" % (self.local_workdir, lbl))
-                calc.read_results()
-                results[i] = copy.deepcopy(calc.results)
-            except:
-                pass
-        
+                results[i] = self.read_results(calc, lbl) 
+            except FileNotFoundError:
+                sys.stderr.write("JOB {} | {} resulted in error:\n".format(i, lbl))
+                sys.stderr.write('File not found!\n')
+                sys.stderr.flush()
+            except Exception as e:
+                sys.stderr.write("JOB {} | {} resulted in error:\n".format(i, lbl))
+                print(e, file=sys.stderr)
+                sys.stderr.flush()
+                
+
+        print('[SUBMISSION {}] GOT RESULTS:\n{}'.format(threading.get_native_id(), results))
         return results
 
     def get_job_id_from_submission_output(self, output):
@@ -641,9 +970,13 @@ class Cluster(object):
 
         Returns None if the output contains an error
         """
+        print('INSIDE GET JOB ID WITH {}'.format(output))
+
 
         try:
             id = output.split()[-1]
+
+            print('Understanding output "{}" => {}'.format(output, id))    
             return id
         except:
             print("Error, expected a standard output, but the result of the submission was: {}".format(output))
@@ -722,8 +1055,16 @@ class Cluster(object):
 
         # Append the additional parameters
         for add_parameter in self.custom_params:
-            submission += "#{} --{}={}\n".format(self.submit_name, add_parameter, self.custom_params[add_parameter])
-        
+
+            adder_string = "--{}".format(add_parameter)
+            if add_parameter.startswith("-"):
+                adder_string = add_parameter
+
+            if self.custom_params[add_parameter] is None:
+                submission += "#{} {}\n".format(self.submit_name, adder_string)
+            else:
+                submission += "#{} {}={}\n".format(self.submit_name, adder_string, self.custom_params[add_parameter])
+
         # Add the loading of the modules
         submission += self.load_modules + "\n"
         
@@ -1058,7 +1399,15 @@ class Cluster(object):
         # Open a pipe with the server
         # Use single ' to avoid string parsing by the local terminal
         cmd = "%s %s 'echo \"%s\"'" % (self.sshcmd, self.hostname, string)
+
+        if self.use_active_shell:
+            cmd = "{ssh} {host} -t '{shell} --login -c \"echo {string}\"'".format(ssh = self.sshcmd, 
+                         host = self.hostname, 
+                         string = parse_symbols(string), 
+                         shell = self.terminal)
         #print cmd
+
+        #print(cmd)
         
         status, output = self.ExecuteCMD(cmd, return_output = True)
 #        
@@ -1076,7 +1425,7 @@ class Cluster(object):
         
         return str(output)
             
-    def compute_ensemble_batch(self, ensemble, ase_calc, get_stress = True, timeout=None):
+    def compute_ensemble_batch(self, ensemble, cellconstructor_calc, get_stress = True, timeout=None):
         """
         RUN THE ENSEMBLE WITH BATCH SUBMISSION
         ======================================
@@ -1087,6 +1436,7 @@ class Cluster(object):
         
         # Setup if the ensemble has the stress
         ensemble.has_stress = get_stress
+        ensemble.all_properties = [None] * ensemble.N
         
         # Check if the working directory exists
         if not os.path.isdir(self.local_workdir):
@@ -1097,22 +1447,46 @@ class Cluster(object):
         num_batch_offset = int(ensemble.N / self.batch_size)
         
         def compute_single_jobarray(jobs_id, calc):
-            structures = [ensemble.structures[i] for i in jobs_id]
+            structures = [ensemble.structures[i].copy() for i in jobs_id]
             n_together = min(len(structures), self.n_together_def)
-            results = self.batch_submission(structures, calc, jobs_id, ".pwi",
+            subs, indices, labels = self.batch_submission(structures, calc, jobs_id, ".pwi",
                                             ".pwo", "ESP", n_together)
             
+            # Thread safe operation
+            self.lock.acquire()
+            print("[THREAD {}] submitted calculations: {}".format(threading.get_native_id(), indices))
+            results = self.collect_results(calc, subs, indices, labels)
+
             for i, res in enumerate(results):
+                print("[THREAD {}] ADDING RESULT {} = {}".format(threading.get_native_id(), jobs_id[i], res))
                 num = jobs_id[i]
+
+                if res is None:
+                    continue
                 
                 # Check if the run was good
-                try:
-                    resk = res.keys()
-                except:
-                    continue
-                check_e = "energy" in resk
-                check_f = "forces" in resk
-                check_s = "stress" in resk
+                check_e = "energy" in res
+                check_f = "forces" in res
+                check_s = "stress" in res
+
+                # Check the structure
+                if "structure" in res:
+                    error_struct = np.linalg.norm(ensemble.structures[jobs_id[i]].coords.ravel() - res["structure"].coords.ravel())
+                    if error_struct > 1e-2:
+                        print("ERROR IDENTIFYING STRUCTURE!")
+                        MSG = """
+Error in thread {}.
+     Displacement between the expected structure {} and the one readed from the calculator
+     is of {} A.
+""".format(threading.get_native_id(), jobs_id[i], error_struct)
+                        print(MSG)
+                        ensemble.structures[jobs_id[i]].save_scf('t_{}_error_struct_generated_{}.scf'.format(threading.get_native_id(), jobs_id[i]))
+                        structures[i].save_scf('t_{}_error_struct_cmp_local_{}.scf'.format(threading.get_native_id(), jobs_id[i]))
+                        res["structure"].save_scf('t_{}_error_struct_readed_{}.scf'.format(threading.get_native_id(), jobs_id[i]))
+
+                        continue
+                else:
+                    print("[WARNING] no check on the structure.")
                 
                 is_success =  check_e and check_f
                 if get_stress:
@@ -1121,6 +1495,7 @@ class Cluster(object):
                 if not is_success:
                     continue
                 
+                ensemble.all_properties[num] = copy.deepcopy(res)
                 ensemble.energies[num] = res["energy"] / units["Ry"]
                 ensemble.forces[num, :, :] = res["forces"] / units["Ry"]
                 if get_stress:
@@ -1137,11 +1512,17 @@ class Cluster(object):
                     # Remember, ase has a very strange definition of the stress
                     ensemble.stresses[num, :, :] = -stress * units["Bohr"]**3 / units["Ry"]
                 success[num] = is_success
+
+            self.lock.release()
         
         # Run until some work has not finished
         recalc = 0
+        self.lock = threading.Lock()
         while np.sum(np.array(success, dtype = int) - 1) != 0:
             threads = []
+
+            print("[CYCLE] SUCCESS: ", success)
+            print("[CYCLE] STOPPING CONDITION:", np.sum(np.array(success, dtype = int) - 1))
             
             # Get the remaining jobs
             false_mask = np.array(success) == False
@@ -1150,12 +1531,14 @@ class Cluster(object):
             count = 0
             # Submit in parallel
             jobs = [false_id[i : i + self.job_number] for i in range(0, len(false_id), self.job_number)]
+            # Create a local copy of the calculator for each thread, to avoid conflicting modifications
+            calculators = [cellconstructor_calc.copy() for i in range(0, len(jobs))]
             
-            for job in jobs:
+            for k_th, job in enumerate(jobs):
                 # Submit only the batch size
                 if count >= self.batch_size:
                     break
-                t = threading.Thread(target = compute_single_jobarray, args=(job, ase_calc, ))
+                t = threading.Thread(target = compute_single_jobarray, args=(job, calculators[k_th], ))
                 t.start()
                 threads.append(t)
                 count += 1
@@ -1164,6 +1547,9 @@ class Cluster(object):
             for t in threads:
                 t.join(timeout)
             
+            print("[CYCLE] [END] SUCCESS: ", success)
+            print("[CYCLE] [END] STOPPING CONDITION:", np.sum(np.array(success, dtype = int) - 1))
+
             recalc += 1
             if recalc > num_batch_offset + self.max_recalc:
                 print ("Expected batch ordinary resubmissions:", num_batch_offset)

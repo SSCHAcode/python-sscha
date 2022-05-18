@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 import sys, os
+import warnings
 import numpy as np
 import time
 
@@ -33,6 +34,9 @@ import cellconstructor.Settings
 
 import sscha.Parallel as Parallel
 from sscha.Parallel import pprint as print
+from sscha.Tools import NumpyEncoder
+
+import json
 
 import difflib
 
@@ -95,7 +99,11 @@ It is used to Load and Save info about the ensemble.
 UNITS_DEFAULT = "default"
 UNITS_HARTREE = "hartree"
 SUPPORTED_UNITS = [UNITS_DEFAULT, UNITS_HARTREE]
-
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
 class Ensemble:
     __debug_index__ = 0
@@ -179,7 +187,7 @@ class Ensemble:
         self.stress_computed = None
 
         # Get the extra quantities
-        self.extra_quantities = {}
+        self.all_properties = []
 
 
         # Setup the attribute control
@@ -610,7 +618,7 @@ Error, the following stress files are missing from the ensemble:
 
             # Get the stress if any
             try:
-                stress = ase_struct.get_stress(voigt=False)
+                stress = - ase_struct.get_stress(voigt=False) 
                 # eV/A^3 -> Ry/bohr^3
                 stress /= Rydberg / Bohr**3
                 count_stress += 1
@@ -762,6 +770,10 @@ Error, the following stress files are missing from the ensemble:
                 np.save("%s/stresses_pop%d.npy" % (data_dir, population_id), self.stresses)
             
             self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
+
+            if len(self.all_properties):
+                with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
+                    json.dump({"properties" : self.all_properties}, fp, cls=NumpyEncoder)
         
     def save_enhanced_xyz(self, filename, append_mode = True, stress_key = "virial", forces_key = "force", energy_key = "energy"):
         """
@@ -861,7 +873,8 @@ Error, the following stress files are missing from the ensemble:
             np.savetxt(os.path.join(root_directory, "coord.raw"), self.xats.reshape((self.N, 3 * nat)))
 
             # Save the box
-            np.savetxt(os.path.join(root_directory, "box.raw"), np.tile(self.current_dyn.structure.unit_cell.ravel(), (self.N, 1)))
+            #Prepare an array with all the unit cells
+            np.savetxt(os.path.join(root_directory, "box.raw"), np.array([s.unit_cell.ravel() for s in self.structures]))
 
             # Save the forces
             np.savetxt(os.path.join(root_directory, "force.raw"), self.forces.reshape((self.N, 3*nat)) * Rydberg)
@@ -949,6 +962,16 @@ Error, the following stress files are missing from the ensemble:
         # Setup that both forces and stresses are not computed
         self.stress_computed = np.ones(self.N, dtype = bool)
         self.force_computed = np.ones(self.N, dtype = bool)
+
+        all_prop_fname = os.path.join(data_dir, "all_properties_pop%d.json" % population_id)
+        if os.path.exists(all_prop_fname):
+            with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
+                props= json.load(fp)
+                if "properties" in props:
+                    self.all_properties = props["properties"]
+                else:
+                    warnings.warn("WARNING: found file {} but not able to load the properties keyword.".format(all_prop_fname))
+                    
         
 
     def init_from_structures(self, structures):
@@ -1616,6 +1639,39 @@ DETAILS OF ERROR:
             return free_energy, error
         return free_energy
 
+    def get_entropy(self, return_error = False):
+        r"""
+        GET THE ENTROPY
+        ===============
+
+        Get the total anharmonic entropy.
+
+        The equation implemented is the analytical derivative of the free energy,
+        and assumes that the SSCHA free energy is minimized.
+
+        .. math::
+
+            S = - \frac{dF}{dT}
+
+            S = S_{harm} - \left<V - {\mathcal V}\right>\sum_\mu \frac{1}{1 + 2n_\mu} \frac{dn_\mu}{dT}
+
+
+        where :math:`S_{harm}` is the 'harmonic' entropy computed from the dynamucal matrix, 
+        plus a correction accounting for the ensemble anharmonicity.
+
+        
+        Parameters
+        ----------
+            return_error : bool
+                If true, returns also the error
+
+        Results
+        -------
+            entropy, error : float
+                Returns the entropy and [optionally] the stochastic error.
+        """
+        raise NotImplementedError("Error, to be implemented")
+
 
     def get_free_energy_interpolating(self, target_supercell, support_dyn_coarse = None, support_dyn_fine = None, error_on_imaginary_frequency = True, return_error = False):
         """
@@ -1624,6 +1680,9 @@ DETAILS OF ERROR:
 
         This is a trick to interpolate the free energy in the
         infinite volume limit.
+
+        Note, this function report the free eenrgy in the primitive cell, while the method get_free_energy
+        returns the energy in the supercell.
 
         Parameters
         ----------
@@ -1659,12 +1718,14 @@ DETAILS OF ERROR:
 
         
         # Interpolate the dynamical matrix
-        new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
-                                                target_supercell,
-                                                support_dyn_coarse,
-                                                support_dyn_fine)
+        if support_dyn_fine is not None:
+            new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
+                                                    target_supercell,
+                                                    support_dyn_coarse,
+                                                    support_dyn_fine)
+        else:
+            new_dyn = self.current_dyn.InterpolateMesh(target_supercell)
 
-        # TODO: Allow double interpolation in case of support dyn
         
         # Get the new harmonic free energy
         harm_fe = new_dyn.GetHarmonicFreeEnergy(self.current_T,
@@ -1863,10 +1924,14 @@ DETAILS OF ERROR:
         if np.prod(self.dyn_0.GetSupercell()) > 1:
 
             # Perform the fourier transform
-            q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+            if return_error:
+                q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+                                                    self.current_dyn.structure, supercell_dyn.structure,fc2=grad_err)
+            else:
+                q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
                                                     self.current_dyn.structure, supercell_dyn.structure)
-            q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
-                                                        self.current_dyn.structure, supercell_dyn.structure)
+            #q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
+             #                                           self.current_dyn.structure, supercell_dyn.structure)
         else:
             nat3, _ = grad.shape
             q_grad = np.zeros( (1, nat3, nat3), dtype = np.double)
@@ -2671,7 +2736,7 @@ DETAILS OF ERROR:
 
 
     def get_free_energy_hessian(self, include_v4 = False, get_full_hessian = True, verbose = False, \
-        use_symmetries = True):
+        use_symmetries = True, return_d3 = False):
         """
         GET THE FREE ENERGY ODD CORRECTION
         ==================================
@@ -2696,11 +2761,16 @@ DETAILS OF ERROR:
             use_symmetries : bool
                 If true, the d3 and d4 are symmetrized in real space.
                 It requires that spglib is installed to detect symmetries in the supercell correctly.
+            return_d3 : bool
+                If true, returns also the tensor of three phonon scattering.
 
         Returns
         -------
             phi_sc : Phonons()
                 The dynamical matrix of the free energy hessian in (Ry/bohr^2)
+            d3 : ndarray (size = (3*nat_sc, 3*nat_sc, 3*nat_sc), Optional
+                Return the three-phonon-scattering tensor (in Ry atomic units).
+                Only if return_d3 is True. 
         """
         # For now the v4 is not implemented
         #     if include_v4:
@@ -2836,6 +2906,8 @@ DETAILS OF ERROR:
                 dyn_hessian.dynmats[iq] = dynq_odd[iq, :, :] 
 
         
+        if return_d3:
+            return dyn_hessian, d3* 2.0 # Ha to Ry
         return dyn_hessian
 
 
