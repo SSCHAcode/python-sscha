@@ -180,8 +180,8 @@ You can use it even in your simulation, simply edit the value of the uppercase k
 .. code-block:: python
 
    # Import the CellConstructor library to plot the dispersion
-   import cellconstructor as CC, cellconstructor.Phonons,
-   improt cellconstructor.ForceTensor
+   import cellconstructor as CC, cellconstructor.Phonons
+   import cellconstructor.ForceTensor
 
    # Import the numerical libraries and those for plotting
    import numpy as np
