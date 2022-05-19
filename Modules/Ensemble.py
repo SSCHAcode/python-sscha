@@ -2184,7 +2184,7 @@ DETAILS OF ERROR:
         
         .. math::
                 
-            P_{\\alpha\\beta} = \\left<P_{\\apha\\beta}\\right>
+            P_{\\alpha\\beta} = \\left<P_{\\alpha\\beta}\\right>
         
         """
         stress = np.einsum("abc, a", self.stresses, self.rho) / np.sum(self.rho)
