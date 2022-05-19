@@ -112,6 +112,15 @@ We prepared an input file in the form of a python script (tested with python-ssc
    relax.minim.dyn.save_qe("sscha_T{}_dyn".format(TEMPERATURE))
 
 
+Now save the file as `sscha_gold.py` and execute it with:
+
+.. code-block:: bash
+
+   $ python sscha_gold.py > output.log
+
+And that's it.
+**Congratulations!**
+
 
 While the input may seem long, it is heavily commented, but lets go through it step by step.
 At the very beginning, we simply import the sscha libraries, cellconstructor, the math libraries and the force field. This is done in python with the `import` statemets. 
@@ -168,6 +177,49 @@ The important parameters are:
 These parameters are almost self-explaining. However, we give a brief overview of how the SSCHA works to help you understand which are the best one for your case.
 While MD or MC calculation represent the equilibrium probability distribution over time of the system by updating a single structure, the SSCHA encodes the whole probability distribution as an analytical function. Therefore, to compute properties, we can generate on the fly the ionic configurations that represent the equilibrium distributions.
 The number of random configuration is exactly how many ionic configuration we generate to compute the properties (Free energy and Stress tensors)
+
+The code that sets up and perform the SSCHA is the following:
+
+.. code-block:: python
+
+   TEMPERATURE = 300
+   N_CONFIGS = 50
+   MAX_ITERATIONS = 20
+
+   # Initialize the random ionic ensemble
+   ensemble = sscha.Ensemble.Ensemble(gold_harmonic_dyn, TEMPERATURE)
+
+   # Initialize the free energy minimizer
+   minim = sscha.SchaMinimizer.SSCHA_Minimizer(ensemble)
+   minim.set_minimization_step(0.01) 
+
+   # Initialize the NVT simulation
+   relax = sscha.Relax.SSCHA(minim, calculator, N_configs = N_CONFIGS,
+   max_pop = MAX_ITERATIONS)
+
+   # Define the I/O operations
+   # To save info about the free energy minimization after each step
+   ioinfo = sscha.Utilities.IOInfo()
+   ioinfo.SetupSaving("minim_info")
+   relax.setup_custom_functions(custom_function_post = ioinfo.CFP_SaveAll)
+
+   # Run the NVT simulation
+   relax.relax(get_stress = True)
+   
+
+
+
+So you see many classes. `ensemble` represent the ensemble of ionic configurations. We initialize it with the dynamical matrix (which represent how much atoms fluctuate around the centroids) and the temperature.
+`minim` is a `SSCHA_Minimizer` object, which performs the free energy minimization. It contains all the info regarding the minimization algorithm, as the initial timestep (that here we set to 0.01). You can avoid setting the time-step, as the code will automatically guess the best value.
+The `relax` is a `SSCHA` object: the class that takes care about the simulation and automatizes all the steps to perform a NVT or NPT calculation.
+We pass the minimizer (which contains the ensemble with the temperature), the force-field (`calculator`), the number of configurations `N_configs` and the maximum number of iterations.
+
+In this example, most of the time is spent in the minimization, however, if we replace the force-field with ab-initio DFT, the time tu run the minimization is negligible with respect to the time to compute energies and forces on the ensemble configurations.
+The total (maximum) number of energy/forces calculations is equal to the number of configurations times the number of iterations (passed through the `max_pop` argument).
+
+The calculation is submitted with `relax.relax()`. However, before running the calculation we introduce another object, the `IOInfo`.
+This tells the `relax` to save information of the free energy, its gradient and the anharmonic phonon frequencies during the minimization in the files *minim_info.dat° and *minim_info.freqs*. It is not mandatory to introduce them, but it is very usefull as it allows to visualize the minimization while it is running.
+
 
 
 
