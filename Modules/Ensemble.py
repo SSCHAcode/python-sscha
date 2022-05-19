@@ -1041,7 +1041,7 @@ Error, the following stress files are missing from the ensemble:
                 If different from None the displacements are projected on the
                 given modes.
             sobol : bool, optional (Default = False)
-                 Defines if the calculation uses random normalized or sobol normaized.
+                 Defines if the calculation uses random Gaussian generator or Sobol Gaussian generator.
         """
 
         if evenodd and (N % 2 != 0):
