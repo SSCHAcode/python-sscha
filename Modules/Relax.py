@@ -377,7 +377,7 @@ Error, the specified location to save the ensemble:
     def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
                  ensemble_loc = None, start_pop = None, stress_numerical = False,
-                 cell_relax_algorithm = "sd", fix_volume = False, sobol = False:
+                 cell_relax_algorithm = "sd", fix_volume = False, sobol = False):
         """
         VARIABLE CELL RELAX
         ====================
@@ -436,7 +436,7 @@ Error, the specified location to save the ensemble:
             fix_volume : bool, optional
                 If true (default False) the volume is fixed, therefore only the cell shape is relaxed.
             sobol : bool, optional (Default = False)
-                 Defines if the calculation uses random Gaussian generator or Sobol Gaussian generator.    
+                 Defines if the calculation uses random Gaussian generator or Sobol Gaussian generator.
 
         Returns
         -------
