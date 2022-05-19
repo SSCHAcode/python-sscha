@@ -1022,7 +1022,7 @@ Error, the following stress files are missing from the ensemble:
         self.force_computed = np.zeros(self.N, dtype = bool)
 
 
-    def generate(self, N, evenodd = True, project_on_modes = None):
+    def generate(self, N, evenodd = True, project_on_modes = None, sobol = False):
         """
         GENERATE THE ENSEMBLE
         =====================
@@ -1040,6 +1040,8 @@ Error, the following stress files are missing from the ensemble:
             project_on_modes : ndarray(size=(3*nat_sc, nproj)), optional
                 If different from None the displacements are projected on the
                 given modes.
+            sobol : bool, optional (Default = False)
+                 Defines if the calculation uses random normalized or sobol normaized.
         """
 
         if evenodd and (N % 2 != 0):
@@ -1053,7 +1055,7 @@ Error, the following stress files are missing from the ensemble:
 
         structures = []
         if evenodd:
-            structs = self.dyn_0.ExtractRandomStructures(N // 2, self.T0, project_on_vectors = project_on_modes, lock_low_w = self.ignore_small_w, sobol = True)  # normal Sobol generator****Diegom_test****
+            structs = self.dyn_0.ExtractRandomStructures(N // 2, self.T0, project_on_vectors = project_on_modes, lock_low_w = self.ignore_small_w, sobol = sobol)  # normal Sobol generator****Diegom_test****
 
 
 
@@ -1064,7 +1066,7 @@ Error, the following stress files are missing from the ensemble:
                 new_s.coords = super_struct.coords - new_s.get_displacement(super_struct)
                 structures.append(new_s)
         else:
-            structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes, lock_low_w = self.ignore_small_w, sobol = True)  # normal Sobol generator****Diegom_test****
+            structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes, lock_low_w = self.ignore_small_w, sobol = sobol)  # normal Sobol generator****Diegom_test****
 
 
         # Enforce all the processors to share the same structures
