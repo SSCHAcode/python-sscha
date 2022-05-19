@@ -1,5 +1,5 @@
-RUN THE SSCHA
-=============
+ADVANCED FEATURES
+=================
 
 
 The python-sscha code can be runned both as a stand-alone application with an input file and as a python library, writing a python script.
@@ -12,12 +12,17 @@ The SSCHA calculation is divided into 3 main steps:
  - The SSCHA free energy minimization
 
 Then this steps are iterated until convergence is achieved.
-This iteration can either be done manually or automatically by the code.
 
-It is always suggested to use the automatic way, however, for completness, here we cover both aspects.
+In this chapter, we cover some advanced features of the SSCHA code, as the manual submission, the use of constrains on modes and atoms or the configurations of cluster with a DFT code different from quantum ESPRESSO.
 
 Manual submission
 -----------------
+
+The manual submission allows the user to take full controll over any steps in the simulation. It also means that the code perform just one iteration, and the user must interact with it to provide the forces and energies of the ensemble at each iterations.
+
+It is usefull if you want to have full control on the number of configurations required to converge, or if you simply do not want to configure the automatic submission through a cluster because you have limited resources and are scared that the code could burn too much computer time without you realizing.
+
+Indeed, it is strongly discuraged in variable cell simulations, as the code exploits the results from previous iterations to optimize the cell in a clever way.
 
 The manual submission means that the user manually computes the energies and forces of all the configurations in the ensemble. The code stops after generating the random ensemble, and the user is requested to provide data files that contain the forces and total energies for each configuration.
 
@@ -133,14 +138,8 @@ You can plot all the minimization path (frequencies, free energy, gradients) cal
 The sscha-plot-data.py script is automatically installed within the SSCHA code.
 
 
-Automatic submission
---------------------
-
-TODO
-
-
-Cluster configuration
----------------------
+Cluster configuration with a code different from Quantum ESPRESSO
+-----------------------------------------------------------------
 
 TODO
 

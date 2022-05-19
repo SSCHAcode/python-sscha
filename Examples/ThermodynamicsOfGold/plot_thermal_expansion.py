@@ -52,7 +52,7 @@ else:
 
 # Prepare the figure and plot the V(T) from the sscha data
 plt.figure(dpi = 150)
-plt.scatter(temperatures, volumes, label = "SSCHA data")
+plt.scatter(temperatures, volumes, label = "SSCHA data", color = 'r')
 
 # Fit the data with a quadratic curve
 def parabola(x, a, b, c):
@@ -72,12 +72,12 @@ plt.text(0.6, 0.2, r"$\alpha_v = "+"{:.1f}".format(vol_thermal_expansion*1e6)+r"
 
 # Plot the fit
 _t_ = np.linspace(np.min(temperatures), np.max(temperatures), 1000)
-plt.plot(_t_, parabola(_t_, *popt), label = "Fit")
+plt.plot(_t_, parabola(_t_, *popt), label = "Fit", color = 'k', zorder = 0)
 
 # Adjust the plot adding labels, legend, and saving in eps
 plt.xlabel("Temperature [K]")
 plt.ylabel(r"Volume [$\AA^3$]")
 plt.legend()
 plt.tight_layout()
-plt.savefig("thermal_expansion.eps")
+plt.savefig("thermal_expansion.png")
 plt.show()
