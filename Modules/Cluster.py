@@ -996,7 +996,15 @@ Error while connecting to the cluster to copy the files:
         lines = output.split("\n")
         if len(lines):
             for l in lines:
-                data = l.strip().split()
+                l = l.strip()
+                if not l:
+                    if verbose:
+                        now = datetime.datetime.now()
+                        sys.stderr.write("{}/{}/{} - {}:{}:{} | job {}: No response from the server \n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id))
+                        sys.stderr.flush()
+                    return False
+                    
+                data = l.split()
                 if len(data) == 0:
                     if verbose:
                         now = datetime.datetime.now()
