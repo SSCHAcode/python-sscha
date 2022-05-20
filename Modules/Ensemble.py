@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 import sys, os
+import warnings
 import numpy as np
 import time
 
@@ -33,6 +34,9 @@ import cellconstructor.Settings
 
 import sscha.Parallel as Parallel
 from sscha.Parallel import pprint as print
+from sscha.Tools import NumpyEncoder
+
+import json
 
 import difflib
 
@@ -82,6 +86,7 @@ except:
     Bohr = 1/__A_TO_BOHR__
     __RyToK__ = 157887.32400374097
 
+__GPa__ = 14710.50763554043
 
 __DEBUG_RHO__ = False
 
@@ -94,7 +99,11 @@ It is used to Load and Save info about the ensemble.
 UNITS_DEFAULT = "default"
 UNITS_HARTREE = "hartree"
 SUPPORTED_UNITS = [UNITS_DEFAULT, UNITS_HARTREE]
-
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
 class Ensemble:
     __debug_index__ = 0
@@ -182,7 +191,7 @@ class Ensemble:
         self.stress_computed = None
 
         # Get the extra quantities
-        self.extra_quantities = {}
+        self.all_properties = []
 
 
         # Setup the attribute control
@@ -619,7 +628,7 @@ Error, the following stress files are missing from the ensemble:
 
             # Get the stress if any
             try:
-                stress = ase_struct.get_stress(voigt=False)
+                stress = - ase_struct.get_stress(voigt=False) 
                 # eV/A^3 -> Ry/bohr^3
                 stress /= Rydberg / Bohr**3
                 count_stress += 1
@@ -771,6 +780,10 @@ Error, the following stress files are missing from the ensemble:
                 np.save("%s/stresses_pop%d.npy" % (data_dir, population_id), self.stresses)
             
             self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
+
+            if len(self.all_properties):
+                with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
+                    json.dump({"properties" : self.all_properties}, fp, cls=NumpyEncoder)
         
     def save_enhanced_xyz(self, filename, append_mode = True, stress_key = "virial", forces_key = "force", energy_key = "energy"):
         """
@@ -823,6 +836,74 @@ Error, the following stress files are missing from the ensemble:
                 c = "w"
             with open(filename, c) as fp:
                 fp.writelines(lines)
+        
+        # Force other processors to wait for the master
+        CC.Settings.barrier()
+
+    def save_raw(self, root_directory, type_dict = None):
+        """
+        Save the ensemble as a set of raw files.
+
+        This is the default format for training with deepmd
+
+        Parameters
+        ----------
+            filename : string
+                The directory on which to save the ensemble. If it does not exist, it is create.
+                NOTE: this will overwrite any other ensemble saved in raw format in that directory
+            type_dict : dict
+                The dictionary between integers and atomic types. If not provided, it is generated on the spot and returned.
+        
+        Returns
+        -------
+            type_dict : dict
+                The dictionary of the parameters
+        """
+        nat = self.current_dyn.structure.N_atoms * np.prod(self.current_dyn.GetSupercell())
+
+        if type_dict is None:
+            atm = np.unique(self.current_dyn.structure.atoms)
+            type_dict = {x : i for i, x in enumerate(atm)}
+        
+        inv_dict = {i : x for x, i in type_dict.items()}
+
+
+        # Save only if the current processor is the master
+        if Parallel.am_i_the_master():
+            if not os.path.exists(root_directory):
+                os.makedirs(root_directory)
+            
+            if not os.path.isdir(root_directory):
+                raise IOError("Error, save_raw expects a directory, but '{}' is not a directory.".format(root_directory))
+
+            # Save the energies
+            np.savetxt(os.path.join(root_directory, "energy.raw"), self.energies * Rydberg)
+
+            # Save the positions
+            np.savetxt(os.path.join(root_directory, "coord.raw"), self.xats.reshape((self.N, 3 * nat)))
+
+            # Save the box
+            #Prepare an array with all the unit cells
+            np.savetxt(os.path.join(root_directory, "box.raw"), np.array([s.unit_cell.ravel() for s in self.structures]))
+
+            # Save the forces
+            np.savetxt(os.path.join(root_directory, "force.raw"), self.forces.reshape((self.N, 3*nat)) * Rydberg)
+
+            # Save the stress
+            np.savetxt(os.path.join(root_directory, "virial.raw"), self.stresses.reshape((self.N, 9)) * __GPa__ * 10000)
+
+            # Save the types
+            ss = self.current_dyn.structure.generate_supercell(self.current_dyn.GetSupercell())
+
+            with open(os.path.join(root_directory, "type_map.raw"), "w") as fp:
+                line = " ".join([inv_dict[x] for x in np.arange(len(type_dict))])
+                fp.write(line + "\n")
+
+            with open(os.path.join(root_directory, "type.raw"), "w") as fp:
+                line = " ".join([str(type_dict[x]) for x in ss.atoms])
+                fp.write(line + "\n")
+
+                
         
         # Force other processors to wait for the master
         CC.Settings.barrier()
@@ -891,6 +972,16 @@ Error, the following stress files are missing from the ensemble:
         # Setup that both forces and stresses are not computed
         self.stress_computed = np.ones(self.N, dtype = bool)
         self.force_computed = np.ones(self.N, dtype = bool)
+
+        all_prop_fname = os.path.join(data_dir, "all_properties_pop%d.json" % population_id)
+        if os.path.exists(all_prop_fname):
+            with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
+                props= json.load(fp)
+                if "properties" in props:
+                    self.all_properties = props["properties"]
+                else:
+                    warnings.warn("WARNING: found file {} but not able to load the properties keyword.".format(all_prop_fname))
+                    
         
 
     def init_from_structures(self, structures):
@@ -1586,6 +1677,9 @@ DETAILS OF ERROR:
         This is a trick to interpolate the free energy in the
         infinite volume limit.
 
+        Note, this function report the free eenrgy in the primitive cell, while the method get_free_energy
+        returns the energy in the supercell.
+
         Parameters
         ----------
             target_supercell : list (N, N, N)
@@ -1620,12 +1714,14 @@ DETAILS OF ERROR:
 
         
         # Interpolate the dynamical matrix
-        new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
-                                                target_supercell,
-                                                support_dyn_coarse,
-                                                support_dyn_fine)
+        if support_dyn_fine is not None:
+            new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
+                                                    target_supercell,
+                                                    support_dyn_coarse,
+                                                    support_dyn_fine)
+        else:
+            new_dyn = self.current_dyn.InterpolateMesh(target_supercell)
 
-        # TODO: Allow double interpolation in case of support dyn
         
         # Get the new harmonic free energy
         harm_fe = new_dyn.GetHarmonicFreeEnergy(self.current_T,
@@ -1824,10 +1920,14 @@ DETAILS OF ERROR:
         if np.prod(self.dyn_0.GetSupercell()) > 1:
 
             # Perform the fourier transform
-            q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+            if return_error:
+                q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+                                                    self.current_dyn.structure, supercell_dyn.structure,fc2=grad_err)
+            else:
+                q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
                                                     self.current_dyn.structure, supercell_dyn.structure)
-            q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
-                                                        self.current_dyn.structure, supercell_dyn.structure)
+            #q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
+             #                                           self.current_dyn.structure, supercell_dyn.structure)
         else:
             nat3, _ = grad.shape
             q_grad = np.zeros( (1, nat3, nat3), dtype = np.double)
@@ -2080,7 +2180,7 @@ DETAILS OF ERROR:
         
         .. math::
                 
-            P_{\\alpha\\beta} = \\left<P_{\\apha\\beta}\\right>
+            P_{\\alpha\\beta} = \\left<P_{\\alpha\\beta}\\right>
         
         """
         stress = np.einsum("abc, a", self.stresses, self.rho) / np.sum(self.rho)
@@ -2305,108 +2405,110 @@ DETAILS OF ERROR:
 #         return df_dfc, err_df_dfc
 
 
-    def get_d3_muspace(self):
-        r"""
-        GET V3 IN MODE SPACE
-        ====================
+    # def get_d3_muspace(self):
+    #     r"""
+    #     GET V3 IN MODE SPACE
+    #     ====================
 
-        This subroutine gets the d3 directly in the space of the modes.
+    #     This subroutine gets the d3 directly in the space of the modes.
 
-        ..math::
+    #     ..math::
 
-            D^{(3)}_{abc} = \sum_{xyz} \frac{\Phi^{(3)}_{xyz} e_a^x e_b^y e_c^z}{\sqrt{m_x m_y m_z}}
-
-
-        """
-
-        # Be shure to have the correct units
-        self.convert_units(UNITS_DEFAULT)
-
-        supersturct = self.current_dyn.structure.generate_supercell(self.supercell)
-
-        # Convert from A to Bohr the space 
-        u_disps = self.u_disps * __A_TO_BOHR__
-        n_rand, n_modes = np.shape(u_disps)
-        forces = (self.forces - self.sscha_forces).reshape(self.N, n_modes)  / __A_TO_BOHR__ 
-
-        Ups = self.current_dyn.GetUpsilonMatrix(self.current_T)
-        v_disp = u_disps.dot(Ups)
-
-        # pass in the polarization space
-        w, pols = self.current_dyn.DiagonalizeSupercell()
-
-        # Discard translations
-        trans = CC.Methods.get_translations(pols, supersturct.get_masses_array())
-        pols = pols[:, ~trans]
-
-        m = np.tile(supersturct.get_masses_array(), (3,1)).T.ravel()
-
-        pol_vec = np.einsum("ab, a->ab", pols, 1 / np.sqrt(m))
-
-        v_mode = v_disp.dot(pol_vec)
-        f_mode = forces.dot(pol_vec)
-
-        # Now compute the d3 as <vvf>
-        N_eff = np.sum(self.rho)
-        f_mode = np.einsum("ia, i->ia", f_mode, self.rho)
-        d3_noperm = np.einsum("ia,ib,ic->abc", v_mode, v_mode, f_mode)
-        d3_noperm /= -N_eff # there is a minus
-
-        # Apply the permuatations
-        d3 = d3_noperm.copy()
-        d3 += np.einsum("abc->acb", d3_noperm)
-        d3 += np.einsum("abc->bac", d3_noperm)
-        d3 += np.einsum("abc->bca", d3_noperm)
-        d3 += np.einsum("abc->cab", d3_noperm)
-        d3 += np.einsum("abc->cba", d3_noperm)
-        d3 /= 6
-
-        # TODO: symmetrize
-
-        return d3
+    #         D^{(3)}_{abc} = \sum_{xyz} \frac{\Phi^{(3)}_{xyz} e_a^x e_b^y e_c^z}{\sqrt{m_x m_y m_z}}
 
 
-    def get_v3_realspace(self):
-        """
-        This is a testing function that computes the V3 matrix in real space:
+    #     """
+
+    #     # Be shure to have the correct units
+    #     self.convert_units(UNITS_DEFAULT)
+
+    #     supersturct = self.current_dyn.structure.generate_supercell(self.supercell)
+
+    #     # Convert from A to Bohr the space 
+    #     u_disps = self.u_disps * __A_TO_BOHR__
+    #     n_rand, n_modes = np.shape(u_disps)
+    #     forces = (self.forces - self.sscha_forces).reshape(self.N, n_modes)  / __A_TO_BOHR__ 
+
+    #     Ups = self.current_dyn.GetUpsilonMatrix(self.current_T)
+    #     v_disp = u_disps.dot(Ups)
+
+    #     # pass in the polarization space
+    #     w, pols = self.current_dyn.DiagonalizeSupercell()
+
+    #     # Discard translations
+    #     trans = CC.Methods.get_translations(pols, supersturct.get_masses_array())
+    #     pols = pols[:, ~trans]
+
+    #     m = np.tile(supersturct.get_masses_array(), (3,1)).T.ravel()
+
+    #     pol_vec = np.einsum("ab, a->ab", pols, 1 / np.sqrt(m))
+
+    #     v_mode = v_disp.dot(pol_vec)
+    #     f_mode = forces.dot(pol_vec)
+
+    #     # Now compute the d3 as <vvf>
+    #     N_eff = np.sum(self.rho)
+    #     f_mode = np.einsum("ia, i->ia", f_mode, self.rho)
+    #     d3_noperm = np.einsum("ia,ib,ic->abc", v_mode, v_mode, f_mode)
+    #     d3_noperm /= -N_eff # there is a minus
+
+    #     # Apply the permuatations
+    #     d3 = d3_noperm.copy()
+    #     d3 += np.einsum("abc->acb", d3_noperm)
+    #     d3 += np.einsum("abc->bac", d3_noperm)
+    #     d3 += np.einsum("abc->bca", d3_noperm)
+    #     d3 += np.einsum("abc->cab", d3_noperm)
+    #     d3 += np.einsum("abc->cba", d3_noperm)
+    #     d3 /= 6
+
+    #     # TODO: symmetrize
+
+    #     return d3
+
+
+    # def get_v3_realspace(self):
+    #     """
+    #     This is a testing function that computes the V3 matrix in real space:
             
-        ..math::
+    #     ..math::
             
-            \\Phi^{(3)}_{xyz} = - \sum_{pq} \\Upsilon_{xp}\\Upsilon_{yq} \\left<u_pu_q f_z\\\right>
-        """
+    #         \\Phi^{(3)}_{xyz} = - \sum_{pq} \\Upsilon_{xp}\\Upsilon_{yq} \\left<u_pu_q f_z\\\right>
+    #     """
         
-        nat_sc = self.structures[0].N_atoms
-        Ups = self.current_dyn.GetUpsilonMatrix(self.current_T)
-        f2 = np.reshape(self.forces - self.sscha_forces, (self.N, 3 * nat_sc))
+    #     nat_sc = self.structures[0].N_atoms
+    #     Ups = self.current_dyn.GetUpsilonMatrix(self.current_T)
+    #     f2 = np.reshape(self.forces - self.sscha_forces, (self.N, 3 * nat_sc))
         
-        # Get the average <uuf>
-        t1 = time.time()
-        N_eff = np.sum(self.rho)
-        uuf = np.einsum("ix,iy,iz,i", self.u_disps, self.u_disps, f2, self.rho)
-        uuf /= N_eff
-        t2 = time.time()
+    #     # Get the average <uuf>
+    #     t1 = time.time()
+    #     N_eff = np.sum(self.rho)
+    #     uuf = np.einsum("ix,iy,iz,i", self.u_disps, self.u_disps, f2, self.rho)
+    #     uuf /= N_eff
+    #     t2 = time.time()
         
-        print("Time elapsed to compute <uuf>:", t2-t1, "s")
+    #     print("Time elapsed to compute <uuf>:", t2-t1, "s")
         
-        # Get the v3
-        v3 = - np.einsum("xp,yq,pqz->xyz", Ups, Ups, uuf) * __A_TO_BOHR__
-        # Symmetrize
-        #v3 = np.einsum("xyz,xzy,yxz,yzx,zxy,zyx->xyz", v3, v3, v3, v3, v3, v3) / 6
-        v3 -=  np.einsum("xp,yq,pqz->xzy", Ups, Ups, uuf) * __A_TO_BOHR__
-        v3 -=  np.einsum("xp,yq,pqz->zyx", Ups, Ups, uuf) * __A_TO_BOHR__
-        v3 -=  np.einsum("xp,yq,pqz->yxz", Ups, Ups, uuf)* __A_TO_BOHR__
-        v3 -=  np.einsum("xp,yq,pqz->zxy", Ups, Ups, uuf)* __A_TO_BOHR__
-        v3 -=  np.einsum("xp,yq,pqz->yzx", Ups, Ups, uuf)* __A_TO_BOHR__
-        v3 /= 6
-        t3 = time.time()
-        print("Time elapsed to compute v3:", t3-t1, "s")
-        return v3
+    #     # Get the v3
+    #     v3 = - np.einsum("xp,yq,pqz->xyz", Ups, Ups, uuf) * __A_TO_BOHR__
+    #     # Symmetrize
+    #     #v3 = np.einsum("xyz,xzy,yxz,yzx,zxy,zyx->xyz", v3, v3, v3, v3, v3, v3) / 6
+    #     v3 -=  np.einsum("xp,yq,pqz->xzy", Ups, Ups, uuf) * __A_TO_BOHR__
+    #     v3 -=  np.einsum("xp,yq,pqz->zyx", Ups, Ups, uuf) * __A_TO_BOHR__
+    #     v3 -=  np.einsum("xp,yq,pqz->yxz", Ups, Ups, uuf)* __A_TO_BOHR__
+    #     v3 -=  np.einsum("xp,yq,pqz->zxy", Ups, Ups, uuf)* __A_TO_BOHR__
+    #     v3 -=  np.einsum("xp,yq,pqz->yzx", Ups, Ups, uuf)* __A_TO_BOHR__
+    #     v3 /= 6
+    #     t3 = time.time()
+    #     print("Time elapsed to compute v3:", t3-t1, "s")
+    #     return v3
 
     def get_odd_realspace(self):
         """
         This is a testing function to compute the odd3 correction 
         using the real space v3 (similar to the raffaello first implementation)
         """
+
+        warnings.warn('TESTING FUNCTION! DO NOT USE FOR PRODUCTION (use get_free_energy_hessian)')
         # Get the dynamical matrix in the supercell
         super_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
         w_sc, pols_sc = super_dyn.DyagDinQ(0)
@@ -2439,200 +2541,200 @@ DETAILS OF ERROR:
         return super_dyn.dynmats[0] + odd_correction
         
 
-    def get_v3_qspace(self, q, k):
-        r"""
-        GET THE PHONON-PHONON SCATTERING ELEMENT
-        ========================================
+    # def get_v3_qspace(self, q, k):
+    #     r"""
+    #     GET THE PHONON-PHONON SCATTERING ELEMENT
+    #     ========================================
 
-        This subroutine computes the 3-body phonon-phonon scatternig within the sscha.
-        It evaluates the vertex where the q phonon splits in a q+k and -k phonon:
+    #     This subroutine computes the 3-body phonon-phonon scatternig within the sscha.
+    #     It evaluates the vertex where the q phonon splits in a q+k and -k phonon:
                     
-                  /---> q + k
-           q ____/
-                 \
-                  \---> -k  
+    #               /---> q + k
+    #        q ____/
+    #              \
+    #               \---> -k  
 
         
-        This computes v3 on the fly in real space.
+    #     This computes v3 on the fly in real space.
         
-        .. math ::
+    #     .. math ::
 
-            V^3_{abc} (q, -q-k, k)
+    #         V^3_{abc} (q, -q-k, k)
 
-        Where :math:`a`, :math:`b` and :math:`c` are the atomic indices in the unit cell.
+    #     Where :math:`a`, :math:`b` and :math:`c` are the atomic indices in the unit cell.
 
-        Parameters
-        ----------
-            q : ndarray(size = 3, dtype = float)
-                The q vector for the v3 compuation V3(q, -q-k, k).
-            k : ndarray(size = 3, dtype = float)
-                The k vector for the v3 computation V3(q, -q-k, k).
+    #     Parameters
+    #     ----------
+    #         q : ndarray(size = 3, dtype = float)
+    #             The q vector for the v3 compuation V3(q, -q-k, k).
+    #         k : ndarray(size = 3, dtype = float)
+    #             The k vector for the v3 computation V3(q, -q-k, k).
         
-        Returns
-        -------
-            v3 : ndarray( size = (3*nat, 3*nat, 3*nat), dtype = np.complex128)
-                The 3-rank tensor vertext V3(q, -q-k, k) of the phonon-phonon scattering
-        """
+    #     Returns
+    #     -------
+    #         v3 : ndarray( size = (3*nat, 3*nat, 3*nat), dtype = np.complex128)
+    #             The 3-rank tensor vertext V3(q, -q-k, k) of the phonon-phonon scattering
+    #     """
 
-        # Define the q vectors
-        q1 = -q -k
-        q2 = k
+    #     # Define the q vectors
+    #     q1 = -q -k
+    #     q2 = k
 
-        superdyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
-        superstruc = superdyn.structure
-        ups_mat = np.real(superdyn.GetUpsilonMatrix(self.current_T))
+    #     superdyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
+    #     superstruc = superdyn.structure
+    #     ups_mat = np.real(superdyn.GetUpsilonMatrix(self.current_T))
 
-        # Get Upsilon dot u
-        vs = self.u_disps.dot(ups_mat) * __A_TO_BOHR__
+    #     # Get Upsilon dot u
+    #     vs = self.u_disps.dot(ups_mat) * __A_TO_BOHR__
         
-        # Get the corrispondance between unit cell and super cell
-        itau = superdyn.structure.get_itau(self.current_dyn.structure) - 1
-        nat_sc = superdyn.structure.N_atoms
-        nat = self.current_dyn.structure.N_atoms
-        struct = self.current_dyn.structure
+    #     # Get the corrispondance between unit cell and super cell
+    #     itau = superdyn.structure.get_itau(self.current_dyn.structure) - 1
+    #     nat_sc = superdyn.structure.N_atoms
+    #     nat = self.current_dyn.structure.N_atoms
+    #     struct = self.current_dyn.structure
 
-        D3 = np.zeros( (3*nat, 3*nat, 3*nat), dtype = np.complex128)
-        N_eff = np.sum(self.rho)
-        fc = np.zeros((3,3,3), dtype = np.float64)
-        for i in range(nat_sc):
-            i_uc = itau[i]
+    #     D3 = np.zeros( (3*nat, 3*nat, 3*nat), dtype = np.complex128)
+    #     N_eff = np.sum(self.rho)
+    #     fc = np.zeros((3,3,3), dtype = np.float64)
+    #     for i in range(nat_sc):
+    #         i_uc = itau[i]
 
-            # The forces and displacement along this atom
-            v_i = vs[:, 3*i:3*i+3]
-            f_i = self.forces[:, i, :] - self.sscha_forces[:, i, :]
-            f_i /= __A_TO_BOHR__
-            for j in range(nat_sc):
-                j_uc = itau[j]
+    #         # The forces and displacement along this atom
+    #         v_i = vs[:, 3*i:3*i+3]
+    #         f_i = self.forces[:, i, :] - self.sscha_forces[:, i, :]
+    #         f_i /= __A_TO_BOHR__
+    #         for j in range(nat_sc):
+    #             j_uc = itau[j]
 
-                R1 = superstruc.coords[i, :] - struct.coords[i_uc, :]
-                R1 -= superstruc.coords[j, :] - struct.coords[j_uc, :]
-                q1dotR = q1.dot(R1)
+    #             R1 = superstruc.coords[i, :] - struct.coords[i_uc, :]
+    #             R1 -= superstruc.coords[j, :] - struct.coords[j_uc, :]
+    #             q1dotR = q1.dot(R1)
 
-                # Forces and displacement along this atom
-                v_j = vs[:, 3*j:3*j+3]
-                f_j = self.forces[:, j, :] - self.sscha_forces[:, j, :] 
-                f_j /= __A_TO_BOHR__
+    #             # Forces and displacement along this atom
+    #             v_j = vs[:, 3*j:3*j+3]
+    #             f_j = self.forces[:, j, :] - self.sscha_forces[:, j, :] 
+    #             f_j /= __A_TO_BOHR__
                 
 
-                for k in range(nat_sc):
-                    k_uc = itau[k]
+    #             for k in range(nat_sc):
+    #                 k_uc = itau[k]
 
-                    R2 = superstruc.coords[i, :] - struct.coords[i_uc, :]
-                    R2 -= superstruc.coords[k, :] - struct.coords[k_uc, :]
-                    q2dotR = q2.dot(R2)
+    #                 R2 = superstruc.coords[i, :] - struct.coords[i_uc, :]
+    #                 R2 -= superstruc.coords[k, :] - struct.coords[k_uc, :]
+    #                 q2dotR = q2.dot(R2)
                         
-                    # Forces and displacement along this atom
-                    v_k = vs[:, 3*k:3*k+3]
-                    f_k = self.forces[:, k, :] - self.sscha_forces[:, k, :] 
-                    f_k /= __A_TO_BOHR__
+    #                 # Forces and displacement along this atom
+    #                 v_k = vs[:, 3*k:3*k+3]
+    #                 f_k = self.forces[:, k, :] - self.sscha_forces[:, k, :] 
+    #                 f_k /= __A_TO_BOHR__
 
-                    fc[:,:] = np.einsum("ia,ib,ic,i", v_i, v_j, f_k, self.rho)
-                    fc += np.einsum("ia,ib,ic,i", v_i, f_j, v_k, self.rho)
-                    fc += np.einsum("ia,ib,ic,i", f_i, v_j, v_k, self.rho)
-                    fc /= 3*N_eff
-                    D3[3*i_uc: 3*i_uc+3, 3*j_uc: 3*j_uc+3, 3*k_uc : 3*k_uc+3] += fc * np.exp(-1j* q1dotR - 1j*q2dotR)
+    #                 fc[:,:] = np.einsum("ia,ib,ic,i", v_i, v_j, f_k, self.rho)
+    #                 fc += np.einsum("ia,ib,ic,i", v_i, f_j, v_k, self.rho)
+    #                 fc += np.einsum("ia,ib,ic,i", f_i, v_j, v_k, self.rho)
+    #                 fc /= 3*N_eff
+    #                 D3[3*i_uc: 3*i_uc+3, 3*j_uc: 3*j_uc+3, 3*k_uc : 3*k_uc+3] += fc * np.exp(-1j* q1dotR - 1j*q2dotR)
 
                     
-        return D3
+    #     return D3
 
 
-    def get_dynamical_bubble(self, q, w, smearing = 1e-5):
-        r"""
-        GET THE DYNAMICAL BUBBLE SELF ENERGY
-        ====================================
+    # def get_dynamical_bubble(self, q, w, smearing = 1e-5):
+    #     r"""
+    #     GET THE DYNAMICAL BUBBLE SELF ENERGY
+    #     ====================================
 
-        This function returns the dynamical bubble self-energy:
+    #     This function returns the dynamical bubble self-energy:
 
-        .. math::
+    #     .. math::
 
-            \Sigma_{af}(q, w) = \sum_{q'q''}\sum_{bc,\mu\nu} D^{(3)}_{abc} \left(-\frac 1 2 \chi_{\mu\nu}(\omega, q', q'')\right) \frac{e_\nu^b e_\mu^c e_\nu^d e_\mu^e}{\sqrt{M_bM_cM_dM_e}} D^{(3)}_{def}
+    #         \Sigma_{af}(q, w) = \sum_{q'q''}\sum_{bc,\mu\nu} D^{(3)}_{abc} \left(-\frac 1 2 \chi_{\mu\nu}(\omega, q', q'')\right) \frac{e_\nu^b e_\mu^c e_\nu^d e_\mu^e}{\sqrt{M_bM_cM_dM_e}} D^{(3)}_{def}
 
         
-        NOTE: The integral in the q space is performed over the mesh grid given by the supercell.
+    #     NOTE: The integral in the q space is performed over the mesh grid given by the supercell.
 
 
-        Parameters
-        ----------
-            q : vector
-                The q vector to compute the dynamical self energy
-            w : float or array
-                The frequency(ies) to compute the dynamical self-energy
+    #     Parameters
+    #     ----------
+    #         q : vector
+    #             The q vector to compute the dynamical self energy
+    #         w : float or array
+    #             The frequency(ies) to compute the dynamical self-energy
 
-        Results
-        -------
-            Sigma : ndarray(size = (3*nat, 3*nat), dtype = np.complex128)
-                The dynamical self energy. Note it could be a list of Sigma
-                if the provided frequency is an array
-        """
+    #     Results
+    #     -------
+    #         Sigma : ndarray(size = (3*nat, 3*nat), dtype = np.complex128)
+    #             The dynamical self energy. Note it could be a list of Sigma
+    #             if the provided frequency is an array
+    #     """
 
 
-        # Perform the summation over the allowed q points
-        q_list = self.current_dyn.q_tot
+    #     # Perform the summation over the allowed q points
+    #     q_list = self.current_dyn.q_tot
 
-        bg = CC.Methods.get_reciprocal_vectors(self.current_dyn.structure.unit_cell)
-        m = self.current_dyn.structure.get_masses_array()
+    #     bg = CC.Methods.get_reciprocal_vectors(self.current_dyn.structure.unit_cell)
+    #     m = self.current_dyn.structure.get_masses_array()
 
-        nat = self.current_dyn.structure.N_atoms
+    #     nat = self.current_dyn.structure.N_atoms
 
-        # Extend m to 3*nat
-        # This is a numpy hack: tile creates a replica matrix of m (3xN_nat)
-        # .T: makes a transposition to N_nat x 3 and ravel convert it in a 1d array
-        m = np.tile(m, (3,1)).T.ravel()
-        minvsqrt = 1 / np.sqrt(m)
+    #     # Extend m to 3*nat
+    #     # This is a numpy hack: tile creates a replica matrix of m (3xN_nat)
+    #     # .T: makes a transposition to N_nat x 3 and ravel convert it in a 1d array
+    #     m = np.tile(m, (3,1)).T.ravel()
+    #     minvsqrt = 1 / np.sqrt(m)
 
-        # Check how many frequencies has been provided
-        N_w = 1
-        try:
-            N_w = len(w)
-        except:
-            pass
+    #     # Check how many frequencies has been provided
+    #     N_w = 1
+    #     try:
+    #         N_w = len(w)
+    #     except:
+    #         pass
 
-        # Initialize the bubble self energy
-        sigma = np.zeros((3*nat, 3*nat), dtype = np.complex128)
-        if N_w > 1:
-            sigmas = [sigma.copy() for x in range(N_w)]
-        for ik, k in enumerate(q_list):
-            k1 = -q -k
+    #     # Initialize the bubble self energy
+    #     sigma = np.zeros((3*nat, 3*nat), dtype = np.complex128)
+    #     if N_w > 1:
+    #         sigmas = [sigma.copy() for x in range(N_w)]
+    #     for ik, k in enumerate(q_list):
+    #         k1 = -q -k
 
-            # Get the v3 
-            d3_1 = self.get_v3_qspace(k1, k)
-            print ("Sum of v3:", np.sum(d3_1))
+    #         # Get the v3 
+    #         d3_1 = self.get_v3_qspace(k1, k)
+    #         print ("Sum of v3:", np.sum(d3_1))
 
-            # Get the phonon-propagator
-            if N_w > 1:
-                bubbles = []
-                for i in range(N_w):
-                    bubbles.append( self.current_dyn.get_phonon_propagator(w[i], self.current_T, k1, k, smearing))
-            else:
-                bubble = self.current_dyn.get_phonon_propagator(w, self.current_T, k1, k, smearing)
+    #         # Get the phonon-propagator
+    #         if N_w > 1:
+    #             bubbles = []
+    #             for i in range(N_w):
+    #                 bubbles.append( self.current_dyn.get_phonon_propagator(w[i], self.current_T, k1, k, smearing))
+    #         else:
+    #             bubble = self.current_dyn.get_phonon_propagator(w, self.current_T, k1, k, smearing)
 
-            # Get the index of k1 to extract the polarization vectors
-            k1_dists = [CC.Methods.get_min_dist_into_cell(bg, k1, x) for x in q_list]
-            k1_i = np.argmin(k1_dists)
+    #         # Get the index of k1 to extract the polarization vectors
+    #         k1_dists = [CC.Methods.get_min_dist_into_cell(bg, k1, x) for x in q_list]
+    #         k1_i = np.argmin(k1_dists)
 
-            wk, polk = self.current_dyn.DyagDinQ(ik)
-            wk1, polk1 = self.current_dyn.DyagDinQ(k1_i)
+    #         wk, polk = self.current_dyn.DyagDinQ(ik)
+    #         wk1, polk1 = self.current_dyn.DyagDinQ(k1_i)
 
-            # Get |e><e| / sqrt(m_a m_b)
-            e_mat = np.einsum("am,bn, a, b->abmn", polk1, polk, minvsqrt, minvsqrt)
+    #         # Get |e><e| / sqrt(m_a m_b)
+    #         e_mat = np.einsum("am,bn, a, b->abmn", polk1, polk, minvsqrt, minvsqrt)
 
-            # Convert the d3 in the mu basis
-            d3_mubasis = np.einsum("abc, bcmn -> amn", d3_1, e_mat)
+    #         # Convert the d3 in the mu basis
+    #         d3_mubasis = np.einsum("abc, bcmn -> amn", d3_1, e_mat)
 
-            # Compute the bubble
-            if N_w > 1:
-                for i in range(N_w):
-                    sigmas[i] -= np.einsum("amn, mn, bmn->ab", d3_mubasis, bubbles[i], np.conj(d3_mubasis)) / 2
-            else:
-                sigma -= np.einsum("amn, mn, bmn->ab", d3_mubasis, bubble, np.conj(d3_mubasis)) / 2
+    #         # Compute the bubble
+    #         if N_w > 1:
+    #             for i in range(N_w):
+    #                 sigmas[i] -= np.einsum("amn, mn, bmn->ab", d3_mubasis, bubbles[i], np.conj(d3_mubasis)) / 2
+    #         else:
+    #             sigma -= np.einsum("amn, mn, bmn->ab", d3_mubasis, bubble, np.conj(d3_mubasis)) / 2
 
-        if N_w > 1:
-            return sigmas
-        return sigma
+    #     if N_w > 1:
+    #         return sigmas
+    #     return sigma
 
 
     def get_free_energy_hessian(self, include_v4 = False, get_full_hessian = True, verbose = False, \
-        use_symmetries = True):
+        use_symmetries = True, return_d3 = False):
         """
         GET THE FREE ENERGY ODD CORRECTION
         ==================================
@@ -2657,11 +2759,16 @@ DETAILS OF ERROR:
             use_symmetries : bool
                 If true, the d3 and d4 are symmetrized in real space.
                 It requires that spglib is installed to detect symmetries in the supercell correctly.
+            return_d3 : bool
+                If true, returns also the tensor of three phonon scattering.
 
         Returns
         -------
             phi_sc : Phonons()
                 The dynamical matrix of the free energy hessian in (Ry/bohr^2)
+            d3 : ndarray (size = (3*nat_sc, 3*nat_sc, 3*nat_sc), Optional
+                Return the three-phonon-scattering tensor (in Ry atomic units).
+                Only if return_d3 is True. 
         """
         # For now the v4 is not implemented
         #     if include_v4:
@@ -2797,6 +2904,8 @@ DETAILS OF ERROR:
                 dyn_hessian.dynmats[iq] = dynq_odd[iq, :, :] 
 
         
+        if return_d3:
+            return dyn_hessian, d3* 2.0 # Ha to Ry
         return dyn_hessian
 
 
@@ -2987,6 +3096,7 @@ DETAILS OF ERROR:
         ----------
             ase_calculator : ase.calculator
                 The ASE interface to the calculator to run the calculation.
+                also a CellConstructor calculator is accepted
             compute_stress : bool
                 If true, the stress is requested from the ASE calculator. Be shure
                 that the calculator you provide supports stress calculation
@@ -3081,10 +3191,10 @@ DETAILS OF ERROR:
             
             
             struct = structures[i]
-            atms = struct.get_ase_atoms()
+            #atms = struct.get_ase_atoms()
             
             # Setup the ASE calculator
-            atms.set_calculator(ase_calculator)
+            #atms.set_calculator(ase_calculator)
 
 
             # Print the status
@@ -3097,15 +3207,21 @@ DETAILS OF ERROR:
             count_fails = 0
             while run:
                 try:
-                    energy = atms.get_total_energy() / Rydberg # eV => Ry
-                    # Get energy, forces (and stress)
-                    energy = atms.get_total_energy() / Rydberg # eV => Ry
-                    forces_ = atms.get_forces() / Rydberg # eV / A => Ry / A
+                    results = CC.calculators.get_results(ase_calculator, struct, get_stress = compute_stress)
+                    energy = results["energy"] / Rydberg # eV => Ry
+                    forces_ = results["forces"] / Rydberg
+
                     if compute_stress:
-                        if not stress_numerical:
-                            stress[9*i0 : 9*i0 + 9] = -atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
-                        else:
-                            stress[9*i0 : 9*i0 + 9] = -ase_calculator.calculate_numerical_stress(atms, voigt = False).ravel()* Bohr**3 / Rydberg 
+                        stress[9*i0 : 9*i0 + 9] = -results["stress"].reshape(9)* Bohr**3 / Rydberg
+                    #energy = atms.get_total_energy() / Rydberg # eV => Ry
+                    # Get energy, forces (and stress)
+                    #energy = atms.get_total_energy() / Rydberg # eV => Ry
+                    #forces_ = atms.get_forces() / Rydberg # eV / A => Ry / A
+                    #if compute_stress:
+                    #    if not stress_numerical:
+                    #        stress[9*i0 : 9*i0 + 9] = -atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
+                    #    else:
+                    #        stress[9*i0 : 9*i0 + 9] = -ase_calculator.calculate_numerical_stress(atms, voigt = False).ravel()* Bohr**3 / Rydberg 
                             
                     # Copy into the ensemble array
                     energies[i0] = energy

@@ -103,7 +103,7 @@ __MAX_IMAG_ERROR_COUNTER__ = 50
 class SSCHA_Minimizer(object):
     
     def __init__(self, ensemble = None, root_representation = "normal",
-                 kong_liu_ratio = 0.5, meaningful_factor = 1,
+                 kong_liu_ratio = 0.5, meaningful_factor = 0.2,
                  minimization_algorithm = "sdes", lambda_a = 1, **kwargs):
         """
         This class create a minimizer to perform the sscha minimization.
@@ -231,6 +231,7 @@ class SSCHA_Minimizer(object):
         self.__gw__ = []
         self.__gw_err__ = []
         self.__KL__ = []
+        self.__good_kasteps__ = []
 
 
 
@@ -561,6 +562,10 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
         
         # Update the previous gradient
         self.prev_grad = dyn_grad
+
+        # If the step is good, pass chose it
+        if self.minimizer.new_direction:
+            self.__good_kasteps__.append(len(self.__fe__) - 1)
         
     def setup_from_namelist(self, input_file):
         """
@@ -682,7 +687,7 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
             
             # Symmetrize the dynmat if requested
             if not self.neglect_symmetries:
-                self.dyn.Symmetrize()
+                self.dyn.Symmetrize(use_spglib = self.use_spglib)
             
             if not __SCHA_DATADIR__ in keys:
                 self.ensemble = Ensemble.Ensemble(self.dyn, 0)
@@ -1239,7 +1244,25 @@ WARNING, the preconditioning is activated together with a root representation.
                                                                     self.__gw_err__[-1] * __RyTomev__))
         print ("Kong-Liu effective sample size = ", self.ensemble.get_effective_sample_size())
         print ()
-        
+
+        # Print the total force on the structure
+        print("Total force on the centroids [eV/A]:")
+        forces, err = self.ensemble.get_average_forces(True)
+        # Apply the symmetries
+        if not self.neglect_symmetries:
+            qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+            if self.use_spglib:
+                qe_sym.SetupFromSPGLIB()
+            else:
+                qe_sym.SetupQPoint()
+            qe_sym.SymmetrizeVector(forces)
+            qe_sym.SymmetrizeVector(err)
+            err /= np.sqrt(qe_sym.QE_nsym)
+
+        for i in range(self.dyn.structure.N_atoms):
+            print("{:4d}) {:14.6f}{:14.6f}{:14.6f}  +- {:14.6f}{:14.6f}{:14.6f}".format(*list([i] + list(forces[i, :] * CC.Units.RY_TO_EV) + list(err[i,:] * CC.Units.RY_TO_EV))))
+        print()
+
         if self.ensemble.has_stress and verbose >= 1:
             print ()
             print (" ==== STRESS TENSOR [GPa] ==== ")
@@ -1405,9 +1428,9 @@ You can try to fix this error setting the {} variable of {} class to True.
             print ()
             print ("The gw gradient satisfy the convergence condition.")
         
-        if self.gradi_op == "gc":
+        if self.gradi_op == "gc" or not self.minim_struct:
             total_cond = gc_cond
-        elif self.gradi_op == "gw":
+        elif self.gradi_op == "gw" or not self.minim_dyn:
             total_cond = gw_cond
         elif self.gradi_op == "all":
             total_cond = gc_cond and gw_cond
@@ -1421,8 +1444,8 @@ You can try to fix this error setting the {} variable of {} class to True.
         
         # Check the KL
         kl = self.ensemble.get_effective_sample_size()
-        
-        if kl / float(self.ensemble.N) < self.kong_liu_ratio and self.minimizer.new_direction:
+
+        if kl / float(self.ensemble.N) < self.kong_liu_ratio and self.minimizer.is_new_direction():
             self.__converged__ = False
             print ("KL:", kl, "KL/N:", kl / float(self.ensemble.N), "KL RAT:", self.kong_liu_ratio)
             print ("  According to your input criteria")
@@ -1483,18 +1506,18 @@ You can try to fix this error setting the {} variable of {} class to True.
     
             self.__gc__.append(self.__gc__[-1])
             self.__gc_err__.append(self.__gc_err__[-1])
+
+        fe = np.array(self.__fe__)[self.__good_kasteps__] * __RyTomev__
+        fe_err = np.array(self.__fe_err__)[self.__good_kasteps__] * __RyTomev__
         
-        # Convert the data in numpy arrays
-        fe = np.array(self.__fe__) * __RyTomev__
-        fe_err = np.array(self.__fe_err__) * __RyTomev__
         
-        gc = np.array(self.__gc__) * __RyTomev__
-        gc_err = np.array(self.__gc_err__) * __RyTomev__
+        gc = np.array(self.__gc__)[self.__good_kasteps__] * __RyTomev__
+        gc_err = np.array(self.__gc_err__)[self.__good_kasteps__] * __RyTomev__
         
-        gw = np.array(self.__gw__) * __RyTomev__
-        gw_err = np.array(self.__gw_err__) * __RyTomev__
+        gw = np.array(self.__gw__)[self.__good_kasteps__] * __RyTomev__
+        gw_err = np.array(self.__gw_err__)[self.__good_kasteps__] * __RyTomev__
         
-        kl = np.array(self.__KL__, dtype = np.float64)
+        kl = np.array(self.__KL__, dtype = np.float64)[self.__good_kasteps__]
         
         steps = np.arange(len(fe))
     
@@ -1507,6 +1530,7 @@ You can try to fix this error setting the {} variable of {} class to True.
             np.savetxt(save_filename, np.real(np.transpose(save_data)),
                        header = "Steps; Free energy +- error [meV]; FC gradient +- error [bohr^2]; Structure gradient +- error [meV / A]; Kong-Liu N_eff")
             print ("Minimization data saved in %s." % save_filename)
+            print('Good steps at {}'.format(self.__good_kasteps__))
         
         
         # Plot

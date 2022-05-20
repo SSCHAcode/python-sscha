@@ -187,6 +187,16 @@ class Minimizer:
             struct = self.current_x[self.nq * self.n_modes * self.n_modes :].reshape(self.dyn.structure.coords.shape)
         return dynq, struct
 
+    def is_new_direction(self):
+        """
+        Return if a new direction must be chosen.
+        """
+
+        if self.fixed_step:
+            return True
+        return self.new_direction
+
+
     def run_step(self, gradient, kl_new):
         """
         Perform the minimization step with the line minimization

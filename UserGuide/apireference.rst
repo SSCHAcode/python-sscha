@@ -40,6 +40,34 @@ Here the parameters read in the &relax name list are read and setup.
    :members:
 
 
+      
+The Utilities Module
+----------------
+
+This module both provides the constrains and the IOinput
+
+IOInfo class
+^^^^^^^^^^^^
+
+Use this class to make the python-sscha print information during the minimization
+
+.. autoclass:: sscha.Utilities.IOInfo
+   :members:
+
+
+Constraints
+^^^^^^^^^^^
+
+The constrains are a member of the Utilities module.
+To implement constrains on phonon modes, use the ModeProjection class
+
+
+.. autoclass:: sscha.Utilities.ModeProjection
+   :members:
+
+
+      
+
 The Cluster Module
 ------------------
 

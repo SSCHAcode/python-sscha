@@ -7,7 +7,7 @@ import sys
 
 RY_TO_CM = 109691.40235
 
-print()
+print('Obsolete since v1.2, please use sscha-plot-data.py')
 print()
 print("PLOTTING THE FREQIENCIES")
 print("========================")

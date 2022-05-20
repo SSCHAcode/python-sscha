@@ -377,20 +377,22 @@ class ModeProjection:
 
             # Go back in cartesian coordinates
             projected_grad_cart = self.pols[:,:, iq].dot(projected_grad.dot(np.conj(self.pols[:,:,iq]).T))
-
-            # Put the masses again and overwrite the gradient
-            new_dyngrad = projected_grad_cart * np.sqrt( np.outer(_m_, _m_))
+            
 
             # Check if the grad increased 
             if self.testing:
-                norm_old = np.sum(np.abs(dyn_grad[iq, :, :])**2)
-                norm_new = np.sum(np.abs(new_dyngrad)**2) 
+                norm_old = np.linalg.norm(grad_nomass)
+                norm_new = np.linalg.norm(projected_grad_cart)
 
                 if norm_new > norm_old:
                     print("Error on q = {}".format(iq))
                     print("Old norm: {} | New norm: {}".format(norm_old, norm_new)) 
                 
                 assert norm_new < norm_old
+                
+            # Put the masses again and overwrite the gradient
+            new_dyngrad = projected_grad_cart * np.sqrt( np.outer(_m_, _m_))
+
 
             dyn_grad[iq, :, :] = new_dyngrad
                     
@@ -454,6 +456,7 @@ class IOInfo:
         self.save_atomic_positions = False
         self.__save_each_step = False
         self.current_struct = None
+        self.minim_data = []
 
     def Reset(self):
         """
@@ -490,10 +493,15 @@ class IOInfo:
         """
         Setup the system to save the data each time the function is called.
 
+        By default, the system will save frequencies and minimization info (like free energy, gradients and kong liu)
+        The files are
+        .freqs   for the frequencies
+        .dat     for the minimization info
+
         Parameters
         ----------
             fname : string 
-                path to the file to save the frequencies vs time
+                path to the file to save the files
             save_each_step : bool
                 If true the file is saved (and updated) each time step.
 
@@ -502,7 +510,7 @@ class IOInfo:
         self.__save_fname = fname
         self.__save_each_step = save_each_step
 
-    def Save(self, fname= None):
+    def Save(self, fname = None):
         """
         Save the data on a file
         
@@ -516,12 +524,22 @@ class IOInfo:
         if not sscha.Parallel.am_i_the_master():
             return
 
-        if fname is None:
-            if self.__save_fname is None:
-                raise IOError("Error, a filename must be specified to save the frequencies.")
-            np.savetxt(self.__save_fname, self.total_freqs, header = "Time vs Frequencies")
-        else:
-            np.savetxt(fname, self.total_freqs, header = "Time vs Frequencies")
+        root_name = fname
+        
+        if root_name is None:
+            root_name = self.__save_fname
+
+        if root_name is None:
+            raise IOError("Error, a filename must be specified to save the data.")
+
+        print("ROOT  NAME:", root_name)
+        print("SAVE  NAME:", self.__save_fname)
+        print("FNAME NAME:", fname)
+        freq_name = root_name + '.freqs'
+        data_name = root_name + '.dat'
+
+        np.savetxt(freq_name, self.total_freqs, header = "Time vs Frequencies")
+        np.savetxt(data_name, self.minim_data, header = '# Free energy [meV] +- error; FC gradient +- error; Structure gradient +- error; Kong-Liu effective sample size')
             
             
         if self.save_weights:
@@ -544,22 +562,35 @@ class IOInfo:
 
         if not sscha.Parallel.am_i_the_master():
             return
-        
-        # Get the weights if required
-        if self.save_weights:
-            self.weights.append(minim.ensemble.rho[:])
+
+        if minim.minimizer.is_new_direction():
             
-        if self.save_dynmats:
-            minim.dyn.save_qe(self.save_dyn_prefix + "_ka%05d_" % self.ka)
-        
-        if self.save_atomic_positions:
-            self.current_struct = minim.dyn.structure.copy()
+            # Get the weights if required
+            if self.save_weights:
+                self.weights.append(minim.ensemble.rho[:])
+                
+            if self.save_dynmats:
+                minim.dyn.save_qe(self.save_dyn_prefix + "_ka%05d_" % self.ka)
             
-        # This perform also the saving
-        self.CFP_SaveFrequencies(minim)
-        
-        # Update the step
-        self.ka += 1
+            if self.save_atomic_positions:
+                self.current_struct = minim.dyn.structure.copy()
+
+            # Get the minimization data
+            fe = minim.__fe__[-1] * sscha.SchaMinimizer.__RyTomev__
+            fe_err = minim.__fe_err__[-1] * sscha.SchaMinimizer.__RyTomev__
+            gc = minim.__gc__[-1] * sscha.SchaMinimizer.__RyTomev__
+            gc_err = minim.__gc_err__[-1] * sscha.SchaMinimizer.__RyTomev__
+            gw = minim.__gw__[-1] * sscha.SchaMinimizer.__RyTomev__
+            gw_err = minim.__gw_err__[-1] * sscha.SchaMinimizer.__RyTomev__
+            kl =  minim.__KL__[-1]
+
+            self.minim_data.append([fe, fe_err, gc, gc_err, gw, gw_err, kl])
+                
+            # This perform also the saving
+            self.CFP_SaveFrequencies(minim)
+            
+            # Update the step
+            self.ka += 1
 
 
     def CFP_SaveFrequencies(self, minim):
@@ -567,16 +598,17 @@ class IOInfo:
         This custom method stores the total frequencies updating an exeternal file
         """
         
-        # Generate the supercell in real space
-        dyn_sc = minim.dyn.GenerateSupercellDyn( minim.ensemble.supercell )
+        # Generate the supercell in real space (Do it only if the frequency changes)
+        if minim.minimizer.new_direction:
+            dyn_sc = minim.dyn.GenerateSupercellDyn( minim.ensemble.supercell )
 
-        # Dyagonalize
-        w, pols = dyn_sc.DyagDinQ(0)
-        self.total_freqs.append(w)
-        
+            # Dyagonalize
+            w, pols = dyn_sc.DyagDinQ(0)
+            self.total_freqs.append(w)
+            
 
-        if self.__save_each_step:
-            self.Save()
+            if self.__save_each_step:
+                self.Save()
 
 
 
