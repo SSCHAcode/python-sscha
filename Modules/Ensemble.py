@@ -136,6 +136,10 @@ class Ensemble:
         self.stresses = []
         self.xats = []
         self.units = UNITS_DEFAULT
+        self.w_0 = None
+        self.pols_0 = None
+        self.current_w = None
+        self.current_pols = None
         
         self.sscha_energies = []
         self.sscha_forces = []
@@ -220,6 +224,12 @@ class Ensemble:
                 raise AttributeError(ERROR_MSG)
         else:
             super(Ensemble, self).__setattr__(name, value)
+
+        if name == "dyn_0":
+            self.w_0, self.pols_0 = value.DiagonalizeSupercell()
+            self.current_dyn = value.Copy()
+            self.current_w = self.w_0.copy()
+            self.current_pols = self.pols_0.copy()
 
 
     def convert_units(self, new_units):
@@ -1297,14 +1307,40 @@ Error, the following stress files are missing from the ensemble:
         
         self.current_T = newT
 
-            
+        # Check if the dynamical matrix has changed
+        changed_dyn = np.max([np.max(np.abs(self.current_dyn.dynmats[i] - new_dynamical_matrix.dynmats[i])) for i in range(len(self.current_dyn.q_tot))])
+        print("DYN CHANGED BY:", changed_dyn)
+        changed_dyn = changed_dyn > 1e-30
+
+        # Prepare the new displacements
+        super_struct0 = self.dyn_0.structure.generate_supercell(self.supercell)
+        super_structure = new_dynamical_matrix.structure.generate_supercell(self.supercell)
+        old_disps = np.zeros(np.shape(self.u_disps), dtype = np.double)
+        Nat_sc = super_structure.N_atoms
+
+        self.u_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_structure.coords.ravel(), (self.N,1))
+        old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_struct0.coords.ravel(), (self.N,1))
+
+        if changed_dyn:
+            w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
+            self.current_w = w_new.copy()
+            self.current_pols = pols.copy()
+        else:
+            w_new = self.current_w.copy()
+            pols  = self.current_pols.copy()
+            #w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
+            #self.current_w = w_new.copy()
+            #self.current_pols = pols.copy()
+        # Update sscha energies and forces
+        self.sscha_energies[:], self.sscha_forces[:,:,:] = new_dynamical_matrix.get_energy_forces(None, displacement = self.u_disps, w_pols = (w_new, pols))
+
         
         t1 = time.time()
         # Get the frequencies of the original dynamical matrix
-        super_struct0 = self.dyn_0.structure.generate_supercell(self.supercell)
         #super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
 
-        w_original, pols_original = self.dyn_0.DiagonalizeSupercell()#super_dyn.DyagDinQ(0)
+        w_original = self.w_0.copy()
+        pols_original = self.pols_0.copy()
         
         # Exclude translations
         if not self.ignore_small_w:
@@ -1321,10 +1357,8 @@ Error, the following stress files are missing from the ensemble:
         old_a = SCHAModules.thermodynamic.w_to_a(w, self.T0)
         
         # Now do the same for the new dynamical matrix
-        super_structure = new_dynamical_matrix.structure.generate_supercell(self.supercell)
         #new_super_dyn = new_dynamical_matrix.GenerateSupercellDyn(self.supercell)
         
-        w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
 
         if not self.ignore_small_w:
             trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
@@ -1341,11 +1375,11 @@ Error, the following stress files are missing from the ensemble:
         if violating_sum_rule:
             ERR_MSG = """
 ERROR WHILE UPDATING THE WEIGHTS
-    
+
 Error, one dynamical matrix does not satisfy the acoustic sum rule.
-       If this problem arises on a sscha run, 
-       it may be due to a gradient that violates the sum rule.
-       Please, be sure you are not using a custom gradient function.
+    If this problem arises on a sscha run, 
+    it may be due to a gradient that violates the sum rule.
+    Please, be sure you are not using a custom gradient function.
 
 DETAILS OF ERROR:
     Number of translatinal modes in the original dyn = {}
@@ -1360,22 +1394,15 @@ DETAILS OF ERROR:
         w = np.array(w/2, dtype = np.float64)
         new_a = SCHAModules.thermodynamic.w_to_a(w, newT)
         
-        Nat_sc = super_structure.N_atoms
         
         # Get the new displacements in the supercell
         t3 = time.time()
-        old_disps = np.zeros(np.shape(self.u_disps), dtype = np.double)
-
-        self.u_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_structure.coords.ravel(), (self.N,1))
-        old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_struct0.coords.ravel(), (self.N,1))
-
         # for i in range(self.N):
         #     self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
             
         #     old_disps[i,:] = (self.xats[i, :, :] - super_dyn.structure.coords).reshape( 3*Nat_sc )
             
         #     # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
-        self.sscha_energies[:], self.sscha_forces[:,:,:] = new_dynamical_matrix.get_energy_forces(None, displacement = self.u_disps, w_pols = (w_new, pols))
 
         t4 = time.time()
 
@@ -1422,6 +1449,8 @@ DETAILS OF ERROR:
             rho_tmp[i] *= np.exp(-0.5 * (v_new - v_old) )
         # Lets try to use this one
         self.rho = rho_tmp
+    
+
 
         #print("\n".join(["%8d) %16.8f" % (i+1, r) for i, r in enumerate(self.rho)]))
         
@@ -1620,7 +1649,7 @@ DETAILS OF ERROR:
                 The free energy in the current dynamical matrix and at the ensemble temperature
         """
         
-        free_energy = self.current_dyn.GetHarmonicFreeEnergy(self.current_T)
+        free_energy = self.current_dyn.GetHarmonicFreeEnergy(self.current_T, w_pols = (self.current_w, self.current_pols))
         
         # We got the F_0 
         # Now we can compute the free energy difference
