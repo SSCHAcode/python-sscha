@@ -24,6 +24,8 @@ This file contains the SSCHA minimizer tool
 It is possible to use it to perform the anharmonic minimization 
 """
 
+from inspect import signature
+
 #import Ensemble
 import numpy as np
 import difflib
@@ -451,9 +453,34 @@ class SSCHA_Minimizer(object):
 
         # Perform the gradient restriction
         if custom_function_gradient is not None:
+
+            # Check the number of parameters
             try:
+                sig = signature(custom_function_gradient).parameters
+            except Exception as e:
+                print(e)
+
+                MSG = '''
+While inspecting the custom_function_gradient an error was rised.
+     Maybe you did not pass the minimizer a valid function?                
+'''             
+                raise ValueError(MSG)
+
+            
+            if len(sig) not in [2,3]:
+                MSG = '''
+Error, the custom_function_gradient must have either 2 or 3 arguments:
+    - dynamical_matrix_gradient
+    - structure gradient
+    - [Optional] The minimizer (self) object
+
+      The function you provided accepts {} arguments instead.
+'''.format(len(sig))
+                raise ValueError(MSG)
+
+            if len(sig) == 3:
                 custom_function_gradient(dyn_grad, struct_grad, self)
-            except:    
+            else:
                 custom_function_gradient(dyn_grad, struct_grad)    
             
 
