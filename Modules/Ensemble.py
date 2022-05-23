@@ -1726,6 +1726,8 @@ DETAILS OF ERROR:
         else:
             new_dyn = self.current_dyn.InterpolateMesh(target_supercell)
 
+        print("dyn after interpolation:", new_dyn.GetSupercell())
+
         
         # Get the new harmonic free energy
         harm_fe = new_dyn.GetHarmonicFreeEnergy(self.current_T,

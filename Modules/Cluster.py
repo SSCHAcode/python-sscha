@@ -994,6 +994,7 @@ Error while connecting to the cluster to copy the files:
 
         status, output = self.ExecuteCMD("squeue -u $USER", False, return_output = True, on_cluster = True, )
         lines = output.split("\n")
+
         if len(lines):
             for l in lines:
                 data = l.strip().split()
