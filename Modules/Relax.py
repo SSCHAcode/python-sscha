@@ -257,7 +257,7 @@ class SSCHA(object):
 
 
     def relax(self, restart_from_ens = False, get_stress = False,
-              ensemble_loc = None, start_pop = None, sobol = False):
+              ensemble_loc = None, start_pop = None, sobol = False, sobol_scramble = False):
         """
         COSTANT VOLUME RELAX
         ====================
@@ -326,7 +326,7 @@ Error, the specified location to save the ensemble:
             self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
 
             if pop != start_pop or not restart_from_ens:
-                self.minim.ensemble.generate(self.N_configs, sobol = sobol)
+                self.minim.ensemble.generate(self.N_configs, sobol = sobol sobol_scramble = sobol_scramble)
 
                 # Compute energies and forces
                 self.minim.ensemble.compute_ensemble(self.calc, get_stress,
@@ -377,7 +377,7 @@ Error, the specified location to save the ensemble:
     def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
                  ensemble_loc = None, start_pop = None, stress_numerical = False,
-                 cell_relax_algorithm = "sd", fix_volume = False, sobol = False):
+                 cell_relax_algorithm = "sd", fix_volume = False, sobol = False, sobol_scramble = False):
         """
         VARIABLE CELL RELAX
         ====================
@@ -538,7 +538,7 @@ Error, the specified location to save the ensemble:
             # Generate the ensemble
             self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
             if pop != start_pop or not restart_from_ens:
-                self.minim.ensemble.generate(self.N_configs, sobol=sobol)
+                self.minim.ensemble.generate(self.N_configs, sobol=sobol, sobol_scramble = sobol_scramble)
 
                 # Save also the generation
                 #if ensemble_loc is not None and self.save_ensemble:
