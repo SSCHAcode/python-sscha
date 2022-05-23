@@ -729,7 +729,7 @@ The complete code is inside Examples/sscha_and_dft/nvt_local.py
    koffset = (1,1,1)
 
    # Specify the command to call quantum espresso
-   command = 'mpirun -np 4 pw.x -npool 1 -i PREFIX.pwi > PREFIX.pwo'
+   command = 'pw.x -i PREFIX.pwi > PREFIX.pwo'
 
 
    # Prepare the quantum espresso calculator
@@ -785,27 +785,171 @@ The complete code is inside Examples/sscha_and_dft/nvt_local.py
 
 
 
-Now you can run the SSCHA with an ab-initio code.
-However, if you run this on a laptop, it will take forever. You can install SSCHA on a cluster
-and exploit the quantum ESPRESSO parallelization changing the command variable specifying more processors together.
-You can even do more. SSCHA itself parallelizes the calculation of configurations, so you can even run the mpirun statememt twice
+Now you can run the SSCHA with an ab-initio code!
+However, your calculation will probably take forever.
+To speedup things, lets discuss parallelization and how to exploit modern HPC infrastructures.
+
+Parallelization
+---------------
+
+If you actually tried to run the code of the previous section on a laptop, it will take forever.
+The reason is that DFT calculations are much more expensive than the SSCHA minimization. While SSCHA minimizes the number of ab initio calculations (especially when compared with MD or PIMD), still they are the bottleneck of the computational time.
+
+For this reason, we need an opportune parallelization strategy to reduce the total time to run a SSCHA.
+
+The simplest way is to call the previous python script with MPI:
 
 .. code-block:: bash
 
-   $ mpirun -np 50 python nvt_local.py
+   $ mpirun -np 50 python nvt_local.py > output.log
 
-In this way, each one of the 50 instances of python-sscha will split the calculations of the ensemble, submitting each one a pw.x calculations (in parallel on 4 processors in this example), for a total number of 200 processors.
+The code will split the configurations in each ensemble on a different MPI process. In this case we have 50 configurations per ensemble, by splitting them into 50 processors, we run the full ensemble in parallel.
+
+However, still the single DFT calculation on 1 processor is going to take hours, and in some cases it may even take days.
+Luckily, also quantum ESPRESSO (and many other software) have an internal parallelization to work with.
+For example, we can tell quantum espresso to run itself in parallel on 8 processors.
+To this purpouse, we simply need to modify the command used to run quantum espresso in the previous script.
+
+.. code-block:: python
+
+   # Lets replace
+   # command = 'pw.x -i PREFIX.pwi > PREFIX.pwo'
+   # with
+   command = 'mpirun -np 8 pw.x -npool 1 -i PREFIX.pwi > PREFIX.pwo'
+
+   # The command string is passed to the espresso calculator
+   calculator = CC.calculators.Espresso(input_data,
+					pseudopotentials,
+					command = command,
+					kpts = kpts,
+					koffset = koffset)
 
 
-However, installing python-sscha on a cluster could be difficult and suboptimal. There is a much more efficient workaround to this, which is defining a cluster variable, that manages automatically the connection with a cluster and the correct submission of the calculations via the SLURM queue system.
-We will see this in the next section.
+In this way, our calculations will run on 400 processors (50 processors splits the ensemble times 8 processors per each calculation).
+This is achieved by nesting mpi calls. However, only the cellconstructor calculators can nest mpi calls without raising errors. This is the reason why we imported the Espresso class from cellconstructor and not from ASE.
+If you want to use ASE for your calculator, you can only use the inner parallelization of the calculator modifying the command, as ASE itself implements a MPI parallelization on I/O operations that conflicts with the python-sscha parallelization. This limitation only applies to FileIOCalculators from ASE (thus the EMT force-field is not affected and can be safely employed with python-sscha parallelization).
+
+
+With this setup, the full code is parallelized over 400 processors. However the SSCHA minimization algorithm is a serial one, and all the time spent in the actual SSCHA minimization is wasting the great number of resources allocated.
+Moreover, the SSCHA code needs to be configured and correctly installed on the cluster, which may be a difficult operation due to the hybrid Fortran/pyhton structure.
+
+In the next section, we provide a workaround: Running the SSCHA code on your laptop, and configure it to automatically interact with a remote server (HPC) in which the ensemble calculation is submitted.
+This is the best way to use the python-sscha code, as no installation of the code in the cluster is required, and the time spent during the minimization does not occupy precious HPC resources.
 
 
 Remote submission on a queue system
 -----------------------------------
 
-TODO
 
+To configure SSCHA to work with a cluster we need to tell the code some info to ssh into it.
+Here is a basic configuration to connect to the Piz Daint cluster at CSCS (Switzerland), but it is very similar to any other cluster.
+
+First of all, we need to configure a straight ssh connection. We have to add to the configuration file of ssh the information about Host and Username. In my case, the $HOME/.ssh/config file looks like:
+
+.. code-block:: bash
+
+   Host ela
+	HostName ela.cscs.ch
+	User lmonacel
+   Host daint
+	HostName daint.cscs.ch
+	ProxyJump ela
+	User lmonacel
+
+
+These are two connection, one to ela (the front-end server of CSCS) and then one to daint.
+To connect to daint, I must before access to ela, this is the reason of ProxyJump command inside the daint block.
+The best way to connect is to configure your ssh private-public key so that you (and python-sscha) can login without password.
+An example of how to do that is `Here <http://www.linuxproblem.org/art_9.html>`_, but you may find a lot of other on internet.
+
+Sometimes cluster may not allow passwordless connection, in this case, you need to provide the password explicitly to python-sscha.
+
+.. code-block:: python
+
+   # Let us define the cluster
+   import sscha.Cluster
+   cluster = sscha.Custer.Cluster(hosthame = 'daint', pwd = None)  # Put the password in pwd if needed
+
+   # Configure the submission strategy
+   cluster.account_name = 's1073'  # Name of the account on which to subtract nodes
+   cluster.n_nodes = 1             # Number of nodes requested for each job
+   cluster.time = '02:30:00'       # Total time requested for each job
+   cluster.n_pool = 1              # Number of pools for the Quantum ESPRESSO calculation
+
+   # Here some custom parameters for the clusters
+   # These are specific for daint, but you can easily figure out those for your machine
+   cluster.custom_params["--constraint"] = "gpu"      # Run on the GPU partition
+   cluster.custom_params["--ntasks-per-node"] = '2'
+   cluster.custom_params["--cpus-per-task"] = '6'
+
+   # Since daint specify the partition with a custom option,
+   # Lets remove the specific partition option of SLURM
+   # Neither we want to specify the total number of cpus (automatically determined by the node)
+   cluster.use_partition = False
+   cluster.use_cpu = False
+
+
+   # Now, we need to tell daint which modules to load to run quantum espresso
+   # Also this is cluster specific, but very simple to figure it out for you
+   cluster.load_modules = """
+   # Load the quantum espresso modules
+   module load daint-gpu
+   module load QuantumESPRESSO
+
+   # Configure the environmental variables of the job
+   export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+   export NO_STOP_MESSAGE=1
+   export CRAY_CUDA_MPS=1
+   
+   ulimit -s unlimited
+   """
+
+   # Now, what is the command to run quantum espresso on the cluster?
+   cluster.binary = pw.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo"
+   # NOTE that NPOOL will be replaced automatically with the cluster.n_pool variable
+
+
+   # Let us setup the working directory (directory in which the jobs runs)
+   cluster.workdir =  "$SCRATCH/Gold_NVT_300k"
+   cluster.setup_workdir()  # Login to the cluster and creates the working directory if it does not exist
+
+
+   # Last but not least:
+   #  How many jobs do you want to submit simultaneously?
+   cluster.batch_size = 10
+
+   #  Now many DFT calculation do you want to run inside each job?
+   cluster.job_number = 5
+
+
+And here we go. We configured the connection to daint. It may seem a bit complex, however, all the configuration is a simple interface to SLURM, and we are only passing informations that are going into the #SBATCH syntax.
+
+Once you defined the cluster, you can run the calculation providing the cluster object to the sscha.Relax.SSCHA class:
+
+
+
+.. code-block:: python
+
+
+   # Initialize the simulation
+   relax = sscha.Relax.SSCHA(minim, calculator,
+		N_configs = N_CONFIGS,
+		max_pop = MAX_ITERATIONS,
+		cluster = cluster,
+		save_ensemble = True)
+
+
+And that's it. Instead of running espresso locally, python-sscha submit the calculations on the specified cluster.
+Here we also added the save_ensemble flag equal to true. Since DFT calculation are computationally expensive, we may want to save the results of each ensemble for further analysis (as computing linear response properties), or maybe to train a neural-network potential later.
+
+By default, the ensemble is stored into a directory called 'data'. You can change it to what you want by editing the setting
+
+.. code-block:: python
+
+   relax.data_dir = 'my_new_data'
+
+If the directory does not exist, python-sscha creates it automatically.
+While the cluster configuration may seem a bit more complex, it is the best way to go.
 
    
 
@@ -813,10 +957,12 @@ Other tutorials
 ---------------
 
 
+Congratulations. If you arrived here, it means that you now have a good overview of the basic functionalities of the SSCHA code, as running an NVT and NPT simulations.
 
+We provide some other tutorial to help you to get used to some other advanced properties, like linear response (Hessian matrix) and spectral properties.
 
+You find these tutorials as executable jupyter notebooks in the Tutorial folder, or in the static html version on the sscha website: `www.sscha.eu/tutorials <http://sscha.eu/tutorials/>`_
 
-To quickly start using the code, we recommend using the jupyter notebooks with examples we provide in the Tutorials directory of the source code.
 
 Tutorials are organized as follows:
 

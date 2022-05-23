@@ -3,6 +3,8 @@ Introduction
 
 Website for more information [sscha.eu](http://sscha.eu/).
 
+The full documentation of the package is in the [python-sscha.pdf](https://github.com/SSCHAcode/python-sscha/blob/master/python-sscha.pdf) file, in the root directory of this repository
+
 What is python-sscha?
 ---------------------
 
