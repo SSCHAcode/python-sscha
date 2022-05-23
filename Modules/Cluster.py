@@ -319,7 +319,7 @@ class Cluster(object):
         
         
         
-    def ExecuteCMD(self, cmd, raise_error = True, return_output = False, on_cluster = False):
+    def ExecuteCMD(self, cmd, raise_error = False, return_output = False, on_cluster = False):
         """
         EXECUTE THE CMD ON THE CLUSTER
         ==============================
@@ -797,7 +797,7 @@ Error while connecting to the cluster to copy the files:
         #cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, 
         #                                           self.workdir, label+ "_" + str(indices[0]))
        
-        return self.ExecuteCMD(cmd, True, return_output=True)
+        return self.ExecuteCMD(cmd, False, return_output=True)
 
     def get_output_path(self, label):
         """
@@ -997,7 +997,15 @@ Error while connecting to the cluster to copy the files:
 
         if len(lines):
             for l in lines:
-                data = l.strip().split()
+                l = l.strip()
+                if not l:
+                    if verbose:
+                        now = datetime.datetime.now()
+                        sys.stderr.write("{}/{}/{} - {}:{}:{} | job {}: No response from the server \n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id))
+                        sys.stderr.flush()
+                    return False
+                    
+                data = l.split()
                 if len(data) == 0:
                     if verbose:
                         now = datetime.datetime.now()
@@ -1368,7 +1376,7 @@ Error while connecting to the cluster to copy the files:
         sshcmd = self.sshcmd + " %s 'mkdir -p %s'" % (self.hostname, 
                                                       workdir)
         
-        self.ExecuteCMD(sshcmd)
+        self.ExecuteCMD(sshcmd, raise_error= True)
 #        
 #        retval = os.system(sshcmd)
 #        if retval != 0:
@@ -1416,7 +1424,7 @@ Error while connecting to the cluster to copy the files:
 
         #print(cmd)
         
-        status, output = self.ExecuteCMD(cmd, return_output = True)
+        status, output = self.ExecuteCMD(cmd, return_output = True, raise_error= True)
 #        
 #        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
 #        output, err = p.communicate()

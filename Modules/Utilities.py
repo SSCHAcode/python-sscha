@@ -627,6 +627,7 @@ def get_fix_rotations_CFG(dyn):
     assert np.max(np.abs(dyn.q_tot[0])) < 1e-5, "Error, the dynamical matrix must be at Gamma"
 
     nat = dyn.structure.N_atoms 
+    raise NotImplementedError("Error, not yet implemented")
     # TODO: To be ended
     
     
