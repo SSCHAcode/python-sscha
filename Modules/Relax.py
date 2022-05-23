@@ -283,6 +283,8 @@ class SSCHA(object):
                 matrix. If None, the content of self.start_pop will be used.
             sobol : bool, optional (Default = False)
                  Defines if the calculation uses random Gaussian generator or Sobol Gaussian generator.
+            sobol_scramble : bool, optional (Default = False)
+                Set the optional scrambling of the generated numbers taken from the Sobol sequence.
 
         Returns
         -------
@@ -326,7 +328,7 @@ Error, the specified location to save the ensemble:
             self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
 
             if pop != start_pop or not restart_from_ens:
-                self.minim.ensemble.generate(self.N_configs, sobol = sobol sobol_scramble = sobol_scramble)
+                self.minim.ensemble.generate(self.N_configs, sobol = sobol, sobol_scramble = sobol_scramble)
 
                 # Compute energies and forces
                 self.minim.ensemble.compute_ensemble(self.calc, get_stress,
@@ -437,6 +439,8 @@ Error, the specified location to save the ensemble:
                 If true (default False) the volume is fixed, therefore only the cell shape is relaxed.
             sobol : bool, optional (Default = False)
                  Defines if the calculation uses random Gaussian generator or Sobol Gaussian generator.
+            sobol_scramble : bool, optional (Default = False)
+                Set the optional scrambling of the generated numbers taken from the Sobol sequence.
 
         Returns
         -------

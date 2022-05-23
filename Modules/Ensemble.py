@@ -1042,6 +1042,9 @@ Error, the following stress files are missing from the ensemble:
                 given modes.
             sobol : bool, optional (Default = False)
                  Defines if the calculation uses random Gaussian generator or Sobol Gaussian generator.
+            sobol_scramble : bool, optional (Default = False)
+                Set the optional scrambling of the generated numbers taken from the Sobol sequence.
+                                 
         """
 
         if evenodd and (N % 2 != 0):
