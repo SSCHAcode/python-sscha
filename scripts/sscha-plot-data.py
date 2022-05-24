@@ -48,65 +48,92 @@ Exit failure!
     minim_files = [sys.argv[x] + '.dat' for x in range(1, len(sys.argv))]
 
     # Check if all the files exist
+    plot_frequencies = None
+    plot_minim = None
     for f, m in zip(freqs_files, minim_files):
-        assert os.path.exists(f), 'Error, file {} not found.'.format(f)
-        assert os.path.exists(m), 'Error, file {} not found.'.format(m)
+        if os.path.exists(f):
+            if plot_frequencies is None:
+                plot_frequencies = True
+            if not plot_frequencies:
+                raise IOError("Error, file {} found, but not others .freqs".format(f))
+        else:
+            if plot_frequencies:
+                raise IOError("Error, file {} not found.".format(f))
+            plot_frequencies = False
 
-    print("Reading the input...")
 
-    # Load all the data
-    freqs_data = np.concatenate([np.loadtxt(f) for f in freqs_files])
-    minim_data = np.concatenate([np.loadtxt(f) for f in minim_files])
+        if os.path.exists(m):
+            if plot_minim is None:
+                plot_minim = True
+            if not plot_minim:
+                raise IOError("Error, file {} found, but not others .freqs".format(m))
+        else:
+            if plot_minim:
+                raise IOError("Error, file {} not found.".format(m))
+            plot_minim = False
 
-    print("Plotting...")
+    if not plot_frequencies and not plot_minim:
+        print("Nothing to plot, check if the .dat and .freqs files exist.")
+        exit()
 
-    # Insert the x axis in the plotting data
-    xsteps = np.arange(minim_data.shape[0])
-    new_data = np.zeros(( len(xsteps), 8), dtype = np.double)
-    new_data[:,0] = xsteps
-    new_data[:, 1:] = minim_data
-    minim_data = new_data
+    if plot_minim:
+        print("Preparing the minimization data...") 
+        minim_data = np.concatenate([np.loadtxt(f) for f in minim_files])
+
+        # Insert the x axis in the plotting data
+        xsteps = np.arange(minim_data.shape[0])
+        new_data = np.zeros(( len(xsteps), 8), dtype = np.double)
+        new_data[:,0] = xsteps
+        new_data[:, 1:] = minim_data
+        minim_data = new_data
+        
+        fig_data, axarr = plt.subplots(nrows=2, ncols = 2, sharex = True, dpi = DPI)
+        
+        # Plot the data
+        axarr[0,0].fill_between(minim_data[:,0], minim_data[:,1] - minim_data[:, 2]*.5 ,
+                                minim_data[:, 1] + minim_data[:, 2] * .5, color = "aquamarine")
+        axarr[0,0].plot(minim_data[:,0], minim_data[:,1], color = "k")
+        axarr[0,0].set_ylabel("Free energy / unit cell [meV]", fontsize = LBL_FS)
+
+
+        axarr[0,1].fill_between(minim_data[:,0], minim_data[:,3] - minim_data[:, 4]*.5 ,
+                                minim_data[:, 3] + minim_data[:, 4] * .5, color = "aquamarine")
+        axarr[0,1].plot(minim_data[:,0], minim_data[:,3], color = "k")
+        axarr[0,1].set_ylabel("FC gradient", fontsize = LBL_FS)
+
+        axarr[1,1].fill_between(minim_data[:,0], minim_data[:,5] - minim_data[:, 6]*.5 ,
+                                minim_data[:, 5] + minim_data[:, 6] * .5, color = "aquamarine")
+        axarr[1,1].plot(minim_data[:,0], minim_data[:,5], color = "k")
+        axarr[1,1].set_ylabel("Structure gradient", fontsize = LBL_FS)
+        axarr[1,1].set_xlabel("Good minimization steps", fontsize = LBL_FS)
+
+
+        axarr[1,0].plot(minim_data[:,0], minim_data[:,7], color = "k")
+        axarr[1,0].set_ylabel("Effective sample size", fontsize = LBL_FS)
+        axarr[1,0].set_xlabel("Good minimization steps", fontsize = LBL_FS)
+        fig_data.tight_layout()
     
-    fig_data, axarr = plt.subplots(nrows=2, ncols = 2, sharex = True, dpi = DPI)
-    
-    # Plot the data
-    axarr[0,0].fill_between(minim_data[:,0], minim_data[:,1] - minim_data[:, 2]*.5 ,
-                            minim_data[:, 1] + minim_data[:, 2] * .5, color = "aquamarine")
-    axarr[0,0].plot(minim_data[:,0], minim_data[:,1], color = "k")
-    axarr[0,0].set_ylabel("Free energy / unit cell [meV]", fontsize = LBL_FS)
 
 
-    axarr[0,1].fill_between(minim_data[:,0], minim_data[:,3] - minim_data[:, 4]*.5 ,
-                            minim_data[:, 3] + minim_data[:, 4] * .5, color = "aquamarine")
-    axarr[0,1].plot(minim_data[:,0], minim_data[:,3], color = "k")
-    axarr[0,1].set_ylabel("FC gradient", fontsize = LBL_FS)
 
-    axarr[1,1].fill_between(minim_data[:,0], minim_data[:,5] - minim_data[:, 6]*.5 ,
-                            minim_data[:, 5] + minim_data[:, 6] * .5, color = "aquamarine")
-    axarr[1,1].plot(minim_data[:,0], minim_data[:,5], color = "k")
-    axarr[1,1].set_ylabel("Structure gradient", fontsize = LBL_FS)
-    axarr[1,1].set_xlabel("Good minimization steps", fontsize = LBL_FS)
+    if plot_frequencies:
+        print("Plotting the frequencies")
 
+        # Load all the data
+        freqs_data = np.concatenate([np.loadtxt(f) for f in freqs_files])
+        # Now plot the frequencies
+        fig_freqs = plt.figure(dpi = DPI)
+        ax = plt.gca()
 
-    axarr[1,0].plot(minim_data[:,0], minim_data[:,7], color = "k")
-    axarr[1,0].set_ylabel("Effective sample size", fontsize = LBL_FS)
-    axarr[1,0].set_xlabel("Good minimization steps", fontsize = LBL_FS)
-    fig_data.tight_layout()
-    
+        N_points, Nw = np.shape(freqs_data)
 
-    # Now plot the frequencies
-    fig_freqs = plt.figure(dpi = DPI)
-    ax = plt.gca()
+        for i in range(Nw):
+            ax.plot(freqs_data[:, i] * CC.Units.RY_TO_CM)
 
-    N_points, Nw = np.shape(freqs_data)
-
-    for i in range(Nw):
-        ax.plot(freqs_data[:, i] * CC.Units.RY_TO_CM)
-
-    ax.set_xlabel("Good minimization steps", fontsize = LBL_FS)
-    ax.set_ylabel("Frequency [cm-1]", fontsize = LBL_FS)
-    ax.set_title("Frequcency evolution", fontsize = TITLE_FS)
-    fig_freqs.tight_layout()
+        ax.set_xlabel("Good minimization steps", fontsize = LBL_FS)
+        ax.set_ylabel("Frequency [cm-1]", fontsize = LBL_FS)
+        ax.set_title("Frequcency evolution", fontsize = TITLE_FS)
+        fig_freqs.tight_layout()
 
     plt.show()
     

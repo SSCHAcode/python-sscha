@@ -1720,7 +1720,9 @@ DETAILS OF ERROR:
                                                     support_dyn_coarse,
                                                     support_dyn_fine)
         else:
-            new_dyn = self.current_dyn.InterpolateMesh(target_supercell)
+            new_dyn = self.current_dyn.InterpolateMesh(target_supercell, lo_to_splitting = True)
+
+        print("dyn after interpolation:", new_dyn.GetSupercell())
 
         
         # Get the new harmonic free energy
