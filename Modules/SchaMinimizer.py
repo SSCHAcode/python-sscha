@@ -200,7 +200,7 @@ class SSCHA_Minimizer(object):
         self.use_spglib = False
 
         # If True, enforce the symmetrization and the sum rule after each step
-        self.enforce_sum_rule = False
+        self.enforce_sum_rule = True
         
         
         # Setup the statistical threshold
