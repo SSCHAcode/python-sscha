@@ -373,6 +373,7 @@ Error, the specified location to save the ensemble:
 
 
         self.start_pop = pop
+        print('Population = ',pop) #**** Diegom_test ****
         return self.minim.is_converged()
 
 
