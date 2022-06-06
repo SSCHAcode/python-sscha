@@ -1032,7 +1032,7 @@ Error, the following stress files are missing from the ensemble:
         self.force_computed = np.zeros(self.N, dtype = bool)
 
 
-    def generate(self, N, evenodd = True, project_on_modes = None, sobol = False, sobol_scramble = False):
+    def generate(self, N, evenodd = True, project_on_modes = None, sobol = False, sobol_scramble = False, sobol_scatter = 0.0):
         """
         GENERATE THE ENSEMBLE
         =====================
@@ -1068,7 +1068,7 @@ Error, the following stress files are missing from the ensemble:
 
         structures = []
         if evenodd:
-            structs = self.dyn_0.ExtractRandomStructures(N // 2, self.T0, project_on_vectors = project_on_modes, lock_low_w = self.ignore_small_w, sobol = sobol, sobol_scramble = sobol_scramble)  # normal Sobol generator****Diegom_test****
+            structs = self.dyn_0.ExtractRandomStructures(N // 2, self.T0, project_on_vectors = project_on_modes, lock_low_w = self.ignore_small_w, sobol = sobol, sobol_scramble = sobol_scramble, sobol_scatter = sobol_scatter)  # normal Sobol generator****Diegom_test****
 
 
 
@@ -1079,7 +1079,7 @@ Error, the following stress files are missing from the ensemble:
                 new_s.coords = super_struct.coords - new_s.get_displacement(super_struct)
                 structures.append(new_s)
         else:
-            structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes, lock_low_w = self.ignore_small_w, sobol = sobol, sobol_scramble = sobol_scramble)  # normal Sobol generator****Diegom_test****
+            structures = self.dyn_0.ExtractRandomStructures(N, self.T0, project_on_vectors = project_on_modes, lock_low_w = self.ignore_small_w, sobol = sobol, sobol_scramble = sobol_scramble, sobol_scatter = sobol_scatter)  # normal Sobol generator****Diegom_test****
 
 
         # Enforce all the processors to share the same structures
