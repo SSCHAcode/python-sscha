@@ -2971,7 +2971,6 @@ DETAILS OF ERROR:
             print("BEFORE COMPUTING:", self.all_properties)
             cluster.compute_ensemble(computing_ensemble, calculator, compute_stress)
 
-            print('ENSEMBLE ALL PROPERTIES:', self.all_properties)
         else:
             computing_ensemble.get_energy_forces(calculator, compute_stress, stress_numerical, verbose = verbose)
         
@@ -2979,6 +2978,7 @@ DETAILS OF ERROR:
             # Remove the noncomputed ensemble from here, and merge 
             self.merge(computing_ensemble)
 
+        print('ENSEMBLE ALL PROPERTIES:', self.all_properties)
 
     def merge(self, other):
         """
@@ -3004,6 +3004,7 @@ DETAILS OF ERROR:
 
         self.stress_computed = np.concatenate( (self.stress_computed, other.stress_computed))
         self.force_computed = np.concatenate( (self.force_computed, other.force_computed))
+        self.all_properties += other.all_properties
 
 
         self.sscha_forces = np.concatenate( (self.sscha_forces, other.sscha_forces), axis = 0)
@@ -3052,6 +3053,8 @@ DETAILS OF ERROR:
 
         ens.update_weights(self.current_dyn, self.current_T)
 
+        ens.all_properties = [self.all_properties[x] for x in np.arange(len(split_mask))[split_mask]]
+
         return ens
 
 
@@ -3074,7 +3077,9 @@ DETAILS OF ERROR:
         self.xats = self.xats[good_mask, :, :]
         self.u_disps = self.u_disps[good_mask, :]
 
-        self.structures = [self.structures[x] for x in np.arange(len(good_mask))[good_mask]]
+        self.structures = [self.structures[x] for x in np.arange(len(good_mask))[good_mask]]        
+        self.all_properties = [self.all_properties[x] for x in np.arange(len(good_mask))[good_mask]]
+
 
         self.rho = self.rho[good_mask]
 
