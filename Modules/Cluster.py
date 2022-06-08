@@ -1510,7 +1510,7 @@ Error in thread {}.
                 if not is_success:
                     continue
                 
-                res_only_extra = [res[x] for x in res if x not in ["energy", "forces", "stress", "structure"]]
+                res_only_extra = {x : res[x] for x in res if x not in ["energy", "forces", "stress", "structure"]}
                 ensemble.all_properties[num].update(res_only_extra)
                 ensemble.energies[num] = res["energy"] / units["Ry"]
                 ensemble.forces[num, :, :] = res["forces"] / units["Ry"]
