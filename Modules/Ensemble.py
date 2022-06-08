@@ -781,7 +781,7 @@ Error, the following stress files are missing from the ensemble:
             
             self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
 
-            if np.all(x is not None for x in self.all_properties):
+            if np.all(len(list(x)) > 0 for x in self.all_properties):
                 print('YES PROPERTIES')
                 with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
                     json.dump({"properties" : self.all_properties}, fp, cls=NumpyEncoder)
@@ -985,7 +985,7 @@ Error, the following stress files are missing from the ensemble:
                 else:
                     warnings.warn("WARNING: found file {} but not able to load the properties keyword.".format(all_prop_fname))
         else:
-            self.all_properties = [None] * self.N
+            self.all_properties = [{}] * self.N
         
 
     def init_from_structures(self, structures):
@@ -1036,7 +1036,7 @@ Error, the following stress files are missing from the ensemble:
         self.force_computed = np.zeros(self.N, dtype = bool)
 
         # Setup the all properties
-        self.all_properties = [None] * self.N
+        self.all_properties = [{}] * self.N
 
 
     def generate(self, N, evenodd = True, project_on_modes = None):
