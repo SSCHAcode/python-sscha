@@ -1510,7 +1510,7 @@ Error in thread {}.
                 if not is_success:
                     continue
                 
-                ensemble.all_properties[num] = copy.deepcopy(res)
+                ensemble.all_properties[num].update(res)
                 ensemble.energies[num] = res["energy"] / units["Ry"]
                 ensemble.forces[num, :, :] = res["forces"] / units["Ry"]
                 if get_stress:
