@@ -781,10 +781,13 @@ Error, the following stress files are missing from the ensemble:
             
             self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
 
-            if len(self.all_properties):
+            if np.all(x is not None for x in self.all_properties):
+                print('YES PROPERTIES')
                 with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
                     json.dump({"properties" : self.all_properties}, fp, cls=NumpyEncoder)
-        
+            else:
+                print('NOOO WHAT IS HAPPENING')
+                print(self.all_properties)
     def save_enhanced_xyz(self, filename, append_mode = True, stress_key = "virial", forces_key = "force", energy_key = "energy"):
         """
         Save the ensemble as an enhanced xyz.
@@ -981,7 +984,8 @@ Error, the following stress files are missing from the ensemble:
                     self.all_properties = props["properties"]
                 else:
                     warnings.warn("WARNING: found file {} but not able to load the properties keyword.".format(all_prop_fname))
-                    
+        else:
+            self.all_properties = [None] * self.N
         
 
     def init_from_structures(self, structures):
@@ -1030,6 +1034,9 @@ Error, the following stress files are missing from the ensemble:
         # Setup that both forces and stresses are not computed
         self.stress_computed = np.zeros(self.N, dtype = bool)
         self.force_computed = np.zeros(self.N, dtype = bool)
+
+        # Setup the all properties
+        self.all_properties = [None] * self.N
 
 
     def generate(self, N, evenodd = True, project_on_modes = None):
@@ -2962,6 +2969,8 @@ DETAILS OF ERROR:
 
         if is_cluster:
             cluster.compute_ensemble(computing_ensemble, calculator, compute_stress)
+
+            print('ENSEMBLE ALL PROPERTIES:', self.all_properties)
         else:
             computing_ensemble.get_energy_forces(calculator, compute_stress, stress_numerical, verbose = verbose)
         

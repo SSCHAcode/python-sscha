@@ -1451,7 +1451,7 @@ Error while connecting to the cluster to copy the files:
         
         # Setup if the ensemble has the stress
         ensemble.has_stress = get_stress
-        ensemble.all_properties = [None] * ensemble.N
+        #ensemble.all_properties = [None] * ensemble.N
         
         # Check if the working directory exists
         if not os.path.isdir(self.local_workdir):
