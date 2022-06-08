@@ -2968,6 +2968,7 @@ DETAILS OF ERROR:
             self.remove_noncomputed() 
 
         if is_cluster:
+            print("BEFORE COMPUTING:", self.all_properties)
             cluster.compute_ensemble(computing_ensemble, calculator, compute_stress)
 
             print('ENSEMBLE ALL PROPERTIES:', self.all_properties)

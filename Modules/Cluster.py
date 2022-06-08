@@ -1570,6 +1570,8 @@ Error in thread {}.
                 print ("Expected batch ordinary resubmissions:", num_batch_offset)
                 raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
                 break
+        
+        print("CALCULATION ENDED: all properties: {}".format(ensemble.all_properties))
             
             
     
@@ -1585,10 +1587,11 @@ Error in thread {}.
         """
         
         # Check if the compute_ensemble batch must be done
-        if self.job_number != 1:
-            self.compute_ensemble_batch(ensemble, ase_calc, get_stress, timeout)
-            return
+        #if self.job_number != 1:
+        self.compute_ensemble_batch(ensemble, ase_calc, get_stress, timeout)
+        return
         
+        """
         # Track the remaining configurations
         success = [False] * ensemble.N
         
@@ -1657,4 +1660,5 @@ Error in thread {}.
                 print ("Expected batch ordinary resubmissions:", num_batch_offset)
                 raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
                 break
+        """
             
