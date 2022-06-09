@@ -977,15 +977,21 @@ Error, the following stress files are missing from the ensemble:
         self.force_computed = np.ones(self.N, dtype = bool)
 
         all_prop_fname = os.path.join(data_dir, "all_properties_pop%d.json" % population_id)
+        self.all_properties = [{}] * self.N
         if os.path.exists(all_prop_fname):
-            with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
-                props= json.load(fp)
-                if "properties" in props:
-                    self.all_properties = props["properties"]
-                else:
+            with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "r") as fp:
+                try:
+                    props= json.load(fp)
+                    reading = True
+                    if "properties" in props:
+                        self.all_properties = props["properties"]
+                    else:
+                        reading = False
+                except:
+                    reading = False
+                
+                if not reading:
                     warnings.warn("WARNING: found file {} but not able to load the properties keyword.".format(all_prop_fname))
-        else:
-            self.all_properties = [{}] * self.N
         
 
     def init_from_structures(self, structures):

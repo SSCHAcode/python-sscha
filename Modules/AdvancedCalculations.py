@@ -3,6 +3,7 @@ import sscha, sscha.Cluster
 import threading, copy
 
 import numpy as np
+import scipy, scipy.interpolate
 
 import sys, os
 
@@ -268,3 +269,74 @@ Error while writing input file {}.
             
         
         return list_of_inputs, list_of_outputs
+
+
+
+def get_optical_spectrum(ensemble, w_array = None):
+    """
+    COMPUTE THE OPTICAL SPECTRUM
+    ============================
+
+    By averaging the dielectric properties of phonon-displaced configurations,
+    we can get the phonon-renormalized optical spectrum.
+
+
+    Parameters
+    ----------
+        ensemble : sscha.Ensemble.Ensemble
+            The ensemble. It should contain the optical data.
+            To do it, use the cluster calculator OpticalQECluster of
+            the AdvancedCalculation module.
+        w_array : ndarray, Optional
+            The frequencies at which to interpolate the results.
+            If not passed, the full dataset of frequencies will be returned.
+
+    Results
+    -------
+        w : ndarray, dtype = float
+            The frequency (eV)
+        n : ndarray, dtype = complex
+            The (complex) refractive index
+    """
+
+    w_data = None
+    for i in range(ensemble.N):
+        if not 'epsilon' in ensemble.all_properties[i]:
+            ERR = """
+Error, the configuration {} has no 'epsilon' data.
+""".format(i)
+            raise ValueError(ERR)
+        
+        data = ensemble.all_properties[i]['epsilon']
+
+        if w_data is None:
+            w_data = data[:,0]
+            eps_real = np.zeros_like(w_data)
+            eps_imag = np.zeros_like(w_data)
+
+
+        eps_real += data[:,1]
+        eps_imag += data[:,2]
+
+    eps_real /= ensemble.N
+    eps_imag /= ensemble.N
+
+    # Interpolate the data if requested
+    if w_array is not None:
+        f_real = scipy.interpolate.interp1d(w_data, eps_real,
+            kind = 'cubic', bounds_error = False, fill_value = 'extrapolate')
+        eps_real = f_real(w_array)
+        f_imag = scipy.interpolate.interp1d(w_data, eps_imag,
+            kind = 'cubic', bounds_error = False, fill_value = 'extrapolate')
+        eps_imag = f_imag(w_array)
+        w_data = w_array
+    
+    # Build the complex epsilon
+    epsilon = eps_real + 1j * eps_imag
+
+    # Build the refractive index
+    n = np.sqrt(epsilon)
+
+    return w_data, n
+
+
