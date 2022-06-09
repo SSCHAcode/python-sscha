@@ -781,10 +781,13 @@ Error, the following stress files are missing from the ensemble:
 
             self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
 
-            if len(self.all_properties):
+            if np.all(len(list(x)) > 0 for x in self.all_properties):
+                print('YES PROPERTIES')
                 with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
                     json.dump({"properties" : self.all_properties}, fp, cls=NumpyEncoder)
-
+            else:
+                print('NOOO WHAT IS HAPPENING')
+                print(self.all_properties)
     def save_enhanced_xyz(self, filename, append_mode = True, stress_key = "virial", forces_key = "force", energy_key = "energy"):
         """
         Save the ensemble as an enhanced xyz.
@@ -974,14 +977,21 @@ Error, the following stress files are missing from the ensemble:
         self.force_computed = np.ones(self.N, dtype = bool)
 
         all_prop_fname = os.path.join(data_dir, "all_properties_pop%d.json" % population_id)
+        self.all_properties = [{}] * self.N
         if os.path.exists(all_prop_fname):
-            with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
-                props= json.load(fp)
-                if "properties" in props:
-                    self.all_properties = props["properties"]
-                else:
-                    warnings.warn("WARNING: found file {} but not able to load the properties keyword.".format(all_prop_fname))
+            with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "r") as fp:
+                try:
+                    props= json.load(fp)
+                    reading = True
+                    if "properties" in props:
+                        self.all_properties = props["properties"]
+                    else:
+                        reading = False
+                except:
+                    reading = False
 
+                if not reading:
+                    warnings.warn("WARNING: found file {} but not able to load the properties keyword.".format(all_prop_fname))
 
 
     def init_from_structures(self, structures):
@@ -1031,6 +1041,9 @@ Error, the following stress files are missing from the ensemble:
         self.stress_computed = np.zeros(self.N, dtype = bool)
         self.force_computed = np.zeros(self.N, dtype = bool)
 
+        # Setup the all properties
+        self.all_properties = [{}] * self.N
+
 
     def generate(self, N, evenodd = True, project_on_modes = None, sobol = False, sobol_scramble = False, sobol_scatter = 0.0):
         """
@@ -1055,7 +1068,7 @@ Error, the following stress files are missing from the ensemble:
             sobol_scramble : bool, optional (Default = False)
                 Set the optional scrambling of the generated numbers taken from the Sobol sequence.
             sobol_scatter : real (0.0 to 1) (Deafault = 0.0)
-                Set the scatter parameter to displace the Sobol positions randommly.                
+                Set the scatter parameter to displace the Sobol positions randommly.
 
         """
 
@@ -2968,7 +2981,9 @@ DETAILS OF ERROR:
             self.remove_noncomputed()
 
         if is_cluster:
+            print("BEFORE COMPUTING:", self.all_properties)
             cluster.compute_ensemble(computing_ensemble, calculator, compute_stress)
+
         else:
             computing_ensemble.get_energy_forces(calculator, compute_stress, stress_numerical, verbose = verbose)
 
@@ -2976,6 +2991,7 @@ DETAILS OF ERROR:
             # Remove the noncomputed ensemble from here, and merge
             self.merge(computing_ensemble)
 
+        print('ENSEMBLE ALL PROPERTIES:', self.all_properties)
 
     def merge(self, other):
         """
@@ -3001,6 +3017,7 @@ DETAILS OF ERROR:
 
         self.stress_computed = np.concatenate( (self.stress_computed, other.stress_computed))
         self.force_computed = np.concatenate( (self.force_computed, other.force_computed))
+        self.all_properties += other.all_properties
 
 
         self.sscha_forces = np.concatenate( (self.sscha_forces, other.sscha_forces), axis = 0)
@@ -3049,6 +3066,8 @@ DETAILS OF ERROR:
 
         ens.update_weights(self.current_dyn, self.current_T)
 
+        ens.all_properties = [self.all_properties[x] for x in np.arange(len(split_mask))[split_mask]]
+
         return ens
 
 
@@ -3072,6 +3091,8 @@ DETAILS OF ERROR:
         self.u_disps = self.u_disps[good_mask, :]
 
         self.structures = [self.structures[x] for x in np.arange(len(good_mask))[good_mask]]
+        self.all_properties = [self.all_properties[x] for x in np.arange(len(good_mask))[good_mask]]
+
 
         self.rho = self.rho[good_mask]
 

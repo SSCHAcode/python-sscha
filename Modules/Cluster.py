@@ -1451,7 +1451,7 @@ Error while connecting to the cluster to copy the files:
         
         # Setup if the ensemble has the stress
         ensemble.has_stress = get_stress
-        ensemble.all_properties = [None] * ensemble.N
+        #ensemble.all_properties = [None] * ensemble.N
         
         # Check if the working directory exists
         if not os.path.isdir(self.local_workdir):
@@ -1510,7 +1510,8 @@ Error in thread {}.
                 if not is_success:
                     continue
                 
-                ensemble.all_properties[num] = copy.deepcopy(res)
+                res_only_extra = {x : res[x] for x in res if x not in ["energy", "forces", "stress", "structure"]}
+                ensemble.all_properties[num].update(res_only_extra)
                 ensemble.energies[num] = res["energy"] / units["Ry"]
                 ensemble.forces[num, :, :] = res["forces"] / units["Ry"]
                 if get_stress:
@@ -1570,6 +1571,8 @@ Error in thread {}.
                 print ("Expected batch ordinary resubmissions:", num_batch_offset)
                 raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
                 break
+        
+        print("CALCULATION ENDED: all properties: {}".format(ensemble.all_properties))
             
             
     
@@ -1585,10 +1588,11 @@ Error in thread {}.
         """
         
         # Check if the compute_ensemble batch must be done
-        if self.job_number != 1:
-            self.compute_ensemble_batch(ensemble, ase_calc, get_stress, timeout)
-            return
+        #if self.job_number != 1:
+        self.compute_ensemble_batch(ensemble, ase_calc, get_stress, timeout)
+        return
         
+        """
         # Track the remaining configurations
         success = [False] * ensemble.N
         
@@ -1657,4 +1661,5 @@ Error in thread {}.
                 print ("Expected batch ordinary resubmissions:", num_batch_offset)
                 raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
                 break
+        """
             
