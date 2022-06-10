@@ -307,7 +307,7 @@ Error, the configuration {} has no 'epsilon' data.
 """.format(i)
             raise ValueError(ERR)
         
-        data = ensemble.all_properties[i]['epsilon']
+        data = np.array(ensemble.all_properties[i]['epsilon'])
 
         if w_data is None:
             w_data = data[:,0]
