@@ -446,7 +446,7 @@ Error, the specified location to save the ensemble:
                 Set the optional scrambling of the generated numbers taken from the Sobol sequence.
             sobol_scatter : real (0.0 to 1) (Deafault = 0.0)
                 Set the scatter parameter to displace the Sobol positions randommly.
-                
+
         Returns
         -------
             status : bool
