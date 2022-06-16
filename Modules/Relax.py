@@ -392,7 +392,7 @@ Error, the specified location to save the ensemble:
     def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
                  ensemble_loc = None, start_pop = None, stress_numerical = False,
-                 cell_relax_algorithm = "sd", fix_volume = False, sobol_scramble = False, sobol_scatter = self.sobol_scatter):
+                 cell_relax_algorithm = "sd", fix_volume = False, sobol = self.sobol, sobol_scramble = False, sobol_scatter = self.sobol_scatter):
         """
         VARIABLE CELL RELAX
         ====================
