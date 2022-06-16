@@ -32,6 +32,8 @@ __RELAX_GENERATE_FIRST_ENSEMBLE__ = "generate_ensemble"
 __RELAX_TARGET_PRESSURE__ = "target_pressure"
 __RELAX_FIXVOLUME__ = "fix_volume"
 __RELAX_BULK_MODULUS__ = "bulk_modulus"
+__RELAX_SOBOL__ = "sobol_sampling"
+__RELAX_SOBOL_SCATTER__ = "sobol_scatter"
 
 __TYPE_SINGLE__ = "sscha"
 __TYPE_RELAX__ = "relax"
@@ -42,7 +44,8 @@ __REQ_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__]
 __ALLOWED_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__, __RELAX_MAX_POP__,
                     __RELAX_START_POP__, __RELAX_SAVE_ENSEMBLE__,
                     __RELAX_FIXVOLUME__, __RELAX_TARGET_PRESSURE__,
-                    __RELAX_BULK_MODULUS__, __RELAX_GENERATE_FIRST_ENSEMBLE__]
+                    __RELAX_BULK_MODULUS__, __RELAX_GENERATE_FIRST_ENSEMBLE__,
+                    __RELAX_SOBOL__, __RELAX_SOBOL_SCATTER__]
 
 class SSCHA(object):
 
@@ -106,6 +109,11 @@ class SSCHA(object):
         self.fix_cell_shape = False
 
 
+        # Set the Sobol Parameters by default (aka no Sobol)
+        self.sobol_sampling = False
+        self.sobol_scatter = 0.0
+
+
         # Setup the attribute control
         self.__total_attributes__ = [item for item in self.__dict__.keys()]
         self.fixed_attributes = True # This must be the last attribute to be setted
@@ -114,6 +122,7 @@ class SSCHA(object):
         # Setup any other keyword given in input (raising the error if not already defined)
         for key in kwargs:
             self.__setattr__(key, kwargs[key])
+
 
     def __setattr__(self, name, value):
         """
@@ -203,6 +212,12 @@ class SSCHA(object):
         if __RELAX_FIXVOLUME__ in keys:
             self.fix_volume = bool(c_info[__RELAX_FIXVOLUME__])
 
+# ****Diegom_test****
+        if __RELAX_SOBOL__ in keys:
+            self.sobol_sampling = bool(c_info[__RELAX_SOBOL__])
+
+        if __RELAX_SOBOL_SCATTER__ in keys:
+            self.sobol_scatter = np.float64(c_info[__RELAX_SOBOL_SCATTER__])
 
         # Check the allowed keys
         for k in keys:
@@ -238,10 +253,11 @@ class SSCHA(object):
 
             if rtype == __TYPE_RELAX__:
                 self.relax(restart_from_ens, self.minim.ensemble.has_stress, self.data_dir,
-                           self.start_pop)
+                           self.start_pop, sobol = self.sobol_sampling, sobol_scatter = self.sobol_scatter)
             elif rtype == __TYPE_VCRELAX__:
                 self.vc_relax(self.target_pressure, self.bulk_modulus,
-                              restart_from_ens, self.data_dir, self.start_pop, fix_volume=self.fix_volume)
+                              restart_from_ens, self.data_dir, self.start_pop, fix_volume=self.fix_volume,
+                               sobol = self.sobol_sampling, sobol_scatter = self.sobol_scatter)
 
     def setup_custom_functions(self, custom_function_pre = None,
                                custom_function_gradient = None,
@@ -257,7 +273,8 @@ class SSCHA(object):
 
 
     def relax(self, restart_from_ens = False, get_stress = False,
-              ensemble_loc = None, start_pop = None, sobol = False, sobol_scramble = False, sobol_scatter = 0.0):
+              ensemble_loc = None, start_pop = None, sobol = False,
+               sobol_scramble = False, sobol_scatter = 0.0):
         """
         COSTANT VOLUME RELAX
         ====================
@@ -382,7 +399,8 @@ Error, the specified location to save the ensemble:
     def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
                  ensemble_loc = None, start_pop = None, stress_numerical = False,
-                 cell_relax_algorithm = "sd", fix_volume = False, sobol = False, sobol_scramble = False, sobol_scatter = 0.0):
+                 cell_relax_algorithm = "sd", fix_volume = False, sobol = False,
+                  sobol_scramble = False, sobol_scatter = 0.0):
         """
         VARIABLE CELL RELAX
         ====================
