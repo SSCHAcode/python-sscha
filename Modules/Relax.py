@@ -32,8 +32,6 @@ __RELAX_GENERATE_FIRST_ENSEMBLE__ = "generate_ensemble"
 __RELAX_TARGET_PRESSURE__ = "target_pressure"
 __RELAX_FIXVOLUME__ = "fix_volume"
 __RELAX_BULK_MODULUS__ = "bulk_modulus"
-__RELAX_SOBOL__ = "sobol_sampling"
-__RELAX_SOBOL_SCATTER__ = "sobol_scatter"
 
 __TYPE_SINGLE__ = "sscha"
 __TYPE_RELAX__ = "relax"
@@ -205,14 +203,6 @@ class SSCHA(object):
         if __RELAX_FIXVOLUME__ in keys:
             self.fix_volume = bool(c_info[__RELAX_FIXVOLUME__])
 
-        # ****Diegom_test****
-        self.sobol = False
-        if __RELAX_SOBOL__ in keys:
-            self.sobol = bool(c_info[__RELAX_SOBOL__])
-
-        self.sobol_scatter = 0.0
-        if __RELAX_SOBOL_SCATTER__ in keys:
-            self.sobol_scatter = np.float64(c_info[__RELAX_SOBOL_SCATTER__])
 
         # Check the allowed keys
         for k in keys:
@@ -267,7 +257,7 @@ class SSCHA(object):
 
 
     def relax(self, restart_from_ens = False, get_stress = False,
-              ensemble_loc = None, start_pop = None, sobol = self.sobol, sobol_scramble = False, sobol_scatter = self.sobol_scatter):
+              ensemble_loc = None, start_pop = None, sobol = False, sobol_scramble = False, sobol_scatter = 0.0):
         """
         COSTANT VOLUME RELAX
         ====================
@@ -392,7 +382,7 @@ Error, the specified location to save the ensemble:
     def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
                  ensemble_loc = None, start_pop = None, stress_numerical = False,
-                 cell_relax_algorithm = "sd", fix_volume = False, sobol = self.sobol, sobol_scramble = False, sobol_scatter = self.sobol_scatter):
+                 cell_relax_algorithm = "sd", fix_volume = False, sobol = False, sobol_scramble = False, sobol_scatter = 0.0):
         """
         VARIABLE CELL RELAX
         ====================
