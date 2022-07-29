@@ -68,6 +68,7 @@ except:
 __ASE__ = True
 try:
     import ase, ase.io
+    import ase.calculators.singlepoint
 except:
     __ASE__ = False
 
@@ -788,6 +789,44 @@ Error, the following stress files are missing from the ensemble:
             else:
                 print('NOOO WHAT IS HAPPENING')
                 print(self.all_properties)
+
+    def save_extxyz(self, filename, append_mode = True):
+        """
+        SAVE INTO EXTXYZ FORMAT
+        =======================
+
+        ASE extxyz format is used for build the training set for the nequip and allegro neural network potentials.
+
+        Parameters
+        ----------
+            filename : str
+                The path to the .extxyz file containing the ensemble
+            append_mode: bool
+                If true the ensemble is appended
+        """
+
+        if not __ASE__:
+            raise ImportError("Error, this function requires ASE installed")
+
+        
+        ase_structs = []
+
+        for i, s in enumerate(self.structures):
+            energy = self.energies[i] * Rydberg  # Ry -> eV
+            forces = self.forces[i, :, :] * Rydberg  # Ry/A -> eV/A
+            stress = self.stresses[i, :, :] * Rydberg /  Bohr**3 # Ry/Bohr^3 -> eV/A^3
+            struct = s.get_ase_atoms()
+
+            calculator = ase.calculators.singlepoint.SinglePointCalculator(struct, energy = energy,
+                forces = forces, stress = CC.Methods.transform_voigt(stress))
+            
+            struct.set_calculator(calculator)
+            ase_structs.append(struct)
+
+        # Now save the extended xyz
+        ase.io.write(filename, ase_structs, format = "extxyz", append = append_mode)
+
+
     def save_enhanced_xyz(self, filename, append_mode = True, stress_key = "virial", forces_key = "force", energy_key = "energy"):
         """
         Save the ensemble as an enhanced xyz.
