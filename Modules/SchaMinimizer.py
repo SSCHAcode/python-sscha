@@ -199,6 +199,9 @@ class SSCHA_Minimizer(object):
         # NOTE: It is slower, but it enables using supercells
         self.use_spglib = False
 
+        # If it is a list, the symmetries are initialized with custom matrices
+        self.custom_symmetries = None
+
         # If True, enforce the symmetrization and the sum rule after each step
         self.enforce_sum_rule = True
         
@@ -312,6 +315,9 @@ class SSCHA_Minimizer(object):
         if self.use_spglib:
             qe_sym.SetupFromSPGLIB()
             self.N_symmetries = qe_sym.QE_nsym
+        elif self.custom_symmetries is not None:
+            qe_sym.InitFromSymmetries(self.custom_symmetries)
+            self.N_symmetries = qe_sym.QE_nsym
         else:
             qe_sym.SetupQPoint(verbose = False)
             self.N_symmetries = qe_sym.QE_nsym
@@ -341,7 +347,7 @@ class SSCHA_Minimizer(object):
         if self.minim_dyn:
             if not self.neglect_symmetries:
                 # Check if the symmetries must be applied in the supercell
-                if self.use_spglib:
+                if self.use_spglib or self.custom_symmetries is not None:
                     # Check if we have a supercell
                     supercell = self.dyn.GetSupercell()
                     n_cell = np.prod(supercell)
@@ -434,7 +440,7 @@ class SSCHA_Minimizer(object):
             
             # Apply the symmetries to the forces
             if not self.neglect_symmetries:
-                if not self.use_spglib:
+                if not self.use_spglib and not (self.custom_symmetries is None):
                     qe_sym.SetupQPoint()
                 qe_sym.SymmetrizeVector(struct_grad)
                 #qe_sym.SymmetrizeVector(struct_grad_err)
@@ -529,7 +535,10 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
 
             # Check if we must enforce the symmetries and the sum rule:
             if self.enforce_sum_rule and (not self.neglect_symmetries):
-                self.dyn.Symmetrize(use_spglib = self.use_spglib)
+                if not self.custom_symmetries:
+                    self.dyn.Symmetrize(use_spglib = self.use_spglib)
+                else:
+                    self.dyn.SymmetrizeSupercell(self.custom_symmetries)
 
 
             # If we have imaginary frequencies, force the kl ratio to zero
