@@ -311,6 +311,8 @@ class SSCHA_Minimizer(object):
         
         # Setup the symmetries
         qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
+        print("I have {} symmetries:", len(self.custom_symmetries))
+
         
         if self.use_spglib:
             qe_sym.SetupFromSPGLIB()
@@ -321,6 +323,8 @@ class SSCHA_Minimizer(object):
         else:
             qe_sym.SetupQPoint(verbose = False)
             self.N_symmetries = qe_sym.QE_nsym
+        
+        print("Now I have {} symmetries:", qe_sym.QE_nsym)
 
         
         
@@ -353,7 +357,13 @@ class SSCHA_Minimizer(object):
                     n_cell = np.prod(supercell)
                     if n_cell == 1:
                         # Only gamma, apply the symmetries
-                        qe_sym.ApplySymmetriesToV2(dyn_grad[0, :, :])
+                        if not self.custom_symmetries:
+                            qe_sym.ApplySymmetriesToV2(dyn_grad[0, :, :])
+                        else:
+                            dumb_dyn = self.dyn.Copy()
+                            dumb_dyn.dynmats[0] = dyn_grad[0, :, :]
+                            dumb_dyn.SymmetrizeSupercell(self.custom_symmetries)
+                            dyn_grad[0, :, :] = dumb_dyn.dynmats[0]
 
                         #qe_sym.ApplySymmetriesToV2(err)
                         #CC.symmetries.CustomASR(err)
@@ -414,6 +424,7 @@ class SSCHA_Minimizer(object):
 #            qe_sym.ImposeSumRule(err)
             
         
+        print("In line: 427 I have {} symmetries".format(qe_sym.QE_nsym))
             
         # If the structure must be minimized perform the step
         struct_grad = np.zeros(self.dyn.structure.coords.shape, dtype = np.double, order = "C")
@@ -440,8 +451,10 @@ class SSCHA_Minimizer(object):
             
             # Apply the symmetries to the forces
             if not self.neglect_symmetries:
-                if not self.use_spglib and not (self.custom_symmetries is None):
+                if not self.use_spglib and (self.custom_symmetries is None):
                     qe_sym.SetupQPoint()
+
+                print("Now I have {} symmetries".format(qe_sym.QE_nsym))
                 qe_sym.SymmetrizeVector(struct_grad)
                 #qe_sym.SymmetrizeVector(struct_grad_err)
                 struct_grad_err /= np.sqrt(qe_sym.QE_nsym)
