@@ -1923,25 +1923,26 @@ DETAILS OF ERROR:
         """
 
         t1 = time.time()
-        supercell_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
-
+        super_struct = self.current_dyn.structure.generate_supercell(self.supercell)
+        #supercell_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
+        
         # Dyagonalize
-        w, pols = supercell_dyn.DyagDinQ(0)
+        w, pols = self.current_dyn.DiagonalizeSupercell()#supercell_dyn.DyagDinQ(0)
 
         if not self.ignore_small_w:
-            trans = CC.Methods.get_translations(pols, supercell_dyn.structure.get_masses_array())
+            trans = CC.Methods.get_translations(pols, super_struct.get_masses_array())
         else:
             trans = np.abs(w) < CC.Phonons.__EPSILON_W__
 
-        ityp = supercell_dyn.structure.get_ityp() + 1 # Py to fortran convertion
-        mass = np.array(list(supercell_dyn.structure.masses.values()))
-
+        ityp = super_struct.get_ityp() + 1 # Py to fortran convertion
+        mass = np.array(list(super_struct.masses.values()))
+        
         log_err = "err_yesrho"
 
         mass *= 2
         w /= 2
 
-        nat = supercell_dyn.structure.N_atoms
+        nat = super_struct.N_atoms
         eforces = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
         u_disp = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
         #print nat
@@ -1982,11 +1983,20 @@ DETAILS OF ERROR:
 
             # Perform the fourier transform
             if return_error:
-                q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
-                                                    self.current_dyn.structure, supercell_dyn.structure,fc2=grad_err)
+                # Check if a multiprocessing function can be exploited
+                if hasattr(CC.Phonons, 'GetDynQFromFCSupercell_parallel') and CC.Settings.GetNProc() > 1:  
+                    q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell_parallel(grad, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, super_struct,fc2=grad_err)
+                else:
+                    q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, super_struct,fc2=grad_err)
             else:
-                q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
-                                                    self.current_dyn.structure, supercell_dyn.structure)
+                if hasattr(CC.Phonons, 'GetDynQFromFCSupercell_parallel'):
+                    q_grad = CC.Phonons.GetDynQFromFCSupercell_parallel(grad, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, super_struct)
+                else:
+                    q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, super_struct)
             #q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
              #                                           self.current_dyn.structure, supercell_dyn.structure)
         else:

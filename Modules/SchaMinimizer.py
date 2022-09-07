@@ -352,6 +352,7 @@ class SSCHA_Minimizer(object):
                         #CC.symmetries.CustomASR(err)
                     else:
                         # We have a supercell, we must generate the dynamical matrix in the supercell
+                        t_5 = time.time()
                         super_structure = self.dyn.structure.generate_supercell(supercell)
                         fc_supercell = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot), \
                             self.dyn.structure, super_structure)
@@ -360,13 +361,22 @@ class SSCHA_Minimizer(object):
                         qe_sym_supcell = CC.symmetries.QE_Symmetry(super_structure)
                         qe_sym_supcell.SetupFromSPGLIB()
 
+                        t_6 = time.time()
+
                         # Apply the symmetries to the fc_supercell matrix
                         qe_sym_supcell.ApplySymmetriesToV2(fc_supercell)
 
+                        t_7 = time.time()
                         # Convert back to Q space
-                        dyn_grad = CC.Phonons.GetDynQFromFCSupercell(fc_supercell, np.array(self.dyn.q_tot), \
+                        dyn_grad = CC.Phonons.GetDynQFromFCSupercell_parallel(fc_supercell, np.array(self.dyn.q_tot), \
                             self.dyn.structure, super_structure)
 
+                        t_8 = time.time()
+
+                        print('    [symmetrization]  Time to prepare the suprecell dyn   : {:.6f} s'.format(t_6 - t_5))
+                        print('    [symmetrization]  Time to symmetrize in the supercell : {:.6f} s'.format(t_7 - t_6))
+                        print('    [symmetrization]  Time to return in fourier space     : {:.6f} s'.format(t_8 - t_7))
+                    
                     # Apply the sum rule at gamma
                     CC.symmetries.CustomASR(dyn_grad[0,:,:])
                 else:
