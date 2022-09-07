@@ -1,7 +1,7 @@
 module anharmonic
   use stochastic
   use thermodynamic
-  
+
 contains
 
   ! This subroutines computes df/da the first part of the
@@ -19,9 +19,9 @@ contains
   ! df_da => Result [Ha / bohr]
   subroutine get_df_da_nonav (w,w_harmonic,T,e,forces,q,mass,&
        stat_method,df_da, l, n, m)
- 
+
     implicit none
-    
+
     double precision, dimension(n), intent(in) :: w
     double precision, dimension(n), intent(in) :: w_harmonic
     double precision, intent(in) :: T
@@ -34,19 +34,19 @@ contains
     double precision, dimension(l,n), intent(out) :: df_da
 
     integer, intent(in) ::  l, n, m
-    
+
     integer :: i1, i2, i3, j, natoms, nrandom, nmodes, i3n
     double precision, dimension(:,:), allocatable :: f
     double precision, dimension(:,:), allocatable :: mat_a, mat_b, mat_c
     double precision, dimension(:,:), allocatable :: e_diag
     double precision, dimension(n) :: a, da_dw
-    double precision, dimension(3*m) :: u_sqrtm 
+!    double precision, dimension(3*m) :: u_sqrtm
 
-    
+
     natoms  = m
     nrandom = l
     nmodes  = n
-    
+
     allocate(mat_a(nmodes, 3 * natoms))
     allocate(mat_b(3 * natoms, nmodes))
     allocate(mat_c(nmodes,nmodes))
@@ -56,8 +56,8 @@ contains
     ! Get a and da_dw
     call w_to_a(w, T, a, n)
     call w_to_da(w, T, da_dw, n)
-    
-    
+
+
 !    ! Print all the info about the input parameters [DEBUG]
 !    print *, ""
 !    print *, "======== dF / dA INPUT VARIABLES ========="
@@ -82,8 +82,8 @@ contains
 !    do i1 = 1, nrandom
 !        print "(I4, A3, 1000D16.8)", i1, ")", q(i1, :)
 !    end do
-!    
-    
+!
+
     ! Create the auxiliar polarization vectors dividing by the
     ! the polarization vectors
 
@@ -111,7 +111,7 @@ contains
 
     do i1 = 1, nmodes
        ! if (.not. mu_relevant(i1)) then
-       !    mat_a(i1,:) = 0.0d0 
+       !    mat_a(i1,:) = 0.0d0
        !    cycle
        ! end if
        i3n = 0
@@ -144,22 +144,22 @@ contains
 
        call dgemm('N','N',nmodes,nmodes,3*natoms,1.0d0,mat_a,nmodes,&
             mat_b,3*natoms,0.0d0,mat_c,nmodes)
-            
+
        ! Print the new matrix
-!       
+!
 !       print *, ""
 !       print *, "MAT A  Conf", j
 !       do i1 = 1, 3*natoms
 !           print *, mat_a(:, i1)
-!       end do 
+!       end do
 !       print *, "MAT B  Conf", j
 !       do i1 = 1, nmodes
 !           print *, mat_b(:, i1)
-!       end do 
+!       end do
 !       print *, "MAT C  Conf", j
 !       do i1 = 1, nmodes
 !           print *, mat_c(:, i1)
-!       end do 
+!       end do
 
        ! Create the gradient according to the different possible statistics
 
@@ -191,12 +191,12 @@ contains
     deallocate(e_diag)
 
   end subroutine get_df_da_nonav
-  
-  
+
+
   ! The following subroutine computes the last derivatives
-  ! That are 
-  
-  subroutine get_da_dcr_and_de_dcr (wr, er, T, mass, x_i, y_i, da_dcr, de_dcr, n, m ) 
+  ! That are
+
+  subroutine get_da_dcr_and_de_dcr (wr, er, T, mass, x_i, y_i, da_dcr, de_dcr, n, m )
 
     implicit none
 
@@ -207,7 +207,7 @@ contains
     integer, intent(in) :: x_i, y_i
     double precision, dimension(n), intent(out) :: da_dcr
     double precision, dimension(3*m, n), intent(out) :: de_dcr
-    
+
     ! Optional integer
     integer, intent(in) :: n, m
 
@@ -218,13 +218,13 @@ contains
 
     natsc  = m
     nmodes = n
-    
+
     atm_x = (x_i - 1) / 3 + 1
     atm_y = (y_i -1 ) / 3 + 1
 
     allocate(g(nmodes,nmodes))
     allocate(gamma_mu_nu(nmodes, nmodes))
-    
+
     ! Prepare gamma_mu_nu
     do mu = 1, nmodes
         do nu = 1, nmodes
@@ -247,7 +247,7 @@ contains
           if (abs((wr(mu)-wr(nu))/wr(nu)) .lt. 0.00001d0) then
              g(mu,nu) = 0.0d0
           else
-             g(mu,nu) = gamma_mu_nu(mu,nu) / (wr(nu)**2 - wr(mu)**2) 
+             g(mu,nu) = gamma_mu_nu(mu,nu) / (wr(nu)**2 - wr(mu)**2)
           end if
        end do
     end do
@@ -259,15 +259,15 @@ contains
     deallocate(g)
 
   end subroutine get_da_dcr_and_de_dcr
-  
-  
+
+
   ! This subroutine gets the derivative of the Free energy with respect
-  ! to the minimum number of coefficients that decompose the dynamical 
+  ! to the minimum number of coefficients that decompose the dynamical
   ! matrices. In this case the statistics are performed here. Thus,
   ! the error of the gradoient is also calculated in this subroutine.
-  ! In this new version the value of dF/de is calculated in this 
-  ! subroutine. This is done to solve memory problems. 
-  
+  ! In this new version the value of dF/de is calculated in this
+  ! subroutine. This is done to solve memory problems.
+
   subroutine get_df_dcoeff_av_new (df, da, forces, q, mass, dedc, rho, &
        minim_polvec, log_err, dfdc, delta_dfdc, r, s, t)
 
@@ -284,7 +284,7 @@ contains
     !  character (len=11), intent(in) :: stat_method
     character (len=10), intent(in) :: log_err
     double precision, intent(out) :: dfdc, delta_dfdc
-    
+
 
     double precision, dimension(:), allocatable :: f
     integer :: nat, nmodes, nrandom
@@ -297,7 +297,7 @@ contains
     nmodes = s
     nat = t
     nrandom = r
-    
+
     allocate(f(nrandom))
 
     ! Compute df/da * da/dcr
@@ -316,13 +316,13 @@ contains
         i3n = 1
         do i = 1, nat
             do alpha = 1, 3
-               aux =  sqrtm1mass(i) * dedc(i3n,mu)  
+               aux =  sqrtm1mass(i) * dedc(i3n,mu)
                i3n = i3n + 1
                !do n = 1, nrandom
-               FORALL(n=1:nrandom) 
+               FORALL(n=1:nrandom)
                   f(n) = f(n) - aux * forces(n,i,alpha) * q(n,mu)
                END FORALL
-            end do 
+            end do
         end do
       end do
       !
