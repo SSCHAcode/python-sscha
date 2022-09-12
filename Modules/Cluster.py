@@ -731,10 +731,8 @@ Error while connecting to the cluster to copy the files:
             cmd = self.sshcmd + " %s '%s'" % (self.hostname, compress_cmd)
             cp_res = self.ExecuteCMD(cmd, False)
             if not cp_res:
-                print ("Error while compressing the outputs:", cmd)
-                print(list_of_output)
-                print ("Return code:", cp_res)
-                return cp_res
+                print ("Error while compressing the outputs:", cmd, list_of_output, "\nReturn code:", cp_res)
+                #return cp_res
 
             
             # Copy the tar and unpack
