@@ -3,8 +3,8 @@ from __future__ import print_function
 
 """
 This module performs the relax over more
-SCHA minimization. It can be both a constant temperature and a 
-constant pressure relax. 
+SCHA minimization. It can be both a constant temperature and a
+constant pressure relax.
 """
 import numpy as np
 import difflib
@@ -32,6 +32,8 @@ __RELAX_GENERATE_FIRST_ENSEMBLE__ = "generate_ensemble"
 __RELAX_TARGET_PRESSURE__ = "target_pressure"
 __RELAX_FIXVOLUME__ = "fix_volume"
 __RELAX_BULK_MODULUS__ = "bulk_modulus"
+__RELAX_SOBOL__ = "sobol_sampling"
+__RELAX_SOBOL_SCATTER__ = "sobol_scatter"
 
 __TYPE_SINGLE__ = "sscha"
 __TYPE_RELAX__ = "relax"
@@ -42,16 +44,17 @@ __REQ_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__]
 __ALLOWED_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__, __RELAX_MAX_POP__,
                     __RELAX_START_POP__, __RELAX_SAVE_ENSEMBLE__,
                     __RELAX_FIXVOLUME__, __RELAX_TARGET_PRESSURE__,
-                    __RELAX_BULK_MODULUS__, __RELAX_GENERATE_FIRST_ENSEMBLE__]
+                    __RELAX_BULK_MODULUS__, __RELAX_GENERATE_FIRST_ENSEMBLE__,
+                    __RELAX_SOBOL__, __RELAX_SOBOL_SCATTER__]
 
 class SSCHA(object):
-    
-    def __init__(self, minimizer = None, ase_calculator=None, N_configs=1, max_pop = 20, 
+
+    def __init__(self, minimizer = None, ase_calculator=None, N_configs=1, max_pop = 20,
                  save_ensemble = False, cluster = None, **kwargs):
         """
         This module initialize the relaxer. It may perform
         constant volume or pressure relaxation using fully anharmonic potentials.
-        
+
         Parameters
         ----------
             minimizer : SSCHA_Minimizer
@@ -71,7 +74,7 @@ class SSCHA(object):
                 will be runned in the provided cluster.
             **kwargs : any other keyword that matches an object of this structure
         """
-        
+
         if minimizer == None:
             self.minim = sscha.SchaMinimizer.SSCHA_Minimizer()
         else:
@@ -82,13 +85,13 @@ class SSCHA(object):
         self.max_pop = max_pop
         self.cluster = cluster
         self.start_pop = 1
-        
+
         # If the ensemble must be saved at each iteration.
-        # 
+        #
         self.save_ensemble = save_ensemble
         self.data_dir = "data"
-        
-        
+
+
 
         self.__cfpre__ = None
         self.__cfpost__ = None
@@ -103,7 +106,12 @@ class SSCHA(object):
         # If true the cell shape is fixed in a variable-cell relaxation
         # even if the symmetries allows for more degrees of freedom in the cell shape.
         # Usefull (for example) if you want to enfoce a cubic cell even if the structure brakes the symmetries
-        self.fix_cell_shape = False  
+        self.fix_cell_shape = False
+
+
+        # Set the Sobol Parameters by default (aka no Sobol)
+        self.sobol_sampling = False
+        self.sobol_scatter = 0.0
 
 
         # Setup the attribute control
@@ -115,13 +123,14 @@ class SSCHA(object):
         for key in kwargs:
             self.__setattr__(key, kwargs[key])
 
+
     def __setattr__(self, name, value):
         """
         This method is used to set an attribute.
         It will raise an exception if the attribute does not exists (with a suggestion of similar entries)
         """
 
-        
+
         if "fixed_attributes" in self.__dict__:
             if name in self.__total_attributes__:
                 super(SSCHA, self).__setattr__(name, value)
@@ -135,18 +144,18 @@ class SSCHA(object):
                 raise AttributeError(ERROR_MSG)
         else:
             super(SSCHA, self).__setattr__(name, value)
-        
-        
-        
+
+
+
     def setup_from_namelist(self, namelist):
         """
         SETUP THE RELAXER FROM THE NAMELIST
         ===================================
-        
+
         Setup the SSCHA relaxer from the given namelist.
-        
+
         Note the calculation will be also started by this method.
-        
+
         Parameters
         ----------
             namelist : dict
@@ -154,71 +163,77 @@ class SSCHA(object):
         """
         if not __RELAX_NAMESPACE__ in namelist.keys():
             raise IOError("Error, %s namespace not found" % __RELAX_NAMESPACE__)
-        
+
         c_info = namelist[__RELAX_NAMESPACE__]
         keys = c_info.keys()
-        
+
         # Load the minim and the ensemble if a inputscha namespace is found
         if "inputscha" in namelist.keys():
             self.minim.setup_from_namelist(namelist)
             if self.minim.ensemble is None:
                 raise IOError("Error, please specify the input dynamical matrix.")
-            
-        
+
+
         # Load the cluster if any
         if sscha.Cluster.__CLUSTER_NAMELIST__ in namelist.keys():
             self.cluster = sscha.Cluster.Cluster()
             self.cluster.setup_from_namelist(namelist)
-        
+
         # Load the calculator if any
         if sscha.Calculator.__CALCULATOR_HEAD__ in namelist.keys():
             self.calc = sscha.Calculator.prepare_calculator_from_namelist(namelist)
-        
+
         # Get if you must use a already loaded ensemble or not
         restart_from_ens = False
         if __RELAX_GENERATE_FIRST_ENSEMBLE__ in keys:
             restart_from_ens = not bool(c_info[__RELAX_GENERATE_FIRST_ENSEMBLE__])
-        
+
         # Get the number of configurations
         if __RELAX_NCONFIGS__ in keys:
             self.N_configs = int(c_info[__RELAX_NCONFIGS__])
-        
+
         # Get the maximum population
         if __RELAX_MAX_POP__ in keys:
             self.max_pop = int(c_info[__RELAX_MAX_POP__])
-            
+
         if __RELAX_START_POP__ in keys:
             self.start_pop = int(c_info[__RELAX_START_POP__])
-        
+
         if __RELAX_SAVE_ENSEMBLE__ in keys:
             self.save_ensemble = True
             self.data_dir = c_info[__RELAX_SAVE_ENSEMBLE__]
-        
+
         if __RELAX_BULK_MODULUS__ in keys:
             self.bulk_modulus = np.float64(c_info[__RELAX_BULK_MODULUS__])
-            
+
         if __RELAX_TARGET_PRESSURE__ in keys:
             self.target_pressure = np.float64(c_info[__RELAX_TARGET_PRESSURE__])
-            
+
         if __RELAX_FIXVOLUME__ in keys:
             self.fix_volume = bool(c_info[__RELAX_FIXVOLUME__])
-        
-        
+
+# ****Diegom_test****
+        if __RELAX_SOBOL__ in keys:
+            self.sobol_sampling = bool(c_info[__RELAX_SOBOL__])
+
+        if __RELAX_SOBOL_SCATTER__ in keys:
+            self.sobol_scatter = np.float64(c_info[__RELAX_SOBOL_SCATTER__])
+
         # Check the allowed keys
-        for k in keys: 
+        for k in keys:
             if not k in __ALLOWED_KEYS__:
                 print ("Error with the key:", k)
                 s = "Did you mean something like:" + str( difflib.get_close_matches(k, __ALLOWED_KEYS__))
                 print (s)
                 raise IOError("Error in calculator namespace: key '" + k +"' not recognized.\n" + s)
-        
+
         # Check for mandatory keys
         for req_key in __REQ_KEYS__:
             if not req_key in keys:
                 raise IOError("Error, the calculator configuration namelist requires the keyword: '" + req_key + "'")
-        
-        
-        
+
+
+
         # Get the calculation type
         if __RELAX_TYPE__ in keys:
             rtype = c_info[__RELAX_TYPE__]
@@ -226,23 +241,24 @@ class SSCHA(object):
                 print ("Unknown relaxation option:", rtype)
                 print ("Did you mean:", difflib.get_close_matches(rtype, __ALLOWED_RELAX_TYPES__))
                 raise ValueError("Error with key %s" % __RELAX_TYPE__)
-        
+
             # Setup custom functions
             if Utilities.__UTILS_NAMESPACE__ in namelist.keys():
                 cfgs = Utilities.get_custom_functions_from_namelist(namelist, self.minim.dyn)
                 self.setup_custom_functions(cfgs[0], cfgs[1], cfgs[2])
-        
+
             # Initialize the minimizer
             #self.minim.init()
             self.minim.print_info()
-        
+
             if rtype == __TYPE_RELAX__:
                 self.relax(restart_from_ens, self.minim.ensemble.has_stress, self.data_dir,
-                           self.start_pop)
+                           self.start_pop, sobol = self.sobol_sampling, sobol_scatter = self.sobol_scatter)
             elif rtype == __TYPE_VCRELAX__:
-                self.vc_relax(self.target_pressure, self.bulk_modulus, 
-                              restart_from_ens, self.data_dir, self.start_pop, fix_volume=self.fix_volume)
-        
+                self.vc_relax(self.target_pressure, self.bulk_modulus,
+                              restart_from_ens, self.data_dir, self.start_pop, fix_volume=self.fix_volume,
+                               sobol = self.sobol_sampling, sobol_scatter = self.sobol_scatter)
+
     def setup_custom_functions(self, custom_function_pre = None,
                                custom_function_gradient = None,
                                custom_function_post = None):
@@ -250,21 +266,22 @@ class SSCHA(object):
         This subroutine setup which custom functions should be called during the minimization.
         Look for the SCHA_Minimizer.run() method for other details.
         """
-        
+
         self.__cfpre__ = custom_function_pre
         self.__cfpost__ = custom_function_post
         self.__cfg__ = custom_function_gradient
-        
-        
+
+
     def relax(self, restart_from_ens = False, get_stress = False,
-              ensemble_loc = None, start_pop = None):
+              ensemble_loc = None, start_pop = None, sobol = False,
+               sobol_scramble = False, sobol_scatter = 0.0):
         """
         COSTANT VOLUME RELAX
         ====================
-        
+
         This function performs the costant volume SCHA relaxation, by submitting several populations
         until the minimization converges (or the maximum number of population is reached)
-        
+
         Parameters
         ----------
             restart_from_ens : bool, optional
@@ -279,13 +296,19 @@ class SSCHA(object):
                 Where the ensemble of each population is saved on the disk. If none, it will
                 use the content of self.data_dir. It is just a way to override the variable self.data_dir
             start_pop : int, optional
-                The starting index for the population, used only for saving the ensemble and the dynamical 
+                The starting index for the population, used only for saving the ensemble and the dynamical
                 matrix. If None, the content of self.start_pop will be used.
-            
+            sobol : bool, optional (Default = False)
+                 Defines if the calculation uses random Gaussian generator or Sobol Gaussian generator.
+            sobol_scramble : bool, optional (Default = False)
+                Set the optional scrambling of the generated numbers taken from the Sobol sequence.
+            sobol_scatter : real (0.0 to 1) (Deafault = 0.0)
+                Set the scatter parameter to displace the Sobol positions randommly.
+
         Returns
         -------
             status : bool
-                True if the minimization converged, False if the maximum number of 
+                True if the minimization converged, False if the maximum number of
                 populations has been reached.
         """
 
@@ -295,11 +318,11 @@ class SSCHA(object):
         if (not ensemble_loc) and self.save_ensemble:
             ERR_MSG = """
 Error, you must specify where to save the ensembles.
-       this can be done either passing ensemble_loc = "path/to/dir" 
+       this can be done either passing ensemble_loc = "path/to/dir"
        for the ensemble, or by setting the data_dir attribute of this object.
 """
             raise IOError(ERR_MSG)
-        
+
         if self.save_ensemble:
             if not os.path.exists(ensemble_loc):
                 os.makedirs(ensemble_loc)
@@ -307,48 +330,48 @@ Error, you must specify where to save the ensembles.
                 if not os.path.isdir(ensemble_loc):
                     ERR_MSG = """
 Error, the specified location to save the ensemble:
-       '{}' 
+       '{}'
        already exists and it is not a directory.
 """.format(ensemble_loc)
                     raise IOError(ERR_MSG)
 
-        
+
         if start_pop is None:
             start_pop = self.start_pop
 
         pop = start_pop
-                
+
         running = True
         while running:
             # Generate the ensemble
             self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
-            
+
             if pop != start_pop or not restart_from_ens:
-                self.minim.ensemble.generate(self.N_configs)
-            
+                self.minim.ensemble.generate(self.N_configs, sobol = sobol, sobol_scramble = sobol_scramble, sobol_scatter = sobol_scatter)
+
                 # Compute energies and forces
-                self.minim.ensemble.compute_ensemble(self.calc, get_stress, 
+                self.minim.ensemble.compute_ensemble(self.calc, get_stress,
                                                  cluster = self.cluster)
                 #self.minim.ensemble.get_energy_forces(self.calc, get_stress)
-            
+
                 if ensemble_loc is not None and self.save_ensemble:
                     self.minim.ensemble.save_bin(ensemble_loc, pop)
-            
+
             self.minim.population = pop
             self.minim.init(delete_previous_data = False)
 
             self.minim.run(custom_function_pre = self.__cfpre__,
                            custom_function_post = self.__cfpost__,
                            custom_function_gradient = self.__cfg__)
-        
-            
+
+
             self.minim.finalize()
-            
+
             # Perform the symmetrization
             print ("Checking the symmetries of the dynamical matrix:")
             qe_sym = CC.symmetries.QE_Symmetry(self.minim.dyn.structure)
             qe_sym.SetupQPoint(verbose = True)
-            
+
             print ("Forcing the symmetries in the dynamical matrix.")
             fcq = np.array(self.minim.dyn.dynmats, dtype = np.complex128)
             qe_sym.SymmetrizeFCQ(fcq, self.minim.dyn.q_stars, asr = "custom")
@@ -358,58 +381,60 @@ Error, the specified location to save the ensemble:
             # Save the dynamical matrix
             if self.save_ensemble:
                 self.minim.dyn.save_qe("dyn_pop%d_" % pop)
-        
+
             # Check if it is converged
             running = not self.minim.is_converged()
             pop += 1
-            
-            
+
+
             if pop > self.max_pop:
                 running = False
-                
+
 
         self.start_pop = pop
+        print('Population = ',pop) #**** Diegom_test ****
         return self.minim.is_converged()
-    
-    
+
+
     def vc_relax(self, target_press = 0, static_bulk_modulus = 100,
                  restart_from_ens = False,
                  ensemble_loc = None, start_pop = None, stress_numerical = False,
-                 cell_relax_algorithm = "sd", fix_volume = False):
+                 cell_relax_algorithm = "sd", fix_volume = False, sobol = False,
+                  sobol_scramble = False, sobol_scatter = 0.0):
         """
         VARIABLE CELL RELAX
         ====================
-        
+
         This function performs a variable cell SCHA relaxation at constant pressure,
         It is similar to the relax calculation, but the unit cell is updated according
-        to the anharmonic stress tensor at each new population. 
+        to the anharmonic stress tensor at each new population.
 
         By default, all the degrees of freedom compatible with the symmetry group are relaxed in the cell.
         You can constrain the cell to keep the same shape by setting fix_cell_shape = True.
 
-        
-        NOTE: 
+
+        NOTE:
             remember to setup the stress_offset variable of the SCHA_Minimizer,
-            because in ab-initio calculation the stress tensor converges porly with the cutoff, 
+            because in ab-initio calculation the stress tensor converges porly with the cutoff,
             but stress tensor differences converges much quicker. Therefore, setup the
             stress tensor difference between a single very high-cutoff calculation and a
             single low-cutoff (the one you use), this difference will be added at the final
             stress tensor to get a better estimation of the true stress.
 
-        
+
         Parameters
         ----------
             target_press : float, optional
-                The target pressure of the minimization (in GPa). The minimization is stopped if the 
+                The target pressure of the minimization (in GPa). The minimization is stopped if the
                 target pressure is the stress tensor is the identity matrix multiplied by the
-                target pressure, with a tollerance equal to the stochastic noise. By default 
+                target pressure, with a tollerance equal to the stochastic noise. By default
                 it is 0 (ambient pressure)
             static_bulk_modulus : float (default 100), or (9x9) matrix or string, optional
                 The static bulk modulus, expressed in GPa. It is used to initialize the
                 hessian matrix on the BFGS cell relaxation, to guess the volume deformation caused
                 by the anharmonic stress tensor in the first steps. By default is 100 GPa (higher value
                 are safer, since they means a lower change in the cell shape).
-                It can be also the whole non isotropic matrix. If you specify a string, it 
+                It can be also the whole non isotropic matrix. If you specify a string, it
                 can be both:
                     - "recalc" : the static bulk modulus is recomputed with finite differences after
                         each step
@@ -422,10 +447,10 @@ Error, the specified location to save the ensemble:
                 Where the ensemble of each population is saved on the disk. You can specify None
                 if you do not want to save the ensemble (useful to avoid disk I/O for force fields)
             start_pop : int, optional
-                The starting index for the population, used only for saving the ensemble and the dynamical 
+                The starting index for the population, used only for saving the ensemble and the dynamical
                 matrix.
             stress_numerical : bool
-                If True the stress is computed by finite difference (usefull for calculators that 
+                If True the stress is computed by finite difference (usefull for calculators that
                 does not support it by default)
             cell_relax_algorithm : string
                 This identifies the stress algorithm. It can be both sd (steepest-descent),
@@ -433,12 +458,17 @@ Error, the specified location to save the ensemble:
                 The most robust one is SD. Do not change if you are not sure what you are doing.
             fix_volume : bool, optional
                 If true (default False) the volume is fixed, therefore only the cell shape is relaxed.
-                
-            
+            sobol : bool, optional (Default = False)
+                 Defines if the calculation uses random Gaussian generator or Sobol Gaussian generator.
+            sobol_scramble : bool, optional (Default = False)
+                Set the optional scrambling of the generated numbers taken from the Sobol sequence.
+            sobol_scatter : real (0.0 to 1) (Deafault = 0.0)
+                Set the scatter parameter to displace the Sobol positions randommly.
+
         Returns
         -------
             status : bool
-                True if the minimization converged, False if the maximum number of 
+                True if the minimization converged, False if the maximum number of
                 populations has been reached.
         """
 
@@ -449,11 +479,11 @@ Error, the specified location to save the ensemble:
         if (not ensemble_loc) and self.save_ensemble:
             ERR_MSG = """
 Error, you must specify where to save the ensembles.
-       this can be done either passing ensemble_loc = "path/to/dir" 
+       this can be done either passing ensemble_loc = "path/to/dir"
        for the ensemble, or by setting the data_dir attribute of this object.
 """
             raise IOError(ERR_MSG)
-        
+
         if self.save_ensemble:
             if not os.path.exists(ensemble_loc):
                 os.makedirs(ensemble_loc)
@@ -461,17 +491,17 @@ Error, you must specify where to save the ensembles.
                 if not os.path.isdir(ensemble_loc):
                     ERR_MSG = """
 Error, the specified location to save the ensemble:
-       '{}' 
+       '{}'
        already exists and it is not a directory.
 """.format(ensemble_loc)
                     raise IOError(ERR_MSG)
 
-        
+
 
         # Rescale the target pressure in eV / A^3
         target_press_evA3 = target_press / sscha.SchaMinimizer.__evA3_to_GPa__
         I = np.eye(3, dtype = np.float64)
-        
+
         SUPPORTED_ALGORITHMS = ["sd", "cg", "bfgs"]
         if not cell_relax_algorithm in SUPPORTED_ALGORITHMS:
             raise ValueError("Error, cell_relax_algorithm %s not supported." %  cell_relax_algorithm)
@@ -495,13 +525,13 @@ Error, the specified location to save the ensemble:
             kind_minimizer = "PSD"
         else:
             raise ValueError("Error, the given value not supported as a bulk modulus.")
-            
-        
-        
+
+
+
 
         if static_bulk_modulus != "recalc":
             # Rescale the static bulk modulus in eV / A^3
-            static_bulk_modulus /= sscha.SchaMinimizer.__evA3_to_GPa__ 
+            static_bulk_modulus /= sscha.SchaMinimizer.__evA3_to_GPa__
 
         # initilaize the cell minimizer
         #BFGS = sscha.Optimizer.BFGS_UC(self.minim.dyn.structure.unit_cell, static_bulk_modulus)
@@ -521,7 +551,7 @@ Error, the specified location to save the ensemble:
             pop = start_pop
         else:
             pop = self.start_pop
-                
+
         running = True
         while running:
             # Compute the static bulk modulus if required
@@ -535,45 +565,45 @@ Error, the specified location to save the ensemble:
             # Generate the ensemble
             self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
             if pop != start_pop or not restart_from_ens:
-                self.minim.ensemble.generate(self.N_configs)
+                self.minim.ensemble.generate(self.N_configs, sobol=sobol, sobol_scramble = sobol_scramble, sobol_scatter = sobol_scatter)
 
                 # Save also the generation
                 #if ensemble_loc is not None and self.save_ensemble:
                 #    self.minim.ensemble.save_bin(ensemble_loc, pop)
-            
+
                 # Compute energies and forces
                 self.minim.ensemble.compute_ensemble(self.calc, True, stress_numerical,
                                                  cluster = self.cluster)
                 #self.minim.ensemble.get_energy_forces(self.calc, True, stress_numerical = stress_numerical)
-            
+
                 if ensemble_loc is not None and self.save_ensemble:
                     self.minim.ensemble.save_bin(ensemble_loc, pop)
-            
+
             self.minim.population = pop
             self.minim.init(delete_previous_data = False)
-        
+
             self.minim.run(custom_function_pre = self.__cfpre__,
                            custom_function_post = self.__cfpost__,
                            custom_function_gradient = self.__cfg__)
-        
-            
+
+
             self.minim.finalize()
-            
+
             # Get the stress tensor [ev/A^3]
-            stress_tensor, stress_err = self.minim.get_stress_tensor() 
+            stress_tensor, stress_err = self.minim.get_stress_tensor()
             stress_tensor *= sscha.SchaMinimizer.__RyBohr3_to_evA3__
             stress_err *=  sscha.SchaMinimizer.__RyBohr3_to_evA3__
 
             # Get the pressure
             Press = np.trace(stress_tensor) / 3
-            
+
             # Get the volume
             Vol = self.minim.dyn.structure.get_volume()
-            
+
             # Get the Helmoltz-Gibbs free energy
             helmoltz = self.minim.get_free_energy() * sscha.SchaMinimizer.__RyToev__
             gibbs = helmoltz + target_press_evA3 * Vol - self.minim.eq_energy
-            
+
             # Prepare a mark to underline which quantity is actually minimized by the
             # Variable relaxation algorithm if the helmoltz free energy (in case of fixed volume)
             # Or the Gibbs free energy (in case of fixed pressure)
@@ -586,13 +616,13 @@ Error, the specified location to save the ensemble:
 
             # Extract the bulk modulus from the cell minimization
             new_bulkmodulus = 1 / (3 * BFGS.alpha * self.minim.dyn.structure.get_volume())
-            new_bulkmodulus *= sscha.SchaMinimizer.__evA3_to_GPa__ 
+            new_bulkmodulus *= sscha.SchaMinimizer.__evA3_to_GPa__
 
             # Print the enthalpic contribution
             message = """
- ====================== 
- ENTHALPIC CONTRIBUTION 
- ====================== 
+ ======================
+ ENTHALPIC CONTRIBUTION
+ ======================
 
  P = {:.4f} GPa   V = {:.4f} A^3
 
@@ -624,25 +654,25 @@ Error, the specified location to save the ensemble:
             #     print "  <-- "
             # print " (Zero energy = %.8e eV) " % self.minim.eq_energy
             # print ""
-        
+
             # Perform the cell step
             if self.fix_cell_shape:
                 # Use a isotropic stress tensor to keep the same cell shape
                 cell_gradient = I * (Press - target_press_evA3)
             else:
                 cell_gradient = (stress_tensor - I *target_press_evA3)
-            
+
             new_uc = self.minim.dyn.structure.unit_cell.copy()
             BFGS.UpdateCell(new_uc,  cell_gradient, fix_volume)
-            
+
             # Strain the structure and the q points preserving the symmetries
             self.minim.dyn.AdjustToNewCell(new_uc)
             #self.minim.dyn.structure.change_unit_cell(new_uc)
 
-            message = """    
+            message = """
  Currently estimated bulk modulus = {:8.3f} GPa
  (Note: this is just indicative, do not use it for computing bulk modulus)
- 
+
  """.format(new_bulkmodulus)
             print(message)
 
@@ -651,13 +681,13 @@ Error, the specified location to save the ensemble:
             print (" v1 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[0,0], new_uc[0,1], new_uc[0,2]))
             print (" v2 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[1,0], new_uc[1,1], new_uc[1,2]))
             print (" v3 [A] = (%16.8f %16.8f %16.8f)" % (new_uc[2,0], new_uc[2,1], new_uc[2,2]))
-            
+
             print ()
             print ("Check the symmetries in the new cell:")
             sys.stdout.flush()
             qe_sym = CC.symmetries.QE_Symmetry(self.minim.dyn.structure)
             qe_sym.SetupQPoint(verbose = True)
-            
+
             print ("Forcing the symmetries in the dynamical matrix.")
             fcq = np.array(self.minim.dyn.dynmats, dtype = np.complex128)
             qe_sym.SymmetrizeFCQ(fcq, self.minim.dyn.q_stars, asr = "custom")
@@ -677,18 +707,18 @@ Error, the specified location to save the ensemble:
                 if np.max(np.abs(cell_gradient[not_zero_mask]) / stress_err[not_zero_mask]) <= 1:
                     running2 = False
             else:
-                if np.max(np.abs((stress_tensor - I * Press)[not_zero_mask] / 
+                if np.max(np.abs((stress_tensor - I * Press)[not_zero_mask] /
                                  stress_err[not_zero_mask])) <= 1:
                     running2 = False
-                
+
 
             running = running1 or running2
 
             pop += 1
-            
+
             if pop > self.max_pop:
                 running = False
-                
+
         self.start_pop = pop
         return (not running1) and (not running2)
 
@@ -728,7 +758,7 @@ def GetStaticBulkModulus(structure, ase_calculator, eps = 1e-3):
     V_0 = np.linalg.det(structure.unit_cell)
     stress_0 = atm_center.get_stress(False)
     I = np.eye(3, dtype = np.float64)
-    
+
 
     qe_sym.ApplySymmetryToMatrix(stress_0)
 
@@ -748,7 +778,7 @@ def GetStaticBulkModulus(structure, ase_calculator, eps = 1e-3):
             mask = (np.abs(trials) < __EPSILON__).astype(np.float64)
 
             strain = eps * mask
-            
+
             dstrain = eps * np.sqrt(np.sum(mask))
 
             # Strain the cell and perform the calculation
@@ -766,13 +796,8 @@ def GetStaticBulkModulus(structure, ase_calculator, eps = 1e-3):
             bk_mod[3*i + j, :] = -(stress_1 - stress_0).ravel() / dstrain
             if j!= i:
                 bk_mod[3*j + i, :] = -(stress_1 - stress_0).ravel() / dstrain
-            
+
             # Apply hermitianity
             bk_mod = 0.5 * (bk_mod.transpose() + bk_mod)
 
     return bk_mod
-
-
-
-
-
