@@ -675,7 +675,7 @@ If you are familiar with the quantum espresso input files, you should recognize 
 Remember, the parameters setted here are just for fun, remember to run appropriate convergence check of the kmesh, smearing and basis set cutoffs before running the SSCHA code.
 Keep also in mind that this input file refers to the supercell, and the kpts variable can be properly rescaled if the supercell is increased.
 
-All the rest of the code remains the same (but here we do not compote harmonic phonons, which can be done more efficiently within the Quantum ESPRESSO).
+All the rest of the code remains the same (but here we do not compute harmonic phonons, which can be done more efficiently within the Quantum ESPRESSO).
 Instead, we take the result obtained with EMT in the previous sections, and try to relax the free energy with a fully ab-initio approach.
 
 The complete code is inside Examples/sscha_and_dft/nvt_local.py
