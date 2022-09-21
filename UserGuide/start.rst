@@ -905,7 +905,7 @@ Sometimes cluster may not allow passwordless connection, in this case, you need 
    """
 
    # Now, what is the command to run quantum espresso on the cluster?
-   cluster.binary = pw.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo"
+   cluster.binary = "pw.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo"
    # NOTE that NPOOL will be replaced automatically with the cluster.n_pool variable
 
 
