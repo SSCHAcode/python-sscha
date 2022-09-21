@@ -868,7 +868,7 @@ Sometimes cluster may not allow passwordless connection, in this case, you need 
 
    # Let us define the cluster
    import sscha.Cluster
-   cluster = sscha.Custer.Cluster(hosthame = 'daint', pwd = None)  # Put the password in pwd if needed
+   cluster = sscha.Cluster.Cluster(hosthame = 'daint', pwd = None)  # Put the password in pwd if needed
 
    # Configure the submission strategy
    cluster.account_name = 's1073'  # Name of the account on which to subtract nodes
