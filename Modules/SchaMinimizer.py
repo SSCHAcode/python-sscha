@@ -1302,6 +1302,8 @@ WARNING, the preconditioning is activated together with a root representation.
             qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
             if self.use_spglib:
                 qe_sym.SetupFromSPGLIB()
+            elif self.custom_symmetries is not None:
+                qe_sym.InitFromSymmetries(self.custom_symmetries)
             else:
                 qe_sym.SetupQPoint()
             qe_sym.SymmetrizeVector(forces)
