@@ -675,7 +675,7 @@ If you are familiar with the quantum espresso input files, you should recognize 
 Remember, the parameters setted here are just for fun, remember to run appropriate convergence check of the kmesh, smearing and basis set cutoffs before running the SSCHA code.
 Keep also in mind that this input file refers to the supercell, and the kpts variable can be properly rescaled if the supercell is increased.
 
-All the rest of the code remains the same (but here we do not compote harmonic phonons, which can be done more efficiently within the Quantum ESPRESSO).
+All the rest of the code remains the same (but here we do not compute harmonic phonons, which can be done more efficiently within the Quantum ESPRESSO).
 Instead, we take the result obtained with EMT in the previous sections, and try to relax the free energy with a fully ab-initio approach.
 
 The complete code is inside Examples/sscha_and_dft/nvt_local.py
@@ -868,7 +868,7 @@ Sometimes cluster may not allow passwordless connection, in this case, you need 
 
    # Let us define the cluster
    import sscha.Cluster
-   cluster = sscha.Custer.Cluster(hosthame = 'daint', pwd = None)  # Put the password in pwd if needed
+   cluster = sscha.Cluster.Cluster(hostname = 'daint', pwd = None)  # Put the password in pwd if needed
 
    # Configure the submission strategy
    cluster.account_name = 's1073'  # Name of the account on which to subtract nodes
@@ -905,7 +905,7 @@ Sometimes cluster may not allow passwordless connection, in this case, you need 
    """
 
    # Now, what is the command to run quantum espresso on the cluster?
-   cluster.binary = pw.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo"
+   cluster.binary = "pw.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo"
    # NOTE that NPOOL will be replaced automatically with the cluster.n_pool variable
 
 
