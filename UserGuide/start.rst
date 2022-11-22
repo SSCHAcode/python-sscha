@@ -629,7 +629,7 @@ In the following example, we initialize the quantum espresso calculator for Gold
 
 .. code-block:: python
 
-   import cellconstructor.Calculators
+   import cellconstructor.calculators
    
    # Initialize the DFT (Quantum Espresso) calculator for gold
    # The input data is a dictionary that encodes the pw.x input file namelist
