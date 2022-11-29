@@ -1886,7 +1886,7 @@ DETAILS OF ERROR:
 
 
         def work_function(ensemble_start_config, ensemble_end_config):
-            mask = np.zeros(ensemble.N, dtype = bool)
+            mask = np.zeros(self.N, dtype = bool)
             mask[ensemble_start_config : ensemble_end_config] = True
             new_ensemble = self.split(mask)
 
