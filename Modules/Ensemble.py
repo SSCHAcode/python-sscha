@@ -1894,11 +1894,11 @@ DETAILS OF ERROR:
             print("mask length:", np.sum(mask.astype(int))," total N:", len(mask))
             new_ensemble = self.split(mask)
 
-            gradient, error = new_ensemble.get_preconditioned_gradient(*args, **kwargs)
+            gradient, _ = new_ensemble.get_preconditioned_gradient(*args, **kwargs)
 
             av_ensemble = np.sum(new_ensemble.rho)
             
-            return gradient * av_ensemble, error * av_ensemble
+            return gradient * av_ensemble
 
         nproc = CC.Settings.GetNProc()
         list_of_inputs = []
@@ -1912,14 +1912,10 @@ DETAILS OF ERROR:
             
             list_of_inputs.append( (start_config, end_config) )
 
-        results = CC.Settings.GoParallelTuple(work_function, list_of_inputs, "+")
-        print(results)
-        print(np.shape(results))
-        gradient, error = results
+        gradient = CC.Settings.GoParallel(work_function, list_of_inputs, "+")
         gradient /= np.sum(self.rho)
-        error /= np.sum(self.rho)
 
-        return gradient, error
+        return gradient, np.zeros_like(gradient) + 1
 
         
 
