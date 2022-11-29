@@ -1885,7 +1885,8 @@ DETAILS OF ERROR:
         """
 
 
-        def work_function(ensemble_start_config, ensemble_end_config):
+        def work_function(argument):
+            ensemble_start_config, ensemble_end_config = argument
             mask = np.zeros(self.N, dtype = bool)
             mask[ensemble_start_config : ensemble_end_config] = True
             new_ensemble = self.split(mask)
