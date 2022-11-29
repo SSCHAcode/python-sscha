@@ -1878,6 +1878,47 @@ DETAILS OF ERROR:
 
         return new_phi
 
+    def get_preconditioned_gradient_parallel(self, *args, **kwargs):
+        """
+        Compute the gradient using multiprocessing.
+        For documentation, see get_preconditioned_gradient
+        """
+
+
+        def work_function(ensemble_start_config, ensemble_end_config):
+            mask = np.zeros(ensemble.N, dtype = bool)
+            mask[ensemble_start_config : ensemble_end_config] = True
+            new_ensemble = self.split(mask)
+
+            gradient, error = new_ensemble.get_preconditioned_gradient(*args, **kwargs)
+
+            av_ensemble = np.sum(new_ensemble.rho)
+            
+            return gradient * av_ensemble, error * av_ensemble
+
+        nproc = CC.Settings.GetNProc()
+        list_of_inputs = []
+        index = 0
+        for i in range(nproc):
+            start_config = index
+            index += self.N // nproc
+            if i < self.N % nproc:
+                index += 1
+            end_config = index
+            
+            list_of_inputs.append( (start_config, end_config) )
+
+        gradient, error = CC.Settings.GoParallelTuple(work_function, list_of_inputs, "+")
+        gradient /= np.sum(self.rho)
+        error /= np.sum(self.rho)
+
+        return gradient, error
+
+        
+
+        
+    
+
     def get_preconditioned_gradient(self, subtract_sscha = True, return_error = False,
                                     use_ups_supercell = True, preconditioned = 1,
                                     fast_grad = False, verbose = True):
@@ -1893,7 +1934,7 @@ DETAILS OF ERROR:
 
         .. math::
 
-            \\Phi_{ab} = \\sum_c \\upsilon_{ac} \\left< u_c f_a\\right>_{\\Phi}
+            \\Phi_{ab} = \\sum_c \\Upsilon_{ac} \\left< u_c f_a\\right>_{\\Phi}
 
         The previous equation is true only if the :math:`\\Phi` matrix is the solution
         of the SCHA theory. Here :math:`\\vec u` are the displacements of the configurations

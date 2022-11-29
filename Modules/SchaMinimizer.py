@@ -323,9 +323,9 @@ class SSCHA_Minimizer(object):
         #dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
         if self.minim_dyn:
             if self.precond_dyn:
-                dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=1)
+                dyn_grad, err = self.ensemble.get_preconditioned_gradient_parallel(True, True, preconditioned=1)
             else:
-                dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=0)
+                dyn_grad, err = self.ensemble.get_preconditioned_gradient_parallel(True, True, preconditioned=0)
         else:
             dyn_grad = np.zeros( (len(self.dyn.q_tot), 3 * self.dyn.structure.N_atoms, 3 * self.dyn.structure.N_atoms), dtype = np.complex128)
             err = np.zeros_like(dyn_grad)
