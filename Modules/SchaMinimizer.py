@@ -304,6 +304,7 @@ class SSCHA_Minimizer(object):
                 It takes as input the two gradient (the dynamical matrix one and the structure one), and
                 modifies them (or does some I/O on it).
         """
+        print("Minimization step, force computed:", len(self.ensemble.force_computed))
 
         # Setup the symmetries
         qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)

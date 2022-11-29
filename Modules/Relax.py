@@ -576,15 +576,20 @@ Error, the specified location to save the ensemble:
                                                  cluster = self.cluster)
                 #self.minim.ensemble.get_energy_forces(self.calc, True, stress_numerical = stress_numerical)
 
+                print("RELAX force length:", len(self.minim.ensemble.force_computed))
+                
                 if ensemble_loc is not None and self.save_ensemble:
                     self.minim.ensemble.save_bin(ensemble_loc, pop)
+                print("RELAX force length:", len(self.minim.ensemble.force_computed))
 
             self.minim.population = pop
             self.minim.init(delete_previous_data = False)
 
+            print("RELAX force length:", len(self.minim.ensemble.force_computed))
             self.minim.run(custom_function_pre = self.__cfpre__,
                            custom_function_post = self.__cfpost__,
                            custom_function_gradient = self.__cfg__)
+            
 
 
             self.minim.finalize()

@@ -1884,11 +1884,14 @@ DETAILS OF ERROR:
         For documentation, see get_preconditioned_gradient
         """
 
+        print("force length:", len(self.force_computed))
 
         def work_function(argument):
+            print("force length [inside]:", len(self.force_computed))
             ensemble_start_config, ensemble_end_config = argument
             mask = np.zeros(self.N, dtype = bool)
             mask[ensemble_start_config : ensemble_end_config] = True
+            print("mask length:", np.sum(mask.astype(int))," total N:", len(mask))
             new_ensemble = self.split(mask)
 
             gradient, error = new_ensemble.get_preconditioned_gradient(*args, **kwargs)
@@ -1909,7 +1912,10 @@ DETAILS OF ERROR:
             
             list_of_inputs.append( (start_config, end_config) )
 
-        gradient, error = CC.Settings.GoParallelTuple(work_function, list_of_inputs, "+")
+        results = CC.Settings.GoParallelTuple(work_function, list_of_inputs, "+")
+        print(results)
+        print(np.shape(results))
+        gradient, error = results
         gradient /= np.sum(self.rho)
         error /= np.sum(self.rho)
 
@@ -3082,9 +3088,12 @@ DETAILS OF ERROR:
         else:
             computing_ensemble.get_energy_forces(calculator, compute_stress, stress_numerical, verbose = verbose)
 
+        print("CE BEFORE MERGE:", len(self.force_computed))
+
         if should_i_merge:
             # Remove the noncomputed ensemble from here, and merge
             self.merge(computing_ensemble)
+        print("CE AFTER MERGE:", len(self.force_computed))
 
         print('ENSEMBLE ALL PROPERTIES:', self.all_properties)
 
@@ -3150,6 +3159,11 @@ DETAILS OF ERROR:
         N = np.sum(split_mask.astype(int))
         ens = Ensemble(self.dyn_0, self.T0, self.dyn_0.GetSupercell())
         ens.init_from_structures(structs)
+        print("Split length:", len(split_mask))
+        print("original force legnth:", len(self.force_computed))
+        print("Expected length:", len(ens.force_computed))
+        print("Splitting force length:", len(self.force_computed[split_mask]))
+
         ens.force_computed[:] = self.force_computed[split_mask]
         ens.stress_computed[:] = self.stress_computed[split_mask]
         ens.energies[:] = self.energies[split_mask]
@@ -3172,7 +3186,7 @@ DETAILS OF ERROR:
         It may be used to run a minimization even if the ensemble was not completely calculated.
         """
 
-        good_mask = self.force_computed
+        good_mask = np.copy(self.force_computed)
         if self.has_stress:
             good_mask = good_mask & self.stress_computed
 
@@ -3184,6 +3198,8 @@ DETAILS OF ERROR:
         self.sscha_energies = self.sscha_energies[good_mask]
         self.xats = self.xats[good_mask, :, :]
         self.u_disps = self.u_disps[good_mask, :]
+        self.force_computed = self.force_computed[good_mask]
+        self.stress_computed = self.stress_computed[good_mask]
 
         self.structures = [self.structures[x] for x in np.arange(len(good_mask))[good_mask]]
         self.all_properties = [self.all_properties[x] for x in np.arange(len(good_mask))[good_mask]]
@@ -3236,6 +3252,7 @@ DETAILS OF ERROR:
 
         # Setup the calculator for each structure
         parallel = False
+        print("Force computed shape:", len(self.force_computed))
         if __MPI__:
             comm = MPI.COMM_WORLD
             size = comm.Get_size()
@@ -3392,6 +3409,7 @@ DETAILS OF ERROR:
         # Reshape the arrays
         self.forces[:, :, :] = np.reshape(total_forces, (N_rand, self.current_dyn.structure.N_atoms*np.prod(self.supercell), 3), order = "C")
         self.force_computed[:] = True
+        print("Force computed shape:", len(self.force_computed))
 
         if compute_stress:
             self.stresses[:,:,:] = np.reshape(total_stress, (N_rand, 3, 3), order = "C")
