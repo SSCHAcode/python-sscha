@@ -56,7 +56,8 @@ You find a copy of the script and the cif file of Gold inside the directory Exam
    relax = CC.calculators.Relax(gold_structure, calculator)
    gold_structure_relaxed = relax.static_relax()
 
-   # Compute the harmonic phonons
+   # Compute the harmonic phonons 
+   # (as from version 1.3 of Cellconstructor, it will exploit the symmetries as phonopy to reduce the number of displacements)
    # NOTE: if the code is run with mpirun, the calculation goes in parallel
    gold_harmonic_dyn = CC.Phonons.compute_phonons_finite_displacements(gold_structure_relaxed, calculator, supercell = (4,4,4))
 
@@ -212,8 +213,8 @@ You can use it even in your simulation, simply edit the value of the uppercase k
    # --------------------- THE SCRIPT FOLLOWS ---------------------
    
    # Load the harmonic and sscha phonons
-   harmonic_dyn = CC.Phonons.Phonons(, NQIRR)
-   sscha_dyn = CC.Phonons.Phonons('sscha_T300_dyn', NQIRR)
+   harmonic_dyn = CC.Phonons.Phonons(HARM_DYN, NQIRR)
+   sscha_dyn = CC.Phonons.Phonons(SSCHA_DYN, NQIRR)
 
    # Get the band path
    qpath, data = CC.Methods.get_bandpath(harmonic_dyn.structure.unit_cell,
@@ -322,8 +323,9 @@ In the next part of the code, we perform the harmonic phonon calculation using c
 
 
 The method `compute_phonons_finite_displacements` is documented in the CellConstructor guide. It requires the structure (in this case `gold_structure_relaxed`), the force-field (`calculator`) and the supercell for the calculation. In this case we use a 4x4x4 (equivalent to 64 atoms). This may not be sufficient to converge all the properties, especially at very high temperature, but it is just a start.
-
-Note that  `compute_phonons_finite_displacements`  works in parallel with MPI, therefore, if the script is executed with `mpirun -np 16 python myscript.py` it will split the calculations of the finite displacements across 16 processors. You need to have mpi4py installed.
+Starting from version 1.3 of Cellconstructor, this automatically exploits the symmetry of the structure to reduce the number of displacements to compute.
+This is extremely efficient for big supercells.
+Note that  `compute_phonons_finite_displacements`  works in parallel with MPI, therefore, if the script is executed with `mpirun -np 4 python myscript.py` it will split the calculations of the finite displacements across 4 processors. You need to have mpi4py installed.
 
 After computing the harmonic phonons in gold_harmonic_dyn, we impose the correct symmetrization and the acousitic sum rule with the `Symmetrize` method, and save the result in the quantum ESPRESSO format with `save_qe`.
 This should not be the case for Gold, however, if we have a structure which has imaginary phonon frequencies, we need to get rid of them before starting the SSCHA. This is achieved with `ForcePositiveDefinite` (see CellConstructor documentation for more details on how these methods work).
@@ -850,14 +852,14 @@ First of all, we need to configure a straight ssh connection. We have to add to 
 
    Host ela
 	HostName ela.cscs.ch
-	User lmonacel
+	User myusernameforela
    Host daint
 	HostName daint.cscs.ch
 	ProxyJump ela
-	User lmonacel
+	User myusernamefordaint
 
 
-These are two connection, one to ela (the front-end server of CSCS) and then one to daint.
+These are two connection, one to ela (the front-end server of CSCS) and then one to daint (Piz Daint supercomputer).
 To connect to daint, I must before access to ela, this is the reason of ProxyJump command inside the daint block.
 The best way to connect is to configure your ssh private-public key so that you (and python-sscha) can login without password.
 An example of how to do that is `Here <http://www.linuxproblem.org/art_9.html>`_, but you may find a lot of other on internet.
