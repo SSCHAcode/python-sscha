@@ -2958,8 +2958,8 @@ DETAILS OF ERROR:
 
             qe_sym = CC.symmetries.QE_Symmetry(super_structure)
             if timer:
-                qe_sym = timer.execute_timed_function(qe_sym.SetupFromSPGLIB)
-                qe_sym = timer.execute_timed_function(qe_sym.ApplySymmetryToTensor3, d3)
+                timer.execute_timed_function(qe_sym.SetupFromSPGLIB)
+                timer.execute_timed_function(qe_sym.ApplySymmetryToTensor3, d3)
             else:
                 qe_sym.SetupFromSPGLIB()
                 qe_sym.ApplySymmetryToTensor3(d3)
