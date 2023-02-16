@@ -425,9 +425,9 @@ class SSCHA_Minimizer(object):
                         CC.symmetries.CustomASR(dyn_grad[0,:,:])
                 else:
                     if timer is not None:
-                        timer.execute_timed_function(qe_sym.SymmetrizeFCQ, dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
+                        timer.execute_timed_function(qe_sym.SymmetrizeFCQ, dyn_grad, self.dyn.q_stars, asr = "custom")
                     else:
-                        qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
+                        qe_sym.SymmetrizeFCQ(dyn_grad, self.dyn.q_stars, asr = "custom")
                     #qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "custom")
 
                 # Just divide the error by the square root the number of symmetries
@@ -509,7 +509,7 @@ class SSCHA_Minimizer(object):
 
 
                 #print "applying sum rule and symmetries:"
-                #qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
+                #qe_sym.SymmetrizeFCQ(dyn_grad, self.dyn.q_stars, asr = "custom")
                 #print "SECOND DIAG:", np.linalg.eigvalsh(dyn_grad[0, :, :])
 
 
