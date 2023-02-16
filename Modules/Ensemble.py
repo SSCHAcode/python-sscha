@@ -416,6 +416,7 @@ class Ensemble:
         # Initialize the computation of energy and forces
         self.force_computed = np.zeros( self.N, dtype = bool)
         self.stress_computed = np.zeros(self.N, dtype = bool)
+        self.all_properties = [None] * self.N
 
         # Add a counter to check if all the stress tensors are present
         count_stress = 0
@@ -1895,7 +1896,7 @@ DETAILS OF ERROR:
 
         return new_phi
 
-    def get_preconditioned_gradient_parallel(self, *args, **kwargs):
+    def get_preconditioned_gradient_parallel(self, *args, timer=None, **kwargs):
         """
         Compute the gradient using multiprocessing.
         For documentation, see get_preconditioned_gradient
@@ -1903,7 +1904,7 @@ DETAILS OF ERROR:
 
         print("force length:", len(self.force_computed))
 
-        def work_function(argument):
+        def work_function(argument, timer=None):
             print("force length [inside]:", len(self.force_computed))
             ensemble_start_config, ensemble_end_config = argument
             mask = np.zeros(self.N, dtype = bool)
@@ -1911,7 +1912,7 @@ DETAILS OF ERROR:
             print("mask length:", np.sum(mask.astype(int))," total N:", len(mask))
             new_ensemble = self.split(mask)
 
-            gradient, _ = new_ensemble.get_preconditioned_gradient(*args, **kwargs)
+            gradient, _ = new_ensemble.get_preconditioned_gradient(*args, timer=timer, **kwargs)
 
             av_ensemble = np.sum(new_ensemble.rho)
             
@@ -1929,7 +1930,11 @@ DETAILS OF ERROR:
             
             list_of_inputs.append( (start_config, end_config) )
 
-        gradient = CC.Settings.GoParallel(work_function, list_of_inputs, "+")
+        if timer:
+            gradient = timer.execute_timed_function(CC.Settings.GoParallel, work_function, list_of_inputs, "+")
+        else:
+            gradient = CC.Settings.GoParallel(work_function, list_of_inputs, "+")
+
         gradient /= np.sum(self.rho)
 
         return gradient, np.zeros_like(gradient) + 1
