@@ -40,6 +40,12 @@ import time
 import warnings
 import sys, os
 
+__SPGLIB__ = True
+try:
+    import spglib
+except:
+    __SPGLIB__ = False
+
 import sscha.Ensemble as Ensemble
 import sscha.Minimizer
 
@@ -105,7 +111,8 @@ class SSCHA_Minimizer(object):
 
     def __init__(self, ensemble = None, root_representation = "normal",
                  kong_liu_ratio = 0.5, meaningful_factor = 0.2,
-                 minimization_algorithm = "sdes", lambda_a = 1, **kwargs):
+                 minimization_algorithm = "sdes", lambda_a = 1, 
+                 timer=None, **kwargs):
         """
         This class create a minimizer to perform the sscha minimization.
         It performs the sscha minimization.
@@ -140,6 +147,8 @@ class SSCHA_Minimizer(object):
 
         self.ensemble = ensemble
         self.root_representation = root_representation
+
+        self.timer=timer
 
 
         # The symmetries
@@ -291,7 +300,7 @@ class SSCHA_Minimizer(object):
         if self.dyn is None:
             self.dyn = self.ensemble.current_dyn.Copy()
 
-    def minimization_step(self, custom_function_gradient = None):
+    def minimization_step(self, custom_function_gradient = None, timer=None):
         """
         Perform the single minimization step.
         This modify the self.dyn matrix and updates the ensemble
@@ -306,6 +315,7 @@ class SSCHA_Minimizer(object):
         """
 
         # Setup the symmetries
+        t1 = time.time()
         qe_sym = CC.symmetries.QE_Symmetry(self.dyn.structure)
 
         if self.use_spglib:
@@ -314,6 +324,9 @@ class SSCHA_Minimizer(object):
         else:
             qe_sym.SetupQPoint(verbose = False)
             self.N_symmetries = qe_sym.QE_nsym
+        t2 = time.time()
+        if timer is not None:
+            timer.add_timer("Setup symmetries", t2 - t1)
 
 
 
@@ -323,9 +336,15 @@ class SSCHA_Minimizer(object):
         #dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
         if self.minim_dyn:
             if self.precond_dyn:
-                dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=1)
+                if timer is not None:
+                    dyn_grad, err = timer.execute_timed_function(self.ensemble.get_preconditioned_gradient, True, True, preconditioned=1)
+                else:
+                    dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=1)
             else:
-                dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=0)
+                if timer is not None:
+                    dyn_grad, err = timer.execute_timed_function(self.ensemble.get_preconditioned_gradient, True, True, preconditioned=0)
+                else:
+                    dyn_grad, err = self.ensemble.get_preconditioned_gradient(True, True, preconditioned=0)
         else:
             dyn_grad = np.zeros( (len(self.dyn.q_tot), 3 * self.dyn.structure.N_atoms, 3 * self.dyn.structure.N_atoms), dtype = np.complex128)
             err = np.zeros_like(dyn_grad)
@@ -346,16 +365,29 @@ class SSCHA_Minimizer(object):
                     n_cell = np.prod(supercell)
                     if n_cell == 1:
                         # Only gamma, apply the symmetries
-                        qe_sym.ApplySymmetriesToV2(dyn_grad[0, :, :])
+                        if timer is not None:
+                            timer.execute_timed_function(qe_sym.ApplySymmetriesToV2, dyn_grad[0, :, :])
+                        else:
+                            qe_sym.ApplySymmetriesToV2(dyn_grad[0, :, :])
 
                         #qe_sym.ApplySymmetriesToV2(err)
                         #CC.symmetries.CustomASR(err)
                     else:
                         # We have a supercell, we must generate the dynamical matrix in the supercell
+                        if timer is not None:
+                            timer_prepare = timer.spawn_child()
+                            timer_apply = timer.spawn_child()
+                            timer_return = timer.spawn_child()
+
+
                         t_5 = time.time()
                         super_structure = self.dyn.structure.generate_supercell(supercell)
-                        fc_supercell = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot), \
-                            self.dyn.structure, super_structure)
+                        if timer is not None:
+                            timer_prepare.execute_timed_function(CC.Phonons.GetSupercellFCFromDyn, dyn_grad, np.array(self.dyn.q_tot), \
+                                self.dyn.structure, super_structure)
+                        else:
+                            fc_supercell = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot), \
+                                self.dyn.structure, super_structure)
 
                         # Lets generate a new symmetries for the supercell
                         qe_sym_supcell = CC.symmetries.QE_Symmetry(super_structure)
@@ -364,31 +396,49 @@ class SSCHA_Minimizer(object):
                         t_6 = time.time()
 
                         # Apply the symmetries to the fc_supercell matrix
-                        qe_sym_supcell.ApplySymmetriesToV2(fc_supercell)
+                        if timer is not None:
+                            timer_apply.execute_timed_function(qe_sym_supcell.ApplySymmetriesToV2, fc_supercell)
+                        else:
+                            qe_sym_supcell.ApplySymmetriesToV2(fc_supercell)
 
                         t_7 = time.time()
                         # Convert back to Q space
-                        dyn_grad = CC.Phonons.GetDynQFromFCSupercell_parallel(fc_supercell, np.array(self.dyn.q_tot), \
-                            self.dyn.structure, super_structure)
+                        if timer:
+                            dyn_grad = timer_return.execute_timed_function(CC.Phonons.GetDynQFromFCSupercell_parallel, fc_supercell, \
+                                                                           np.array(self.dyn.q_tot), self.dyn.structure, super_structure)
+                        else:
+                            dyn_grad = CC.Phonons.GetDynQFromFCSupercell(fc_supercell, np.array(self.dyn.q_tot), \
+                                self.dyn.structure, super_structure)
 
                         t_8 = time.time()
 
-                        print('    [symmetrization]  Time to prepare the suprecell dyn   : {:.6f} s'.format(t_6 - t_5))
-                        print('    [symmetrization]  Time to symmetrize in the supercell : {:.6f} s'.format(t_7 - t_6))
-                        print('    [symmetrization]  Time to return in fourier space     : {:.6f} s'.format(t_8 - t_7))
+                        if timer is not None:
+                            timer.add_timer("Prepare the suprecell dyn", t_6 - t_5, timer=timer_prepare)
+                            timer.add_timer("Symmetrize in the supercell", t_7 - t_6, timer=timer_apply)
+                            timer.add_timer("Return in fourier space", t_8 - t_7, timer=timer_return)
+
                     
                     # Apply the sum rule at gamma
-                    CC.symmetries.CustomASR(dyn_grad[0,:,:])
+                    if timer is not None:
+                        timer.execute_timed_function(CC.symmetries.CustomASR, dyn_grad[0,:,:])
+                    else:
+                        CC.symmetries.CustomASR(dyn_grad[0,:,:])
                 else:
-                    qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
+                    if timer is not None:
+                        timer.execute_timed_function(qe_sym.SymmetrizeFCQ, dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
+                    else:
+                        qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
                     #qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "custom")
 
                 # Just divide the error by the square root the number of symmetries
                 err /= np.sqrt(qe_sym.QE_nsym * np.prod(self.ensemble.supercell))
             else:
-                CC.symmetries.CustomASR(dyn_grad[0, :,:])
-        t2 = time.time()
-        print ("Time elapsed to symmetrize the gradient:", t2 - t1, "s")
+                # Apply the sum rule at gamma
+                if timer is not None:
+                    timer.execute_timed_function(CC.symmetries.CustomASR, dyn_grad[0,:,:])
+                else:
+                    CC.symmetries.CustomASR(dyn_grad[0,:,:])
+
 
 #        # get the gradient in the supercell
 #        new_grad_tmp = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot),
@@ -433,19 +483,27 @@ class SSCHA_Minimizer(object):
                 w_pols = None
                 if len(self.dyn.q_tot) == 1:
                     w_pols = (self.ensemble.current_w, self.ensemble.current_pols)
-                struct_precond = GetStructPrecond(self.ensemble.current_dyn, ignore_small_w = self.ensemble.ignore_small_w, w_pols = w_pols)
+
+                if timer:
+                    struct_precond = timer.execute_timed_function(GetStructPrecond, self.ensemble.current_dyn, ignore_small_w = self.ensemble.ignore_small_w, w_pols = w_pols)
+                else:
+                    struct_precond = GetStructPrecond(self.ensemble.current_dyn, ignore_small_w = self.ensemble.ignore_small_w, w_pols = w_pols)
                 struct_grad_precond = struct_precond.dot(struct_grad_reshaped)
                 struct_grad = struct_grad_precond.reshape( (self.dyn.structure.N_atoms, 3))
             t2 = time.time()
 
-            print ("Time elapsed to compute the structure gradient:", t2 - t1, "s")
+            if timer:
+                timer.add_timer("Compute the structure gradient", t2 - t1)
 
 
             # Apply the symmetries to the forces
             if not self.neglect_symmetries:
                 if not self.use_spglib:
                     qe_sym.SetupQPoint()
-                qe_sym.SymmetrizeVector(struct_grad)
+                if timer:
+                    timer.execute_timed_function(qe_sym.SymmetrizeVector, struct_grad)
+                else:
+                    qe_sym.SymmetrizeVector(struct_grad)
                 #qe_sym.SymmetrizeVector(struct_grad_err)
                 struct_grad_err /= np.sqrt(qe_sym.QE_nsym)
 
@@ -488,9 +546,15 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
                 raise ValueError(MSG)
 
             if len(sig) == 3:
-                custom_function_gradient(dyn_grad, struct_grad, self)
+                if timer:
+                    timer.execute_timed_function(custom_function_gradient, dyn_grad, struct_grad, self)
+                else:
+                    custom_function_gradient(dyn_grad, struct_grad, self)
             else:
-                custom_function_gradient(dyn_grad, struct_grad)
+                if timer:
+                    timer.execute_timed_function(custom_function_gradient, dyn_grad, struct_grad)
+                else:
+                    custom_function_gradient(dyn_grad, struct_grad)
 
 
         # Append the gradient modulus to the minimization info
@@ -507,7 +571,10 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
         self.__gc_err__.append( np.sqrt(np.sum( np.abs(err)**2)))
 
         # Perform the minimization step (with the chosen minimization algorithm)
-        new_kl_ratio = self.ensemble.get_effective_sample_size() / self.ensemble.N
+        if timer:
+            new_kl_ratio = timer.execute_timed_function(self.ensemble.get_effective_sample_size) / self.ensemble.N
+        else:
+            new_kl_ratio = self.ensemble.get_effective_sample_size() / self.ensemble.N
 
         # Here a cycle to avoid diagonalization issues
         is_diag_ok = False
@@ -515,12 +582,16 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
         imag_freq_counter = 0
         while not is_diag_ok:
             is_diag_ok = True
-            self.minimizer.update_dyn(new_kl_ratio, dyn_grad, struct_grad)
+            if timer:
+                timer.execute_timed_function(self.minimizer.update_dyn, new_kl_ratio, dyn_grad, struct_grad)
+                new_dyn, new_struct = timer.execute_timed_function(self.minimizer.get_dyn_struct)
+            else:
+                self.minimizer.update_dyn(new_kl_ratio, dyn_grad, struct_grad)        
+                new_dyn, new_struct = self.minimizer.get_dyn_struct()
 
 
 
             # Get the new dynamical matrix and strucure after the step
-            new_dyn, new_struct = self.minimizer.get_dyn_struct()
 
             # Perform the step for the dynamical matrix respecting the root representation
             #new_dyn = PerformRootStep(np.array(self.dyn.dynmats, order = "C"), dyn_grad,
@@ -538,14 +609,20 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
 
             # Check if we must enforce the symmetries and the sum rule:
             if self.enforce_sum_rule and (not self.neglect_symmetries):
-                self.dyn.Symmetrize(use_spglib = self.use_spglib)
+                if timer:
+                    timer.execute_timed_function(self.dyn.Symmetrize, use_spglib = self.use_spglib)
+                else:
+                    self.dyn.Symmetrize(use_spglib = self.use_spglib)
 
 
             # If we have imaginary frequencies, force the kl ratio to zero
 
             # Update the ensemble
             try:
-                self.update()
+                if timer:
+                    timer.execute_timed_function(self.update)
+                else:
+                    self.update()
             except np.linalg.LinAlgError as error:
                 print("Diagonalization error:")
                 print(error)
@@ -554,7 +631,12 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
                 is_diag_ok = False
                 diag_error_counter += 1
 
-            if self.check_imaginary_frequencies():
+            if timer:
+                check_imag = timer.execute_timed_function(self.check_imaginary_frequencies)
+            else:
+                check_imag = self.check_imaginary_frequencies()
+
+            if check_imag:
                 print("Immaginary frequencies found! Redoing the step.")
                 new_kl_ratio = 0
                 is_diag_ok = False
@@ -878,7 +960,7 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
         """
         return self.__converged__
 
-    def update(self):
+    def update(self, timer=None):
         """
         UPDATE IMPORTANCE SAMPLING
         ==========================
@@ -892,7 +974,10 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
         NOTE: it is equivalent to call self.ensemble.update_weights(self.dyn, self.ensemble.current_T)
         """
 
-        self.ensemble.update_weights(self.dyn, self.ensemble.current_T)
+        if timer:
+            timer.execute_timed_function(self.ensemble.update_weights, self.dyn, self.ensemble.current_T)
+        else:
+            self.ensemble.update_weights(self.dyn, self.ensemble.current_T)
 
 
     def get_free_energy(self, return_error = False):
@@ -933,7 +1018,7 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
 
         return self.ensemble.get_free_energy(return_error = return_error) / np.prod(self.ensemble.supercell)
 
-    def init(self, verbosity = False, delete_previous_data = True):
+    def init(self, verbosity = False, delete_previous_data = True, init_timer = True):
         """
         INITIALIZE THE MINIMIZATION
         ===========================
@@ -947,7 +1032,14 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
                 If true prints some debugging information
             delete_previous_data : bool
                 If true, it will clean previous minimizations from the free energies, gradients...
+            init_timer : bool
+                If true, it will initialize the timer for timing the function.
+                This can slightly slowdown the minimization, 
+                however enables the use of the timer to check the time spent in each step.
+
         """
+        if self.timer is None and init_timer:
+            self.timer = CC.Timer.Timer(active=True)
 
         if (not self.minim_dyn) and (not self.minim_struct):
             raise ValueError("Error, either one of minim_dyn or minim_struct should be True.")
@@ -1086,7 +1178,7 @@ WARNING, the preconditioning is activated together with a root representation.
 
 
     def run(self, verbose = 1, custom_function_pre = None, custom_function_post = None,
-            custom_function_gradient = None):
+            custom_function_gradient = None, timer=None):
         """
         RUN THE SSCHA MINIMIZATION
         ==========================
@@ -1122,6 +1214,8 @@ WARNING, the preconditioning is activated together with a root representation.
                 It is called after the two gradients have been computed, and it is used to
                 impose some constraint on the minimization.
         """
+        if timer is None:
+            timer = self.timer
 
 
         # Eliminate the convergence flag
@@ -1151,7 +1245,10 @@ WARNING, the preconditioning is activated together with a root representation.
                 custom_function_pre(self)
 
             # Store the original dynamical matrix
-            old_dyn = self.dyn.Copy()
+            if timer is not None:
+                old_dyn = timer.execute_timed_function(self.dyn.Copy)
+            else:
+                old_dyn = self.dyn.Copy()
 
             if verbose >= 1:
                 print ()
@@ -1159,14 +1256,15 @@ WARNING, the preconditioning is activated together with a root representation.
                 print ("Step ka = ", len(self.__fe__))
 
             # Perform the minimization step
-            t1 = time.time()
-            self.minimization_step(custom_function_gradient)
-            t2 = time.time()
-            if verbose >=1:
-                print ("Time elapsed to perform the minimization step:", t2 - t1, "s")
+            if timer is not None:
+                timer.execute_timed_function(self.minimization_step, custom_function_gradient) 
+                im_freqs = timer.execute_timed_function(self.check_imaginary_frequencies)
+            else:
+                self.minimization_step(custom_function_gradient)
+                im_freqs = self.check_imaginary_frequencies()
 
 
-            if self.check_imaginary_frequencies():
+            if im_freqs:
                 print ("Immaginary frequencies found.")
                 print ("Minimization aborted.")
                 break
@@ -1177,13 +1275,21 @@ WARNING, the preconditioning is activated together with a root representation.
             self.__fe__.append(np.real(fe))
             self.__fe_err__.append(np.real(err))
 
-            harm_fe = self.dyn.GetHarmonicFreeEnergy(self.ensemble.current_T, w_pols = (self.ensemble.current_w, self.ensemble.current_pols)) / np.prod(self.ensemble.supercell)
+            if timer is not None:
+                harm_fe = timer.execute_timed_function(self.dyn.GetHarmonicFreeEnergy, self.ensemble.current_T, w_pols = (self.ensemble.current_w, self.ensemble.current_pols)) / np.prod(self.ensemble.supercell)
+            else:
+                harm_fe = self.dyn.GetHarmonicFreeEnergy(self.ensemble.current_T, w_pols = (self.ensemble.current_w, self.ensemble.current_pols)) / np.prod(self.ensemble.supercell)
             anharm_fe = np.real(fe - harm_fe)
 
             # Compute the KL ratio
             #print "SAVE RHO BEFORE PRINT:"
             #np.savetxt("LAST_RHO_BEFORE_PRINT.dat", self.ensemble.rho)
-            self.__KL__.append(self.ensemble.get_effective_sample_size())
+            if timer is not None:
+                kl_sample_size = timer.execute_timed_function(self.ensemble.get_effective_sample_size)
+            else:
+                kl_sample_size = self.ensemble.get_effective_sample_size()
+
+            self.__KL__.append(kl_sample_size)
 
             # Print the step
             if verbose >= 1:
@@ -1191,7 +1297,6 @@ WARNING, the preconditioning is activated together with a root representation.
                 print ("")
                 print("Number of symmetries before the step: ", self.N_symmetries)
                 if self.use_spglib:
-                    import spglib
                     print("Group space: ", spglib.get_spacegroup(self.dyn.structure.get_ase_atoms()))
                 print ("Harmonic contribution to free energy = %16.8f meV" % (harm_fe * __RyTomev__))
                 print ("Anharmonic contribution to free energy = %16.8f +- %16.8f meV" % (anharm_fe * __RyTomev__,
@@ -1213,17 +1318,30 @@ WARNING, the preconditioning is activated together with a root representation.
 
 
             # Get the stopping criteria
-            running = not self.check_stop()
-            print ("Check the stopping criteria: Running = ", running)
+            if timer is not None:
+                running = not timer.execute_timed_function(self.check_stop)
+            else:
+                running = not self.check_stop()
+
+            if verbose >= 1:
+                print ("Check the stopping criteria: Running = ", running)
 
 
             if len(self.__fe__) > self.max_ka and self.max_ka > 0:
-                print ("Maximum number of steps reached.")
+                if verbose >= 1:
+                    print ("Maximum number of steps reached.")
                 running = False
 
             # Invoke the custom function (if any)
             if custom_function_post is not None:
-                custom_function_post(self)
+                if timer is not None:
+                    timer.execute_timed_function(custom_function_post, self)
+                else:
+                    custom_function_post(self)
+
+
+            if verbose >= 2:
+                timer.print_report(is_master = True)
 
             # Flush the output to avoid asyncronous printing
             sys.stdout.flush()
@@ -1240,7 +1358,7 @@ WARNING, the preconditioning is activated together with a root representation.
             print ()
 
 
-    def finalize(self, verbose = 1):
+    def finalize(self, verbose = 1, timer=None):
         """
         FINALIZE
         ========
@@ -1255,6 +1373,8 @@ WARNING, the preconditioning is activated together with a root representation.
                 If 1 the stress tensor is also printed. If 2 also the final structure and frequencies
                 are printed.
         """
+        if timer is None:
+            timer = self.timer
 
 
 
@@ -1350,6 +1470,9 @@ WARNING, the preconditioning is activated together with a root representation.
                 print ("Mode %5d:   freq %16.8f cm-1  | is translation? " % (i+1, w[i] * __RyToCm__), trans[i])
 
             print ()
+
+        if timer is not None:
+            timer.print_report(is_master=True)
 
 
     def check_imaginary_frequencies(self):

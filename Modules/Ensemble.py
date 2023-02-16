@@ -1342,7 +1342,7 @@ Error, the following stress files are missing from the ensemble:
 
 
 
-    def update_weights(self, new_dynamical_matrix, newT, update_q = False):
+    def update_weights(self, new_dynamical_matrix, newT, update_q = False, timer=None):
         """
         IMPORTANCE SAMPLING
         ===================
@@ -1381,7 +1381,10 @@ Error, the following stress files are missing from the ensemble:
         old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_struct0.coords.ravel(), (self.N,1))
 
         if changed_dyn:
-            w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
+            if timer:
+                w_new, pols = timer.execute_timed_function(new_dynamical_matrix.DiagonalizeSupercell)
+            else:
+                w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
             self.current_w = w_new.copy()
             self.current_pols = pols.copy()
         else:
@@ -1391,7 +1394,11 @@ Error, the following stress files are missing from the ensemble:
             #self.current_w = w_new.copy()
             #self.current_pols = pols.copy()
         # Update sscha energies and forces
-        self.sscha_energies[:], self.sscha_forces[:,:,:] = new_dynamical_matrix.get_energy_forces(None, displacement = self.u_disps, w_pols = (w_new, pols))
+        if timer:
+            self.sscha_energies[:], self.sscha_forces[:,:,:] = timer.execute_timed_function(new_dynamical_matrix.get_energy_forces,
+                                                                                            None, displacement = self.u_disps, w_pols = (w_new, pols))
+        else:
+            self.sscha_energies[:], self.sscha_forces[:,:,:] = new_dynamical_matrix.get_energy_forces(None, displacement = self.u_disps, w_pols = (w_new, pols))
 
 
         t1 = time.time()
@@ -1455,7 +1462,9 @@ DETAILS OF ERROR:
 
 
         # Get the new displacements in the supercell
-        t3 = time.time()
+        t2 = time.time()
+        if timer:
+            timer.add_timer("update preparation", t2-t1)
         # for i in range(self.N):
         #     self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
 
@@ -1463,7 +1472,6 @@ DETAILS OF ERROR:
 
         #     # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
 
-        t4 = time.time()
 
 
         # Convert the q vectors in the Hartree units
@@ -1483,22 +1491,23 @@ DETAILS OF ERROR:
 
 
         # Get the covariance matrices of the ensemble
-        ups_new = np.real(new_dynamical_matrix.GetUpsilonMatrix(self.current_T, w_pols = (w_new, pols)))
-        ups_old = np.real(self.dyn_0.GetUpsilonMatrix(self.T0, w_pols = (w_original, pols_original)))
+        if timer:
+            ups_new = np.real(timer.execute_timed_function(new_dynamical_matrix.GetUpsilonMatrix, self.current_T, w_pols = (w_new, pols)))
+            ups_old = np.real(timer.execute_timed_function(self.dyn_0.GetUpsilonMatrix, self.T0, w_pols = (w_original, pols_original)))
+        else:
+            ups_new = np.real(new_dynamical_matrix.GetUpsilonMatrix(self.current_T, w_pols = (w_new, pols)))
+            ups_old = np.real(self.dyn_0.GetUpsilonMatrix(self.T0, w_pols = (w_original, pols_original)))
 
         # Get the normalization ratio
         #norm = np.sqrt(np.abs(np.linalg.det(ups_new) / np.linalg.det(ups_old)))
         norm = np.prod( old_a / new_a)
 
         t2 = time.time()
-        print( "Time elapsed to prepare the rho update:", t2 - t1, "s")
-        print (" (of which to diagonalize and prepare the structure: %.4f s)" % (t3-t1))
-        print ( "(of which to update sscha energies and forces: %.4f s)" % (t4-t3))
-        print ( "(of which computing the Upsilon matrix: %.4f s)" % (t2 - t4))
 
         rho_tmp = np.ones( self.N, dtype = np.float64) * norm
         if __DEBUG_RHO__:
             print("Norm factor:", norm)
+
         for i in range(self.N):
             v_new = self.u_disps[i, :].dot(ups_new.dot(self.u_disps[i, :])) * __A_TO_BOHR__**2
             v_old = old_disps[i, :].dot(ups_old.dot(old_disps[i, :])) * __A_TO_BOHR__**2
@@ -1524,11 +1533,12 @@ DETAILS OF ERROR:
             #self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
             #self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
         t1 = time.time()
+        if timer:
+            timer.add_timer("<u| Y |u> and weights update (TODO: parallelizable)", t1-t2)
+            self.current_dyn = timer.execute_timed_function(new_dynamical_matrix.Copy)
         #print( "Time elapsed to update weights the sscha energies, forces and displacements:", t1 - t3, "s")
-        print( "(of which to update the weights):", t1 - t2, "s")
-        self.current_dyn = new_dynamical_matrix.Copy()
-        t2 = time.time()
-        print(" | to copy the dynamical matrix: {} s".format(t2-t1))
+        else:
+            self.current_dyn = new_dynamical_matrix.Copy()
 
 
         if __DEBUG_RHO__:
@@ -1880,7 +1890,7 @@ DETAILS OF ERROR:
 
     def get_preconditioned_gradient(self, subtract_sscha = True, return_error = False,
                                     use_ups_supercell = True, preconditioned = 1,
-                                    fast_grad = False, verbose = True):
+                                    fast_grad = False, verbose = True, timer=None):
         """
         SELF CONSISTENT SCHA EQUATION
         =============================
@@ -1926,12 +1936,14 @@ DETAILS OF ERROR:
                 self-consistent equation.
         """
 
-        t1 = time.time()
         super_struct = self.current_dyn.structure.generate_supercell(self.supercell)
         #supercell_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
         
         # Dyagonalize
-        w, pols = self.current_dyn.DiagonalizeSupercell()#supercell_dyn.DyagDinQ(0)
+        if timer:
+            w, pols = timer.execute_timed_function(self.current_dyn.DiagonalizeSupercell)
+        else:
+            w, pols = self.current_dyn.DiagonalizeSupercell()#supercell_dyn.DyagDinQ(0)
 
         if not self.ignore_small_w:
             trans = CC.Methods.get_translations(pols, super_struct.get_masses_array())
@@ -1949,6 +1961,8 @@ DETAILS OF ERROR:
         nat = super_struct.N_atoms
         eforces = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
         u_disp = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
+
+        t1 = time.time()
         #print nat
         if subtract_sscha:
             eforces[:,:,:] = self.forces - self.sscha_forces
@@ -1962,24 +1976,33 @@ DETAILS OF ERROR:
         pols = np.real(pols)
 
         t2 = time.time()
-        if verbose:
-            print( " [GRADIENT] Time to prepare the gradient calculation:", t2 -t1,"s")
+        if timer:
+            timer.add_timer("Preparation of the gradient", t2 - t1)
 
 
-        t1 = time.time()
         if fast_grad or not preconditioned:
-            grad, grad_err = SCHAModules.get_gradient_supercell(self.rho, u_disp, eforces, w, pols, trans,
+            if timer:
+                grad, grad_err = timer.execute_timed_function(SCHAModules.get_gradient_supercell, 
+                                                              self.rho, u_disp, eforces, w, pols, trans,
+                                                              self.current_T, mass, ityp, log_err, self.N,
+                                                              nat, 3*nat, len(mass), preconditioned,
+                                                              override_name = "get_gradient_supercell")
+            else:
+                grad, grad_err = SCHAModules.get_gradient_supercell(self.rho, u_disp, eforces, w, pols, trans,
                                                                 self.current_T, mass, ityp, log_err, self.N,
                                                                 nat, 3*nat, len(mass), preconditioned)
         else:
-            grad, grad_err = SCHAModules.get_gradient_supercell_new(self.rho, u_disp, eforces, w, pols, trans,
+            if timer:
+                grad, grad_err = timer.execute_timed_function(SCHAModules.get_gradient_supercell_new,
+                                                              self.rho, u_disp, eforces, w, pols, trans,
+                                                                     self.current_T, mass, ityp, log_err, self.N,
+                                                                     nat, 3*nat, len(mass),
+                                                                     override_name = "get_gradient_supercell_new")
+            else:
+                grad, grad_err = SCHAModules.get_gradient_supercell_new(self.rho, u_disp, eforces, w, pols, trans,
                                                                      self.current_T, mass, ityp, log_err, self.N,
                                                                      nat, 3*nat, len(mass))
 
-
-        t2 = time.time()
-        if verbose:
-            print (" [GRADIENT] Time to call the fortran code:", t2 - t1, "s")
 
         # If we are at gamma, we can skip this part
         # Which makes the code faster
@@ -1989,17 +2012,37 @@ DETAILS OF ERROR:
             if return_error:
                 # Check if a multiprocessing function can be exploited
                 if hasattr(CC.Phonons, 'GetDynQFromFCSupercell_parallel') and CC.Settings.GetNProc() > 1:  
-                    q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell_parallel(grad, np.array(self.current_dyn.q_tot),
+                    if timer:
+                        q_grad,q_grad_err = timer.execute_timed_function(CC.Phonons.GetDynQFromFCSupercell_parallel,
+                                                                         grad, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, super_struct,fc2=grad_err)
+                    else:
+                        q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell_parallel(grad, np.array(self.current_dyn.q_tot),
                                                         self.current_dyn.structure, super_struct,fc2=grad_err)
                 else:
-                    q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+                    if timer:
+                        q_grad,q_grad_err = timer.execute_timed_function(CC.Phonons.GetDynQFromFCSupercell,
+                                                                         grad, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, super_struct,fc2=grad_err)
+                    else:
+                        q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
                                                         self.current_dyn.structure, super_struct,fc2=grad_err)
             else:
                 if hasattr(CC.Phonons, 'GetDynQFromFCSupercell_parallel'):
-                    q_grad = CC.Phonons.GetDynQFromFCSupercell_parallel(grad, np.array(self.current_dyn.q_tot),
+                    if timer:
+                        q_grad = timer.execute_timed_function(CC.Phonons.GetDynQFromFCSupercell_parallel,
+                                                              grad, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, super_struct)
+                    else:
+                        q_grad = CC.Phonons.GetDynQFromFCSupercell_parallel(grad, np.array(self.current_dyn.q_tot),
                                                         self.current_dyn.structure, super_struct)
                 else:
-                    q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+                    if timer:
+                        q_grad = timer.execute_timed_function(CC.Phonons.GetDynQFromFCSupercell, 
+                                                              grad, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, super_struct)
+                    else:
+                        q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
                                                         self.current_dyn.structure, super_struct)
             #q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
              #                                           self.current_dyn.structure, supercell_dyn.structure)
@@ -2009,11 +2052,6 @@ DETAILS OF ERROR:
             q_grad_err = np.zeros_like(q_grad)
             q_grad[0, :, :] = grad
             q_grad_err[0, :, :] = grad_err
-
-        t1 = time.time()
-        if verbose:
-            print (" [GRADIENT] Time to get back in fourier space:", t1 - t2, "s")
-
 
         if return_error:
             return q_grad, q_grad_err
