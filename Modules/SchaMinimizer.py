@@ -376,11 +376,11 @@ class SSCHA_Minimizer(object):
                         print('    [symmetrization]  Time to prepare the suprecell dyn   : {:.6f} s'.format(t_6 - t_5))
                         print('    [symmetrization]  Time to symmetrize in the supercell : {:.6f} s'.format(t_7 - t_6))
                         print('    [symmetrization]  Time to return in fourier space     : {:.6f} s'.format(t_8 - t_7))
-                    
+
                     # Apply the sum rule at gamma
                     CC.symmetries.CustomASR(dyn_grad[0,:,:])
                 else:
-                    qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
+                    qe_sym.SymmetrizeFCQ(dyn_grad, self.dyn.q_stars, asr = "custom")
                     #qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "custom")
 
                 # Just divide the error by the square root the number of symmetries
