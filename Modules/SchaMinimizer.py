@@ -380,7 +380,7 @@ class SSCHA_Minimizer(object):
                     # Apply the sum rule at gamma
                     CC.symmetries.CustomASR(dyn_grad[0,:,:])
                 else:
-                    qe_sym.SymmetrizeFCQ(dyn_grad, np.array(self.dyn.q_stars), asr = "custom")
+                    qe_sym.SymmetrizeFCQ(dyn_grad, self.dyn.q_stars, asr = "custom")
                     #qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "custom")
 
                 # Just divide the error by the square root the number of symmetries
