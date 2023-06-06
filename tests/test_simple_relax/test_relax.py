@@ -72,6 +72,8 @@ def test_simple_relax(verbose = False):
     minim.run()
     minim.finalize()
 
+
+    minim.timer.save_json("timer.json")
     # Check the differences in the atomic positions
     delta_s = np.max(np.abs(dyn_target.structure.coords - minim.dyn.structure.coords))
     starting_delta_s = np.max(np.abs(minim.dyn.structure.coords - dyn_start.structure.coords))
