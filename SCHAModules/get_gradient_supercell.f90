@@ -395,7 +395,7 @@ call cpu_time(t2)
 !print *, "Time to compute the upsilon matrix:", t2 - t1
 
 
-!$OMP PARALLEL DO PRIVATE(ical, jcal)
+!!$OMP PARALLEL DO PRIVATE(ical, jcal)
 do i_r = 1, n_random
    do alpha = 1, 3
       do i = 1, natsc
@@ -412,11 +412,11 @@ do i_r = 1, n_random
       enddo
    enddo
 enddo
-!$OMP END PARALLEL DO
+!!$OMP END PARALLEL DO
 
 
 call cpu_time(t1)
-!$OMP PARALLEL DO COLLAPSE(4) PRIVATE(ical, jcal)
+!!$OMP PARALLEL DO COLLAPSE(4) PRIVATE(ical, jcal)
 do alpha = 1, 3
    do beta = 1, 3
       do i = 1, natsc
@@ -431,7 +431,7 @@ do alpha = 1, 3
       end do
    end do
 end do
-!$OMP END PARALLEL DO
+!!$OMP END PARALLEL DO
 
 ! Impose the hermitianity
 ! do ical = 1, 3*natsc

@@ -334,7 +334,8 @@ class Ensemble:
         self.units = new_units
 
 
-    def load(self, data_dir, population, N, verbose = False, load_displacements = True, raise_error_on_not_found = False, load_noncomputed_ensemble = False):
+    def load(self, data_dir, population, N, verbose = False, load_displacements = True, raise_error_on_not_found = False, load_noncomputed_ensemble = False,
+             timer=None):
         """
         LOAD THE ENSEMBLE
         =================
@@ -415,14 +416,15 @@ class Ensemble:
         # Initialize the computation of energy and forces
         self.force_computed = np.zeros( self.N, dtype = bool)
         self.stress_computed = np.zeros(self.N, dtype = bool)
+        self.all_properties = [None] * self.N
 
         # Add a counter to check if all the stress tensors are present
         count_stress = 0
 
         # Superstructure
-        dyn_supercell = self.dyn_0.GenerateSupercellDyn(self.supercell)
-        super_structure = dyn_supercell.structure
-        super_fc = np.real(dyn_supercell.dynmats[0])
+        #dyn_supercell = self.dyn_0.GenerateSupercellDyn(self.supercell)
+        super_structure = self.dyn_0.structure.generate_supercell(self.supercell)
+        #super_fc = np.real(dyn_supercell.dynmats[0])
 
         self.structures = []
 
@@ -433,23 +435,26 @@ class Ensemble:
             # Load the structure
             structure = CC.Structure.Structure()
             if os.path.exists(os.path.join(data_dir, "scf_population%d_%d.dat" % (population, i+1))) and not load_displacements:
-                t1 = time.time()
-                structure.read_scf(os.path.join(data_dir, "scf_population%d_%d.dat" % (population, i+1)), alat = self.dyn_0.alat)
-                t2 = time.time()
-                total_t_for_loading += t2 - t1
+                if timer:
+                    timer.execute_timed_function(structure.read_scf, os.path.join(data_dir, "scf_population%d_%d.dat" % (population, i+1)), alat = self.dyn_0.alat)
+                else:
+                    structure.read_scf(os.path.join(data_dir, "scf_population%d_%d.dat" % (population, i+1)), alat = self.dyn_0.alat)
 
                 structure.has_unit_cell = True
                 structure.unit_cell = super_structure.unit_cell
 
                 # Get the displacement [ANGSTROM]
-                self.u_disps[i,:] = structure.get_displacement(super_structure).reshape( 3 * Nat_sc)
+                if timer:
+                    self.u_disps[i,:] = timer.execute_timed_function(structure.get_displacement, super_structure).ravel()
+                else:
+                    self.u_disps[i,:] = structure.get_displacement(super_structure).ravel()
 
             else:
                 structure = super_structure.copy()
-                t1 = time.time()
-                disp =np.loadtxt(os.path.join(data_dir, "u_population%d_%d.dat" % (population, i+1))) /__A_TO_BOHR__
-                t2 = time.time()
-                total_t_for_loading += t2 - t1
+                if timer:
+                    disp = timer.execute_timed_function(np.loadtxt, os.path.join(data_dir, "u_population%d_%d.dat" % (population, i+1))) / A_TO_BOHR
+                else:
+                    disp =np.loadtxt(os.path.join(data_dir, "u_population%d_%d.dat" % (population, i+1))) /__A_TO_BOHR__
 
                 structure.coords += disp
                 self.u_disps[i, :] = disp.ravel()
@@ -463,7 +468,10 @@ class Ensemble:
             force_path = os.path.join(data_dir, "forces_population%d_%d.dat" % (population, i+1))
 
             if os.path.exists(force_path):
-                self.forces[i,:,:] = np.loadtxt(force_path) * A_TO_BOHR
+                if timer:
+                    self.forces[i,:,:] = timer.execute_timed_function(np.loadtxt, force_path) * A_TO_BOHR
+                else:
+                    self.forces[i,:,:] = np.loadtxt(force_path) * A_TO_BOHR
                 self.force_computed[i] = True
             else:
                 if raise_error_on_not_found:
@@ -479,12 +487,14 @@ Error, the file '{}' is missing from the ensemble
 
             # Load stress
             if os.path.exists(os.path.join(data_dir, "pressures_population%d_%d.dat" % (population, i+1))):
-                self.stresses[i,:,:] =  np.loadtxt(os.path.join(data_dir, "pressures_population%d_%d.dat" % (population, i+1)))
+                if timer:
+                    self.stresses[i,:,:] =  timer.execute_timed_function(np.loadtxt, os.path.join(data_dir, "pressures_population%d_%d.dat" % (population, i+1)))
+                else:
+                    self.stresses[i,:,:] =  np.loadtxt(os.path.join(data_dir, "pressures_population%d_%d.dat" % (population, i+1)))
                 self.stress_computed[i] = True
             else:
                 self.stress_computed[i] = False
             t2 = time.time()
-            total_t_for_loading += t2 - t1
 
 
 
@@ -508,13 +518,17 @@ Error, the file '{}' is missing from the ensemble
 
         t1 = time.time()
         # Load the energy
-        total_energies = np.loadtxt(os.path.join(data_dir, "energies_supercell_population%d.dat" % (population)))
-        t2 = time.time()
-        total_t_for_sscha_ef += t2 - t1
+        if timer:
+            total_energies = timer.execute_timed_function(np.loadtxt, os.path.join(data_dir, "energies_supercell_population%d.dat" % (population)))
+        else:
+            total_energies = np.loadtxt(os.path.join(data_dir, "energies_supercell_population%d.dat" % (population)))
         self.energies = total_energies[:N]
 
         # Compute the SSCHA energies and forces
-        self.sscha_energies[:], self.sscha_forces[:,:,:] = self.dyn_0.GenerateSupercellDyn(self.supercell).get_energy_forces(None, displacement = self.u_disps)
+        if timer:
+            self.sscha_energies[:], self.sscha_forces[:,:,:] = timer.execute_timed_function(self.dyn_0.get_energy_forces, None, displacement = self.u_disps)
+        else:
+            self.sscha_energies[:], self.sscha_forces[:,:,:] = self.dyn_0.get_energy_forces(None, displacement = self.u_disps)
 
 
         # Setup the initial weight
@@ -523,15 +537,9 @@ Error, the file '{}' is missing from the ensemble
         # Initialize the q_start
 
         t1 = time.time()
-        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell, self.u_disps)
+        #self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell, self.u_disps)
         t2 = time.time()
-        self.current_q = self.q_start.copy()
-
-        if verbose:
-            print( "[LOAD ENSEMBLE]: time elapsed to compute the current q vectors:", t2 - t1)
-            print( "[LOAD ENSEMBLE]: time elapsed while loading with numpy:", total_t_for_loading)
-            print( "[LOAD ENSEMBLE]: time elapsed for computing sscha energy and forces:", total_t_for_sscha_ef)
-
+        #self.current_q = self.q_start.copy()
 
         p_count = np.sum(self.stress_computed.astype(int))
         if p_count > 0:
@@ -1342,7 +1350,7 @@ Error, the following stress files are missing from the ensemble:
 
 
 
-    def update_weights(self, new_dynamical_matrix, newT, update_q = False):
+    def update_weights(self, new_dynamical_matrix, newT, update_q = False, timer=None):
         """
         IMPORTANCE SAMPLING
         ===================
@@ -1381,7 +1389,10 @@ Error, the following stress files are missing from the ensemble:
         old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_struct0.coords.ravel(), (self.N,1))
 
         if changed_dyn:
-            w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
+            if timer:
+                w_new, pols = timer.execute_timed_function(new_dynamical_matrix.DiagonalizeSupercell)
+            else:
+                w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
             self.current_w = w_new.copy()
             self.current_pols = pols.copy()
         else:
@@ -1391,7 +1402,11 @@ Error, the following stress files are missing from the ensemble:
             #self.current_w = w_new.copy()
             #self.current_pols = pols.copy()
         # Update sscha energies and forces
-        self.sscha_energies[:], self.sscha_forces[:,:,:] = new_dynamical_matrix.get_energy_forces(None, displacement = self.u_disps, w_pols = (w_new, pols))
+        if timer:
+            self.sscha_energies[:], self.sscha_forces[:,:,:] = timer.execute_timed_function(new_dynamical_matrix.get_energy_forces,
+                                                                                            None, displacement = self.u_disps, w_pols = (w_new, pols))
+        else:
+            self.sscha_energies[:], self.sscha_forces[:,:,:] = new_dynamical_matrix.get_energy_forces(None, displacement = self.u_disps, w_pols = (w_new, pols))
 
 
         t1 = time.time()
@@ -1455,7 +1470,9 @@ DETAILS OF ERROR:
 
 
         # Get the new displacements in the supercell
-        t3 = time.time()
+        t2 = time.time()
+        if timer:
+            timer.add_timer("update preparation", t2-t1)
         # for i in range(self.N):
         #     self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
 
@@ -1463,7 +1480,6 @@ DETAILS OF ERROR:
 
         #     # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
 
-        t4 = time.time()
 
 
         # Convert the q vectors in the Hartree units
@@ -1483,22 +1499,23 @@ DETAILS OF ERROR:
 
 
         # Get the covariance matrices of the ensemble
-        ups_new = np.real(new_dynamical_matrix.GetUpsilonMatrix(self.current_T, w_pols = (w_new, pols)))
-        ups_old = np.real(self.dyn_0.GetUpsilonMatrix(self.T0, w_pols = (w_original, pols_original)))
+        if timer:
+            ups_new = np.real(timer.execute_timed_function(new_dynamical_matrix.GetUpsilonMatrix, self.current_T, w_pols = (w_new, pols)))
+            ups_old = np.real(timer.execute_timed_function(self.dyn_0.GetUpsilonMatrix, self.T0, w_pols = (w_original, pols_original)))
+        else:
+            ups_new = np.real(new_dynamical_matrix.GetUpsilonMatrix(self.current_T, w_pols = (w_new, pols)))
+            ups_old = np.real(self.dyn_0.GetUpsilonMatrix(self.T0, w_pols = (w_original, pols_original)))
 
         # Get the normalization ratio
         #norm = np.sqrt(np.abs(np.linalg.det(ups_new) / np.linalg.det(ups_old)))
         norm = np.prod( old_a / new_a)
 
         t2 = time.time()
-        print( "Time elapsed to prepare the rho update:", t2 - t1, "s")
-        print (" (of which to diagonalize and prepare the structure: %.4f s)" % (t3-t1))
-        print ( "(of which to update sscha energies and forces: %.4f s)" % (t4-t3))
-        print ( "(of which computing the Upsilon matrix: %.4f s)" % (t2 - t4))
 
         rho_tmp = np.ones( self.N, dtype = np.float64) * norm
         if __DEBUG_RHO__:
             print("Norm factor:", norm)
+
         for i in range(self.N):
             v_new = self.u_disps[i, :].dot(ups_new.dot(self.u_disps[i, :])) * __A_TO_BOHR__**2
             v_old = old_disps[i, :].dot(ups_old.dot(old_disps[i, :])) * __A_TO_BOHR__**2
@@ -1524,11 +1541,12 @@ DETAILS OF ERROR:
             #self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
             #self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
         t1 = time.time()
+        if timer:
+            timer.add_timer("<u| Y |u> and weights update (TODO: parallelizable)", t1-t2)
+            self.current_dyn = timer.execute_timed_function(new_dynamical_matrix.Copy)
         #print( "Time elapsed to update weights the sscha energies, forces and displacements:", t1 - t3, "s")
-        print( "(of which to update the weights):", t1 - t2, "s")
-        self.current_dyn = new_dynamical_matrix.Copy()
-        t2 = time.time()
-        print(" | to copy the dynamical matrix: {} s".format(t2-t1))
+        else:
+            self.current_dyn = new_dynamical_matrix.Copy()
 
 
         if __DEBUG_RHO__:
@@ -1878,9 +1896,57 @@ DETAILS OF ERROR:
 
         return new_phi
 
+    def get_preconditioned_gradient_parallel(self, *args, timer=None, **kwargs):
+        """
+        Compute the gradient using multiprocessing.
+        For documentation, see get_preconditioned_gradient
+        """
+
+        print("force length:", len(self.force_computed))
+
+        def work_function(argument, timer=None):
+            print("force length [inside]:", len(self.force_computed))
+            ensemble_start_config, ensemble_end_config = argument
+            mask = np.zeros(self.N, dtype = bool)
+            mask[ensemble_start_config : ensemble_end_config] = True
+            print("mask length:", np.sum(mask.astype(int))," total N:", len(mask))
+            new_ensemble = self.split(mask)
+
+            gradient, _ = new_ensemble.get_preconditioned_gradient(*args, timer=timer, **kwargs)
+
+            av_ensemble = np.sum(new_ensemble.rho)
+            
+            return gradient * av_ensemble
+
+        nproc = CC.Settings.GetNProc()
+        list_of_inputs = []
+        index = 0
+        for i in range(nproc):
+            start_config = index
+            index += self.N // nproc
+            if i < self.N % nproc:
+                index += 1
+            end_config = index
+            
+            list_of_inputs.append( (start_config, end_config) )
+
+        if timer:
+            gradient = timer.execute_timed_function(CC.Settings.GoParallel, work_function, list_of_inputs, "+")
+        else:
+            gradient = CC.Settings.GoParallel(work_function, list_of_inputs, "+")
+
+        gradient /= np.sum(self.rho)
+
+        return gradient, np.zeros_like(gradient) + 1
+
+        
+
+        
+    
+
     def get_preconditioned_gradient(self, subtract_sscha = True, return_error = False,
                                     use_ups_supercell = True, preconditioned = 1,
-                                    fast_grad = False, verbose = True):
+                                    fast_grad = False, verbose = True, timer=None):
         """
         SELF CONSISTENT SCHA EQUATION
         =============================
@@ -1893,7 +1959,7 @@ DETAILS OF ERROR:
 
         .. math::
 
-            \\Phi_{ab} = \\sum_c \\upsilon_{ac} \\left< u_c f_a\\right>_{\\Phi}
+            \\Phi_{ab} = \\sum_c \\Upsilon_{ac} \\left< u_c f_a\\right>_{\\Phi}
 
         The previous equation is true only if the :math:`\\Phi` matrix is the solution
         of the SCHA theory. Here :math:`\\vec u` are the displacements of the configurations
@@ -1926,12 +1992,14 @@ DETAILS OF ERROR:
                 self-consistent equation.
         """
 
-        t1 = time.time()
         super_struct = self.current_dyn.structure.generate_supercell(self.supercell)
         #supercell_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
         
         # Dyagonalize
-        w, pols = self.current_dyn.DiagonalizeSupercell()#supercell_dyn.DyagDinQ(0)
+        if timer:
+            w, pols = timer.execute_timed_function(self.current_dyn.DiagonalizeSupercell)
+        else:
+            w, pols = self.current_dyn.DiagonalizeSupercell()#supercell_dyn.DyagDinQ(0)
 
         if not self.ignore_small_w:
             trans = CC.Methods.get_translations(pols, super_struct.get_masses_array())
@@ -1949,6 +2017,8 @@ DETAILS OF ERROR:
         nat = super_struct.N_atoms
         eforces = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
         u_disp = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
+
+        t1 = time.time()
         #print nat
         if subtract_sscha:
             eforces[:,:,:] = self.forces - self.sscha_forces
@@ -1962,24 +2032,33 @@ DETAILS OF ERROR:
         pols = np.real(pols)
 
         t2 = time.time()
-        if verbose:
-            print( " [GRADIENT] Time to prepare the gradient calculation:", t2 -t1,"s")
+        if timer:
+            timer.add_timer("Preparation of the gradient", t2 - t1)
 
 
-        t1 = time.time()
         if fast_grad or not preconditioned:
-            grad, grad_err = SCHAModules.get_gradient_supercell(self.rho, u_disp, eforces, w, pols, trans,
+            if timer:
+                grad, grad_err = timer.execute_timed_function(SCHAModules.get_gradient_supercell, 
+                                                              self.rho, u_disp, eforces, w, pols, trans,
+                                                              self.current_T, mass, ityp, log_err, self.N,
+                                                              nat, 3*nat, len(mass), preconditioned,
+                                                              override_name = "get_gradient_supercell")
+            else:
+                grad, grad_err = SCHAModules.get_gradient_supercell(self.rho, u_disp, eforces, w, pols, trans,
                                                                 self.current_T, mass, ityp, log_err, self.N,
                                                                 nat, 3*nat, len(mass), preconditioned)
         else:
-            grad, grad_err = SCHAModules.get_gradient_supercell_new(self.rho, u_disp, eforces, w, pols, trans,
+            if timer:
+                grad, grad_err = timer.execute_timed_function(SCHAModules.get_gradient_supercell_new,
+                                                              self.rho, u_disp, eforces, w, pols, trans,
+                                                                     self.current_T, mass, ityp, log_err, self.N,
+                                                                     nat, 3*nat, len(mass),
+                                                                     override_name = "get_gradient_supercell_new")
+            else:
+                grad, grad_err = SCHAModules.get_gradient_supercell_new(self.rho, u_disp, eforces, w, pols, trans,
                                                                      self.current_T, mass, ityp, log_err, self.N,
                                                                      nat, 3*nat, len(mass))
 
-
-        t2 = time.time()
-        if verbose:
-            print (" [GRADIENT] Time to call the fortran code:", t2 - t1, "s")
 
         # If we are at gamma, we can skip this part
         # Which makes the code faster
@@ -1989,17 +2068,37 @@ DETAILS OF ERROR:
             if return_error:
                 # Check if a multiprocessing function can be exploited
                 if hasattr(CC.Phonons, 'GetDynQFromFCSupercell_parallel') and CC.Settings.GetNProc() > 1:  
-                    q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell_parallel(grad, np.array(self.current_dyn.q_tot),
+                    if timer:
+                        q_grad,q_grad_err = timer.execute_timed_function(CC.Phonons.GetDynQFromFCSupercell_parallel,
+                                                                         grad, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, super_struct,fc2=grad_err)
+                    else:
+                        q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell_parallel(grad, np.array(self.current_dyn.q_tot),
                                                         self.current_dyn.structure, super_struct,fc2=grad_err)
                 else:
-                    q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+                    if timer:
+                        q_grad,q_grad_err = timer.execute_timed_function(CC.Phonons.GetDynQFromFCSupercell,
+                                                                         grad, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, super_struct,fc2=grad_err)
+                    else:
+                        q_grad,q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
                                                         self.current_dyn.structure, super_struct,fc2=grad_err)
             else:
                 if hasattr(CC.Phonons, 'GetDynQFromFCSupercell_parallel'):
-                    q_grad = CC.Phonons.GetDynQFromFCSupercell_parallel(grad, np.array(self.current_dyn.q_tot),
+                    if timer:
+                        q_grad = timer.execute_timed_function(CC.Phonons.GetDynQFromFCSupercell_parallel,
+                                                              grad, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, super_struct)
+                    else:
+                        q_grad = CC.Phonons.GetDynQFromFCSupercell_parallel(grad, np.array(self.current_dyn.q_tot),
                                                         self.current_dyn.structure, super_struct)
                 else:
-                    q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
+                    if timer:
+                        q_grad = timer.execute_timed_function(CC.Phonons.GetDynQFromFCSupercell, 
+                                                              grad, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, super_struct)
+                    else:
+                        q_grad = CC.Phonons.GetDynQFromFCSupercell(grad, np.array(self.current_dyn.q_tot),
                                                         self.current_dyn.structure, super_struct)
             #q_grad_err = CC.Phonons.GetDynQFromFCSupercell(grad_err, np.array(self.current_dyn.q_tot),
              #                                           self.current_dyn.structure, supercell_dyn.structure)
@@ -2009,11 +2108,6 @@ DETAILS OF ERROR:
             q_grad_err = np.zeros_like(q_grad)
             q_grad[0, :, :] = grad
             q_grad_err[0, :, :] = grad_err
-
-        t1 = time.time()
-        if verbose:
-            print (" [GRADIENT] Time to get back in fourier space:", t1 - t2, "s")
-
 
         if return_error:
             return q_grad, q_grad_err
@@ -2108,7 +2202,7 @@ DETAILS OF ERROR:
         return cov_mat
 
 
-    def get_stress_tensor(self, offset_stress = None, add_centroid_contrib = False, use_spglib = False):
+    def get_stress_tensor(self, offset_stress = None, use_spglib = False):
 
         """
         GET STRESS TENSOR
@@ -2125,9 +2219,6 @@ DETAILS OF ERROR:
             offset_stress : 3x3 matrix, optional
                 An offset stress to be subtracted to the real stress tensor.
                 Usefull if you want to compute just the anharmonic contribution.
-            add_centroid_contrib : bool, optional
-                If true the contribution of the centroid is added. This is always zero when
-                the system is relaxed.
             use_spglib : bool
                 If true use the spglib library to perform the symmetrization
 
@@ -2146,21 +2237,22 @@ DETAILS OF ERROR:
 
 
         # Get frequencies and polarization vectors
-        super_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
-        wr, pols = super_dyn.DyagDinQ(0)
+        super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
+        #super_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
+        wr, pols = self.current_dyn.DiagonalizeSupercell()
 
         if not self.ignore_small_w:
-            trans = ~ CC.Methods.get_translations(pols, super_dyn.structure.get_masses_array())
+            trans = ~ CC.Methods.get_translations(pols, super_structure.get_masses_array())
         else:
             trans = np.abs(wr) > CC.Phonons.__EPSILON_W__
 
         wr = np.real( wr[trans])
         pols = np.real( pols[:, trans])
 
-        nat = super_dyn.structure.N_atoms
+        nat = super_structure.N_atoms
 
         # Volume bohr^3
-        volume = super_dyn.structure.get_volume() * __A_TO_BOHR__**3
+        volume = super_structure.get_volume() * __A_TO_BOHR__**3
 
 
         # Get the correctly shaped polarization vectors
@@ -2184,50 +2276,39 @@ DETAILS OF ERROR:
                                                            self.N, nat, len(wr))
 
         # Correct the stress adding the centroid contribution
-        if add_centroid_contrib:
+        # if add_centroid_contrib:
 
-            eforces = self.forces - self.sscha_forces
+        #     eforces = self.forces - self.sscha_forces
 
-            if not np.prod(self.supercell) == 1:
-                # Refold the forces in the unit cell
-                super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
-                itau = super_structure.get_itau(self.current_dyn.structure) - 1 # Fort -> Py
-                nat = self.dyn_0.structure.N_atoms
-                new_forces = np.zeros((self.N, nat, 3), dtype  =np.float64, order = "C")
+        #     if not np.prod(self.supercell) == 1:
+        #         # Refold the forces in the unit cell
+        #         itau = super_structure.get_itau(self.current_dyn.structure) - 1 # Fort -> Py
+        #         nat = self.dyn_0.structure.N_atoms
+        #         new_forces = np.zeros((self.N, nat, 3), dtype  =np.float64, order = "C")
 
-                # Project in the unit cell the forces
-                for i in range(nat):
-                    #print "%d) ITAU LIST:" % i, itau == i
-                    new_forces[:, i, :] = np.sum(eforces[:, itau==i,:], axis = 1) / np.prod(self.supercell)
-                    #new_forces[:, i, :] =
+        #         # Project in the unit cell the forces
+        #         for i in range(nat):
+        #             #print "%d) ITAU LIST:" % i, itau == i
+        #             new_forces[:, i, :] = np.sum(eforces[:, itau==i,:], axis = 1) / np.prod(self.supercell)
+        #             #new_forces[:, i, :] =
 
-                eforces = new_forces
+        #         eforces = new_forces
 
-            stress_centr = np.zeros( (3,3), dtype = np.float64)
-            error_centr = np.zeros( (3,3), dtype = np.float64)
-            for i in range(0, 3):
-                for j in range(i, 3):
-                    av_array = 0.5 * np.einsum("h, ah", self.current_dyn.structure.coords[:, i],
-                                               eforces[:,:,j])
-                    av_array += 0.5 * np.einsum("h, ah", self.current_dyn.structure.coords[:, j],
-                                                eforces[:,:,i])
-                    stress_centr[i,j], error_centr[i,j] = SCHAModules.stochastic.average_error_weight(av_array, self.rho, "err_yesrho")
-                    stress_centr[j,i] = stress_centr[i,j]
-                    error_centr[j,i] = error_centr[i,j]
+        #     stress_centr = np.zeros( (3,3), dtype = np.float64)
+        #     error_centr = np.zeros( (3,3), dtype = np.float64)
+        #     for i in range(0, 3):
+        #         for j in range(i, 3):
+        #             av_array = 0.5 * np.einsum("h, ah", self.current_dyn.structure.coords[:, i],
+        #                                        eforces[:,:,j])
+        #             av_array += 0.5 * np.einsum("h, ah", self.current_dyn.structure.coords[:, j],
+        #                                         eforces[:,:,i])
+        #             stress_centr[i,j], error_centr[i,j] = SCHAModules.stochastic.average_error_weight(av_array, self.rho, "err_yesrho")
+        #             stress_centr[j,i] = stress_centr[i,j]
+        #             error_centr[j,i] = error_centr[i,j]
 
 
-#            f, err_f = self.get_average_forces(True)
-#            stress_centroid = 0.5 * np.einsum( "ai,aj", self.current_dyn.structure.coords * __A_TO_BOHR__, f) / volume
-#            stress_centroid += np.transpose(stress_centroid)
-#            err_stress_centroid = np.einsum( "ai,aj", self.current_dyn.structure.coords**2 , err_f**2)
-#            err_stress_centroid = np.sqrt(err_stress_centroid) * __A_TO_BOHR__ / volume
-#            err_stress_centroid = np.sqrt( err_stress_centroid**2 + np.transpose(err_stress_centroid**2))
-#            divideby = np.ones( (3,3)) * 2
-#            divideby[np.eye(3) == 1] = np.sqrt(2)
-#            err_stress_centroid /= divideby
-
-            stress += stress_centr
-            err_stress = np.sqrt(err_stress**2 + error_centr**2)
+        #   stress += stress_centr
+        #   err_stress = np.sqrt(err_stress**2 + error_centr**2)
 
 
 
@@ -2809,7 +2890,7 @@ DETAILS OF ERROR:
 
 
     def get_free_energy_hessian(self, include_v4 = False, get_full_hessian = True, verbose = False, \
-        use_symmetries = True, return_d3 = False):
+        use_symmetries = True, return_d3 = False, w_pols = None, timer=None):
         """
         GET THE FREE ENERGY ODD CORRECTION
         ==================================
@@ -2836,6 +2917,8 @@ DETAILS OF ERROR:
                 It requires that spglib is installed to detect symmetries in the supercell correctly.
             return_d3 : bool
                 If true, returns also the tensor of three phonon scattering.
+            w_pols : list of ndarray
+                If provided, it avoids the diagonalization of the dynamical matrix to speedup the time.
 
         Returns
         -------
@@ -2857,8 +2940,16 @@ DETAILS OF ERROR:
         self.convert_units(UNITS_HARTREE)
 
         # Get the dynamical matrix in the supercell
-        dyn_supercell = self.current_dyn.GenerateSupercellDyn(self.supercell)
-        w, pols = dyn_supercell.DyagDinQ(0)
+        #dyn_supercell = self.current_dyn.GenerateSupercellDyn(self.supercell)
+        super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
+        if w_pols is None:
+            if timer:
+                w, pols = timer.execute_timed_function(self.current_dyn.DiagonalizeSupercell)
+            else:
+                w, pols = self.current_dyn.DiagonalizeSupercell()
+        else:
+            w, pols = w_pols
+
         a = SCHAModules.thermodynamic.w_to_a(w, self.current_T)
 
 
@@ -2874,13 +2965,13 @@ DETAILS OF ERROR:
 
         # Get the translational modes
         if not self.ignore_small_w:
-            trans = CC.Methods.get_translations(pols, dyn_supercell.structure.get_masses_array())
+            trans = CC.Methods.get_translations(pols, super_structure.get_masses_array())
         else:
             trans = np.abs(w) < CC.Phonons.__EPSILON_W__
 
 
         # Get the atomic types
-        ityp = dyn_supercell.structure.get_ityp() + 1 #Py to Fortran indexing
+        ityp = super_structure.get_ityp() + 1 #Py to Fortran indexing
         n_typ = len(self.current_dyn.structure.masses)
 
         amass = np.zeros(n_typ, dtype = np.double)
@@ -2898,8 +2989,12 @@ DETAILS OF ERROR:
         # Lets call the Fortran subroutine to compute the v3
         if verbose:
             print ("Going into d3")
-        d3 = SCHAModules.get_v3(a, new_pol, trans, amass, ityp,
-                                f, u, self.rho, log_err)
+        if timer:
+            d3 = timer.execute_timed_function(SCHAModules.get_v3, a, new_pol, trans, amass, ityp,
+                                    f, u, self.rho, log_err, override_name="SCHAModules.get_v3")
+        else:
+            d3 = SCHAModules.get_v3(a, new_pol, trans, amass, ityp,
+                                    f, u, self.rho, log_err)
         if verbose:
             print("Outside d3")
 
@@ -2909,9 +3004,15 @@ DETAILS OF ERROR:
             if verbose:
                 print("Symmetrizing the d3")
                 np.save("d3_realspace_nosym.npy", d3)
-            qe_sym = CC.symmetries.QE_Symmetry(dyn_supercell.structure)
-            qe_sym.SetupFromSPGLIB()
-            qe_sym.ApplySymmetryToTensor3(d3)
+
+            qe_sym = CC.symmetries.QE_Symmetry(super_structure)
+            if timer:
+                timer.execute_timed_function(qe_sym.SetupFromSPGLIB)
+                timer.execute_timed_function(qe_sym.ApplySymmetryToTensor3, d3)
+            else:
+                qe_sym.SetupFromSPGLIB()
+                qe_sym.ApplySymmetryToTensor3(d3)
+            
 
         if verbose:
             print("Saving the third order force constants as d3_realspace_sym.npy [Ha units]")
@@ -2921,20 +3022,29 @@ DETAILS OF ERROR:
         if include_v4:
             print("Computing the v4, this requires some time...")
             t1 = time.time()
-            d4 = SCHAModules.get_v4(a, new_pol, trans, amass, ityp, \
-                f, u, self.rho, log_err)
+            if timer:
+                d4 = timer.execute_timed_function(SCHAModules.get_v4, a, new_pol, trans, amass, ityp, \
+                    f, u, self.rho, log_err, override_name="SCHAModules.get_v4")
+            else:
+                d4 = SCHAModules.get_v4(a, new_pol, trans, amass, ityp, \
+                    f, u, self.rho, log_err)
             t2 = time.time()
             print("Time elapsed to compute the v4: {} s".format(t2-t1))
 
             # Symmetrize the v4
             if use_symmetries:
-                qe_sym = CC.symmetries.QE_Symmetry(dyn_supercell.structure)
-                qe_sym.SetupFromSPGLIB()
-                qe_sym.ApplySymmetryToTensor4(d4)
+                if timer:
+                    timer.execute_timed_function(qe_sym.ApplySymmetryToTensor4, d4)
+                else:
+                    qe_sym.ApplySymmetryToTensor4(d4)
 
             if verbose: print("Inside odd straight")
-            phi_sc_odd = SCHAModules.get_odd_straight_with_v4(a, w, new_pol, trans, \
-                amass, ityp, self.current_T, d3, d4)
+            if timer:
+                phi_sc_odd = timer.execute_timed_function(SCHAModules.get_odd_straight_with_v4, a, w, new_pol, trans, \
+                    amass, ityp, self.current_T, d3, d4, override_name="SCHAModules.get_odd_straight_with_v4")
+            else:
+                phi_sc_odd = SCHAModules.get_odd_straight_with_v4(a, w, new_pol, trans, \
+                    amass, ityp, self.current_T, d3, d4)
             if verbose : print("Outside odd straight")
         else:
             # Only v3
@@ -2947,8 +3057,12 @@ DETAILS OF ERROR:
                 print (" AMASS = ", amass)
                 print (" ITYP = ", ityp)
                 print (" T = ", self.current_T)
-            phi_sc_odd = SCHAModules.get_odd_straight(a, w, new_pol, trans, amass, ityp,
-                                                    self.current_T, d3)
+            if timer:
+                phi_sc_odd = timer.execute_timed_function(SCHAModules.get_odd_straight, a, w, new_pol, trans, amass, ityp,
+                                                        self.current_T, d3)
+            else:
+                phi_sc_odd = SCHAModules.get_odd_straight(a, w, new_pol, trans, amass, ityp,
+                                                        self.current_T, d3)
 
             if verbose:
                 print ("Outside odd straight.")
@@ -2956,14 +3070,18 @@ DETAILS OF ERROR:
                 np.save("phi_odd.npy", phi_sc_odd)
 
                 # Try to save this matrix
-                dyn_supercell.dynmats[0] = phi_sc_odd
-                dyn_supercell.save_qe("SupercellOddDynHa")
+                #dyn_supercell.dynmats[0] = phi_sc_odd
+                #dyn_supercell.save_qe("SupercellOddDynHa")
 
 
 
         # Lets fourier transform
-        dynq_odd = CC.Phonons.GetDynQFromFCSupercell(phi_sc_odd, np.array(self.current_dyn.q_tot),
-                                                     self.current_dyn.structure, dyn_supercell.structure)
+        if timer:
+            dynq_odd = timer.execute_timed_function(CC.Phonons.GetDynQFromFCSupercell, phi_sc_odd, np.array(self.current_dyn.q_tot),
+                                                     self.current_dyn.structure, super_structure)
+        else:
+            dynq_odd = CC.Phonons.GetDynQFromFCSupercell(phi_sc_odd, np.array(self.current_dyn.q_tot),
+                                                        self.current_dyn.structure, super_structure)
 
 
         # Convert back the ensemble in Default units
@@ -3040,9 +3158,12 @@ DETAILS OF ERROR:
         else:
             computing_ensemble.get_energy_forces(calculator, compute_stress, stress_numerical, verbose = verbose)
 
+        print("CE BEFORE MERGE:", len(self.force_computed))
+
         if should_i_merge:
             # Remove the noncomputed ensemble from here, and merge
             self.merge(computing_ensemble)
+        print("CE AFTER MERGE:", len(self.force_computed))
 
         print('ENSEMBLE ALL PROPERTIES:', self.all_properties)
 
@@ -3108,6 +3229,11 @@ DETAILS OF ERROR:
         N = np.sum(split_mask.astype(int))
         ens = Ensemble(self.dyn_0, self.T0, self.dyn_0.GetSupercell())
         ens.init_from_structures(structs)
+        print("Split length:", len(split_mask))
+        print("original force legnth:", len(self.force_computed))
+        print("Expected length:", len(ens.force_computed))
+        print("Splitting force length:", len(self.force_computed[split_mask]))
+
         ens.force_computed[:] = self.force_computed[split_mask]
         ens.stress_computed[:] = self.stress_computed[split_mask]
         ens.energies[:] = self.energies[split_mask]
@@ -3130,7 +3256,7 @@ DETAILS OF ERROR:
         It may be used to run a minimization even if the ensemble was not completely calculated.
         """
 
-        good_mask = self.force_computed
+        good_mask = np.copy(self.force_computed)
         if self.has_stress:
             good_mask = good_mask & self.stress_computed
 
@@ -3142,6 +3268,8 @@ DETAILS OF ERROR:
         self.sscha_energies = self.sscha_energies[good_mask]
         self.xats = self.xats[good_mask, :, :]
         self.u_disps = self.u_disps[good_mask, :]
+        self.force_computed = self.force_computed[good_mask]
+        self.stress_computed = self.stress_computed[good_mask]
 
         self.structures = [self.structures[x] for x in np.arange(len(good_mask))[good_mask]]
         self.all_properties = [self.all_properties[x] for x in np.arange(len(good_mask))[good_mask]]
@@ -3194,6 +3322,7 @@ DETAILS OF ERROR:
 
         # Setup the calculator for each structure
         parallel = False
+        print("Force computed shape:", len(self.force_computed))
         if __MPI__:
             comm = MPI.COMM_WORLD
             size = comm.Get_size()
@@ -3350,6 +3479,7 @@ DETAILS OF ERROR:
         # Reshape the arrays
         self.forces[:, :, :] = np.reshape(total_forces, (N_rand, self.current_dyn.structure.N_atoms*np.prod(self.supercell), 3), order = "C")
         self.force_computed[:] = True
+        print("Force computed shape:", len(self.force_computed))
 
         if compute_stress:
             self.stresses[:,:,:] = np.reshape(total_stress, (N_rand, 3, 3), order = "C")
