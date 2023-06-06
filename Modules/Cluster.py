@@ -64,6 +64,9 @@ __CLUSTER_UMEM__ = "use_memory"
 __CLUSTER_VPART__ = "v_partition"
 __CLUSTER_NPART__ = "partition_name"
 __CLUSTER_UPART__ = "use_partition"
+__CLUSTER_VQOS__ = "v_qos"
+__CLUSTER_NQOS__ = "qos_name"
+__CLUSTER_UQOS__ = "use_qos"
 __CLUSTER_INITSCRIPT__ = "init_script"
 __CLUSTER_MAXRECALC__ = "max_recalc"
 __CLUSTER_BATCHSIZE__ = "batch_size"
@@ -91,7 +94,8 @@ __CLUSTER_KEYS__ = [__CLUSTER_NAMELIST__, __CLUSTER_TEMPLATE__, __CLUSTER_HOST__
                     __CLUSTER_UNODES__, __CLUSTER_VCPU__, __CLUSTER_NCPU__, __CLUSTER_UCPU__,
                     __CLUSTER_VTIME__, __CLUSTER_NTIME__, __CLUSTER_UTIME__, __CLUSTER_VMEM__,
                     __CLUSTER_NMEM__, __CLUSTER_UMEM__, __CLUSTER_VPART__, __CLUSTER_NPART__,
-                    __CLUSTER_UPART__, __CLUSTER_INITSCRIPT__, __CLUSTER_MAXRECALC__, __CLUSTER_BATCHSIZE__,
+                    __CLUSTER_UPART__, __CLUSTER_VQOS__, __CLUSTER_NQOS__, __CLUSTER_UQOS__,
+                    __CLUSTER_INITSCRIPT__, __CLUSTER_MAXRECALC__, __CLUSTER_BATCHSIZE__,
                     __CLUSTER_LOCALWD__, __CLUSTER_VACCOUNT__, __CLUSTER_UACCOUNT__, __CLUSTER_SSHCMD__,
                     __CLUSTER_SCPCMD__, __CLUSTER_WORKDIR__, __CLUSTER_TIMEOUT__, 
                     __CLUSTER_JOBNUMBER__, __CLUSTER_NPARALLEL__, __CLUSTER_NPOOLS__,
@@ -132,7 +136,7 @@ def parse_symbols(string):
 class Cluster(object):
     
     def __init__(self, hostname=None, pwd=None, extra_options="", workdir = "",
-                 account_name = "", partition_name = "", binary="pw.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo",
+                 account_name = "", partition_name = "", qos_name = "", binary="pw.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo",
                  mpi_cmd=r"srun --mpi=pmi2 -n NPROC"):
         """
         SETUP THE CLUSTER
@@ -163,6 +167,8 @@ class Cluster(object):
                 The name of the account for the job submission
             partition_name:
                 The partition name for the job submission
+            qos_name:
+                The QOS name for the job submission
         """
         
         self.hostname = hostname
@@ -189,6 +195,9 @@ class Cluster(object):
         self.partition_name = partition_name
         if partition_name:
             self.use_partition = True
+        self.qos_name = qos_name
+        if qos_name:
+            self.use_qos = True
             
         self.binary = binary
         self.mpi_cmd = mpi_cmd
@@ -209,6 +218,8 @@ class Cluster(object):
         self.use_memory = False
         self.v_partition="--partition="
         self.use_partition= False
+        self.v_qos = "--qos="
+        self.use_qos = False
         self.timeout = 1000
         self.use_timeout = False
 
@@ -259,6 +270,9 @@ class Cluster(object):
         # The default partition in which to submit calculations
         self.partition_name = ""
         
+        # The default qos in which to submit calculations
+        self.qos_name = ""
+
         # Still unused
         self.prefix_name = "prefix" # Variable in the calculator for differentiating the calculations
         
@@ -481,6 +495,8 @@ class Cluster(object):
             submission += "#%s %s%s\n" % (self.submit_name, self.v_memory, self.ram)
         if self.use_partition:
             submission += "#%s %s%s\n" % (self.submit_name, self.v_partition, self.partition_name)
+        if self.use_qos:
+            submission += "#%s %s%s\n" % (self.submit_name, self.v_qos, self.qos_name)
 
         # Append the additional parameters
         for add_parameter in self.custom_params:
@@ -1303,6 +1319,13 @@ Error while connecting to the cluster to copy the files:
             self.use_partition = True
         #if __CLUSTER_UPART__ in keys:
         #    self.use_partition = c_info[__CLUSTER_UPART__]
+        if __CLUSTER_VQOS__ in keys:
+            self.v_qos = c_info[__CLUSTER_VQOS__]
+        if __CLUSTER_NQOS__ in keys:
+            self.qos_name = c_info[__CLUSTER_NQOS__]
+            self.use_qos = True
+        if __CLUSTER_UQOS__ in keys:
+            self.use_qos = c_info[__CLUSTER_UQOS__]
         if __CLUSTER_UACCOUNT__ in keys:
             self.use_account = c_info[__CLUSTER_UACCOUNT__]
         if __CLUSTER_VACCOUNT__ in keys:

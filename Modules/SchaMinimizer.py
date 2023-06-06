@@ -429,6 +429,7 @@ class SSCHA_Minimizer(object):
                         timer.execute_timed_function(qe_sym.SymmetrizeFCQ, dyn_grad, self.dyn.q_stars, asr = "custom")
                     else:
                         qe_sym.SymmetrizeFCQ(dyn_grad, self.dyn.q_stars, asr = "custom")
+
                     #qe_sym.SymmetrizeFCQ(err, np.array(self.dyn.q_stars), asr = "custom")
 
                 # Just divide the error by the square root the number of symmetries

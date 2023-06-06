@@ -1,9 +1,21 @@
+
+
+
 Introduction
 ============
 
 Website for more information [sscha.eu](http://sscha.eu/).
 
 The full documentation of the package is in the [python-sscha.pdf](https://github.com/SSCHAcode/python-sscha/blob/master/python-sscha.pdf) file, in the root directory of this repository
+
+
+Subscriptions to the 2023 School are open!
+==========================================
+
+Visit the official [webpage](http://sscha.eu/Schools/2023/home/) to learn more about the in presence school on the sscha code about how to compute thermodynamic properties of the matter, accounting for anharmonicity and quantum fluctuations of ions!
+The school will be held in San Sebastian, Spain, between 26-30 June.
+
+
 
 What is python-sscha?
 ---------------------
