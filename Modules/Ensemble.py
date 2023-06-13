@@ -822,7 +822,7 @@ Error, the following stress files are missing from the ensemble:
         for i, s in enumerate(self.structures):
             energy = self.energies[i] * Rydberg  # Ry -> eV
             forces = self.forces[i, :, :] * Rydberg  # Ry/A -> eV/A
-            stress = self.stresses[i, :, :] * Rydberg /  Bohr**3 # Ry/Bohr^3 -> eV/A^3
+            stress = -self.stresses[i, :, :] * Rydberg /  Bohr**3 # Ry/Bohr^3 -> eV/A^3 (with ase conventions on sign)
             struct = s.get_ase_atoms()
 
             calculator = ase.calculators.singlepoint.SinglePointCalculator(struct, energy = energy,
@@ -835,7 +835,7 @@ Error, the following stress files are missing from the ensemble:
         ase.io.write(filename, ase_structs, format = "extxyz", append = append_mode)
 
 
-    def save_enhanced_xyz(self, filename, append_mode = True, stress_key = "virial", forces_key = "force", energy_key = "energy"):
+    def save_enhanced_xyz(self, filename, append_mode = True, stress_key = "stress", forces_key = "forces", energy_key = "energy"):
         """
         Save the ensemble as an enhanced xyz.
 
@@ -866,7 +866,8 @@ Error, the following stress files are missing from the ensemble:
                 info += '{}={:.16f} '.format(energy_key, self.energies[i] * Rydberg)
 
                 # Add the virial stress
-                info += '{}="{:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f}" '.format(stress_key, *list(self.stresses[i].ravel()))
+                stress_data = - self.stresses[i].ravel * CC.Units.RY_PER_BOHR3_TO_EV_PER_A3
+                info += '{}="{:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f}" '.format(stress_key, *list(stress_data))
 
                 # Add the secription of the xyz format
                 info += 'Properties=species:S:1:pos:R:3:{}:R:3\n'.format(forces_key)
@@ -1376,7 +1377,6 @@ Error, the following stress files are missing from the ensemble:
 
         # Check if the dynamical matrix has changed
         changed_dyn = np.max([np.max(np.abs(self.current_dyn.dynmats[i] - new_dynamical_matrix.dynmats[i])) for i in range(len(self.current_dyn.q_tot))])
-        print("DYN CHANGED BY:", changed_dyn)
         changed_dyn = changed_dyn > 1e-30
 
         # Prepare the new displacements
@@ -1902,14 +1902,11 @@ DETAILS OF ERROR:
         For documentation, see get_preconditioned_gradient
         """
 
-        print("force length:", len(self.force_computed))
 
         def work_function(argument, timer=None):
-            print("force length [inside]:", len(self.force_computed))
             ensemble_start_config, ensemble_end_config = argument
             mask = np.zeros(self.N, dtype = bool)
             mask[ensemble_start_config : ensemble_end_config] = True
-            print("mask length:", np.sum(mask.astype(int))," total N:", len(mask))
             new_ensemble = self.split(mask)
 
             gradient, _ = new_ensemble.get_preconditioned_gradient(*args, timer=timer, **kwargs)
@@ -3229,10 +3226,7 @@ DETAILS OF ERROR:
         N = np.sum(split_mask.astype(int))
         ens = Ensemble(self.dyn_0, self.T0, self.dyn_0.GetSupercell())
         ens.init_from_structures(structs)
-        print("Split length:", len(split_mask))
-        print("original force legnth:", len(self.force_computed))
-        print("Expected length:", len(ens.force_computed))
-        print("Splitting force length:", len(self.force_computed[split_mask]))
+        
 
         ens.force_computed[:] = self.force_computed[split_mask]
         ens.stress_computed[:] = self.stress_computed[split_mask]
