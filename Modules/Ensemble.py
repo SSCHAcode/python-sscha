@@ -822,7 +822,7 @@ Error, the following stress files are missing from the ensemble:
         for i, s in enumerate(self.structures):
             energy = self.energies[i] * Rydberg  # Ry -> eV
             forces = self.forces[i, :, :] * Rydberg  # Ry/A -> eV/A
-            stress = -self.stresses[i, :, :] * Rydberg /  Bohr**3 # Ry/Bohr^3 -> eV/A^3
+            stress = -self.stresses[i, :, :] * Rydberg /  Bohr**3 # Ry/Bohr^3 -> eV/A^3 (with ase conventions on sign)
             struct = s.get_ase_atoms()
 
             calculator = ase.calculators.singlepoint.SinglePointCalculator(struct, energy = energy,
