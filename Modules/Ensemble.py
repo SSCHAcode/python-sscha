@@ -791,12 +791,8 @@ Error, the following stress files are missing from the ensemble:
             self.dyn_0.save_qe("%s/dyn_gen_pop%d_" % (data_dir, population_id))
 
             if np.all(len(list(x)) > 0 for x in self.all_properties):
-                print('YES PROPERTIES')
                 with open(os.path.join(data_dir, "all_properties_pop%d.json" % population_id), "w") as fp:
                     json.dump({"properties" : self.all_properties}, fp, cls=NumpyEncoder)
-            else:
-                print('NOOO WHAT IS HAPPENING')
-                print(self.all_properties)
 
     def save_extxyz(self, filename, append_mode = True):
         """
@@ -3149,20 +3145,15 @@ DETAILS OF ERROR:
             self.remove_noncomputed()
 
         if is_cluster:
-            print("BEFORE COMPUTING:", self.all_properties)
             cluster.compute_ensemble(computing_ensemble, calculator, compute_stress)
 
         else:
             computing_ensemble.get_energy_forces(calculator, compute_stress, stress_numerical, verbose = verbose)
 
-        print("CE BEFORE MERGE:", len(self.force_computed))
 
         if should_i_merge:
             # Remove the noncomputed ensemble from here, and merge
             self.merge(computing_ensemble)
-        print("CE AFTER MERGE:", len(self.force_computed))
-
-        print('ENSEMBLE ALL PROPERTIES:', self.all_properties)
 
     def merge(self, other):
         """
