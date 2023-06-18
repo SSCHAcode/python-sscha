@@ -866,7 +866,7 @@ Error, the following stress files are missing from the ensemble:
                 info += '{}={:.16f} '.format(energy_key, self.energies[i] * Rydberg)
 
                 # Add the virial stress
-                stress_data = - self.stresses[i].ravel * CC.Units.RY_PER_BOHR3_TO_EV_PER_A3
+                stress_data = - self.stresses[i].ravel() * CC.Units.RY_PER_BOHR3_TO_EV_PER_A3
                 info += '{}="{:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f}" '.format(stress_key, *list(stress_data))
 
                 # Add the secription of the xyz format
