@@ -50,6 +50,20 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache
+input_tmp.in
+tmp_dyn*
+dyn_end_*
+dyn_start_*
+final_dyn*
+grad_*.dat
+u_population*.dat
+energies*.dat
+forces_*.dat
+prova
+scf_population*.dat
+frequencies*.*
+timer.json
+minim.dat
 
 # Translations
 *.mo
