@@ -15,6 +15,7 @@ import sscha.Cluster
 import sscha.Utilities as Utilities
 import cellconstructor as CC
 import cellconstructor.symmetries
+from sscha.aiida_ensemble import AiiDAEnsemble
 
 import sys, os
 
@@ -49,8 +50,17 @@ __ALLOWED_KEYS__ = [__RELAX_TYPE__, __RELAX_NCONFIGS__, __RELAX_MAX_POP__,
 
 class SSCHA(object):
 
-    def __init__(self, minimizer = None, ase_calculator=None, N_configs=1, max_pop = 20,
-                 save_ensemble = False, cluster = None, **kwargs):
+    def __init__(
+        self,
+        minimizer = None,
+        ase_calculator=None, 
+        aiida_inputs: dict | None = None,
+        N_configs=1, 
+        max_pop = 20,
+        save_ensemble = False, 
+        cluster = None,
+        **kwargs
+    ):
         """
         This module initialize the relaxer. It may perform
         constant volume or pressure relaxation using fully anharmonic potentials.
@@ -63,6 +73,16 @@ class SSCHA(object):
             ase_calculator : ase.calculators...
                 An initialized ASE calculator. This will be used to compute energies and forces
                 for the relaxation of the SSCHA.
+            aiida_input: dict
+                Dictionary containing the input data for the 
+                :class:`~sscha.aiida_ensemble.AiiDAEnsemble.compute_ensmble`
+                method; namely:
+                    * pw_code: str,
+                    * protocol: str = 'moderate',
+                    * options: dict = None,
+                    * overrides: dict = None,
+                    * group_label: str = None,
+                    * kwargs
             N_configs : int
                 The number of configuration to be used for each population
             max_pop: int, optional
@@ -84,6 +104,7 @@ class SSCHA(object):
         self.N_configs = N_configs
         self.max_pop = max_pop
         self.cluster = cluster
+        self.aiida_inputs = aiida_inputs
         self.start_pop = 1
 
         # If the ensemble must be saved at each iteration.
@@ -350,8 +371,11 @@ Error, the specified location to save the ensemble:
                 self.minim.ensemble.generate(self.N_configs, sobol = sobol, sobol_scramble = sobol_scramble, sobol_scatter = sobol_scatter)
 
                 # Compute energies and forces
-                self.minim.ensemble.compute_ensemble(self.calc, get_stress,
-                                                 cluster = self.cluster)
+                if isinstance(self.minim.ensemble, AiiDAEnsemble):
+                    self.minim.ensemble.compute_ensemble(**self.aiida_inputs)
+                else:
+                    self.minim.ensemble.compute_ensemble(
+                        self.calc, get_stress, cluster = self.cluster)
                 #self.minim.ensemble.get_energy_forces(self.calc, get_stress)
 
                 if ensemble_loc is not None and self.save_ensemble:
@@ -572,8 +596,11 @@ Error, the specified location to save the ensemble:
                 #    self.minim.ensemble.save_bin(ensemble_loc, pop)
 
                 # Compute energies and forces
-                self.minim.ensemble.compute_ensemble(self.calc, True, stress_numerical,
-                                                 cluster = self.cluster)
+                if isinstance(self.minim.ensemble, AiiDAEnsemble):
+                    self.minim.ensemble.compute_ensemble(**self.aiida_inputs)
+                else:
+                    self.minim.ensemble.compute_ensemble(
+                        self.calc, True, stress_numerical, cluster = self.cluster)
                 #self.minim.ensemble.get_energy_forces(self.calc, True, stress_numerical = stress_numerical)
 
                 print("RELAX force length:", len(self.minim.ensemble.force_computed))
