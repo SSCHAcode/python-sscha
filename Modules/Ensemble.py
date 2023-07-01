@@ -76,6 +76,15 @@ except:
 __EPSILON__ =  1e-6
 __A_TO_BOHR__ = 1.889725989
 
+__JULIA_EXT__ = False
+try:
+    import julia, julia.Main
+    julia.Main.include(os.path.join(os.path.dirname(__file__), 
+        "gradient_fourier.jl"))
+    __JULIA_EXT__ = True
+except:
+    pass
+
 try:
     from ase.units import create_units
     units = create_units("2006")#Rydberg, Bohr
