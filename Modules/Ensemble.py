@@ -80,7 +80,7 @@ __JULIA_EXT__ = False
 try:
     import julia, julia.Main
     julia.Main.include(os.path.join(os.path.dirname(__file__), 
-        "gradient_fourier.jl"))
+        "fourier_gradient.jl"))
     __JULIA_EXT__ = True
 except:
     pass
@@ -1904,6 +1904,51 @@ DETAILS OF ERROR:
             return new_phi, delta_new_phi
 
         return new_phi
+
+    def get_fourier_gradient(self, timer=None):
+        r"""
+        GET GRADIENT IN FOURIER SPACE
+        =============================
+
+        This subroutine computes the gradient in foureir space
+
+        It employes the acceleration available thanks 
+        to the julia code.
+
+        In brief, the calculation performs:
+
+        .. math::
+
+            \left< u(q) \delta f(-q)\right> 
+
+        To get the gradient in the q space. 
+        The method can be easily parallelized, 
+        since the julia subroutine returns also the average of the
+        square.
+        """
+        nq = len(self.current_dyn.q_tot)
+        nat = self.current_dyn.structure.N_atoms
+        nat_sc = self.structures[0].N_atoms
+        
+        # Get the covariance matrix (required for the gradient)
+        Y_matrix = self.current_dyn.GetUpsilonMatrix(self.current_T,
+                w_pols = (self.current_w, self.current_pols))
+
+
+        phi_grad = np.zeros((nq, 3*nat, 3*nat), dtype = np.complex128) 
+        phi_grad2 = np.zeros((nq, 3*nat, 3*nat), dtype = np.complex128)
+        r_lat = zeros((nat_sc, 3), dtype = np.float64)
+        
+        # Create the lattices
+        super_struct = self.current_dyn.structure.generate_supercell(self.supercell))
+        itau = super_struct.get_itau(self.current_dyn.structure)
+        for i in range(nat_sc):
+            r_lat[i,:] = super_struct.coords[i, :] - self.current_dyn.structure[itau[i] - 1, :]
+        r_lat *= CC.Units.A_TO_BOHR
+        
+        f_vector = (self.forces - self.sscha_forces).reshape( (self.N, 3 * nat_sc)) * CC.Units.BOHR_TO_ANGSTROM
+
+
 
     def get_preconditioned_gradient_parallel(self, *args, timer=None, **kwargs):
         """
