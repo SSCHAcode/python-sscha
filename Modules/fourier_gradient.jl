@@ -1,3 +1,5 @@
+using LinearAlgebra
+
 @doc raw"""
     function get_gradient_fourier(
         Φ_grad :: Array{U, 3},
@@ -23,8 +25,13 @@ where
 
     u_a(q) = \sum_R e^{-i q ⋅ R} u_a(R)
 
-Paramters 
----------
+All the average are reported by summing times the weights
+without normalization. 
+This makes it easier to enable parallelization in the error 
+calculation and compute the actual average in a super function. 
+
+Parameters 
+----------
 
 - Φ_grad : size (nq, 3*nat, 3*nat); the gradient of the free energy 
 - Φ_grad_err : size (nq, 3*nat, 3*nat); the average of squares. Used to evaluate the variance 
@@ -79,8 +86,8 @@ function get_gradient_fourier!(Φ_grad :: Array{U, 3},
     for i ∈  1:n_random
         for jq ∈ 1:nq
             for k ∈ 1:nat_sc
-                v_tilde[i, jq, itau[k]] += exp(- 1j * 2π * q[jq] * R_lat[k]) * v_vectors[k, i]
-                δf_tilde[i, jq, itau[k]] += exp(+ 1j * 2π * q[jq] * R_lat[k]) * δf_sc[k, i]
+                v_tilde[i, jq, itau[k]] += exp(- 1im * 2π * q[jq] * R_lat[k]) * v_vectors[k, i]
+                δf_tilde[i, jq, itau[k]] += exp(+ 1im * 2π * q[jq] * R_lat[k]) * δf_sc[k, i]
             end
         end
     end

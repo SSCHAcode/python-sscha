@@ -1925,6 +1925,19 @@ DETAILS OF ERROR:
         The method can be easily parallelized, 
         since the julia subroutine returns also the average of the
         square.
+
+        Parameters
+        ----------
+            - timer : Timer object, optional
+                If present, the time spent in the julia code is added to the timer.
+            
+        Results
+        -------
+            - grad : ndarray (3*nat x 3*nat)
+                The gradient in the fourier space.
+            - error_grad : float
+                The error of the gradient.
+                It does not count the symmetries
         """
         nq = len(self.current_dyn.q_tot)
         nat = self.current_dyn.structure.N_atoms
@@ -1937,7 +1950,7 @@ DETAILS OF ERROR:
 
         phi_grad = np.zeros((nq, 3*nat, 3*nat), dtype = np.complex128) 
         phi_grad2 = np.zeros((nq, 3*nat, 3*nat), dtype = np.complex128)
-        r_lat = zeros((nat_sc, 3), dtype = np.float64)
+        r_lat = np.zeros((nat_sc, 3), dtype = np.float64)
         
         # Create the lattices
         super_struct = self.current_dyn.structure.generate_supercell(self.supercell))
@@ -1945,8 +1958,32 @@ DETAILS OF ERROR:
         for i in range(nat_sc):
             r_lat[i,:] = super_struct.coords[i, :] - self.current_dyn.structure[itau[i] - 1, :]
         r_lat *= CC.Units.A_TO_BOHR
+
+        q_tot = np.array(self.current_dyn.q_tot) / CC.Units.A_TO_BOHR
         
         f_vector = (self.forces - self.sscha_forces).reshape( (self.N, 3 * nat_sc)) * CC.Units.BOHR_TO_ANGSTROM
+        u_vector = self.u_disps.reshape( (self.N, 3 * nat_sc)) / CC.Units.BOHR_TO_ANGSTROM
+
+        # Call the julia subroutine
+        julia.Main.get_gradient_fourier(phi_grad,
+                                        phi_grad2,
+                                        u_vector,
+                                        f_vector,
+                                        r_lat,
+                                        q_tot,
+                                        itau,
+                                        self.rho,
+                                        Y_matrix)
+        
+        # Divide by the total weights
+        n_tot = np.sum(self.rho)
+        phi_grad /= n_tot
+        phi_grad2 /= n_tot
+        error_grad = np.sqrt(np.sum(phi_grad2 - phi_grad**2)) / np.sqrt(n_tot)
+
+
+        return phi_grad, error_grad
+
 
 
 
