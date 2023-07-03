@@ -192,6 +192,8 @@ class Ensemble:
         self.q_start = np.zeros( (self.N, Nsc * 3))
         self.current_q = np.zeros( (self.N, Nsc * 3))
 
+        self.q_opposite_index = None
+
         # Store also the displacements
         self.u_disps = np.zeros( (self.N, Nsc * 3))
 
@@ -952,6 +954,7 @@ Error, the following stress files are missing from the ensemble:
             np.savetxt(os.path.join(root_directory, "force.raw"), self.forces.reshape((self.N, 3*nat)) * Rydberg)
 
             # Save the stress
+            #TODO: Check if there is a -1 sign or if the the units are correct
             np.savetxt(os.path.join(root_directory, "virial.raw"), self.stresses.reshape((self.N, 9)) * __GPa__ * 10000)
 
             # Save the types
@@ -1102,6 +1105,22 @@ Error, the following stress files are missing from the ensemble:
 
         # Setup the all properties
         self.all_properties = [{}] * self.N
+
+        # Initialize the opposite q points
+        # Useful to compute the transpose symmetry in q space
+        self.init_q_opposite()
+
+    def init_q_opposite(self):
+        """
+        Setup the inverse q points.
+        
+        This subroutine identifies the inverse of each q point from the dynamical matrix"""
+        bg = self.current_dyn.structure.get_reciprocal_vectors() / 2* np.pi 
+        self.q_opposite_index = julia.Main.get_opposite_q(
+            np.array(self.current_dyn.q_tot, dtype = np.float64),
+            bg
+        )
+
 
 
     def generate(self, N, evenodd = True, project_on_modes = None, sobol = False, sobol_scramble = False, sobol_scatter = 0.0):
@@ -1950,6 +1969,10 @@ Error while loading the julia module.
     interpreter. 
 """
             raise ImportError(MSG)
+        
+        # Check if the opposite q are initialize, otherwise do it once for all
+        if self.q_opposite_index is None:
+            self.init_q_opposite()
 
         nq = len(self.current_dyn.q_tot)
         nat = self.current_dyn.structure.N_atoms
@@ -1989,7 +2012,7 @@ Error while loading the julia module.
             itau,
             self.rho,
             Y_matrix,
-            bg)
+            self.q_opposite_index)
         
         # Divide by the total weights
         n_tot = np.sum(self.rho)
