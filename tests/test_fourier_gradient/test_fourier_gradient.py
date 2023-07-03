@@ -1,3 +1,4 @@
+import time
 import pytest
 import cellconstructor as CC, cellconstructor.Phonons
 import sscha, sscha.Ensemble
@@ -6,7 +7,7 @@ import sys, os
 import numpy as np
 
 @pytest.mark.julia 
-def test_fourier():
+def test_fourier(verbose = False):
     # Fix the seed to assure reproducibility 
     np.random.seed(0)
 
@@ -30,33 +31,44 @@ def test_fourier():
     dynmat = CC.Phonons.compute_phonons_finite_displacements(
         struct,
         calculator, 
-        supercell = (1,1,1))
-    
+        supercell = (3,3,3))
+ 
+    dynmat.AdjustQStar()
     dynmat.Symmetrize()
     dynmat.ForcePositiveDefinite()
     
 
     # Compute the gradient of the ensemble
     ensemble = sscha.Ensemble.Ensemble(dynmat, 0)
-    ensemble.generate(10)
+    ensemble.generate(50)
     ensemble.compute_ensemble(calculator)
 
     # Get the gradient in fourier
-    grad, err = ensemble.get_fourier_gradient()
+    if verbose:
+        # Warm up
+        ensemble.get_fourier_gradient()
 
-    assert np.max(np.abs(np.imag(grad))) < 1e-8, "Error, imaginary part non zero"
+    t1 = time.time()
+    grad, err = ensemble.get_fourier_gradient()
+    t2 = time.time()
+
+    assert np.max(np.abs(np.imag(grad[0, :, :]))) < 1e-8, "Error, imaginary part non zero"
 
     # Get the standard gradient
     grad_standard = ensemble.get_preconditioned_gradient()
+    t3 = time.time()
 
-    print("new gradient:")
-    print(np.real(grad[0, :, :]))
-    print("old gradient:")
-    print(grad_standard)
+    if verbose:
+        print("Time fourier:", t2 - t1)
+        print("Time standard:", t3 - t2)
 
-    assert np.max(np.abs(grad - grad_standard)) < 1e-8, "Error, the fourier gradient does not match with benchmark"
+    
+    for iq, q in enumerate(ensemble.current_dyn.q_tot):
+        assert np.max(np.abs(grad[iq, :, :] - grad_standard[iq, :, :])) < 1e-8, "Error, the fourier gradient does not match with benchmark"
+
+
 
 
 if __name__ == "__main__":
-    test_fourier()
+    test_fourier(verbose=True)
 

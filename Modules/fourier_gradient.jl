@@ -68,6 +68,7 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
         bg :: Matrix{T}) where {T <: AbstractFloat, I <: Integer}
     # TODO: Check that U and T are the complex of the other
 
+    begin
 
     # Get the system size
     nat_sc = size(u_sc, 2) ÷ 3
@@ -77,7 +78,7 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
 
     # Evaluate the v vector (product between u and Y matrix).
     v_vectors = zeros(T, (3*nat_sc, n_random))
-    v_vectors = Y * u_sc'
+    mul!(v_vectors, Y, u_sc')
 
 
     # Fourier transform the v and δf vectors
@@ -90,53 +91,61 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
                 for α in 1:3
                     index_sc = 3 * (k - 1) + α
                     index_uc = 3 * (itau[k] - 1) + α
-                    v_tilde[i, jq, index_uc] += exp(- 1im * 2π * q[jq] * R_lat[k]) * v_vectors[index_sc, i]
-                    δf_tilde[i, jq, index_sc] += exp(+ 1im * 2π * q[jq] * R_lat[k]) * δf_sc[i, index_sc]
+                    @views v_tilde[i, jq, index_uc] += exp(- 1im * 2π  * q[jq, :]' * R_lat[k, :]) * v_vectors[index_sc, i]
+                    @views δf_tilde[i, jq, index_uc] += exp(- 1im * 2π * q[jq, :]' * R_lat[k, :]) * δf_sc[i, index_sc]
                 end
             end
         end
     end
 
+    v_tilde ./= √(nq)
+    δf_tilde ./= √(nq)
+    
+    end
 
     # Compute the gradient exploiting a new average
     Φ_grad .= 0
     Φ_grad_err .= 0
     # Define helper arrays that avoid memory allocations during the for loop
     tmp = zeros(Complex{T}, (nat*3, nat*3))
-    tmp2 = zeros(Complex{T}, (nat*3, nat*3))
+    tmp2 = zeros(T, (nat*3, nat*3))
 
+    begin 
 
-
-    println("Computing gradient:")
-    println("Size comparison:")
-    println("Φ : $(size(Φ_grad))")
-    println("TMP: $(size(tmp))")
-    println()
     for i in 1:n_random
         for jq in 1:nq
-            @views tmp .= v_tilde[i, jq, :] * δf_tilde[i, jq, :]'  
-            tmp2 .= tmp 
-            tmp2 .*= conj(tmp)
-
-            println("JQ: $jq ; tmp modulus = $(sum(abs.(tmp)))")
-            @show tmp
+            # The ' also perform the conjugation
+            @views mul!(tmp, v_tilde[i, jq, :], δf_tilde[i, jq, :]')  
+            tmp2 .= abs.(tmp) 
+            tmp2 .^= 2
 
             tmp .*= weights[i]
             tmp2 .*= weights[i]
 
             Φ_grad[jq, :, :] .+= tmp
-            Φ_grad_err[jq, :, :] .+= real.(tmp2)
+            Φ_grad_err[jq, :, :] .+= tmp2
         end
+    end
     end
 
     # Apply the transpose symmetry
+    begin 
     minus_q_index = zeros(Int, nq)
     get_opposit_q!(minus_q_index, q, bg)
-
-    for iq in 1:nq
-        @views Φ_grad[iq, :, :] .+= conj(Φ_grad[minus_q_index[iq], :, :])'
     end
-    Φ_grad .*= 0.5
+
+    begin
+    tmp_grad = zeros(Complex{T}, (nq, 3*nat, 3*nat))
+    for iq in 1:nq
+        @views Φ_grad[iq, :, :] .+= Φ_grad[iq, :, :]'
+        @views tmp_grad[iq, :, :] .= Φ_grad[iq, :, :]
+    end
+    for iq in 1:nq
+        @views tmp_grad[iq, :, :] .+= conj.(Φ_grad[minus_q_index[iq], :, :]')
+    end
+    Φ_grad .= tmp_grad
+    Φ_grad .*= 0.25
+    end
 end
 function get_gradient_fourier(
     u_sc :: Matrix{T},
@@ -189,6 +198,10 @@ function get_opposit_q!(
     nq = size(q_list, 1)
     q_vector = zeros(T, 3)
     minus_q = zeros(T, 3)
+    G1_tmp = zeros(T, 3)
+    G2_tmp = zeros(T, 3)
+    G3_tmp = zeros(T, 3)
+    δ = zeros(T, 3)
     for i in 1:nq
         @views minus_q .= -q_list[i, :] 
         for j in 1:nq
@@ -197,18 +210,29 @@ function get_opposit_q!(
                 if skip 
                     break
                 end
+                @views G1_tmp .= bg[1, :]
+                G1_tmp .*= xx
                 for yy in -far : far + 1
                     if skip 
                         break
                     end
+                        @views G2_tmp .= bg[2, :]
+                    G2_tmp .*= yy
+
                     for zz in -far : far + 1
+                        @views G3_tmp .= bg[3, :]
+                        G3_tmp .*= zz
+
                         begin 
-                            @views q_vector .= q_list[i, :] + 
-                                xx * bg[1, :] +
-                                yy * bg[2, :] + 
-                                zz * bg[3, :]
+                            @views q_vector .= q_list[j, :]
+                            @views q_vector .+= G1_tmp
+                            @views q_vector .+= G2_tmp
+                            @views q_vector .+= G3_tmp 
                         end
-                        if max(abs.(minus_q .- q_vector)...) < 1e-8
+                        δ .= minus_q
+                        δ .-= q_vector
+                        δ .= abs.(δ)
+                        if max(δ...) < 1e-8
                             opposite_index[i] = j
                             skip = true
                             break
@@ -217,11 +241,5 @@ function get_opposit_q!(
                 end
             end
         end
-    end
-    println()
-    println("q tot:")
-    println(q_list)
-
-    println("Opposite q list:")
-    println(opposite_index)
+    end    
 end
