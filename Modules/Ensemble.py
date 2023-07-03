@@ -77,12 +77,14 @@ __EPSILON__ =  1e-6
 __A_TO_BOHR__ = 1.889725989
 
 __JULIA_EXT__ = False
+__JULIA_ERROR__ = ""
 try:
     import julia, julia.Main
     julia.Main.include(os.path.join(os.path.dirname(__file__), 
         "fourier_gradient.jl"))
     __JULIA_EXT__ = True
 except:
+    raise 
     pass
 
 try:
@@ -1939,6 +1941,16 @@ DETAILS OF ERROR:
                 The error of the gradient.
                 It does not count the symmetries
         """
+        if not __JULIA_EXT__:
+            MSG = """
+Error while loading the julia module.
+    This subroutine requires the julia speedup.
+    install julia as specified in the guide,
+    and execute the python script using the python-jl 
+    interpreter. 
+"""
+            raise ImportError(MSG)
+
         nq = len(self.current_dyn.q_tot)
         nat = self.current_dyn.structure.N_atoms
         nat_sc = self.structures[0].N_atoms
@@ -1949,14 +1961,15 @@ DETAILS OF ERROR:
 
 
         phi_grad = np.zeros((nq, 3*nat, 3*nat), dtype = np.complex128) 
-        phi_grad2 = np.zeros((nq, 3*nat, 3*nat), dtype = np.complex128)
+        phi_grad2 = np.zeros((nq, 3*nat, 3*nat), dtype = np.float64)
         r_lat = np.zeros((nat_sc, 3), dtype = np.float64)
         
         # Create the lattices
-        super_struct = self.current_dyn.structure.generate_supercell(self.supercell))
+        super_struct = self.current_dyn.structure.generate_supercell(self.supercell)
         itau = super_struct.get_itau(self.current_dyn.structure)
         for i in range(nat_sc):
-            r_lat[i,:] = super_struct.coords[i, :] - self.current_dyn.structure[itau[i] - 1, :]
+            r_lat[i,:] = super_struct.coords[i, :] - \
+                self.current_dyn.structure.coords[itau[i] - 1, :]
         r_lat *= CC.Units.A_TO_BOHR
 
         q_tot = np.array(self.current_dyn.q_tot) / CC.Units.A_TO_BOHR
@@ -1964,16 +1977,19 @@ DETAILS OF ERROR:
         f_vector = (self.forces - self.sscha_forces).reshape( (self.N, 3 * nat_sc)) * CC.Units.BOHR_TO_ANGSTROM
         u_vector = self.u_disps.reshape( (self.N, 3 * nat_sc)) / CC.Units.BOHR_TO_ANGSTROM
 
+        bg = self.current_dyn.structure.get_reciprocal_vectors() / CC.Units.A_TO_BOHR
+        bg /= 2 * np.pi 
+
         # Call the julia subroutine
-        julia.Main.get_gradient_fourier(phi_grad,
-                                        phi_grad2,
-                                        u_vector,
-                                        f_vector,
-                                        r_lat,
-                                        q_tot,
-                                        itau,
-                                        self.rho,
-                                        Y_matrix)
+        phi_grad, phi_grad2 = julia.Main.get_gradient_fourier(
+            u_vector,
+            f_vector,
+            r_lat,
+            q_tot,
+            itau,
+            self.rho,
+            Y_matrix,
+            bg)
         
         # Divide by the total weights
         n_tot = np.sum(self.rho)
