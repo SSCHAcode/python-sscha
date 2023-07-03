@@ -89,7 +89,7 @@ SCHAModules = Extension(name = "SCHAModules",
 
 # Prepare the compilation of the Python Conde
 setup( name = "python-sscha",
-       version = "1.3.2.2",
+       version = "1.3.2.3",
        description = "Python implementation of the sscha code",
        author = "Lorenzo Monacelli",
        url = "https://github.com/mesonepigreco/python-sscha",
