@@ -45,6 +45,9 @@ jobs:
         cd ..
         
         python setup.py install --user
+
+        # Install julia requirements
+        python -c 'import julia; julia.install()'
     - name: Test with pytest
       run: |
         export OMP_NUM_THREADS=1
