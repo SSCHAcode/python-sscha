@@ -75,8 +75,8 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
         nat = nat_sc ÷ nq
 
         # Evaluate the v vector (product between u and Y matrix).
-        v_vectors = zeros(T, (3*nat_sc, n_random))
-        mul!(v_vectors, Y, u_sc')
+        v_vectors = zeros(T, (n_random, 3*nat_sc))
+        mul!(v_vectors, u_sc, Y)
 
 
         # Fourier transform the v and δf vectors
@@ -85,15 +85,16 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
         q_dot_R = 0
 
 
-        for i ∈  1:n_random
-            for jq ∈ 1:nq
-                for k ∈ 1:nat_sc
-                    @views q_dot_R = q[:, jq]' * R_lat[:, k]
-                    exp_value = exp(- 1im * 2π * q_dot_R)
-                    for α in 1:3
-                        index_sc = 3 * (k - 1) + α
-                        index_uc = 3 * (itau[k] - 1) + α
-                        v_tilde[index_uc, jq, i] += exp_value * v_vectors[index_sc, i]
+        for jq ∈ 1:nq
+            for k ∈ 1:nat_sc
+                @views q_dot_R = q[:, jq]' * R_lat[:, k]
+                exp_value = exp(- 1im * 2π * q_dot_R)
+
+                for α in 1:3
+                    index_sc = 3 * (k - 1) + α
+                    index_uc = 3 * (itau[k] - 1) + α
+                    for i ∈ 1:n_random
+                        v_tilde[index_uc, jq, i] += exp_value * v_vectors[i, index_sc]
                         δf_tilde[index_uc, jq, i] += exp_value * δf_sc[i, index_sc]
                     end
                 end

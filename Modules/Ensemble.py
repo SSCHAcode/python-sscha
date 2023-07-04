@@ -1970,9 +1970,11 @@ Error while loading the julia module.
 """
             raise ImportError(MSG)
         
+        t1 = time.time()
         # Check if the opposite q are initialize, otherwise do it once for all
         if self.q_opposite_index is None:
             self.init_q_opposite()
+        t2 = time.time()
 
         nq = len(self.current_dyn.q_tot)
         nat = self.current_dyn.structure.N_atoms
@@ -1982,14 +1984,21 @@ Error while loading the julia module.
         Y_matrix = self.current_dyn.GetUpsilonMatrix(self.current_T,
                 w_pols = (self.current_w, self.current_pols))
 
+        t3 = time.time()
 
         phi_grad = np.zeros((nq, 3*nat, 3*nat), dtype = np.complex128) 
         phi_grad2 = np.zeros((nq, 3*nat, 3*nat), dtype = np.float64)
         r_lat = np.zeros((nat_sc, 3), dtype = np.float64)
         
         # Create the lattices
-        super_struct = self.current_dyn.structure.generate_supercell(self.supercell)
-        itau = super_struct.get_itau(self.current_dyn.structure)
+        if timer is not None:  
+            super_struct, itau = timer.execute_timed_function(self.current_dyn.structure.generate_supercell, self.supercell, get_itau=True)
+        else:
+            super_struct, itau = self.current_dyn.structure.generate_supercell(self.supercell, get_itau=True)
+        #itau = super_struct.get_itau(self.current_dyn.structure)
+        itau += 1 # Py -> Fortran
+
+        t4 = time.time()
         for i in range(nat_sc):
             r_lat[i,:] = super_struct.coords[i, :] - \
                 self.current_dyn.structure.coords[itau[i] - 1, :]
@@ -1997,11 +2006,15 @@ Error while loading the julia module.
 
         q_tot = np.array(self.current_dyn.q_tot) / CC.Units.A_TO_BOHR
         
+        t5 = time.time()
+
         f_vector = (self.forces - self.sscha_forces).reshape( (self.N, 3 * nat_sc)) * CC.Units.BOHR_TO_ANGSTROM
         u_vector = self.u_disps.reshape( (self.N, 3 * nat_sc)) / CC.Units.BOHR_TO_ANGSTROM
 
         bg = self.current_dyn.structure.get_reciprocal_vectors() / CC.Units.A_TO_BOHR
         bg /= 2 * np.pi 
+
+        t6 = time.time()
 
         # Call the julia subroutine
         phi_grad, phi_grad2 = julia.Main.get_gradient_fourier(
@@ -2020,6 +2033,15 @@ Error while loading the julia module.
         phi_grad2 /= n_tot
         error_grad = np.sqrt(np.sum(phi_grad2 - phi_grad**2)) / np.sqrt(n_tot)
 
+        t7 = time.time()
+
+        if timer is not None:
+            timer.add_timer("fourier gradient inverse q", t2-t1)
+            timer.add_timer("fourier gradient upsilon", t3-t2)
+            timer.add_timer("fourier gradient super struct", t4-t3)
+            timer.add_timer("fourier gradient lattice R and q", t5-t4)
+            timer.add_timer("fourier gradient forces", t6-t5)
+            timer.add_timer("fourier gradient julia", t7-t6)
 
         return phi_grad, error_grad
 

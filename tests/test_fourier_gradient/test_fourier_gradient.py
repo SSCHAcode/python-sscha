@@ -31,7 +31,7 @@ def test_fourier(verbose = False):
     dynmat = CC.Phonons.compute_phonons_finite_displacements(
         struct,
         calculator, 
-        supercell = (3,3,3))
+        supercell = (4,4,4))
  
     dynmat.AdjustQStar()
     dynmat.Symmetrize()
