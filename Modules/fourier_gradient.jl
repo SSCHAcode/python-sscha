@@ -282,3 +282,79 @@ function get_opposite_q(
     get_opposite_q!(opposite_index, q_list, bg; far = far)
     return opposite_index
 end
+
+
+@doc raw"""
+
+
+Compute the Υ matrix in the Fourier space.
+
+"""
+function get_upsilon_fourier!(
+    Y :: Array{Complex{T}, 3},
+    dynq :: Array{Complex{T}, 3},
+    q :: Matrix{T},
+    masses :: Vector{T},
+    temperature :: T;
+    w_min_threshold :: T = 1e-6) where {T <: AbstractFloat}
+
+    K_TO_RY = 6.336857346553283e-06
+
+    nat = size(dynq, 1) ÷ 3
+    nq = size(q, 1)
+
+    dyn_mat = zeros(Complex{T}, (3*nat, 3*nat))
+    n_ω = zeros(T, 3*nat)
+    ω = zeros(T, 3*nat)
+    pols = zeros(Complex{T}, (3*nat, 3*nat))
+    factor = zeros(T, 3*nat)
+    new_pols = zeros(Complex{T}, (3*nat, 3*nat))
+
+    # Convert the temperature in Ry
+    temperature = temperature * K_TO_RY
+    skip_mode = zeros(Bool, 3*nat)
+
+    for i in 1:nq
+        # Setup the dynamical matrix
+        dyn_mat = dynq[:, :, i] 
+        for j1 in 1:3*nat 
+            for j2 in 1:3*nat 
+                dyn_mat[j1, j2] *= 1.0 / sqrt(masses[j1] * masses[j2])
+            end
+        end
+
+        # Diagonalize the dynamical matrix
+        eigdata = eigen(dyn_mat)
+        ω = eigdata.values
+        pols = eigdata.vectors
+
+        skip_mode .= false
+        for μ in 1:3*nat
+            if ω[μ] < w_min_threshold
+                ω[μ] = 0
+                skip_mode[μ] = true
+            end
+        end
+
+        # Compute the occupation factor
+        if temperature > 0
+            @. n_ω = 1.0 / (exp(ω / temperature) - 1.0)
+        end
+
+        @. factor = 2 * ω / (1.0 + 2*n_ω)
+        
+        for μ in 1:3*nat
+            if skip_mode[μ]
+                factor[μ] = 0
+            end
+        end
+        
+        # Get the correct Y matrix in q space
+        for j1 in 1:3*nat
+            for j2 in 1:3*nat
+                new_pols[j1, j2] = pols[j1, j2] * factor[j2] 
+            end
+        end
+        @views mul!(Y[:, :, i], new_pols, pols')
+    end
+end
