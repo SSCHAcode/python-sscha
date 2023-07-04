@@ -1115,7 +1115,7 @@ Error, the following stress files are missing from the ensemble:
         Setup the inverse q points.
         
         This subroutine identifies the inverse of each q point from the dynamical matrix"""
-        bg = self.current_dyn.structure.get_reciprocal_vectors() / 2* np.pi 
+        bg = self.current_dyn.structure.get_reciprocal_vectors() / (2* np.pi )
         self.q_opposite_index = julia.Main.get_opposite_q(
             np.array(self.current_dyn.q_tot, dtype = np.float64),
             bg

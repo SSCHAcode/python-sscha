@@ -211,7 +211,7 @@ bg must be aligned in python way ``bg[i, :]`` is the i-th vector.
 function get_opposite_q!(
     opposite_index :: Vector{Int},
     q_list :: Matrix{T},
-    bg :: Matrix{T}; far :: Int = 3) where {T <: AbstractFloat}
+    bg :: Matrix{T}; far :: Int = 4) where {T <: AbstractFloat}
 
     opposite_index .= -1
     nq = size(q_list, 1)
@@ -251,7 +251,12 @@ function get_opposite_q!(
                         δ .= minus_q
                         δ .-= q_vector
                         δ .= abs.(δ)
-                        if max(δ...) < 1e-8
+                        
+                        if i == 28
+                            println("Check $i vs $j; $xx, $yy, $zz; $δ")
+                        end
+
+                        if max(δ...) < 1e-6
                             opposite_index[i] = j
                             skip = true
                             break
@@ -261,6 +266,16 @@ function get_opposite_q!(
             end
         end
     end    
+
+    # Check if all the q have been found
+    for i in 1:nq
+        if opposite_index[i] == -1
+            println("Error on q: $(q_list[i, :])")
+            println("All q: $(opposite_index)")
+
+            error("The opposite q for $i has not been found")
+        end
+    end
 end
 function get_opposite_q(
     q_list :: Matrix{T},
