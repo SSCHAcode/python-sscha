@@ -84,8 +84,17 @@ try:
         "fourier_gradient.jl"))
     __JULIA_EXT__ = True
 except:
-    raise 
-    pass
+    try:
+        import julia
+        from julia.api import Julia
+        jl = Julia(compiled_modules=False)
+        import julia.Main
+        julia.Main.include(os.path.join(os.path.dirname(__file__),
+            "fourier_gradient.jl"))
+        __JULIA_EXT__ = True
+    except:
+        raise 
+        pass
 
 try:
     from ase.units import create_units
