@@ -211,7 +211,7 @@ bg must be aligned in python way ``bg[i, :]`` is the i-th vector.
 function get_opposite_q!(
     opposite_index :: Vector{Int},
     q_list :: Matrix{T},
-    bg :: Matrix{T}; far :: Int = 4) where {T <: AbstractFloat}
+    bg :: Matrix{T}; far :: Int = 3) where {T <: AbstractFloat}
 
     opposite_index .= -1
     nq = size(q_list, 1)
@@ -251,10 +251,6 @@ function get_opposite_q!(
                         δ .= minus_q
                         δ .-= q_vector
                         δ .= abs.(δ)
-                        
-                        if i == 28
-                            println("Check $i vs $j; $xx, $yy, $zz; $δ")
-                        end
 
                         if max(δ...) < 1e-6
                             opposite_index[i] = j
@@ -282,6 +278,6 @@ function get_opposite_q(
     bg :: Matrix{T}; far :: Int = 3) :: Vector{Int} where {T <: AbstractFloat}
 
     opposite_index = zeros(Int, size(q_list, 1))
-    get_opposite_q!(opposite_index, q_list, bg, far = far)
+    get_opposite_q!(opposite_index, q_list, bg; far = far)
     return opposite_index
 end
