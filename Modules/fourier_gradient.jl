@@ -77,7 +77,7 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
         # Fourier transform the v and δf vectors
         v_tilde = zeros(Complex{T}, (3*nat, nq, n_random))
         δf_tilde = zeros(Complex{T}, (3*nat, nq, n_random))
-        u_tilde = zeros(T, (3*nat, nq, n_random))
+        u_tilde = zeros(Complex{T}, (3*nat, nq, n_random))
         q_dot_R = 0
 
         for jq ∈ 1:nq
