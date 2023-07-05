@@ -162,6 +162,13 @@ class Ensemble:
         self.current_w = None
         self.current_pols = None
 
+        # The frequencies and polarizations of the ensemble
+        # In q space
+        self.w_q_0 = None
+        self.pols_q_0 = None
+        self.w_q_current = None
+        self.pols_q_current = None
+
         self.sscha_energies = []
         self.sscha_forces = []
 
@@ -249,10 +256,12 @@ class Ensemble:
             super(Ensemble, self).__setattr__(name, value)
 
         if name == "dyn_0":
-            self.w_0, self.pols_0 = value.DiagonalizeSupercell()
+            self.w_0, self.pols_0, self.w_q_0, self.pols_q_0 = value.DiagonalizeSupercell(return_qmodes=True)
             self.current_dyn = value.Copy()
             self.current_w = self.w_0.copy()
             self.current_pols = self.pols_0.copy()
+            self.w_q_current = self.w_q_0.copy()
+            self.pols_q_current = self.pols_q_0.copy()
 
 
     def convert_units(self, new_units):
@@ -1429,14 +1438,18 @@ Error, the following stress files are missing from the ensemble:
 
         if changed_dyn:
             if timer:
-                w_new, pols = timer.execute_timed_function(new_dynamical_matrix.DiagonalizeSupercell)
+                w_new, pols, wqn, polsqn = timer.execute_timed_function(new_dynamical_matrix.DiagonalizeSupercell, return_qmodes=True)
             else:
-                w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
+                w_new, pols, wqn, polsqn = new_dynamical_matrix.DiagonalizeSupercell(return_qmodes=True)#new_super_dyn.DyagDinQ(0)
             self.current_w = w_new.copy()
             self.current_pols = pols.copy()
+            self.w_q_current = wqn.copy()
+            self.pols_q_current = polsqn.copy()
         else:
             w_new = self.current_w.copy()
             pols  = self.current_pols.copy()
+            wqn = self.w_q_current.copy()
+            polsqn = self.pols_q_current.copy()
             #w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
             #self.current_w = w_new.copy()
             #self.current_pols = pols.copy()
@@ -1989,9 +2002,16 @@ Error while loading the julia module.
         nat = self.current_dyn.structure.N_atoms
         nat_sc = self.structures[0].N_atoms
         
+        Y_qspace = julia.Main.get_upsilon_fourier(
+            self.w_q_current,
+            self.pols_q_current,
+            self.current_dyn.structure.get_masses_array(),
+            np.float64(self.current_T)
+        )
+
         # Get the covariance matrix (required for the gradient)
-        Y_matrix = self.current_dyn.GetUpsilonMatrix(self.current_T,
-                w_pols = (self.current_w, self.current_pols))
+        #Y_matrix = self.current_dyn.GetUpsilonMatrix(self.current_T,
+        #        w_pols = (self.current_w, self.current_pols))
 
         t3 = time.time()
 
@@ -2033,7 +2053,7 @@ Error while loading the julia module.
             q_tot,
             itau,
             self.rho,
-            Y_matrix,
+            Y_qspace,
             self.q_opposite_index)
         
         # Divide by the total weights

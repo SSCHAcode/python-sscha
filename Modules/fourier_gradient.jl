@@ -9,7 +9,7 @@ using LinearAlgebra
         R_lat :: Matrix{T},
         q :: Matrix{T},
         itau :: Array{Int},
-        Y_matrix :: Matrix{T},
+        Y_matrix_q :: Array{Complex{T}, 3},
         q_opposite_index :: Vector{I})  {where T <: AbstractFloat, U <: AbstractComplex}
 
 Also a nonbang (!) version of the subroutine exists where the Φ_grad and Φ_grad_err 
@@ -44,7 +44,7 @@ calculation and compute the actual average in a super function.
 - q : size (nq, 3) the q vectors
 - itau : size (nat_sc); the index in the primitive cell corresponding to the supercell
 - weights : size (n_random); the weights of the configurations
-- Y_matrix : (3*nat_sc, 3*nat_sc) The inverse covariance matrix in the supercell.
+- Y_matrix_q : (3*nat, 3*nat, nq) The inverse covariance matrix in q-space.
 - bg : (3, 3) The brilluin zone vectors (used to identify the q -> -q + G_)
 
 
@@ -64,7 +64,7 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
         q :: Matrix{T},
         itau :: Vector{I},
         weights :: Vector{T},
-        Y :: Matrix{T},
+        Y :: Array{Complex{T}, 3},
         minus_q_index :: Vector{N}) where {T <: AbstractFloat, I <: Integer, N <: Integer}
 
     @time begin
@@ -74,16 +74,11 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
         nq = size(q, 2)
         nat = nat_sc ÷ nq
 
-        # Evaluate the v vector (product between u and Y matrix).
-        v_vectors = zeros(T, (n_random, 3*nat_sc))
-        mul!(v_vectors, u_sc, Y)
-
-
         # Fourier transform the v and δf vectors
         v_tilde = zeros(Complex{T}, (3*nat, nq, n_random))
         δf_tilde = zeros(Complex{T}, (3*nat, nq, n_random))
+        u_tilde = zeros(T, (3*nat, nq, n_random))
         q_dot_R = 0
-
 
         for jq ∈ 1:nq
             for k ∈ 1:nat_sc
@@ -94,16 +89,21 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
                     index_sc = 3 * (k - 1) + α
                     index_uc = 3 * (itau[k] - 1) + α
                     for i ∈ 1:n_random
-                        v_tilde[index_uc, jq, i] += exp_value * v_vectors[i, index_sc]
+                        u_tilde[index_uc, jq, i] += exp_value * u_sc[i, index_sc]
                         δf_tilde[index_uc, jq, i] += exp_value * δf_sc[i, index_sc]
                     end
                 end
             end
         end
 
+        for i in 1:n_random
+            for jq in 1:nq
+                @views mul!(v_tilde[:, jq, i], Y[:, :, jq], u_tilde[:, jq, i])
+            end
+        end
+
         v_tilde ./= √(nq)
         δf_tilde ./= √(nq)
-    
     end
 
     # Compute the gradient exploiting a new average
@@ -155,7 +155,7 @@ function get_gradient_fourier(
     q :: Matrix{T},
     itau :: Vector{I},
     weights :: Vector{T},
-    Y :: Matrix{T},
+    Y :: Array{Complex{T}, 3},
     minus_q_vector :: Vector{N}) where {T <: AbstractFloat, I <: Integer, N <: Integer}
     
     nq = size(q, 1)
