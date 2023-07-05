@@ -204,6 +204,11 @@ class Ensemble:
         # How many atoms in the supercell
         Nsc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms
 
+        # Prepare the atoms in the supercell structure
+        super_struct, itau = dyn0.structure.generate_supercell(self.supercell, get_itau=True)
+        self.supercell_structure = super_struct
+        self.itau = itau + 1
+
         # To avoid to recompute each time the same variables store something usefull here
         self.q_start = np.zeros( (self.N, Nsc * 3))
         self.current_q = np.zeros( (self.N, Nsc * 3))
@@ -1128,6 +1133,13 @@ Error, the following stress files are missing from the ensemble:
         # Useful to compute the transpose symmetry in q space
         self.init_q_opposite()
 
+        # Initialize the supercell
+        super_struct, itau = self.current_dyn.structure.generate_supercell(self.supercell, get_itau=True)
+        self.supercell_structure = super_struct
+        self.itau = itau + 1
+
+
+
     def init_q_opposite(self):
         """
         Setup the inverse q points.
@@ -2019,13 +2031,20 @@ Error while loading the julia module.
         phi_grad2 = np.zeros((nq, 3*nat, 3*nat), dtype = np.float64)
         r_lat = np.zeros((nat_sc, 3), dtype = np.float64)
         
-        # Create the lattices
-        if timer is not None:  
-            super_struct, itau = timer.execute_timed_function(self.current_dyn.structure.generate_supercell, self.supercell, get_itau=True)
+        if self.itau is not None:
+            super_struct = self.supercell_structure
+            itau = self.itau
         else:
-            super_struct, itau = self.current_dyn.structure.generate_supercell(self.supercell, get_itau=True)
-        #itau = super_struct.get_itau(self.current_dyn.structure)
-        itau += 1 # Py -> Fortran
+            # Create the lattices
+            if timer is not None:  
+                super_struct, itau = timer.execute_timed_function(self.current_dyn.structure.generate_supercell, self.supercell, get_itau=True)
+            else:
+                super_struct, itau = self.current_dyn.structure.generate_supercell(self.supercell, get_itau=True)
+            #itau = super_struct.get_itau(self.current_dyn.structure)
+            itau += 1 # Py -> Fortran
+
+            self.supercell_structure = super_struct
+            self.itau = itau
 
         t4 = time.time()
         for i in range(nat_sc):
