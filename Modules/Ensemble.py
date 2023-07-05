@@ -94,7 +94,7 @@ except:
         __JULIA_EXT__ = True
     except:
         raise 
-        pass
+    pass
 
 try:
     from ase.units import create_units
@@ -3642,3 +3642,9 @@ Error while loading the julia module.
             self.stress_computed[:] = True
         else:
             self.has_stress = False
+
+
+
+def _wrapper_julia_get_upsilon_q(*args, **kwargs):
+    """Worker function, just for testing"""
+    return julia.Main.get_upsilon_fourier(*args, **kwargs)

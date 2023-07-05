@@ -285,23 +285,40 @@ end
 
 
 @doc raw"""
+    get_upsilon_fourier!(
+        Y :: Array{Complex{T}, 3},
+        ω :: Matrix{T},
+        pols :: Array{Complex{T}, 3},
+        masses :: Vector{T},
+        temperature :: T;
+        w_min_threshold :: T = 1e-6) where {T <: AbstractFloat}
+
 
 
 Compute the Υ matrix in the Fourier space.
 
+## Parameters
+
+- Y : The Υ matrix in Fourier space (last index is the q point)
+    This is modified by the function
+- ω_q : The frequencies in the q point (q is the last index)
+- pols_q : The polarization vectors in the q point (q is the last index)
+- masses : (length nat) The masses of the atoms (in the primitive cell)
+- temperature : The temperature in kelvin
+- w_min_threshold : The minimum frequency to consider a mode (in Ry)
 """
 function get_upsilon_fourier!(
     Y :: Array{Complex{T}, 3},
-    dynq :: Array{Complex{T}, 3},
-    q :: Matrix{T},
+    ω_q :: Matrix{T},
+    pols_q :: Array{Complex{T}, 3},
     masses :: Vector{T},
     temperature :: T;
-    w_min_threshold :: T = 1e-6) where {T <: AbstractFloat}
+    w_min_threshold :: T = 1e-12) where {T <: AbstractFloat}
 
     K_TO_RY = 6.336857346553283e-06
 
-    nat = size(dynq, 1) ÷ 3
-    nq = size(q, 1)
+    nat = size(Y, 1) ÷ 3
+    nq = size(Y, 3)
 
     dyn_mat = zeros(Complex{T}, (3*nat, 3*nat))
     n_ω = zeros(T, 3*nat)
@@ -315,19 +332,10 @@ function get_upsilon_fourier!(
     skip_mode = zeros(Bool, 3*nat)
 
     for i in 1:nq
+        @views ω .= ω_q[:, i]
+        @views pols .= pols_q[:, :, i]
+        
         # Setup the dynamical matrix
-        dyn_mat = dynq[:, :, i] 
-        for j1 in 1:3*nat 
-            for j2 in 1:3*nat 
-                dyn_mat[j1, j2] *= 1.0 / sqrt(masses[j1] * masses[j2])
-            end
-        end
-
-        # Diagonalize the dynamical matrix
-        eigdata = eigen(dyn_mat)
-        ω = eigdata.values
-        pols = eigdata.vectors
-
         skip_mode .= false
         for μ in 1:3*nat
             if ω[μ] < w_min_threshold
@@ -356,5 +364,26 @@ function get_upsilon_fourier!(
             end
         end
         @views mul!(Y[:, :, i], new_pols, pols')
+
+        # Apply the mass rescaling
+        for j1 in 1:nat
+            for j2 in 1:nat
+                @views Y[3*(j1 - 1) + 1 : 3*j1, 3*(j2-1) + 1 : 3*j2, i] .*= √(masses[j1] * masses[j2])
+            end
+        end
     end
+end
+function get_upsilon_fourier(
+    ω_q :: Matrix{T},
+    pols_q :: Array{Complex{T}, 3},
+    masses :: Vector{T},
+    temperature :: T;
+    w_min_threshold :: T = 1e-12) :: Array{Complex{T}, 3} where {T <: AbstractFloat}
+
+    # Create Y and return it
+    nq = size(ω_q, 2)
+    nat = size(masses, 1)
+    Y = zeros(Complex{T}, (3*nat, 3*nat, nq))
+    get_upsilon_fourier!(Y, ω_q, pols_q, masses, temperature; w_min_threshold = w_min_threshold)
+    return Y
 end
