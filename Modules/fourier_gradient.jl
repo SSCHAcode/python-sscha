@@ -387,3 +387,183 @@ function get_upsilon_fourier(
     get_upsilon_fourier!(Y, ω_q, pols_q, masses, temperature; w_min_threshold = w_min_threshold)
     return Y
 end
+
+
+
+@doc raw"""
+    vector_r2q!(
+        v_q :: Array{Complex{T}, 3},
+        v_sc :: Matrix{T},
+        q_tot :: Matrix{T})
+
+
+Fourier transform a vector from real space and q space.
+
+$$
+v_k(\vec q) = \frac{1}{\sqrt{N_q}} \sum_{R} e^{-i 2\pi \vec R\cdot \vec q} v_k(\vec R)
+$$
+
+
+## Parameters
+
+- v_q : (3*nat, nq, n_configs) 
+    The target vector in Fourier space.
+- v_sc : (n_configs, 3*nat_sc)
+    The original vector in real space
+- q_tot : (3, nq)
+    The list of q vectors
+- itau : (nat_sc)
+    The correspondance for each atom in the supercell with the atom in the primitive cell.
+- R_lat : (3, nat_sc)
+    The origin coordinates of the supercell in which the atom is
+"""
+function vector_r2q!(
+        v_q :: Array{Complex{T}, 3},
+        v_sc :: Matrix{T},
+        q :: Matrix{T},
+        itau :: Vector{I},
+        R_lat :: Matrix{T}
+    ) where {T <: AbstractFloat, I <: Integer}
+
+    nq = size(q, 2)
+    n_random = size(v_sc, 1)
+    nat_sc = size(v_sc, 2) ÷ 3
+    nat = size(v_q, 2)
+
+    v_q .= 0
+
+    for jq ∈ 1:nq
+        for k ∈ 1:nat_sc
+            @views q_dot_R = q[:, jq]' * R_lat[:, k]
+            exp_value = exp(- 1im * 2π * q_dot_R)
+
+            for α in 1:3
+                index_sc = 3 * (k - 1) + α
+                index_uc = 3 * (itau[k] - 1) + α
+                for i ∈ 1:n_random
+                    v_q[index_uc, jq, i] += exp_value * v_sc[i, index_sc]
+                end
+            end
+        end
+    end
+
+    v_q ./= √(nq)
+end
+function vector_r2q(
+        v_sc :: Matrix{T},
+        q_jj:: Matrix{T},
+        itau :: Vector{I},
+        R_jj :: Matrix{T}
+    ) :: Array{Complex{T}, 3} where {T <: AbstractFloat, I <: Integer}
+
+    nq = size(q_jj, 1)
+    nat_sc = size(R_jj, 1)
+    nat = nat_sc ÷ nq
+    n_random = size(v_sc, 1)
+
+    # Prepare the input and form the output
+    R_lat = zeros(T, (3, nat_sc))
+    q = zeros(T, (3, nq))
+
+    R_lat .= R_jj'
+    q .= q_jj'
+
+    v_q = zeros(Complex{T}, (nat*3, nq, n_random))
+
+    vector_r2q!(v_q, v_sc, q, itau, R_lat)
+    return v_q
+end
+
+
+@doc raw"""
+    vector_q2r!(
+        v_sc :: Matrix{T},
+        v_q :: Array{Complex{T}, 3},
+        q_tot :: Matrix{T},
+        itau :: Vector{I},
+        R_lat :: Matrix{T}) where {T <: AbstractFloat, I <: Integer}
+
+
+Fourier transform a vector from q space to real space.
+
+$$
+v_k(\vec R) = \frac{1}{\sqrt{N_q}} \sum_{R} e^{+i 2\pi \vec R\cdot \vec q} v_k(\vec q)
+$$
+
+
+## Parameters
+
+
+- v_sc : (n_configs, 3*nat_sc)
+    The target vector in real space
+- v_q : (nq, 3*nat, n_configs) 
+    The original vector in Fourier space. 
+- q_tot : (3, nq)
+    The list of q vectors
+- itau : (nat_sc)
+    The correspondance for each atom in the supercell with the atom in the primitive cell.
+- R_lat : (3, nat_sc)
+    The origin coordinates of the supercell in which the atom is
+"""
+function vector_q2r!(
+        v_sc :: Matrix{T},
+        v_q :: Array{Complex{T}, 3},
+        q :: Matrix{T},
+        itau :: Vector{I},
+        R_lat :: Matrix{T}
+    ) where {T <: AbstractFloat, I <: Integer}
+
+    nq = size(q, 2)
+    n_random = size(v_sc, 1)
+    nat_sc = size(v_sc, 2) ÷ 3
+    nat = size(v_q, 2)
+    tmp_vector = zeros(Complex{T}, (n_random, 3*nat_sc))
+
+    v_sc .= 0
+    for jq ∈ 1:nq
+        for k ∈ 1:nat_sc
+            @views q_dot_R = q[:, jq]' * R_lat[:, k]
+            exp_value = exp(1im * 2π * q_dot_R)
+
+            for α in 1:3
+                index_sc = 3 * (k - 1) + α
+                index_uc = 3 * (itau[k] - 1) + α
+                for i ∈ 1:n_random
+                    tmp_vector[i, index_sc] += exp_value * v_q[index_uc, jq, i]
+                end
+            end
+        end
+    end
+
+    println("SIZE ORIGINAL: $(size(v_sc))")
+    println("SIZE TARGET: $(size(tmp_vector))")
+
+    v_sc .= real(tmp_vector)
+    v_sc ./= √(nq)
+end
+function vector_q2r(
+        v_q :: Array{Complex{T},3},
+        q_jj:: Matrix{T},
+        itau :: Vector{I},
+        R_jj :: Matrix{T}
+    ) :: Matrix{T} where {T <: AbstractFloat, I <: Integer}
+
+    nq = size(q_jj, 1)
+    nat_sc = size(R_jj, 1)
+    nat = nat_sc ÷ nq
+    n_random = size(v_q, 3)
+
+
+    # Prepare the input and form the output
+    R_lat = zeros(T, (3, nat_sc))
+    q = zeros(T, (3, nq))
+
+    R_lat .= R_jj'
+    q .= q_jj'
+    v_sc = zeros(T, (n_random, 3*nat_sc))
+
+    vector_q2r!(v_sc, v_q, q, itau, R_lat)
+    return v_sc
+end
+
+

@@ -1409,6 +1409,207 @@ Error, the following stress files are missing from the ensemble:
         self.sscha_energies = sscha_energies_new
         self.sscha_forces = sscha_forces_new
 
+    def update_weights_fourier(self, new_dynamical_matrix, newT, timer=None):
+        """
+        IMPORTANCE SAMPLING
+        ===================
+
+
+        This function updates the importance sampling for the given dynamical matrix.
+        The result is written in the self.rho variable
+
+
+        Parameters
+        ----------
+            new_dynamical_matrix : CC.Phonons.Phonons()
+                The new dynamical matrix on which you want to compute the averages.
+            new_T : float
+                The new temperature.
+        """
+
+        self.current_T = newT
+
+        # Check if the dynamical matrix has changed
+        changed_dyn = np.max([np.max(np.abs(self.current_dyn.dynmats[i] - new_dynamical_matrix.dynmats[i])) for i in range(len(self.current_dyn.q_tot))])
+        changed_dyn = changed_dyn > 1e-30
+
+        # Prepare the new displacements
+        super_struct0 = self.dyn_0.structure.generate_supercell(self.supercell)
+        super_structure = new_dynamical_matrix.structure.generate_supercell(self.supercell)
+        old_disps = np.zeros(np.shape(self.u_disps), dtype = np.double)
+        Nat_sc = super_structure.N_atoms
+
+        self.u_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_structure.coords.ravel(), (self.N,1))
+        old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_struct0.coords.ravel(), (self.N,1))
+
+        
+        # Get the displacements according to Fourier
+        
+
+        if changed_dyn:
+            if timer:
+                w_new, pols, wqn, polsqn = timer.execute_timed_function(new_dynamical_matrix.DiagonalizeSupercell, return_qmodes=True)
+            else:
+                w_new, pols, wqn, polsqn = new_dynamical_matrix.DiagonalizeSupercell(return_qmodes=True)#new_super_dyn.DyagDinQ(0)
+            self.current_w = w_new.copy()
+            self.current_pols = pols.copy()
+            self.w_q_current = wqn.copy()
+            self.pols_q_current = polsqn.copy()
+        else:
+            w_new = self.current_w.copy()
+            pols  = self.current_pols.copy()
+            wqn = self.w_q_current.copy()
+            polsqn = self.pols_q_current.copy()
+            #w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
+            #self.current_w = w_new.copy()
+            #self.current_pols = pols.copy()
+        # Update sscha energies and forces
+        if timer:
+            self.sscha_energies[:], self.sscha_forces[:,:,:] = timer.execute_timed_function(new_dynamical_matrix.get_energy_forces,
+                                                                                            None, displacement = self.u_disps, w_pols = (w_new, pols))
+        else:
+            self.sscha_energies[:], self.sscha_forces[:,:,:] = new_dynamical_matrix.get_energy_forces(None, displacement = self.u_disps, w_pols = (w_new, pols))
+
+
+        t1 = time.time()
+        # Get the frequencies of the original dynamical matrix
+        #super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
+
+        w_original = self.w_0.copy()
+        pols_original = self.pols_0.copy()
+
+        # Exclude translations
+        if not self.ignore_small_w:
+            trans_original = CC.Methods.get_translations(pols_original, super_struct0.get_masses_array())
+        else:
+            trans_original = np.abs(w_original) < CC.Phonons.__EPSILON_W__
+
+        w = w_original[~trans_original]
+
+        # Convert from Ry to Ha and in fortran double precision
+        w = np.array(w/2, dtype = np.float64)
+
+        # Get the a_0
+        old_a = SCHAModules.thermodynamic.w_to_a(w, self.T0)
+
+        # Now do the same for the new dynamical matrix
+        #new_super_dyn = new_dynamical_matrix.GenerateSupercellDyn(self.supercell)
+
+
+        if not self.ignore_small_w:
+            trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
+        else:
+            trans_mask = np.abs(w_new) < CC.Phonons.__EPSILON_W__
+
+
+        # Check if the new dynamical matrix satisfies the sum rule
+        violating_sum_rule = (np.sum(trans_mask.astype(int)) != 3) or (np.sum(trans_original.astype(int)) != 3)
+        if self.ignore_small_w:
+            violating_sum_rule = np.sum(trans_mask.astype(int)) != np.sum(trans_original.astype(int))
+
+
+        if violating_sum_rule:
+            ERR_MSG = """
+ERROR WHILE UPDATING THE WEIGHTS
+
+Error, one dynamical matrix does not satisfy the acoustic sum rule.
+    If this problem arises on a sscha run,
+    it may be due to a gradient that violates the sum rule.
+    Please, be sure you are not using a custom gradient function.
+
+DETAILS OF ERROR:
+    Number of translatinal modes in the original dyn = {}
+    Number of translational modes in the target dyn = {}
+    (They should be both 3)
+""".format(np.sum(trans_original.astype(int)), np.sum(trans_mask.astype(int)))
+
+            print(ERR_MSG)
+            raise ValueError(ERR_MSG)
+
+        w= w_new[~trans_mask]
+        w = np.array(w/2, dtype = np.float64)
+        new_a = SCHAModules.thermodynamic.w_to_a(w, newT)
+
+
+        # Get the new displacements in the supercell
+        t2 = time.time()
+        if timer:
+            timer.add_timer("update preparation", t2-t1)
+        # for i in range(self.N):
+        #     self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
+
+        #     old_disps[i,:] = (self.xats[i, :, :] - super_dyn.structure.coords).reshape( 3*Nat_sc )
+
+        #     # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
+
+
+
+        # Convert the q vectors in the Hartree units
+        #old_q = self.q_start * np.sqrt(np.float64(2)) * __A_TO_BOHR__
+        #new_q = self.current_q * np.sqrt(np.float64(2)) * __A_TO_BOHR__
+
+
+        #t1 = time.time()
+        #self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
+        #t2 = time.time()
+
+        if __DEBUG_RHO__:
+            print( " ==== [UPDATE RHO DEBUGGING] ==== ")
+            print( " INPUT INFO: ")
+            np.savetxt("rho_%05d.dat" % self.__debug_index__, self.rho)
+            print( " rho saved in ", "rho_%05d.dat" % self.__debug_index__)
+
+
+        # Get the covariance matrices of the ensemble
+        if timer:
+            ups_new = np.real(timer.execute_timed_function(new_dynamical_matrix.GetUpsilonMatrix, self.current_T, w_pols = (w_new, pols)))
+            ups_old = np.real(timer.execute_timed_function(self.dyn_0.GetUpsilonMatrix, self.T0, w_pols = (w_original, pols_original)))
+        else:
+            ups_new = np.real(new_dynamical_matrix.GetUpsilonMatrix(self.current_T, w_pols = (w_new, pols)))
+            ups_old = np.real(self.dyn_0.GetUpsilonMatrix(self.T0, w_pols = (w_original, pols_original)))
+
+        # Get the normalization ratio
+        #norm = np.sqrt(np.abs(np.linalg.det(ups_new) / np.linalg.det(ups_old)))
+        norm = np.prod( old_a / new_a)
+
+        t2 = time.time()
+
+        rho_tmp = np.ones( self.N, dtype = np.float64) * norm
+        if __DEBUG_RHO__:
+            print("Norm factor:", norm)
+
+        for i in range(self.N):
+            v_new = self.u_disps[i, :].dot(ups_new.dot(self.u_disps[i, :])) * __A_TO_BOHR__**2
+            v_old = old_disps[i, :].dot(ups_old.dot(old_disps[i, :])) * __A_TO_BOHR__**2
+
+            if __DEBUG_RHO__:
+                print("CONF {} | displacement = {}".format(i, v_new - v_old))
+            rho_tmp[i] *= np.exp(-0.5 * (v_new - v_old) )
+        # Lets try to use this one
+        self.rho = rho_tmp
+
+
+
+        #print("\n".join(["%8d) %16.8f" % (i+1, r) for i, r in enumerate(self.rho)]))
+
+        #np.savetxt("upsilon_%05d.dat" % self.__debug_index__, ups_new)
+        #np.savetxt("d_upsilon_%05d.dat" % self.__debug_index__, dups)
+
+
+        #print "RHO:", self.rho
+
+        #for i in range(self.N):
+            # Get the new displacement
+            #self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
+            #self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
+        t1 = time.time()
+        if timer:
+            timer.add_timer("<u| Y |u> and weights update (TODO: parallelizable)", t1-t2)
+            self.current_dyn = timer.execute_timed_function(new_dynamical_matrix.Copy)
+        #print( "Time elapsed to update weights the sscha energies, forces and displacements:", t1 - t3, "s")
+        else:
+            self.current_dyn = new_dynamical_matrix.Copy()
+
 
 
     def update_weights(self, new_dynamical_matrix, newT, update_q = False, timer=None):
@@ -1447,6 +1648,8 @@ Error, the following stress files are missing from the ensemble:
 
         self.u_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_structure.coords.ravel(), (self.N,1))
         old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_struct0.coords.ravel(), (self.N,1))
+
+        
 
         if changed_dyn:
             if timer:
@@ -3355,14 +3558,14 @@ Error while loading the julia module.
         else:
             computing_ensemble.get_energy_forces(calculator, compute_stress, stress_numerical, verbose = verbose)
 
-        print("CE BEFORE MERGE:", len(self.force_computed))
+        #print("CE BEFORE MERGE:", len(self.force_computed))
 
         if should_i_merge:
             # Remove the noncomputed ensemble from here, and merge
             self.merge(computing_ensemble)
-        print("CE AFTER MERGE:", len(self.force_computed))
+        #print("CE AFTER MERGE:", len(self.force_computed))
 
-        print('ENSEMBLE ALL PROPERTIES:', self.all_properties)
+        #print('ENSEMBLE ALL PROPERTIES:', self.all_properties)
 
     def merge(self, other):
         """
@@ -3687,3 +3890,48 @@ Error while loading the julia module.
 def _wrapper_julia_get_upsilon_q(*args, **kwargs):
     """Worker function, just for testing"""
     return julia.Main.get_upsilon_fourier(*args, **kwargs)
+
+def _wrapper_julia_vector_q2r(*args, **kwargs):
+    """
+    Worker function to test the julia wrapper.
+
+    Fourier transform a vector from q space to supercell
+
+    Parameters
+    ----------
+
+        - vector_q : ndarray (3*nat, nq, n_random) 
+        - q_tot : ndarray (nq, 3)
+        - itau : ndarray (nat_sc)
+        - R_lat : ndarray (nat_sc, 3)
+
+    Returns
+    -------
+
+        - vector_sc : ndarray (n_random, 3*nat_sc)
+        
+    """
+
+    return julia.Main.vector_q2r(*args, **kwargs)
+
+def _wrapper_julia_vector_r2q(*args, **kwargs):
+    """
+    Worker function to test the julia wrapper.
+
+    Fourier transform a vector from supercell to q space
+
+    Parameters
+    ----------
+
+        - vector_sc : ndarray (n_random, 3*nat_sc) 
+        - q_tot : ndarray (nq, 3)
+        - itau : ndarray (nat_sc)
+        - R_lat : ndarray (nat_sc, 3)
+
+    Returns
+    -------
+        
+        - vector_q : ndarray (3*nat, nq, n_random)
+    """
+
+    return julia.Main.vector_r2q(*args, **kwargs)
