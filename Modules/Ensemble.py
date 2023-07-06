@@ -206,6 +206,7 @@ class Ensemble:
 
         # Prepare the atoms in the supercell structure
         super_struct, itau = dyn0.structure.generate_supercell(self.supercell, get_itau=True)
+        self.supercell_structure_original = super_struct.copy()
         self.supercell_structure = super_struct
         self.itau = itau + 1
 
@@ -1433,17 +1434,41 @@ Error, the following stress files are missing from the ensemble:
         changed_dyn = np.max([np.max(np.abs(self.current_dyn.dynmats[i] - new_dynamical_matrix.dynmats[i])) for i in range(len(self.current_dyn.q_tot))])
         changed_dyn = changed_dyn > 1e-30
 
+        # Check if the structure has changed
+        changed_struct = np.max(np.abs(self.current_dyn.structure.coords - new_dynamical_matrix.structure.coords)) > 1e-10
+
         # Prepare the new displacements
-        super_struct0 = self.dyn_0.structure.generate_supercell(self.supercell)
-        super_structure = new_dynamical_matrix.structure.generate_supercell(self.supercell)
+        #super_struct0 = self.dyn_0.structure.generate_supercell(self.supercell)
+        super_struct0 = self.supercell_structure_original.copy()
+        if changed_struct:
+            super_structure = new_dynamical_matrix.structure.generate_supercell(self.supercell)
+            self.supercell_structure = super_structure.copy()
+        else:
+            super_structure = self.supercell_structure.copy()
+
         old_disps = np.zeros(np.shape(self.u_disps), dtype = np.double)
         Nat_sc = super_structure.N_atoms
-
+    
         self.u_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_structure.coords.ravel(), (self.N,1))
         old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_struct0.coords.ravel(), (self.N,1))
 
+        # Get the lattice vectors
+        nat_sc = super_structure.N_atoms
+        r_lat = np.zeros((nat_sc, 3), dtype = np.double)
         
+        for i in range(nat_sc):
+            r_lat[i,:] = super_structure.coords[i, :] - \
+                self.current_dyn.structure.coords[self.itau[i] - 1, :]
+ 
+
         # Get the displacements according to Fourier
+        u_disp_fourier = julia.Main.vector_r2q(
+            self.u_disps,
+            np.array(self.current_dyn.q_tot),
+            self.itau,
+            r_lat 
+        )
+
         
 
         if changed_dyn:
@@ -1559,14 +1584,24 @@ DETAILS OF ERROR:
             np.savetxt("rho_%05d.dat" % self.__debug_index__, self.rho)
             print( " rho saved in ", "rho_%05d.dat" % self.__debug_index__)
 
+        # Get the two covariance matrix
+        t1 = time.time()
+        Y_qspace_new = julia.Main.get_upsilon_fourier(
+            self.w_q_current,
+            self.pols_q_current,
+            self.current_dyn.structure.get_masses_array(),
+            np.float64(self.current_T)
+        )
+        Y_qspace_old = julia.Main.get_upsilon_fourier(
+            self.w_q_0,
+            self.pols_q_0,
+            self.dyn0.structure.get_masses_array(),
+            np.float64(self.T0)
+        ) 
+        t2 = time.time()
 
-        # Get the covariance matrices of the ensemble
         if timer:
-            ups_new = np.real(timer.execute_timed_function(new_dynamical_matrix.GetUpsilonMatrix, self.current_T, w_pols = (w_new, pols)))
-            ups_old = np.real(timer.execute_timed_function(self.dyn_0.GetUpsilonMatrix, self.T0, w_pols = (w_original, pols_original)))
-        else:
-            ups_new = np.real(new_dynamical_matrix.GetUpsilonMatrix(self.current_T, w_pols = (w_new, pols)))
-            ups_old = np.real(self.dyn_0.GetUpsilonMatrix(self.T0, w_pols = (w_original, pols_original)))
+            timer.add_timer("get upsilon fourier", t2-t1)
 
         # Get the normalization ratio
         #norm = np.sqrt(np.abs(np.linalg.det(ups_new) / np.linalg.det(ups_old)))

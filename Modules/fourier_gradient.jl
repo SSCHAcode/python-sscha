@@ -567,3 +567,97 @@ function vector_q2r(
 end
 
 
+@doc raw"""
+    multiply_Y_u_fourier!(
+        v_tilde :: Array{Complex{T}, 3},
+        Yq :: Array{Complex{T}, 3},
+        u_tilde :: Array{Complex{T}, 3}
+    ) where {T <: AbstractFloat}
+
+Multiply the Fourier transform of the Y matrix with the Fourier transform of the u vector.
+
+## Parameters
+
+- v_tilde :: Array{Complex{T}, 3}
+    The output vector  
+- Yq :: Array{Complex{T}, 3}
+    The Fourier transform of the Y matrix
+- u_tilde :: Array{Complex{T}, 3}
+    The Fourier transform of the u vector
+
+## Returns
+
+- v_tilde :: Array{Complex{T}, 3}
+    The output vector
+"""
+function multiply_Y_u_fourier!(
+    v_tilde:: Array{Complex{T}, 3},
+    Yq :: Array{Complex{T}, 3},
+    u_tilde:: Array{Complex{T}, 3}
+) where {T <: AbstractFloat}
+
+    nq = size(v_q, 2)
+    n_random = size(v_q, 3)
+
+    for i in 1:n_random
+        for jq in 1:nq
+            @views mul!(v_tilde[:, jq, i], Yq[:, :, jq], u_tilde[:, jq, i])
+        end
+    end
+end
+function multiply_Y_u_fourier(
+    Yq :: Array{Complex{T}, 3},
+    u_tilde:: Array{Complex{T}, 3}
+) :: Array{Complex{T}, 3} where {T <: AbstractFloat}
+    nq = size(Yq, 3)
+    n_random = size(u_tilde, 3)
+
+    v_tilde = zeros(Complex{T}, size(u_tilde))
+    multiply_Y_u_fourier!(v_tilde, Yq, u_tilde)
+    return v_tilde
+end
+
+
+@doc raw"""
+    get_uYu_fourier(
+        u_tilde :: Array{Complex{T}, 3},
+        Yq :: Array{Complex{T}, 3}
+    ) :: Vector{T} where {T <: AbstractFloat}
+
+Compute the factor 
+
+$$
+\left< u | Y | u \right>
+$$
+
+## Parameters
+
+- u_tilde :: Array{Complex{T}, 3} (3*nat, nq, n_random)
+    The Fourier transform of the u vector
+- Yq :: Array{Complex{T}, 3} (3*nat, 3*nat, nq)
+    The Fourier transform of the Y matrix
+
+## Returns
+
+- uYu :: Array{T, 1} (n_random)
+    The factor
+"""
+function get_uYu_fourier(
+    u_tilde :: Array{Complex{T}, 3},
+    Yq :: Array{Complex{T}, 3}
+) :: Vector{T} {where T <: AbstractFloat}
+    v_tilde = multiply_Y_u_fourier(Yq, u_tilde)
+
+    n_random = size(u_tilde, 3)
+    nq = size(u_tilde, 2)
+    uYu = zeros(T, n_random)
+
+    for i in 1:n_random
+        for jq in 1:nq
+            @views uYu[i] += real(u_tilde[:, jq, i]' * v_tilde[:, jq, i])
+        end
+    end
+    return uYu
+end
+    
+    
