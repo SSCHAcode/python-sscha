@@ -1462,14 +1462,23 @@ Error, the following stress files are missing from the ensemble:
  
 
         # Get the displacements according to Fourier
-        u_disp_fourier = julia.Main.vector_r2q(
+        t1 = time.time()
+        u_disp_fourier_new = julia.Main.vector_r2q(
             self.u_disps,
             np.array(self.current_dyn.q_tot),
             self.itau,
             r_lat 
         )
+        u_disp_fourier_old = julia.Main.vector_r2q(
+            old_disp,
+            np.array(self.current_dyn.q_tot),
+            self.itau,
+            r_lat 
+        )
+        t2 = time.time()
 
-        
+        if timer:
+            timer.add_timer("Fourier transform of u_disp", t2-t1)
 
         if changed_dyn:
             if timer:
@@ -1488,15 +1497,39 @@ Error, the following stress files are missing from the ensemble:
             #w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
             #self.current_w = w_new.copy()
             #self.current_pols = pols.copy()
-        # Update sscha energies and forces
-        if timer:
-            self.sscha_energies[:], self.sscha_forces[:,:,:] = timer.execute_timed_function(new_dynamical_matrix.get_energy_forces,
-                                                                                            None, displacement = self.u_disps, w_pols = (w_new, pols))
-        else:
-            self.sscha_energies[:], self.sscha_forces[:,:,:] = new_dynamical_matrix.get_energy_forces(None, displacement = self.u_disps, w_pols = (w_new, pols))
 
 
+        # Get the dynq matrix in the correct format for the julia call
         t1 = time.time()
+        dynq = np.zeros((3*nat, 3*nat, nq), dtype = np.complex128, order = "F")
+        for i in range(len(new_dynamical_matrix.q_tot)):
+            dynq[:, :, i] = new_dynamical_matrix.dynmats[i]
+        t2 = time.time()
+        if timer:
+            timer.add_timer("Prepare dynq for julia", t2-t1)
+        
+        # Get the forces 
+        forces_sscha_q = julia.Main.multiply_matrix_vector_fourier(
+                dynq,
+                u_disp_fourier_new * CC.Units.A_TO_BOHR,
+                )
+        self.sscha_energies[:] = julia.Main.multiply_vector_fourier(
+                forces_sscha_q,
+                u_disp_fourier_new * CC.Units.A_TO_BOHR
+                )
+
+        # Go back to real space and convert in Ry/Angstrom
+        forces_sscha_sc = julia.Main.vector_q2r(
+                forces_sscha_q,
+                np.array(new_dynamical_matrix.q_tot),
+                self.itau,
+                r_lat
+                ) * CC.Units.A_TO_BOHR 
+
+
+        t2 = time.time()
+        if timer:
+            timer.add_timer("Time to get SSCHA energy and forces", t2-t1)
         # Get the frequencies of the original dynamical matrix
         #super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
 

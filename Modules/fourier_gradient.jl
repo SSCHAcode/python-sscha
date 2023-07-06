@@ -568,7 +568,7 @@ end
 
 
 @doc raw"""
-    multiply_Y_u_fourier!(
+    multiply_matrix_vector_fourier!(
         v_tilde :: Array{Complex{T}, 3},
         Yq :: Array{Complex{T}, 3},
         u_tilde :: Array{Complex{T}, 3}
@@ -590,7 +590,7 @@ Multiply the Fourier transform of the Y matrix with the Fourier transform of the
 - v_tilde :: Array{Complex{T}, 3}
     The output vector
 """
-function multiply_Y_u_fourier!(
+function multiply_matrix_vector_foureir!(
     v_tilde:: Array{Complex{T}, 3},
     Yq :: Array{Complex{T}, 3},
     u_tilde:: Array{Complex{T}, 3}
@@ -605,7 +605,7 @@ function multiply_Y_u_fourier!(
         end
     end
 end
-function multiply_Y_u_fourier(
+function multiply_matrix_vector_fourier(
     Yq :: Array{Complex{T}, 3},
     u_tilde:: Array{Complex{T}, 3}
 ) :: Array{Complex{T}, 3} where {T <: AbstractFloat}
@@ -613,7 +613,7 @@ function multiply_Y_u_fourier(
     n_random = size(u_tilde, 3)
 
     v_tilde = zeros(Complex{T}, size(u_tilde))
-    multiply_Y_u_fourier!(v_tilde, Yq, u_tilde)
+    multiply_matrix_vector_fourier!(v_tilde, Yq, u_tilde)
     return v_tilde
 end
 
@@ -646,7 +646,7 @@ function get_uYu_fourier(
     u_tilde :: Array{Complex{T}, 3},
     Yq :: Array{Complex{T}, 3}
 ) :: Vector{T} {where T <: AbstractFloat}
-    v_tilde = multiply_Y_u_fourier(Yq, u_tilde)
+    v_tilde = multiply_matrix_vector_fourier(Yq, u_tilde)
 
     n_random = size(u_tilde, 3)
     nq = size(u_tilde, 2)
@@ -661,3 +661,30 @@ function get_uYu_fourier(
 end
     
     
+function multiply_vector_fourier!(
+        result :: Vector{T},
+        vector1 :: Array{Complex{T}, 3},
+        vector2 :: Array{Complex{T}, 3}
+        ) where {T <: AbstractFloat} 
+
+    nq = size(vector1, 2)
+    n_random = size(vector1, 3)
+    
+    for i in 1:n_random
+        for jq in 1:nq
+            @views result[i] += real(vector1[:, jq, i]' * vector2[:, jq, i])
+        end
+    end
+end
+function multiply_vector_fourier(
+        vector1 :: Array{Complex{T}, 3},
+        vector2 :: Array{Complex{T}, 3}
+        ) :: Vector{T} where {T <: AbstractFloat} 
+
+    nq = size(vector1, 2)
+    n_random = size(vector1, 3)
+    
+    result = zeros(T, n_random)
+    multiply_vector_fourier!(result, vector1, vector2)
+    return result
+end
