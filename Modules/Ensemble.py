@@ -1647,15 +1647,16 @@ DETAILS OF ERROR:
             u_disp_fourier_old)
 
         uYu_new = julia.Main.multiply_vector_vector_fourier(
-            u_disp_fourier_new,
-            v_new)
+            u_disp_fourier_new * CC.Units.A_TO_BOHR,
+            v_new * CC.Units.A_TO_BOHR)
         uYu_old = julia.Main.multiply_vector_vector_fourier(
-            u_disp_fourier_old,
-            v_old)
+            u_disp_fourier_old * CC.Units.A_TO_BOHR,
+            v_old * CC.Units.A_TO_BOHR)
         t3 = time.time()
         if timer:
             timer.add_timer("get uYu", t3-t2)
 
+        # Print the displacements
 
         # Get the normalization ratio
         #norm = np.sqrt(np.abs(np.linalg.det(ups_new) / np.linalg.det(ups_old)))
@@ -1859,10 +1860,13 @@ DETAILS OF ERROR:
         if __DEBUG_RHO__:
             print("Norm factor:", norm)
 
+        uYu = np.zeros(self.N, dtype = np.float64)
+
         for i in range(self.N):
             v_new = self.u_disps[i, :].dot(ups_new.dot(self.u_disps[i, :])) * __A_TO_BOHR__**2
             v_old = old_disps[i, :].dot(ups_old.dot(old_disps[i, :])) * __A_TO_BOHR__**2
 
+            uYu[i] = v_new
             if __DEBUG_RHO__:
                 print("CONF {} | displacement = {}".format(i, v_new - v_old))
             rho_tmp[i] *= np.exp(-0.5 * (v_new - v_old) )
