@@ -1592,9 +1592,9 @@ DETAILS OF ERROR:
 
 
         # Get the new displacements in the supercell
-        t2 = time.time()
+        t3 = time.time()
         if timer:
-            timer.add_timer("update preparation", t2-t1)
+            timer.add_timer("update norm", t3-t2)
         # for i in range(self.N):
         #     self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
 

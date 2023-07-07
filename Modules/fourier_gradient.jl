@@ -1,4 +1,5 @@
 using LinearAlgebra
+#using LoopVectorization
 
 @doc raw"""
     function get_gradient_fourier!(
@@ -470,6 +471,7 @@ function vector_r2q(
 
     v_q = zeros(Complex{T}, (nat*3, nq, n_random))
 
+    println("Timing vector_r2q! ")
     vector_r2q!(v_q, v_sc, q, itau, R_lat)
     return v_q
 end
@@ -535,9 +537,6 @@ function vector_q2r!(
         end
     end
 
-    println("SIZE ORIGINAL: $(size(v_sc))")
-    println("SIZE TARGET: $(size(tmp_vector))")
-
     v_sc .= real(tmp_vector)
     v_sc ./= √(nq)
 end
@@ -562,6 +561,7 @@ function vector_q2r(
     q .= q_jj'
     v_sc = zeros(T, (n_random, 3*nat_sc))
 
+    println("Timing vector_q2r")
     vector_q2r!(v_sc, v_q, q, itau, R_lat)
     return v_sc
 end
