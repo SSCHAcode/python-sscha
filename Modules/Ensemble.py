@@ -1470,7 +1470,7 @@ Error, the following stress files are missing from the ensemble:
             r_lat 
         )
         u_disp_fourier_old = julia.Main.vector_r2q(
-            old_disp,
+            old_disps,
             np.array(self.current_dyn.q_tot),
             self.itau,
             r_lat 
@@ -1501,6 +1501,8 @@ Error, the following stress files are missing from the ensemble:
 
         # Get the dynq matrix in the correct format for the julia call
         t1 = time.time()
+        nat = self.current_dyn.structure.N_atoms
+        nq = len(self.current_dyn.q_tot)
         dynq = np.zeros((3*nat, 3*nat, nq), dtype = np.complex128, order = "F")
         for i in range(len(new_dynamical_matrix.q_tot)):
             dynq[:, :, i] = new_dynamical_matrix.dynmats[i]
@@ -1508,15 +1510,15 @@ Error, the following stress files are missing from the ensemble:
         if timer:
             timer.add_timer("Prepare dynq for julia", t2-t1)
         
-        # Get the forces 
-        forces_sscha_q = julia.Main.multiply_matrix_vector_fourier(
+        # Get the forces and energies 
+        forces_sscha_q = - julia.Main.multiply_matrix_vector_fourier(
                 dynq,
                 u_disp_fourier_new * CC.Units.A_TO_BOHR,
                 )
-        self.sscha_energies[:] = julia.Main.multiply_vector_fourier(
+        self.sscha_energies[:] = julia.Main.multiply_vector_vector_fourier(
                 forces_sscha_q,
                 u_disp_fourier_new * CC.Units.A_TO_BOHR
-                )
+                ) * 0.5 
 
         # Go back to real space and convert in Ry/Angstrom
         forces_sscha_sc = julia.Main.vector_q2r(
@@ -1628,7 +1630,7 @@ DETAILS OF ERROR:
         Y_qspace_old = julia.Main.get_upsilon_fourier(
             self.w_q_0,
             self.pols_q_0,
-            self.dyn0.structure.get_masses_array(),
+            self.dyn_0.structure.get_masses_array(),
             np.float64(self.T0)
         ) 
         t2 = time.time()
@@ -1636,26 +1638,33 @@ DETAILS OF ERROR:
         if timer:
             timer.add_timer("get upsilon fourier", t2-t1)
 
+        # Get the <u | Y | u> in Fourier space
+        v_new  = julia.Main.multiply_matrix_vector_fourier(
+            Y_qspace_new,
+            u_disp_fourier_new)
+        v_old  = julia.Main.multiply_matrix_vector_fourier(
+            Y_qspace_old,
+            u_disp_fourier_old)
+
+        uYu_new = julia.Main.multiply_vector_vector_fourier(
+            u_disp_fourier_new,
+            v_new)
+        uYu_old = julia.Main.multiply_vector_vector_fourier(
+            u_disp_fourier_old,
+            v_old)
+        t3 = time.time()
+        if timer:
+            timer.add_timer("get uYu", t3-t2)
+
+
         # Get the normalization ratio
         #norm = np.sqrt(np.abs(np.linalg.det(ups_new) / np.linalg.det(ups_old)))
-        norm = np.prod( old_a / new_a)
-
         t2 = time.time()
+        self.rho = np.prod( old_a / new_a) * np.exp(-0.5 * (uYu_new - uYu_old) ) 
+        t3 = time.time()
 
-        rho_tmp = np.ones( self.N, dtype = np.float64) * norm
-        if __DEBUG_RHO__:
-            print("Norm factor:", norm)
-
-        for i in range(self.N):
-            v_new = self.u_disps[i, :].dot(ups_new.dot(self.u_disps[i, :])) * __A_TO_BOHR__**2
-            v_old = old_disps[i, :].dot(ups_old.dot(old_disps[i, :])) * __A_TO_BOHR__**2
-
-            if __DEBUG_RHO__:
-                print("CONF {} | displacement = {}".format(i, v_new - v_old))
-            rho_tmp[i] *= np.exp(-0.5 * (v_new - v_old) )
-        # Lets try to use this one
-        self.rho = rho_tmp
-
+        if timer:
+            timer.add_timer("get rho", t3-t2)
 
 
         #print("\n".join(["%8d) %16.8f" % (i+1, r) for i, r in enumerate(self.rho)]))
@@ -1670,9 +1679,8 @@ DETAILS OF ERROR:
             # Get the new displacement
             #self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
             #self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
-        t1 = time.time()
+      
         if timer:
-            timer.add_timer("<u| Y |u> and weights update (TODO: parallelizable)", t1-t2)
             self.current_dyn = timer.execute_timed_function(new_dynamical_matrix.Copy)
         #print( "Time elapsed to update weights the sscha energies, forces and displacements:", t1 - t3, "s")
         else:

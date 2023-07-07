@@ -590,14 +590,14 @@ Multiply the Fourier transform of the Y matrix with the Fourier transform of the
 - v_tilde :: Array{Complex{T}, 3}
     The output vector
 """
-function multiply_matrix_vector_foureir!(
+function multiply_matrix_vector_fourier!(
     v_tilde:: Array{Complex{T}, 3},
     Yq :: Array{Complex{T}, 3},
     u_tilde:: Array{Complex{T}, 3}
 ) where {T <: AbstractFloat}
 
-    nq = size(v_q, 2)
-    n_random = size(v_q, 3)
+    nq = size(v_tilde, 2)
+    n_random = size(v_tilde, 3)
 
     for i in 1:n_random
         for jq in 1:nq
@@ -645,7 +645,7 @@ $$
 function get_uYu_fourier(
     u_tilde :: Array{Complex{T}, 3},
     Yq :: Array{Complex{T}, 3}
-) :: Vector{T} {where T <: AbstractFloat}
+) :: Vector{T} where {T <: AbstractFloat}
     v_tilde = multiply_matrix_vector_fourier(Yq, u_tilde)
 
     n_random = size(u_tilde, 3)
@@ -661,7 +661,7 @@ function get_uYu_fourier(
 end
     
     
-function multiply_vector_fourier!(
+function multiply_vector_vector_fourier!(
         result :: Vector{T},
         vector1 :: Array{Complex{T}, 3},
         vector2 :: Array{Complex{T}, 3}
@@ -676,7 +676,7 @@ function multiply_vector_fourier!(
         end
     end
 end
-function multiply_vector_fourier(
+function multiply_vector_vector_fourier(
         vector1 :: Array{Complex{T}, 3},
         vector2 :: Array{Complex{T}, 3}
         ) :: Vector{T} where {T <: AbstractFloat} 
@@ -685,6 +685,6 @@ function multiply_vector_fourier(
     n_random = size(vector1, 3)
     
     result = zeros(T, n_random)
-    multiply_vector_fourier!(result, vector1, vector2)
+    multiply_vector_vector_fourier!(result, vector1, vector2)
     return result
 end
