@@ -407,7 +407,7 @@ $$
 
 ## Parameters
 
-- v_q : (3*nat, nq, n_configs) 
+- v_q : (n_configs, 3nat, nq) 
     The target vector in Fourier space.
 - v_sc : (n_configs, 3*nat_sc)
     The original vector in real space
@@ -442,7 +442,7 @@ function vector_r2q!(
                 index_sc = 3 * (k - 1) + α
                 index_uc = 3 * (itau[k] - 1) + α
                 for i ∈ 1:n_random
-                    v_q[index_uc, jq, i] += exp_value * v_sc[i, index_sc]
+                    v_q[i, index_uc, jq] += exp_value * v_sc[i, index_sc]
                 end
             end
         end
@@ -469,7 +469,7 @@ function vector_r2q(
     R_lat .= R_jj'
     q .= q_jj'
 
-    v_q = zeros(Complex{T}, (nat*3, nq, n_random))
+    v_q = zeros(Complex{T}, (n_random, nat*3, nq))
 
     println("Timing vector_r2q! ")
     vector_r2q!(v_q, v_sc, q, itau, R_lat)
@@ -498,7 +498,7 @@ $$
 
 - v_sc : (n_configs, 3*nat_sc)
     The target vector in real space
-- v_q : (nq, 3*nat, n_configs) 
+- v_q : (n_configs, nq, 3*nat) 
     The original vector in Fourier space. 
 - q_tot : (3, nq)
     The list of q vectors
@@ -518,7 +518,6 @@ function vector_q2r!(
     nq = size(q, 2)
     n_random = size(v_sc, 1)
     nat_sc = size(v_sc, 2) ÷ 3
-    nat = size(v_q, 2)
     tmp_vector = zeros(Complex{T}, (n_random, 3*nat_sc))
 
     v_sc .= 0
@@ -531,7 +530,7 @@ function vector_q2r!(
                 index_sc = 3 * (k - 1) + α
                 index_uc = 3 * (itau[k] - 1) + α
                 for i ∈ 1:n_random
-                    tmp_vector[i, index_sc] += exp_value * v_q[index_uc, jq, i]
+                    tmp_vector[i, index_sc] += exp_value * v_q[i, index_uc, jq]
                 end
             end
         end
@@ -550,7 +549,7 @@ function vector_q2r(
     nq = size(q_jj, 1)
     nat_sc = size(R_jj, 1)
     nat = nat_sc ÷ nq
-    n_random = size(v_q, 3)
+    n_random = size(v_q, 1)
 
 
     # Prepare the input and form the output
