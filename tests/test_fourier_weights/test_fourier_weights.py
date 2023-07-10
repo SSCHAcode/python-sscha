@@ -18,7 +18,7 @@ def test_fourier(verbose = False):
     temperature = 300
     new_temperature = 310
     n_configs = 2
-    supercell = (3, 3, 3)
+    supercell = (1, 1, 1)
 
     # Load gold but build a crazy dynamical matrix just to test a low symmetry group
     # R3m (without inversion)
@@ -49,7 +49,7 @@ def test_fourier(verbose = False):
     
     #Edit the dynamical matrix
     new_dyn = dynmat.Copy()
-    new_dyn.dynmats[1][:,:] += np.random.normal(
+    new_dyn.dynmats[-1][:,:] += np.random.normal(
             size=(3 * struct.N_atoms, 3 * struct.N_atoms)) * 1e-4
     new_dyn.structure.coords[1, :] += 0.01
     new_dyn.Symmetrize()

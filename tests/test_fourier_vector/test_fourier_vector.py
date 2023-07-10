@@ -15,6 +15,8 @@ def test_fourier_vector(verbose = False):
     total_path = os.path.dirname(os.path.abspath(__file__))
     os.chdir(total_path)
 
+    temperature = 300.0
+
     # Load gold but build a crazy dynamical matrix just to test a low symmetry group
     # R3m (without inversion)
     struct = CC.Structure.Structure(2)
@@ -63,6 +65,22 @@ def test_fourier_vector(verbose = False):
         print(vector_sc)
         print("New vector:")
         print(vector_sc_new)
+
+    # Get the Y matrix in q space
+    Y_q = sscha.Ensemble._wrapper_julia_get_upsilon_q(
+        w_q,
+        pols_q,
+        struct.get_masses_array(),
+        temperature
+        )
+
+    # Get Y in real space
+    # TODO
+
+    # Multiply uYu in real space and compare with 
+    # The same in fourier space
+    # TODO
+
 
     # Check if they are the same
     assert np.max(np.abs(vector_sc_new - vector_sc)) < 1e-8,  "Error in the fourier transform of the vectors."

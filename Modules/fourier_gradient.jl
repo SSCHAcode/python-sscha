@@ -595,12 +595,17 @@ function multiply_matrix_vector_fourier!(
     u_tilde:: Array{Complex{T}, 3}
 ) where {T <: AbstractFloat}
 
-    nq = size(v_tilde, 2)
-    n_random = size(v_tilde, 3)
+    nq = size(v_tilde, 3)
+    n_random = size(v_tilde, 1)
+    nat3 = size(v_tilde, 2)
 
-    for i in 1:n_random
-        for jq in 1:nq
-            @views mul!(v_tilde[:, jq, i], Yq[:, :, jq], u_tilde[:, jq, i])
+    for jq in 1:nq
+        for k in 1:nat3
+            for h in 1:nat3
+                for i in 1:n_random
+                    v_tilde[i, k, jq] = Yq[k, h, jq] *  u_tilde[i, h, jq]
+                end
+            end
         end
     end
 end
@@ -608,8 +613,7 @@ function multiply_matrix_vector_fourier(
     Yq :: Array{Complex{T}, 3},
     u_tilde:: Array{Complex{T}, 3}
 ) :: Array{Complex{T}, 3} where {T <: AbstractFloat}
-    nq = size(Yq, 3)
-    n_random = size(u_tilde, 3)
+    n_random = size(u_tilde, 1)
 
     v_tilde = zeros(Complex{T}, size(u_tilde))
     multiply_matrix_vector_fourier!(v_tilde, Yq, u_tilde)
@@ -617,48 +621,48 @@ function multiply_matrix_vector_fourier(
 end
 
 
-@doc raw"""
-    get_uYu_fourier(
-        u_tilde :: Array{Complex{T}, 3},
-        Yq :: Array{Complex{T}, 3}
-    ) :: Vector{T} where {T <: AbstractFloat}
-
-Compute the factor 
-
-$$
-\left< u | Y | u \right>
-$$
-
-## Parameters
-
-- u_tilde :: Array{Complex{T}, 3} (3*nat, nq, n_random)
-    The Fourier transform of the u vector
-- Yq :: Array{Complex{T}, 3} (3*nat, 3*nat, nq)
-    The Fourier transform of the Y matrix
-
-## Returns
-
-- uYu :: Array{T, 1} (n_random)
-    The factor
-"""
-function get_uYu_fourier(
-    u_tilde :: Array{Complex{T}, 3},
-    Yq :: Array{Complex{T}, 3}
-) :: Vector{T} where {T <: AbstractFloat}
-    v_tilde = multiply_matrix_vector_fourier(Yq, u_tilde)
-
-    n_random = size(u_tilde, 3)
-    nq = size(u_tilde, 2)
-    uYu = zeros(T, n_random)
-
-    for i in 1:n_random
-        for jq in 1:nq
-            @views uYu[i] += real(u_tilde[:, jq, i]' * v_tilde[:, jq, i])
-        end
-    end
-    return uYu
-end
-    
+# @doc raw"""
+#     get_uYu_fourier(
+#         u_tilde :: Array{Complex{T}, 3},
+#         Yq :: Array{Complex{T}, 3}
+#     ) :: Vector{T} where {T <: AbstractFloat}
+# 
+# Compute the factor 
+# 
+# $$
+# \left< u | Y | u \right>
+# $$
+# 
+# ## Parameters
+# 
+# - u_tilde :: Array{Complex{T}, 3} (3*nat, nq, n_random)
+#     The Fourier transform of the u vector
+# - Yq :: Array{Complex{T}, 3} (3*nat, 3*nat, nq)
+#     The Fourier transform of the Y matrix
+# 
+# ## Returns
+# 
+# - uYu :: Array{T, 1} (n_random)
+#     The factor
+# """
+# function get_uYu_fourier(
+#     u_tilde :: Array{Complex{T}, 3},
+#     Yq :: Array{Complex{T}, 3}
+# ) :: Vector{T} where {T <: AbstractFloat}
+#     v_tilde = multiply_matrix_vector_fourier(Yq, u_tilde)
+# 
+#     n_random = size(u_tilde, 3)
+#     nq = size(u_tilde, 2)
+#     uYu = zeros(T, n_random)
+# 
+#     for i in 1:n_random
+#         for jq in 1:nq
+#             @views uYu[i] += real(u_tilde[:, jq, i]' * v_tilde[:, jq, i])
+#         end
+#     end
+#     return uYu
+# end
+#     
     
 function multiply_vector_vector_fourier!(
         result :: Vector{T},
@@ -666,12 +670,16 @@ function multiply_vector_vector_fourier!(
         vector2 :: Array{Complex{T}, 3}
         ) where {T <: AbstractFloat} 
 
-    nq = size(vector1, 2)
-    n_random = size(vector1, 3)
+    nq = size(vector1, 3)
+    n_random = size(vector1, 1)
+    nat3 = size(vector1, 2)
     
-    for i in 1:n_random
-        for jq in 1:nq
-            @views result[i] += real(vector1[:, jq, i]' * vector2[:, jq, i])
+
+    for jq in 1:nq
+        for k in 1:nat3
+            for i in 1:n_random
+                @views result[i] += real(conj(vector1[i, k, jq]) * vector2[i, k, jq])
+            end
         end
     end
 end
@@ -680,8 +688,7 @@ function multiply_vector_vector_fourier(
         vector2 :: Array{Complex{T}, 3}
         ) :: Vector{T} where {T <: AbstractFloat} 
 
-    nq = size(vector1, 2)
-    n_random = size(vector1, 3)
+    n_random = size(vector1, 1)
     
     result = zeros(T, n_random)
     multiply_vector_vector_fourier!(result, vector1, vector2)
