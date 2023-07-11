@@ -676,12 +676,12 @@ function multiply_vector_vector_fourier!(
     n_random = size(vector1, 1)
     nat3 = size(vector1, 2)
     
-    results .= 0
+    result .= 0
 
     for jq in 1:nq
         for k in 1:nat3
             for i in 1:n_random
-                @views result[i] += real(conj(vector1[i, k, jq]) * vector2[i, k, jq])
+                result[i] += real(conj(vector1[i, k, jq]) * vector2[i, k, jq])
             end
         end
     end

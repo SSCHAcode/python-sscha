@@ -32,7 +32,7 @@ def test_fourier_vector(verbose = False):
     itau += 1
 
     nat_sc = super_struct.N_atoms
-    n_random = 1
+    n_random = 10
     vector_sc = np.random.normal(size = (n_random, 3*nat_sc))
 
     calculator = ase.calculators.emt.EMT()
@@ -73,6 +73,11 @@ def test_fourier_vector(verbose = False):
         print(vector_sc)
         print("New vector:")
         print(vector_sc_new)
+
+
+    # Check if they are the same
+    assert np.max(np.abs(vector_sc_new - vector_sc)) < 1e-8,  "Error in the fourier transform of the vectors."
+
 
     # Get the Y matrix in q space
     w_r, p_r, w_q, pols_q = dynmat.DiagonalizeSupercell(return_qmodes=True)
@@ -120,11 +125,22 @@ def test_fourier_vector(verbose = False):
     assert np.allclose(Yv_sc_original, Yv_sc_ft), "Error in the matrix vector multiplication in q space"
 
 
+    # Now try the simple scalar product and benchmark it
+    results = sscha.Ensemble._wrapper_julia_vector_vector_fourier(
+            Yv_q,
+            vector_q)
+
+    results_sc = np.zeros_like(results)
+    for i in range(n_random):
+        results_sc[i] = Yv_sc_original[i, :].dot(vector_sc[i, :])
+
+    if verbose:
+        print()
+        print("Results compare:")
+        print("\n".join(["{:.5f}  {:.5f}".format(results[i], 
+            results_sc[i]) for i in range(n_random)]))
 
 
-
-    # Check if they are the same
-    assert np.max(np.abs(vector_sc_new - vector_sc)) < 1e-8,  "Error in the fourier transform of the vectors."
 
     
 if __name__ == "__main__":

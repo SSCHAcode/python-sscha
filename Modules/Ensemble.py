@@ -4061,7 +4061,7 @@ def _wrapper_julia_vector_vector_fourier(*args, **kwargs):
             The result of the vector vector multiplication
     """
 
-    return julia.Main.multiply_matrix_vector_fourier(*args, 
+    return julia.Main.multiply_vector_vector_fourier(*args, 
             **kwargs)
 
 
