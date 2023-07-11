@@ -18,7 +18,7 @@ def test_fourier(verbose = False):
     temperature = 300
     new_temperature = 310
     n_configs = 2
-    supercell = (1, 1, 1)
+    supercell = (4, 4, 4)
 
     # Load gold but build a crazy dynamical matrix just to test a low symmetry group
     # R3m (without inversion)
