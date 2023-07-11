@@ -3994,6 +3994,7 @@ def _wrapper_julia_vector_q2r(*args, **kwargs):
 
     return julia.Main.vector_q2r(*args, **kwargs)
 
+
 def _wrapper_julia_vector_r2q(*args, **kwargs):
     """
     Worker function to test the julia wrapper.
@@ -4015,3 +4016,52 @@ def _wrapper_julia_vector_r2q(*args, **kwargs):
     """
 
     return julia.Main.vector_r2q(*args, **kwargs)
+
+
+def _wrapper_julia_matrix_vector_fourier(*args, **kwargs):
+    """
+    Worker function to test the matrix vector
+    multiplication in Fourier space
+
+    Parameters
+    ----------
+
+        - matrix : ndarray(size=(3*nat, 3*nat, nq)
+            The matrix in q space
+        - vector : ndarray(size=(n_random, 3*nat, nq)
+            The vector in q space.
+
+    Returns
+    -------
+        
+        - vector_q : ndarray (n_random, 3*nat, nq)
+            The result of the matrix vector multiplication
+    """
+
+    return julia.Main.multiply_matrix_vector_fourier(*args, 
+            **kwargs)
+
+def _wrapper_julia_vector_vector_fourier(*args, **kwargs):
+    """
+    Worker function to test the matrix vector
+    multiplication in Fourier space
+
+    Parameters
+    ----------
+
+        - vector1 : ndarray(size=(n_random, 3*nat, nq)
+            The first vector in q space.
+        - vector2 : ndarray(size=(n_random, 3*nat, nq)
+            The second vector in q space.
+
+    Returns
+    -------
+
+        - result : ndarray (n_random)
+            The result of the vector vector multiplication
+    """
+
+    return julia.Main.multiply_matrix_vector_fourier(*args, 
+            **kwargs)
+
+

@@ -599,11 +599,13 @@ function multiply_matrix_vector_fourier!(
     n_random = size(v_tilde, 1)
     nat3 = size(v_tilde, 2)
 
+    v_tilde .= 0
+
     for jq in 1:nq
         for k in 1:nat3
             for h in 1:nat3
                 for i in 1:n_random
-                    v_tilde[i, k, jq] = Yq[k, h, jq] *  u_tilde[i, h, jq]
+                    v_tilde[i, k, jq] += Yq[k, h, jq] *  u_tilde[i, h, jq]
                 end
             end
         end
@@ -674,6 +676,7 @@ function multiply_vector_vector_fourier!(
     n_random = size(vector1, 1)
     nat3 = size(vector1, 2)
     
+    results .= 0
 
     for jq in 1:nq
         for k in 1:nat3
