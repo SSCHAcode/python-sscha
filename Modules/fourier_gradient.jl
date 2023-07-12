@@ -3,15 +3,11 @@ using LinearAlgebra
 
 @doc raw"""
     function get_gradient_fourier!(
-        Φ_grad :: Array{U, 3},
-        Φ_grad_err :: Array{U, 3},
-        u_sc :: Matrix{T},
-        δf_sc :: Matrix{T},
-        R_lat :: Matrix{T},
-        q :: Matrix{T},
-        itau :: Array{Int},
-        Y_matrix_q :: Array{Complex{T}, 3},
-        q_opposite_index :: Vector{I})  {where T <: AbstractFloat, U <: AbstractComplex}
+        Φ_grad :: Array{Complex{T}, 3},
+        Φ_grad_err :: Array{Complex{T}, 3},
+        v_tilde :: Array{Complex{T}, 3},
+        δf_tilde :: Array{Complex{T}, 3},
+        q_opposite_index :: Vector{I})  {where T <: AbstractFloat}
 
 Also a nonbang (!) version of the subroutine exists where the Φ_grad and Φ_grad_err 
 are returned instead of beying taken as parameters.
@@ -37,16 +33,15 @@ calculation and compute the actual average in a super function.
 
 ## Parameters 
 
-- Φ_grad : size (nq, 3*nat, 3*nat); the gradient of the free energy 
-- Φ_grad_err : size (nq, 3*nat, 3*nat); the average of squares. Used to evaluate the variance 
-- u_sc : size (n_random, 3*nat_sc); the atomic displacements (in Bohr)
-- δf_sc : size (n_random, 3*nat_sc); the forces (Ry / Bohr)
-- R_lat : size (nat_sc, 3) the lattice vectors
-- q : size (nq, 3) the q vectors
-- itau : size (nat_sc); the index in the primitive cell corresponding to the supercell
-- weights : size (n_random); the weights of the configurations
-- Y_matrix_q : (3*nat, 3*nat, nq) The inverse covariance matrix in q-space.
-- bg : (3, 3) The brilluin zone vectors (used to identify the q -> -q + G_)
+    - Φ_grad : size (nq, 3*nat, 3*nat); the gradient of the free energy 
+    - Φ_grad_err : size (nq, 3*nat, 3*nat); the average of squares. Used to evaluate the variance 
+    - v_tilde : size(n_random, 3*nat, nq); The result of multiplying Y with the displacements in q space
+    - δf_tilde : size (n_random, 3*nat, nq); the forces (Ry / Bohr)
+    - R_lat : size (nat_sc, 3) the lattice vectors
+    - q : size (nq, 3) the q vectors
+    - itau : size (nat_sc); the index in the primitive cell corresponding to the supercell
+    - weights : size (n_random); the weights of the configurations
+    - q_opposite_index : size(nq) The index of the q = -q + G
 
 
 $$
@@ -59,73 +54,41 @@ The method returns the gredient (not symmetrized) in fourier space
 """
 function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3}, 
         Φ_grad_err :: Array{T, 3},
-        u_sc :: Matrix{T},
-        δf_sc :: Matrix{T},
-        R_lat :: Matrix{T},
-        q :: Matrix{T},
-        itau :: Vector{I},
+        v_tilde :: Array{Complex{T}, 3},
+        δf_tilde :: Array{Complex{T}, 3},
         weights :: Vector{T},
-        Y :: Array{Complex{T}, 3},
         minus_q_index :: Vector{N}) where {T <: AbstractFloat, I <: Integer, N <: Integer}
-
-    @time begin
-        # Get the system size
-        nat_sc = size(u_sc, 2) ÷ 3
-        n_random = size(u_sc, 1)
-        nq = size(q, 2)
-        nat = nat_sc ÷ nq
-
-        # Fourier transform the v and δf vectors
-        v_tilde = zeros(Complex{T}, (3*nat, nq, n_random))
-        δf_tilde = zeros(Complex{T}, (3*nat, nq, n_random))
-        u_tilde = zeros(Complex{T}, (3*nat, nq, n_random))
-        q_dot_R = 0
-
-        for jq ∈ 1:nq
-            for k ∈ 1:nat_sc
-                @views q_dot_R = q[:, jq]' * R_lat[:, k]
-                exp_value = exp(- 1im * 2π * q_dot_R)
-
-                for α in 1:3
-                    index_sc = 3 * (k - 1) + α
-                    index_uc = 3 * (itau[k] - 1) + α
-                    for i ∈ 1:n_random
-                        u_tilde[index_uc, jq, i] += exp_value * u_sc[i, index_sc]
-                        δf_tilde[index_uc, jq, i] += exp_value * δf_sc[i, index_sc]
-                    end
-                end
-            end
-        end
-
-        for i in 1:n_random
-            for jq in 1:nq
-                @views mul!(v_tilde[:, jq, i], Y[:, :, jq], u_tilde[:, jq, i])
-            end
-        end
-
-        v_tilde ./= √(nq)
-        δf_tilde ./= √(nq)
-    end
+    
+    # Get the system size
+    nat_sc = size(u_sc, 2) ÷ 3
+    n_random = size(u_sc, 1)
+    nq = size(q, 2)
+    nat = nat_sc ÷ nq
 
     # Compute the gradient exploiting a new average
     Φ_grad .= 0
     Φ_grad_err .= 0
     # Define helper arrays that avoid memory allocations during the for loop
-    tmp = zeros(Complex{T}, (nat*3, nat*3))
-    tmp2 = zeros(T, (nat*3, nat*3))
-
+    
     @time begin 
-        for i in 1:n_random
-            for jq in 1:nq
-                # The ' also perform the conjugation
-                @views mul!(tmp, v_tilde[:, jq, i], δf_tilde[:, jq, i]')  
-                @. tmp2 = tmp * conj(tmp)
+        for jq in 1:nq
+            for k in 1:3*nat
+                for j in 1:3*nat
+                    for i in 1:n_random
+                        tmp = v_tilde[i, j, jq] * conj(δf_tilde[i, k, jq])
+                        Φ_grad[j, k, jq] += tmp * weights[i]
+                        Φ_grad_err[j, k, jq] += tmp * conj(tmp) * weights[i]
 
-                tmp .*= weights[i]
-                tmp2 .*= weights[i]
+                        # @views mul!(tmp, v_tilde[:, jq, i], δf_tilde[:, jq, i]')  
+                        # @. tmp2 = tmp * conj(tmp)
 
-                Φ_grad[:, :, jq] .+= tmp
-                Φ_grad_err[:, :, jq] .+= tmp2
+                        # tmp .*= weights[i]
+                        # tmp2 .*= weights[i]
+
+                        # Φ_grad[:, :, jq] .+= tmp
+                        # Φ_grad_err[:, :, jq] .+= tmp2
+                    end
+                end
             end
         end
     end
@@ -150,14 +113,11 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
     end
 end
 function get_gradient_fourier(
-    u_sc :: Matrix{T},
-    δf_sc :: Matrix{T},
-    R_lat :: Matrix{T},
-    q :: Matrix{T},
-    itau :: Vector{I},
+    v_tilde :: Array{Complex{T}, 3},
+    δf_tilde :: Array{Complex{T}, 3},
     weights :: Vector{T},
-    Y :: Array{Complex{T}, 3},
-    minus_q_vector :: Vector{N}) where {T <: AbstractFloat, I <: Integer, N <: Integer}
+    minus_q_index :: Vector{N}u_sc :: Matrix{T}
+    ) where {T <: AbstractFloat, I <: Integer, N <: Integer}
     
     nq = size(q, 1)
     nat = size(u_sc, 2) ÷ (3*nq) 
@@ -167,19 +127,14 @@ function get_gradient_fourier(
     Φ_grad_err = zeros(T, (nq, 3*nat, 3*nat))
     Φ_grad_jj = zeros(Complex{T}, (3*nat, 3*nat, nq))
     Φ_grad_err_jj = zeros(T, (3*nat, 3*nat, nq))
-    R_lat_jj = zeros(T, (3, nat_sc))
-    q_jj = zeros(T, (3, nq))
-
-    R_lat_jj .= R_lat'
-    q_jj .= q'
 
     get_gradient_fourier!(Φ_grad_jj, Φ_grad_err_jj,
-        u_sc, δf_sc, R_lat_jj, q_jj, itau, weights, Y, minus_q_vector)
+        v_tilde, δf_tilde, weights, minus_q_vector)
 
     # Reorder the gradient
     for iq in 1:nq
-        Φ_grad[iq, :, :] = Φ_grad_jj[:, :, iq]
-        Φ_grad_err[iq, :, :] = Φ_grad_err_jj[:, :, iq]
+        @views Φ_grad[iq, :, :] = Φ_grad_jj[:, :, iq]
+        @views Φ_grad_err[iq, :, :] = Φ_grad_err_jj[:, :, iq]
     end
 
     return Φ_grad, Φ_grad_err
