@@ -220,7 +220,8 @@ class SSCHA_Minimizer(object):
         # Setup the minimization algorithm
         self.minimization_algorithm = minimization_algorithm
 
-        # This is used to polish the ensemble energy
+        # This is the energy [in Ry] of the primitive cell without quantum fluctuation
+        # It is used to get the real contribution of anharmonicity.
         self.eq_energy = 0
 
         # This is used to store the number of symmetries
