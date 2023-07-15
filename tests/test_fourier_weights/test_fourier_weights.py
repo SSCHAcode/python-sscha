@@ -63,7 +63,12 @@ def test_fourier(verbose = False):
 
     timer.execute_timed_function(ensemble.update_weights_fourier, new_dyn, new_temperature)
     # print the displacements
-    disp_new = ensemble.u_disps.copy()
+    disp_new_qspace = ensemble.u_disps_qspace.copy()
+    disp_new = sscha.Ensemble._wrapper_julia_vector_q2r(
+            disp_new_qspace,
+            ensemble.q_grid,
+            ensemble.itau,
+            ensemble.r_lat)
 
     # Get also sscha forces and energies
     energies = ensemble.sscha_energies.copy()

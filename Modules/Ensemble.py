@@ -1555,7 +1555,8 @@ Error, the following stress files are missing from the ensemble:
         delta = self.dyn_0.structure.coords - new_structure.coords
 
         # The update only shift the Gamma value of the displacements
-        self.u_disps_qspace[:,:,0] = np.tile(delta.ravel(), (self.N, 1))
+        nq = self.q_grid.shape[0]
+        self.u_disps_qspace[:,:,0] += np.tile(delta.ravel(), (self.N, 1)) * np.sqrt(nq)
 
 
     def update_weights_fourier(self, new_dynamical_matrix, newT, timer=None):
@@ -1601,7 +1602,8 @@ Error, the following stress files are missing from the ensemble:
         
         
         # Get the new displacements.
-
+        # In fourier space this only affects the q=0 point
+        self.update_displacements(new_dynamical_matrix.structure)
 
         # Get the lattice vectors
         nat_sc = super_structure.N_atoms
