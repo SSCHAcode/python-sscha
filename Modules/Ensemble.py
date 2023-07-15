@@ -205,6 +205,7 @@ class Ensemble:
         Nsc = np.prod(self.supercell) * self.dyn_0.structure.N_atoms
         nat = self.dyn_0.structure.N_atoms
         nq = len(self.dyn_0.q_tot)
+        nat_sc = nat*nq
         assert nq == np.prod(self.supercell), """
 Error, the supercell does not match with the q grid of the dynamical matrix.
     Expected supercell size = {}
@@ -249,13 +250,15 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
         # Initialize the q grid and lattice 
         # For the fourier transform
         self.q_grid = np.array(self.dyn_0.q_tot) / CC.Units.A_TO_BOHR
-        self.r_lat = np.zeros_like(self.q_grid)
+        self.r_lat = np.zeros((nat_sc, 3), dtype = np.float64)
         for i in range(nat_sc):
             self.r_lat[i,:] = self.supercell_structure.coords[i, :] - \
                 self.dyn_0.structure.coords[self.itau[i] - 1, :]
         self.r_lat *= CC.Units.A_TO_BOHR
         self.init_q_opposite()
 
+        self.u_disps_original = np.zeros_like(self.u_disps)
+        self.u_disps_original_qspace = np.zeros_like(self.u_disps_qspace)
 
         # Setup the attribute control
         self.__total_attributes__ = [item for item in self.__dict__.keys()]
@@ -404,6 +407,7 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
         """
         nat = self.dyn_0.structure.N_atoms
         nq = self.q_grid.shape[0]
+        nat_sc = nat*nq
         dynq = np.zeros((3*nat, 3*nat, nq), dtype = np.complex128, order = "F")
         for i in range(nq):
             dynq[:, :, i] = self.current_dyn.dynmats[i]
@@ -417,24 +421,29 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
                 self.r_lat, 
             )
             self.forces_qspace = julia.Main.vector_r2q(
-                    self.forces,
-                    self.q_grid,
-                    self.itau,
-                    self.r_lat
-                )
+                self.forces.reshape((self.N, 3*nat_sc)),
+                self.q_grid,
+                self.itau,
+                self.r_lat
+            )
 
             # These should be in Ry/A to be consistent with the units
             self.sscha_forces_qspace = -julia.Main.multiply_matrix_vector_fourier(
                 dynq,
-                u_disp_fourier_new * CC.Units.A_TO_BOHR,
-                ) / CC.BOHR_TO_ANGSTROM
+                self.u_disps_qspace * CC.Units.A_TO_BOHR,
+                ) * CC.Units.A_TO_BOHR
 
             self.sscha_energies[:] = -julia.Main.multiply_vector_vector_fourier(
                 self.forces_qspace / CC.Units.A_TO_BOHR,
-                u_disp_fourier_new * CC.Units.A_TO_BOHR
+                self.u_disps_qspace * CC.Units.A_TO_BOHR
             ) * 0.5 # The conversion is useless, keep it for clarity 
 
-            self.sscha_forces = None
+            self.sscha_forces = julia.Main.vector_q2r(
+                self.sscha_forces_qspace,
+                self.q_grid,
+                self.itau,
+                self.r_lat
+            ).reshape((self.N, nat_sc, 3))
         else:
             self.u_disps[:,:] = np.reshape(self.xats - np.tile(self.supercell_structure.coords, (self.N, 1,1)), (self.N, 3 * Nat_sc), order = "C")
             self.sscha_energies[:], self.sscha_forces[:,:,:] = self.dyn_0.get_energy_forces(None, displacement = self.u_disps)
@@ -1082,7 +1091,7 @@ Error, the following stress files are missing from the ensemble:
 
 
 
-    def load_bin(self, data_dir, population_id = 1, avoid_loading_dyn = False):
+    def load_bin(self, data_dir, population_id = 1, avoid_loading_dyn = False, timer=None):
         """
         LOAD THE BINARY ENSEMBLE
         ========================
@@ -1209,19 +1218,32 @@ Error, the following stress files are missing from the ensemble:
         if self.fourier_gradient:
             self.u_disps_qspace = julia.Main.vector_r2q(
                 self.u_disps,
-                np.array(self.current_dyn.q_tot),
+                self.q_grid,
                 self.itau,
-                r_lat 
+                self.r_lat 
             )
+            self.u_disps_original_qspace = julia.Main.vector_r2q(
+                self.u_disps_original,
+                self.q_grid,
+                self.itau,
+                self.r_lat 
+            )
+            # Get the dynamical matrix in the fourier format
+            nat = self.dyn_0.structure.N_atoms
+            nq = self.q_grid.shape[0]
+            dynq = np.zeros((3*nat, 3*nat, nq), dtype = np.complex128, order = "F")
+            for iq in range(nq):
+                dynq[:, :, iq] = self.current_dyn.dynmats[iq]
+
             self.u_disps_original_qspace = self.u_disps_qspace.copy()
             self.forces_qspace = np.zeros_like(self.u_disps_qspace)
             self.sscha_forces_qspace = - julia.Main.multiply_matrix_vector_fourier(
                 dynq,
-                u_disp_fourier_new * CC.Units.A_TO_BOHR,
+                self.u_disps_original_qspace * CC.Units.A_TO_BOHR,
             )
             self.sscha_energies[:] = julia.Main.multiply_vector_vector_fourier(
-                forces_sscha_q,
-                u_disp_fourier_new * CC.Units.A_TO_BOHR
+                self.sscha_forces_qspace,
+                self.u_disps_original_qspace * CC.Units.A_TO_BOHR
             ) * 0.5 
 
 
@@ -1243,7 +1265,8 @@ Error, the following stress files are missing from the ensemble:
         # Initialize the supercell
         
         self.q_grid = np.array(self.dyn_0.q_tot) / CC.Units.A_TO_BOHR
-        self.r_lat = np.zeros_like(self.q_grid)
+        nat_sc = self.supercell_structure.N_atoms
+        self.r_lat = np.zeros((nat_sc, 3), dtype = np.float64)
         for i in range(nat_sc):
             self.r_lat[i,:] = self.supercell_structure.coords[i, :] - \
                 self.dyn_0.structure.coords[self.itau[i] - 1, :]
@@ -2416,7 +2439,7 @@ Error while loading the julia module.
         t3 = time.time()
 
         # Get the v tilde (Yu) vector in fourier space (Bohr^-1)
-        v_tilde = julia.multiply_matrix_vector_fourier(
+        v_tilde = julia.Main.multiply_matrix_vector_fourier(
                 Y_qspace,
                 self.u_disps_qspace * CC.Units.A_TO_BOHR)
 
@@ -2460,7 +2483,7 @@ Error while loading the julia module.
         delta_forces = self.forces_qspace - self.sscha_forces_qspace 
         delta_forces /= CC.Units.A_TO_BOHR
         phi_grad, phi_grad2 = julia.Main.get_gradient_fourier(
-            v_tilde
+            v_tilde,
             delta_forces,
             self.rho,
             self.q_opposite_index)
@@ -3787,6 +3810,9 @@ Error while loading the julia module.
         self.sscha_energies = np.concatenate( (self.sscha_energies, other.sscha_energies))
 
         self.rho = np.concatenate( (self.rho, other.rho))
+
+        # Init the forces once more
+        self.init_forces()
 
         # Now update everything
         self.update_weights(self.current_dyn, self.current_T)

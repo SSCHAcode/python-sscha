@@ -60,10 +60,11 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
         minus_q_index :: Vector{N}) where {T <: AbstractFloat, I <: Integer, N <: Integer}
     
     # Get the system size
-    nat_sc = size(u_sc, 2) ÷ 3
-    n_random = size(u_sc, 1)
-    nq = size(q, 2)
-    nat = nat_sc ÷ nq
+     
+    nq = size(v_tilde, 3)
+    nat = size(v_tilde, 2) ÷ 3
+    nat_sc = nat * nq
+    n_random = size(v_tilde, 1)
 
     # Compute the gradient exploiting a new average
     Φ_grad .= 0
@@ -116,11 +117,11 @@ function get_gradient_fourier(
     v_tilde :: Array{Complex{T}, 3},
     δf_tilde :: Array{Complex{T}, 3},
     weights :: Vector{T},
-    minus_q_index :: Vector{N}u_sc :: Matrix{T}
+    minus_q_index :: Vector{N}
     ) where {T <: AbstractFloat, I <: Integer, N <: Integer}
     
-    nq = size(q, 1)
-    nat = size(u_sc, 2) ÷ (3*nq) 
+    nq = size(v_tilde, 3)
+    nat = size(v_tilde, 2) ÷ 3
     nat_sc = nat * nq
 
     Φ_grad = zeros(Complex{T}, (nq, 3*nat, 3*nat))
@@ -129,7 +130,7 @@ function get_gradient_fourier(
     Φ_grad_err_jj = zeros(T, (3*nat, 3*nat, nq))
 
     get_gradient_fourier!(Φ_grad_jj, Φ_grad_err_jj,
-        v_tilde, δf_tilde, weights, minus_q_vector)
+        v_tilde, δf_tilde, weights, minus_q_index)
 
     # Reorder the gradient
     for iq in 1:nq
@@ -426,7 +427,6 @@ function vector_r2q(
 
     v_q = zeros(Complex{T}, (n_random, nat*3, nq))
 
-    println("Timing vector_r2q! ")
     vector_r2q!(v_q, v_sc, q, itau, R_lat)
     return v_q
 end
