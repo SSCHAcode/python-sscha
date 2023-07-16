@@ -1556,7 +1556,7 @@ Error, the following stress files are missing from the ensemble:
 
         # The update only shift the Gamma value of the displacements
         nq = self.q_grid.shape[0]
-        self.u_disps_qspace[:,:,0] += np.tile(delta.ravel(), (self.N, 1)) * np.sqrt(nq
+        self.u_disps_qspace[:,:,0] += np.tile(delta.ravel(), (self.N, 1)) * np.sqrt(nq)
 
 
     def update_weights_fourier(self, new_dynamical_matrix, newT, timer=None):
