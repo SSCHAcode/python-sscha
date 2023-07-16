@@ -55,7 +55,7 @@ Requirements
 ------------
 
 To install python-sscha you need:
-1. python (either 2.7 or 3.*)
+1. python <= 3.10
 2. numpy
 3. scipy
 4. matplotlib
