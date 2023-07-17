@@ -649,6 +649,53 @@ Error, the file '{}' is missing from the ensemble
         else:
             self.sscha_energies[:], self.sscha_forces[:,:,:] = self.dyn_0.get_energy_forces(None, displacement = self.u_disps)
 
+    
+        # Initialize the supercell
+        super_struct, itau = self.dyn_0.structure.generate_supercell(self.supercell, get_itau=True)
+        self.supercell_structure = super_struct
+        self.itau = itau + 1
+
+        self.u_disps_original = self.u_disps.copy()
+        if self.fourier_gradient:
+            self.u_disps_qspace = julia.Main.vector_r2q(
+                self.u_disps,
+                self.q_grid,
+                self.itau,
+                self.r_lat 
+            )
+            self.u_disps_original_qspace = julia.Main.vector_r2q(
+                self.u_disps_original,
+                self.q_grid,
+                self.itau,
+                self.r_lat 
+            )
+            # Get the dynamical matrix in the fourier format
+            nat = self.dyn_0.structure.N_atoms
+            nq = self.q_grid.shape[0]
+            dynq = np.zeros((3*nat, 3*nat, nq), dtype = np.complex128, order = "F")
+            for iq in range(nq):
+                dynq[:, :, iq] = self.current_dyn.dynmats[iq]
+
+            self.u_disps_original_qspace = self.u_disps_qspace.copy()
+            self.forces_qspace = np.zeros_like(self.u_disps_qspace)
+            self.sscha_forces_qspace = - julia.Main.multiply_matrix_vector_fourier(
+                dynq,
+                self.u_disps_original_qspace * CC.Units.A_TO_BOHR,
+            )
+            self.sscha_energies[:] = julia.Main.multiply_vector_vector_fourier(
+                self.sscha_forces_qspace,
+                self.u_disps_original_qspace * CC.Units.A_TO_BOHR
+            ) * 0.5 
+
+        self.q_grid = np.array(self.dyn_0.q_tot) / CC.Units.A_TO_BOHR
+        nat_sc = self.supercell_structure.N_atoms
+        self.r_lat = np.zeros((nat_sc, 3), dtype = np.float64)
+        for i in range(nat_sc):
+            self.r_lat[i,:] = self.supercell_structure.coords[i, :] - \
+                self.dyn_0.structure.coords[self.itau[i] - 1, :]
+        self.r_lat *= CC.Units.A_TO_BOHR
+        self.init_q_opposite()
+
 
         # Setup the initial weight
         self.rho = np.ones(self.N, dtype = np.float64)

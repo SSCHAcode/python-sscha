@@ -30,7 +30,8 @@ def test_update_weights(verbose = False):
     ens.load(DATA_PATH, 2, 1000)
 
     #Update the ensemble
-    ens.update_weights(dyn_target, 0)
+    ens.update_weights_fourier(dyn_target, 0)
+    #ens.update_weights(dyn_target, 0)
 
     delta_rho = np.max(np.abs(ens.rho - rho_final))
     EPS = 1e-7

@@ -228,6 +228,11 @@ class SSCHA_Minimizer(object):
         # It is used almost to check that no symmetry is broken along the minimization
         self.N_symmetries = 1
 
+        # Check if julia is available
+        self.use_julia = False
+        if Ensemble.__JULIA_EXT__:
+            self.use_julia = True
+
         # This is the maximum number of steps (if negative = infinity)
         self.max_ka = -1
 
@@ -282,6 +287,9 @@ class SSCHA_Minimizer(object):
             if value < 0:
                 raise ValueError("Error, the step attribute {} must be positive ({} given)".format(name, value))
 
+        if "use_julia" in name:
+            if value and not Ensemble.__JULIA_EXT__:
+                raise ValueError("Error, Julia is not available")
 
     def set_minimization_step(self, step):
         """
@@ -338,10 +346,16 @@ class SSCHA_Minimizer(object):
         #dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
         if self.minim_dyn:
             if self.precond_dyn:
-                if timer is not None:
-                    dyn_grad, err = timer.execute_timed_function(self.ensemble.get_preconditioned_gradient_parallel, True, True, preconditioned=1)
+                if self.use_julia:
+                    if timer is not None:
+                        dyn_grad, err = timer.execute_timed_function(self.ensemble.get_fourier_gradient)
+                    else:
+                        dyn_grad, err = self.ensemble.get_fourier_gradiennt()
                 else:
-                    dyn_grad, err = self.ensemble.get_preconditioned_gradient_parallel(True, True, preconditioned=1)
+                    if timer is not None:
+                        dyn_grad, err = timer.execute_timed_function(self.ensemble.get_preconditioned_gradient_parallel, True, True, preconditioned=1)
+                    else:
+                        dyn_grad, err = self.ensemble.get_preconditioned_gradient_parallel(True, True, preconditioned=1)
             else:
                 if timer is not None:
                     dyn_grad, err = timer.execute_timed_function(self.ensemble.get_preconditioned_gradient_parallel, True, True, preconditioned=0)
@@ -571,7 +585,10 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
 
         # Store the gradient in the minimization
         self.__gc__.append( np.sqrt(np.sum( np.abs(dyn_grad)**2)))
-        self.__gc_err__.append( np.sqrt(np.sum( np.abs(err)**2)))
+        if self.use_julia:
+            self.__gc_err__.append(err)
+        else:
+            self.__gc_err__.append( np.sqrt(np.sum( np.abs(err)**2)))
 
         # Perform the minimization step (with the chosen minimization algorithm)
         if timer:
@@ -976,12 +993,16 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
 
         NOTE: it is equivalent to call self.ensemble.update_weights(self.dyn, self.ensemble.current_T)
         """
-
-        if timer:
-            timer.execute_timed_function(self.ensemble.update_weights, self.dyn, self.ensemble.current_T)
+        if not self.use_julia:
+            if timer:
+                timer.execute_timed_function(self.ensemble.update_weights, self.dyn, self.ensemble.current_T)
+            else:
+                self.ensemble.update_weights(self.dyn, self.ensemble.current_T)
         else:
-            self.ensemble.update_weights(self.dyn, self.ensemble.current_T)
-
+            if timer:
+                timer.execute_timed_function(self.ensemble.update_weights_fourier, self.dyn, self.ensemble.current_T)
+            else:
+                self.ensemble.update_weights_fourier(self.dyn, self.ensemble.current_T)
 
     def get_free_energy(self, return_error = False):
         """
@@ -1129,7 +1150,13 @@ Maybe data_dir is missing from your input?"""
         #grad = self.ensemble.get_fc_from_self_consistency(True, False)
         if verbosity:
             print ("Get the gradient for the first time...")
-        grad = self.ensemble.get_preconditioned_gradient(True)
+        if self.use_julia:
+            if self.timer:
+                grad, err_grad = self.timer.execute_timed_function(self.ensemble.get_fourier_gradient)
+            else:
+                grad, err_grad = self.ensemble.get_fourier_gradient()
+        else:
+            grad = self.ensemble.get_preconditioned_gradient(True)
         if verbosity:
             print ("After gradient.")
         self.prev_grad = grad
