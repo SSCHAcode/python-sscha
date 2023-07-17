@@ -102,6 +102,25 @@ def test_fourier(verbose = False):
     if verbose:
         timer.print_report(verbosity_limit=0)
 
+    # Here, compute the gradient with the two methods
+    # and check if they are the same
+
+    gradient_old = ensemble.get_preconditioned_gradient() 
+    gradient_new, err = ensemble.get_fourier_gradient()
+
+    if verbose:
+        print("Old gradient:")
+        print(gradient_old)
+        print("New gradient:")
+        print(gradient_new)
+        print("Delta:")
+        print(gradient_old - gradient_new)
+        print("Max delta:")
+        print(np.max(np.abs(gradient_old - gradient_new)))
+
+    assert np.allclose(gradient_old, gradient_new)
+
+
 
 if __name__ == "__main__":
     test_fourier(verbose=True)
