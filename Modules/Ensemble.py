@@ -445,7 +445,7 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
                 self.r_lat
             ).reshape((self.N, nat_sc, 3))
         else:
-            self.u_disps[:,:] = np.reshape(self.xats - np.tile(self.supercell_structure.coords, (self.N, 1,1)), (self.N, 3 * Nat_sc), order = "C")
+            self.u_disps[:,:] = np.reshape(self.xats - np.tile(self.supercell_structure.coords, (self.N, 1,1)), (self.N, 3 * nat_sc), order = "C")
             self.sscha_energies[:], self.sscha_forces[:,:,:] = self.dyn_0.get_energy_forces(None, displacement = self.u_disps)
 
             self.forces_qspace = None
@@ -688,7 +688,7 @@ Error, the following stress files are missing from the ensemble:
                 raise IOError(ERROR_MSG)
 
 
-    def load_from_calculator_output(self, directory, out_ext = ".pwo"):
+    def load_from_calculator_output(self, directory, out_ext = ".pwo", timer=None):
         """
         LOAD THE ENSEMBLE FROM A CALCULATION
         ====================================
