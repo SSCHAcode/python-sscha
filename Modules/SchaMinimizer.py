@@ -490,9 +490,12 @@ class SSCHA_Minimizer(object):
         if self.minim_struct:
             t1 = time.time()
             # Get the gradient of the free-energy respect to the structure
-            struct_grad, struct_grad_err =  self.ensemble.get_average_forces(True)
-            #print "SHAPE:", np.shape(struct_grad)
-            struct_grad_reshaped = - struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
+            if self.use_julia:
+                struct_grad_reshaped, struct_grad_err = self.ensemble.get_fourier_forces(get_error=True)
+            else:
+                struct_grad, struct_grad_err =  self.ensemble.get_average_forces(True)
+                #print "SHAPE:", np.shape(struct_grad)
+                struct_grad_reshaped = - struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
 
 
             # Preconditionate the gradient for the wyckoff minimization
@@ -577,7 +580,7 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
         # Append the gradient modulus to the minimization info
         if self.minim_struct:
             self.__gw__.append(np.sqrt( np.sum(struct_grad**2)))
-            self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
+            self.__gw_err__.append(np.sqrt( np.sum(struct_grad_err**2) / qe_sym.QE_nsymq))
         else:
             self.__gw__.append(0)
             self.__gw_err__.append(0)

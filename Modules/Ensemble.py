@@ -1696,7 +1696,7 @@ Error, the following stress files are missing from the ensemble:
                 u_disp_fourier_new * CC.Units.A_TO_BOHR,
                 )  / CC.Units.BOHR_TO_ANGSTROM
 
-        self.sscha_energies[:] = julia.Main.multiply_vector_vector_fourier(
+        self.sscha_energies[:] = -julia.Main.multiply_vector_vector_fourier(
                 self.sscha_forces_qspace / CC.Units.A_TO_BOHR,
                 u_disp_fourier_new * CC.Units.A_TO_BOHR
                 ) * 0.5 
@@ -2167,6 +2167,27 @@ DETAILS OF ERROR:
         if return_error:
             return value, error
         return value
+
+    def get_fourier_forces(self, get_error=True):
+        """
+        GET THE FORCES USING THE FOURIER TRANSFORM
+        ==========================================
+
+        This method is the same as before, but it exploits the fourier
+        transform to avoid doing the average once more.
+        """
+
+        
+        delta_forces = np.real(self.forces_qspace[:, :, 0] - self.sscha_forces_qspace[:, :, 0])
+        sum_f = np.sum(delta_forces, axis=0)
+        N_eff = np.sum(self.rho)
+        f_average = sum_f / N_eff
+        
+        if get_error:
+            sum_f2 = np.sum(delta_forces**2, axis=0)
+            error_f = np.sqrt(sum_f2 / N_eff - f_average**2) / np.sqrt(N_eff)
+            return f_average, error_f
+        return f_average
 
     def get_average_forces(self, get_error, in_unit_cell = True):
         """

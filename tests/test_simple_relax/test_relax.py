@@ -65,6 +65,7 @@ def test_simple_relax(verbose = False):
     ens.load(DATA_PATH, 2, 1000)
 
     minim = sscha.SchaMinimizer.SSCHA_Minimizer(ens)
+    # minim.use_julia = False
     minim.minim_struct = True
     minim.min_step_dyn = 0.5
     minim.min_step_struc = 0.5
