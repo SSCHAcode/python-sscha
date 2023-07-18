@@ -2179,6 +2179,8 @@ DETAILS OF ERROR:
 
         
         delta_forces = np.real(self.forces_qspace[:, :, 0] - self.sscha_forces_qspace[:, :, 0])
+        nq = self.q_tot.shape[0]
+        delta_forces *= np.sqrt(nq)
         sum_f = np.sum(delta_forces, axis=0)
         N_eff = np.sum(self.rho)
         f_average = sum_f / N_eff

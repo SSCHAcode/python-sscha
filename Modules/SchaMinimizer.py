@@ -589,7 +589,7 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
         # Store the gradient in the minimization
         self.__gc__.append( np.sqrt(np.sum( np.abs(dyn_grad)**2)))
         if self.use_julia:
-            self.__gc_err__.append(err)
+            self.__gc_err__.append(np.real(err))
         else:
             self.__gc_err__.append( np.sqrt(np.sum( np.abs(err)**2)))
 
