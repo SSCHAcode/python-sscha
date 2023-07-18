@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+    # -*- coding: utf-8 -*-
 from __future__ import print_function
 from __future__ import division
 
@@ -57,8 +57,22 @@ def test_simple_relax(verbose = False):
     # It is printing the structure slightly displaced
     dyn_target = CC.Phonons.Phonons(os.path.join(DATA_PATH, "dyn1_population2"), full_name = True)
 
+    cfp = None
+    if verbose:
+        def save_all(minim):
+            ka = len(minim.__fe__)
+
+            minim_data = {}
+            minim_data["avforce"] = minim.ensemble.get_fourier_forces(False)
+            minim_data["rho"] = minim.ensemble.rho
+            minim_data["disp_q"] = minim.ensemble.u_disps_qspace.ravel()
+            minim_data["disp_r"] = minim.ensemble.u_disps.ravel()
+            minim.dyn.save_qe("dyn_relax_ka{}_".format(ka))
+
+            fname = "minim_data_ka{}.npz".format(ka)
+            np.savez(fname, **minim_data)
     
-    
+        cfp = save_all
 
     # Perform the minimization
     ens = sscha.Ensemble.Ensemble(dyn_start, 0, dyn_start.GetSupercell())
@@ -71,11 +85,15 @@ def test_simple_relax(verbose = False):
     minim.min_step_struc = 0.5
     minim.meaningful_factor = 1e-10
     minim.init()
-    minim.run()
+    minim.run(custom_function_pre = cfp)
     minim.finalize()
 
+    if verbose:
+        lbl = "timer_julia.json"
+        if not minim.use_julia:
+            lbl = "timer_python.json"
+        minim.timer.save_json(lbl)
 
-    minim.timer.save_json("timer.json")
     # Check the differences in the atomic positions
     delta_s = np.max(np.abs(dyn_target.structure.coords - minim.dyn.structure.coords))
     starting_delta_s = np.max(np.abs(minim.dyn.structure.coords - dyn_start.structure.coords))

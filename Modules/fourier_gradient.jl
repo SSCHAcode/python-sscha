@@ -57,7 +57,7 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
         v_tilde :: Array{Complex{T}, 3},
         δf_tilde :: Array{Complex{T}, 3},
         weights :: Vector{T},
-        minus_q_index :: Vector{N}) where {T <: AbstractFloat, I <: Integer, N <: Integer}
+        minus_q_index :: Vector{N}) where {T <: AbstractFloat, N <: Integer}
     
     # Get the system size
      
@@ -118,7 +118,7 @@ function get_gradient_fourier(
     δf_tilde :: Array{Complex{T}, 3},
     weights :: Vector{T},
     minus_q_index :: Vector{N}
-    ) where {T <: AbstractFloat, I <: Integer, N <: Integer}
+    ) where {T <: AbstractFloat, N <: Integer}
     
     nq = size(v_tilde, 3)
     nat = size(v_tilde, 2) ÷ 3

@@ -2179,14 +2179,14 @@ DETAILS OF ERROR:
 
         
         delta_forces = np.real(self.forces_qspace[:, :, 0] - self.sscha_forces_qspace[:, :, 0])
-        nq = self.q_tot.shape[0]
-        delta_forces *= np.sqrt(nq)
-        sum_f = np.sum(delta_forces, axis=0)
+        nq = self.q_grid.shape[0]
+        delta_forces /= np.sqrt(nq)
+        sum_f = self.rho.dot(delta_forces)
         N_eff = np.sum(self.rho)
         f_average = sum_f / N_eff
         
         if get_error:
-            sum_f2 = np.sum(delta_forces**2, axis=0)
+            sum_f2 = self.rho.dot(delta_forces**2)
             error_f = np.sqrt(sum_f2 / N_eff - f_average**2) / np.sqrt(N_eff)
             return f_average, error_f
         return f_average
