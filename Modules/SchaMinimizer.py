@@ -492,6 +492,7 @@ class SSCHA_Minimizer(object):
             # Get the gradient of the free-energy respect to the structure
             if self.use_julia:
                 struct_grad_reshaped, struct_grad_err = self.ensemble.get_fourier_forces(get_error=True)
+                struct_grad_reshaped *= -1
             else:
                 struct_grad, struct_grad_err =  self.ensemble.get_average_forces(True)
                 #print "SHAPE:", np.shape(struct_grad)

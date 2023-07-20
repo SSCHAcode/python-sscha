@@ -45,7 +45,7 @@ def test_update_weights(verbose = False):
             
     assert delta_rho < 2e-5
 
-def test_simple_relax(verbose = False):
+def test_simple_relax(verbose = False, use_julia = True):
     total_path = os.path.dirname(os.path.abspath(__file__))
     os.chdir(total_path)
 
@@ -58,6 +58,7 @@ def test_simple_relax(verbose = False):
     dyn_target = CC.Phonons.Phonons(os.path.join(DATA_PATH, "dyn1_population2"), full_name = True)
 
     cfp = None
+    cfg = None
     if verbose:
         def save_all(minim):
             ka = len(minim.__fe__)
@@ -72,20 +73,47 @@ def test_simple_relax(verbose = False):
             fname = "minim_data_ka{}.npz".format(ka)
             np.savez(fname, **minim_data)
     
+        
+
+        grad_structs = []
+
+        def save_gradient(grad_dyn, grad_struct, minim):
+            grad_structs.append(grad_struct.ravel())
+
+            np.savetxt("grad_struct.dat", 
+                np.concatenate([
+                    np.transpose([np.arange(len(grad_structs))]),
+                    np.array(grad_structs)
+                ], axis=1), header = "step; gradient structure")
+
         cfp = save_all
+        cfg = save_gradient
 
     # Perform the minimization
     ens = sscha.Ensemble.Ensemble(dyn_start, 0, dyn_start.GetSupercell())
     ens.load(DATA_PATH, 2, 1000)
 
     minim = sscha.SchaMinimizer.SSCHA_Minimizer(ens)
-    minim.use_julia = False
+    minim.use_julia = use_julia
     minim.minim_struct = True
     minim.min_step_dyn = 0.5
     minim.min_step_struc = 0.5
     minim.meaningful_factor = 1e-10
+    
+    # Go in the working directory to avoid missing up files
+    if verbose:
+        if minim.use_julia:
+            if not os.path.isdir("julia"):
+                os.mkdir("julia")
+            os.chdir("julia")
+        else:
+            if not os.path.isdir("standard"):
+                os.mkdir("standard")
+            os.chdir("standard")
+
     minim.init()
-    minim.run(custom_function_pre = cfp)
+    minim.run(custom_function_pre=cfp, 
+              custom_function_gradient=cfg)
     minim.finalize()
 
     if verbose:
@@ -117,4 +145,9 @@ def test_simple_relax(verbose = False):
 
 if __name__ == "__main__":
     test_update_weights(True)
-    test_simple_relax(True)
+    
+    use_julia=True
+    if len(sys.argv) > 1:
+        use_julia = sys.argv[1] == "julia"
+    
+    test_simple_relax(True, use_julia)
