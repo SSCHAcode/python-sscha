@@ -68,7 +68,7 @@ def test_gold(use_julia=True, verbose=False):
             print("Delta q = ", final_dyn.q_tot[i])
             print("Delta max = ", np.max(np.abs(delta)))
 
-        assert delta < 0.005, "Error in the dynamical matrix at q = " + str(final_dyn.q_tot[i])
+        assert np.max(np.abs(delta)) < 0.005, "Error in the dynamical matrix at q = " + str(final_dyn.q_tot[i])
 
     delta = final_dyn.structure.unit_cell[0,0] - gold_dyn.structure.unit_cell[0,0]
     assert np.abs(delta) < 0.0005, "Error in the lattice parameter"

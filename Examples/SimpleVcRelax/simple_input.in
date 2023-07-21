@@ -34,8 +34,8 @@
 
 	! We want to perform a standard vc-relax with target pressure
 	! So we do now want to fix the volume, and we need to specify
-	! a target pressure:
-	fix_volume = .false.
+	! a target pressure (if fix_volume is .true., remove target pressure!):
+	! fix_volume = .false.
 	target_pressure = 0 ! [GPa]
 
 	! We can provide a bulk modulus,
