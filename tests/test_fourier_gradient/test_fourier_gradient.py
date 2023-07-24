@@ -64,7 +64,7 @@ def test_fourier(verbose = False):
 
     
     for iq, q in enumerate(ensemble.current_dyn.q_tot):
-        assert np.max(np.abs(grad[iq, :, :] - grad_standard[iq, :, :])) < 1e-8, "Error, the fourier gradient does not match with benchmark"
+        assert np.max(np.abs(grad[iq, :, :] - grad_standard[iq, :, :])) < 1e-8, "Error, the fourier gradient does not match with benchmark at q = {} (iq = {})".format(q, iq)
 
 
 

@@ -2533,12 +2533,43 @@ Error while loading the julia module.
         # Call the julia subroutine
         delta_forces = self.forces_qspace - self.sscha_forces_qspace 
         delta_forces /= CC.Units.A_TO_BOHR
-        phi_grad, phi_grad2 = julia.Main.get_gradient_fourier(
-            v_tilde,
-            delta_forces,
-            self.rho,
-            self.q_opposite_index)
+
+        # Compute the gradient splitting the configurations
+        def get_gradient_worker(cfgs, timer=None):
+            # Get the starting and final configurations from the first argument
+            start_config, end_config = cfgs
+
+            # Select only the configurations in the ensemble required
+            new_vtilde = v_tilde[start_config:end_config, :, :]
+            new_delta_forces = delta_forces[start_config:end_config, :, :]
+            new_rho = self.rho[start_config:end_config]
+
+            phi_grad, phi_grad2 = julia.Main.get_gradient_fourier(
+                new_vtilde,
+                new_delta_forces,
+                new_rho,
+                self.q_opposite_index)
+
+            # Create a fake array that concatenates both
+            result = np.concatenate((phi_grad, phi_grad2), axis=0)
+            return result
+
         
+
+        # Get the range of the configurations to be computed for each processor
+        configs_ranges = CC.Settings.split_configurations(self.N)
+
+        if timer is not None:
+            gradient_and_error = timer.execute_timed_function(CC.Settings.GoParallel,
+                    get_gradient_worker, configs_ranges, "+")
+        else:
+            gradient_and_error = CC.Settings.GoParallel(get_gradient_worker,
+                    configs_ranges, "+")
+
+        # Get the gradient and its sum back
+        phi_grad = gradient_and_error[:nq, :, :]
+        phi_grad2 = gradient_and_error[nq:, :, :]
+
         # Divide by the total weights
         n_tot = np.sum(self.rho)
         phi_grad /= n_tot
@@ -2577,18 +2608,9 @@ Error while loading the julia module.
             
             return gradient * av_ensemble
 
-        nproc = CC.Settings.GetNProc()
-        list_of_inputs = []
-        index = 0
-        for i in range(nproc):
-            start_config = index
-            index += self.N // nproc
-            if i < self.N % nproc:
-                index += 1
-            end_config = index
-            
-            list_of_inputs.append( (start_config, end_config) )
-
+        # Get the range of the configurations to be computed for each processor
+        configs_ranges = CC.Settings.split_configurations(self.N)
+        
         if timer:
             gradient = timer.execute_timed_function(CC.Settings.GoParallel, work_function, list_of_inputs, "+")
         else:
