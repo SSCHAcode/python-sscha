@@ -71,7 +71,7 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
     Φ_grad_err .= 0
     # Define helper arrays that avoid memory allocations during the for loop
     
-    @time begin 
+    begin 
         for jq in 1:nq
             for k in 1:3*nat
                 for j in 1:3*nat
@@ -100,7 +100,7 @@ function get_gradient_fourier!(Φ_grad :: Array{Complex{T}, 3},
     #    get_opposit_q!(minus_q_index, q, bg)
     #end
 
-    @time begin
+    begin
         tmp_grad = zeros(Complex{T}, (3*nat, 3*nat, nq))
         for iq in 1:nq
             @views Φ_grad[:, :, iq] .+= Φ_grad[:, :, iq]'
@@ -515,7 +515,6 @@ function vector_q2r(
     q .= q_jj'
     v_sc = zeros(T, (n_random, 3*nat_sc))
 
-    println("Timing vector_q2r")
     vector_q2r!(v_sc, v_q, q, itau, R_lat)
     return v_sc
 end

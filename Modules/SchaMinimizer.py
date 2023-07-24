@@ -1509,7 +1509,7 @@ WARNING, the preconditioning is activated together with a root representation.
             timer.print_report(is_master=True)
 
 
-    def check_imaginary_frequencies(self):
+    def check_imaginary_frequencies(self, timer=None):
         """
         The following subroutine check if the current matrix has imaginary frequency. In this case
         the minimization is stopped.
@@ -1524,7 +1524,8 @@ WARNING, the preconditioning is activated together with a root representation.
         w = self.ensemble.current_w.copy()
         pols = self.ensemble.current_pols.copy()
         #w, pols = self.dyn.DiagonalizeSupercell()#.DyagDinQ(0)
-        ss = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
+        ss = self.ensemble.supercell_structure.copy()
+        #ss = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
 
         # Get translations
         if not self.ensemble.ignore_small_w:
@@ -1546,10 +1547,10 @@ WARNING, the preconditioning is activated together with a root representation.
             pold = self.ensemble.pols_0.copy()
             #wold, pold = self.ensemble.dyn_0.DiagonalizeSupercell()# superdyn0.DyagDinQ(0)
 
-            ss0 = self.ensemble.dyn_0.structure.generate_supercell(self.dyn.GetSupercell())
+            #ss0 = self.ensemble.dyn_0.structure.generate_supercell(self.dyn.GetSupercell())
 
             if not self.ensemble.ignore_small_w:
-                trans_mask = ~CC.Methods.get_translations(pold, ss0.get_masses_array())
+                trans_mask = ~CC.Methods.get_translations(pold, ss.get_masses_array())
             else:
                 trans_mask = np.abs(wold) > CC.Phonons.__EPSILON_W__
 
@@ -1588,7 +1589,7 @@ You can try to fix this error setting the {} variable of {} class to True.
         return False
 
 
-    def check_stop(self):
+    def check_stop(self, timer=None):
         """
         CHECK THE STOPPING CONDITION
         ============================
@@ -1646,7 +1647,10 @@ You can try to fix this error setting the {} variable of {} class to True.
             return True
 
         # Check if there are imaginary frequencies
-        im_freq = self.check_imaginary_frequencies()
+        if timer is not None:
+            im_freq = timer.execute_timed_function(self.check_imaginary_frequencies)
+        else:
+            im_freq = self.check_imaginary_frequencies()
         if im_freq:
             print ("ERROR: imaginary frequencies found in the minimization")
             sys.stderr.write("ERROR: imaginary frequencies found in the minimization\n")

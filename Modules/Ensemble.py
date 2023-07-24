@@ -2570,6 +2570,7 @@ Error while loading the julia module.
         phi_grad = gradient_and_error[:nq, :, :]
         phi_grad2 = gradient_and_error[nq:, :, :]
 
+        
         # Divide by the total weights
         n_tot = np.sum(self.rho)
         phi_grad /= n_tot
@@ -2612,9 +2613,9 @@ Error while loading the julia module.
         configs_ranges = CC.Settings.split_configurations(self.N)
         
         if timer:
-            gradient = timer.execute_timed_function(CC.Settings.GoParallel, work_function, list_of_inputs, "+")
+            gradient = timer.execute_timed_function(CC.Settings.GoParallel, work_function, configs_ranges, "+")
         else:
-            gradient = CC.Settings.GoParallel(work_function, list_of_inputs, "+")
+            gradient = CC.Settings.GoParallel(work_function, configs_ranges, "+")
 
         gradient /= np.sum(self.rho)
 
