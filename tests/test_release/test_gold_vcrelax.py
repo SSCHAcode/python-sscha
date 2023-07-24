@@ -78,8 +78,9 @@ def test_gold(use_julia=True, verbose=False):
 
 
 if __name__ == "__main__":
-    use_julia=False
+    use_julia=True
     if len(sys.argv) > 1:
-        use_julia = sys.argv[1] == "julia"
+        if sys.argv[1].lower() != "julia":
+            use_julia=False
                 
     test_gold(verbose=True, use_julia=use_julia)
