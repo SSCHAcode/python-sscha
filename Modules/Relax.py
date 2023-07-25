@@ -89,6 +89,7 @@ class SSCHA(object):
         # If the ensemble must be saved at each iteration.
         #
         self.save_ensemble = save_ensemble
+        self.save_dyn = True # Save the dynamical matrix at each iteration
         self.data_dir = "data"
 
 
@@ -379,7 +380,7 @@ Error, the specified location to save the ensemble:
                 self.minim.dyn.dynmats[iq] = fcq[iq, :, :]
 
             # Save the dynamical matrix
-            if self.save_ensemble:
+            if self.save_ensemble or self.save_dyn:
                 self.minim.dyn.save_qe("dyn_pop%d_" % pop)
 
             # Check if it is converged
@@ -700,7 +701,8 @@ Error, the specified location to save the ensemble:
                 self.minim.dyn.dynmats[iq] = fcq[iq, :, :]
 
             # Save the dynamical matrix
-            self.minim.dyn.save_qe("dyn_pop%d_" % pop)
+            if self.save_ensemble or self.save_dyn:
+                self.minim.dyn.save_qe("dyn_pop%d_" % pop)
 
             # Check if the constant volume calculation is converged
             running1 = not self.minim.is_converged()
