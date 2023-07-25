@@ -399,8 +399,12 @@ class SSCHA_Minimizer(object):
                         t_5 = time.time()
                         super_structure = self.dyn.structure.generate_supercell(supercell)
                         if timer is not None:
-                            timer_prepare.execute_timed_function(CC.Phonons.GetSupercellFCFromDyn, dyn_grad, np.array(self.dyn.q_tot), \
-                                self.dyn.structure, super_structure)
+                            fc_supercell = timer_prepare.execute_timed_function(
+                                    CC.Phonons.GetSupercellFCFromDyn, 
+                                    dyn_grad, 
+                                    np.array(self.dyn.q_tot),
+                                    self.dyn.structure, 
+                                    super_structure)
                         else:
                             fc_supercell = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot), \
                                 self.dyn.structure, super_structure)
