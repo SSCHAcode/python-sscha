@@ -321,16 +321,17 @@ class Cluster(object):
         """.format(name, type(self).__name__,  similar_objects)
 
                 raise AttributeError(ERROR_MSG)
+
+            # Setting the account or partition name will automatically result in
+            # activating the corresponding flags
+            if name.endswith("_name"):
+                key = "use_{}".format(name.split("_")[0])
+                self.__dict__[key] = True
         else:
             super(Cluster, self).__setattr__(name, value)
 
 
-        # Setting the account or partition name will automatically result in
-        # activating the corresponding flags
-        if name.endswith("_name"):
-            key = "use_{}".format(name.split("_")[0])
-            self.__dict__[key] = True
-        
+                
         
         
     def ExecuteCMD(self, cmd, raise_error = False, return_output = False, on_cluster = False):
