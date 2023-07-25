@@ -622,11 +622,15 @@ class Cluster(object):
 
                 list_of_inputs.append(input_file)     
                 list_of_outputs.append(output_file)
-            except:
+            except Exception as e: 
                 MSG = '''
 Error while writing input file {}.
+
+Error message:
 '''.format(label)
+                MSG += str(e)
                 print(MSG)
+
 
             # Release the lock on the threads
             self.lock.release()            
