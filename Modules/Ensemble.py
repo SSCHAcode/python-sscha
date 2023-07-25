@@ -956,6 +956,9 @@ Error, the following stress files are missing from the ensemble:
 
         ASE extxyz format is used for build the training set for the nequip and allegro neural network potentials.
 
+        Note, this is the same as save_enhanced_xyz, but it uses ASE builtin function.
+        If ase is not found, it will use the save_enhanced_xyz function.
+
         Parameters
         ----------
             filename : str
@@ -965,6 +968,7 @@ Error, the following stress files are missing from the ensemble:
         """
 
         if not __ASE__:
+            self.save_enhanced_xyz(filename, append_mode = append_mode)
             raise ImportError("Error, this function requires ASE installed")
 
         
