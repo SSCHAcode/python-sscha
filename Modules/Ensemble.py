@@ -89,12 +89,22 @@ except:
         from julia.api import Julia
         jl = Julia(compiled_modules=False)
         import julia.Main
-        julia.Main.include(os.path.join(os.path.dirname(__file__),
+        try:
+            julia.Main.include(os.path.join(os.path.dirname(__file__),
             "fourier_gradient.jl"))
-        __JULIA_EXT__ = True
-    except:
-        raise 
-    pass
+            __JULIA_EXT__ = True
+        except:
+            # Install the required modules
+            julia.install()
+            try:
+                julia.Main.include(os.path.join(os.path.dirname(__file__),
+                    "fourier_gradient.jl"))
+                __JULIA_EXT__ = True
+            except Exception as e:
+                warnings.warn("Julia extension not available.\nError: {}".format(e))
+    except Exception as e:
+        warnings.warn("Julia extension not available.\nError: {}".format(e))
+
 
 try:
     from ase.units import create_units
