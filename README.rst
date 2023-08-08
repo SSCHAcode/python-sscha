@@ -4,16 +4,14 @@
 Introduction
 ============
 
-Website for more information [sscha.eu](http://sscha.eu/).
-
-The full documentation of the package is in the [python-sscha.pdf](https://github.com/SSCHAcode/python-sscha/blob/master/python-sscha.pdf) file, in the root directory of this repository
+Tutorials and documentation can be found at `www.sscha.eu <https://sscha.eu/>`_.
 
 
-Subscriptions to the 2023 School are open!
-==========================================
+Video lessons from  the 2023 School are available
+=================================================
 
-Visit the official [webpage](http://sscha.eu/Schools/2023/home/) to learn more about the in presence school on the sscha code about how to compute thermodynamic properties of the matter, accounting for anharmonicity and quantum fluctuations of ions!
-The school will be held in San Sebastian, Spain, between 26-30 June.
+The full recordings, both of theoretical lectures, tutorials and Hands-on sessions can be found 
+in our youtube channel `SSCHAcode <https://www.youtube.com/@SSCHAcode>`_
 
 
 
@@ -47,12 +45,39 @@ What are you waiting for? Download and install python-sscha, and start enjoying 
 How to install
 ==============
 
-The SSCHA code is a collection of 2 python packages: CellConstructor and python-sscha.
-In this guide, we refer to the installation of python-sscha.
+The SSCHA code is a collection of 3 python packages: CellConstructor, python-sscha and tdscha.
+
+- `CellConstructor <https://github.com/SSCHAcode/CellConstructor>`_ : utility to manage phonon dispersions, atomic structures and crystal symmetries
+- `sscha <https://github.com/SSCHAcode/python-sscha>`_ : This repository, relax with anharmonicity and compute static linear response properties.
+- `tdscha <https://github.com/SSCHAcode/tdscha>`_ : Compute the dynamical linear response (Raman and IR, spectral functions) 
+
+More details about installations are in the official website `www.sscha.eu <https://sscha.eu/download>`_
+
+Install with Anaconda
+---------------------
+
+The easiest way to install the code is through anaconda.
+First make sure you have anaconda installed `(install anaconda) <https://www.anaconda.com/download>`_
+
+The following commands are sufficient to install the full sscha suite and its dependencies.
+
+.. code:: console
+   
+   conda create -n sscha -c conda-forge python=3.10 gfortran libblas lapack openmpi julia openmpi-mpicc pip numpy scipy spglib
+   conda activate sscha
+   pip install ase julia mpi4py
+   pip install cellconstructor python-sscha tdscha
+
+To activate the environment and execute the SSCHA, run
+
+.. code:: console
+
+   conda activate sscha
 
 
-Requirements
-------------
+
+Manual installation
+-------------------
 
 To install python-sscha you need:
 1. python (either 2.7 or 3.*)
