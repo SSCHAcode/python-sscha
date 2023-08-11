@@ -86,12 +86,12 @@ try:
 except:
     try:
         import julia
-        from julia.api import Julia
-        jl = Julia(compiled_modules=False)
-        import julia.Main
         try:
+            from julia.api import Julia
+            jl = Julia(compiled_modules=False)
+            import julia.Main
             julia.Main.include(os.path.join(os.path.dirname(__file__),
-            "fourier_gradient.jl"))
+                "fourier_gradient.jl"))
             __JULIA_EXT__ = True
         except:
             # Install the required modules

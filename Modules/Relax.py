@@ -576,6 +576,7 @@ Error, the specified location to save the ensemble:
             pop = start_pop
         else:
             pop = self.start_pop
+            start_pop = self.start_pop
 
         running = True
         while running:
@@ -590,6 +591,8 @@ Error, the specified location to save the ensemble:
             # Generate the ensemble
             self.minim.ensemble.dyn_0 = self.minim.dyn.Copy()
             if pop != start_pop or not restart_from_ens:
+                print("POP:", pop, "START_POP:", start_pop)
+                print("RESTART_FROM_ENS:", restart_from_ens)
                 self.minim.ensemble.generate(self.N_configs, sobol=sobol, sobol_scramble = sobol_scramble, sobol_scatter = sobol_scatter)
 
                 # Save also the generation
