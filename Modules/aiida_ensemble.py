@@ -59,9 +59,6 @@ class AiiDAEnsemble(Ensemble):
         if self.force_computed is None:
             self.force_computed = np.array([False] * self.N, dtype=bool)
 
-        n_calcs = np.sum(self.force_computed.astype(int)) 
-        computing_ensemble = self
-
         self.has_stress = True # by default we calculate stresses with the `get_builder_from_protocol`
         if overrides:
             try:
@@ -69,17 +66,10 @@ class AiiDAEnsemble(Ensemble):
                 self.has_stress = tstress
             except KeyError:
                 pass
-
-        # Check wheter compute the whole ensemble, or just a small part
-        should_i_merge = False
-        if n_calcs != self.N:
-            should_i_merge = True
-            computing_ensemble = self.get_noncomputed()
-            self.remove_noncomputed()
             
         # ============= AIIDA SECTION ============= #
         workchains = submit_and_get_workchains(
-            structures=computing_ensemble.structures,
+            structures=self.structures,
             pw_code=pw_code,
             temperature=self.current_T,
             protocol=protocol,
@@ -93,28 +83,33 @@ class AiiDAEnsemble(Ensemble):
 
         workchains_copy = copy(workchains)
         while(workchains_copy):
-            workchains_copy = get_running_workchains(workchains_copy, computing_ensemble.force_computed)
+            workchains_copy = get_running_workchains(workchains_copy, self.force_computed)
             if workchains_copy:
                 time.sleep(60) # wait before checking again
         
-        for i, is_computed in enumerate(computing_ensemble.force_computed):
+        for i, is_computed in enumerate(self.force_computed):
             if is_computed:
                 out = workchains[i].outputs
-                computing_ensemble.energies[i] = out.output_parameters.dict.energy / CONSTANTS.ry_to_ev
-                computing_ensemble.forces[i] = out.output_trajectory.get_array('forces')[-1] / CONSTANTS.ry_to_ev
+                self.energies[i] = out.output_parameters.dict.energy / CONSTANTS.ry_to_ev
+                self.forces[i] = out.output_trajectory.get_array('forces')[-1] / CONSTANTS.ry_to_ev
                 if self.has_stress:
-                    computing_ensemble.stresses[i] = out.output_trajectory.get_array('stress')[-1] * gpa_to_rybohr3
+                    self.stresses[i] = out.output_trajectory.get_array('stress')[-1] * gpa_to_rybohr3
         # ============= AIIDA SECTION ============= #
 
         if self.has_stress:
-            computing_ensemble.stress_computed = copy(computing_ensemble.force_computed)
+            self.stress_computed = copy(self.force_computed)
 
-        print("CE BEFORE MERGE:", len(self.force_computed))
+        self._clean_runs()
 
-        if should_i_merge:
-            # Remove the noncomputed ensemble from here, and merge
-            self.merge(computing_ensemble)
-        print("CE AFTER MERGE:", len(self.force_computed))
+    def _clean_runs(self) -> None:
+        """Clean the failed runs and print summary."""
+        n_calcs = np.sum(self.force_computed.astype(int))
+        print('=============== SUMMARY AIIDA CALCULATIONS =============== \n')
+        print('Total structures included: ', n_calcs)
+        print('Structures not included  : ', self.N-n_calcs, '\n')
+        print('===================== END OF SUMMARY ===================== \n')
+        if n_calcs != self.N:
+            self.remove_noncomputed()
 
 
 def get_running_workchains(workchains: list, success: list[bool]) -> list:
