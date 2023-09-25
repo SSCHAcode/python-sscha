@@ -1484,82 +1484,91 @@ def train_mtp_on_cfg(specorder, mlip_run_command, path_to_mlip, pot_name,
         print('There are no new structures that need to be added to the train set!')
         return
 
-    for i in range(n_cfg):
-        print(f"Calculating ab initio energies and forces for configuration selected.cfg.{i}")
-        # cmd_convert  = f'{mlip_run_command} {path_to_mlip} convert --output_format=poscar sampled.cfg.{i} {i}.POSCAR' 
-        # os.system(cmd_convert)
-        ab_initio_dir = f'ab_initio_dir_{i}'+ '_' + str(datetime.now()).replace(' ','_').replace(':','-')
-        cmd_mkdir_abinitio = f'mkdir {ab_initio_dir}'
-        if not os.path.exists(ab_initio_dir): 
-            os.system(cmd_mkdir_abinitio)
-        else: 
-            print(f'Ab initio directory {ab_initio_dir} already exists!')
-        
-        ab_initio_ase_atoms = one_cfg_to_atoms(f'selected.cfg.{i}',specorder) 
-
-        if ab_initio_calculator == "QE":
+    if n_cfg > 0:
+        for i in range(n_cfg):
+            print(f"Calculating ab initio energies and forces for configuration selected.cfg.{i}")
+            # cmd_convert  = f'{mlip_run_command} {path_to_mlip} convert --output_format=poscar sampled.cfg.{i} {i}.POSCAR' 
+            # os.system(cmd_convert)
+            ab_initio_dir = f'ab_initio_dir_{i}'+ '_' + str(datetime.now()).replace(' ','_').replace(':','-')
+            cmd_mkdir_abinitio = f'mkdir {ab_initio_dir}'
+            if not os.path.exists(ab_initio_dir): 
+                os.system(cmd_mkdir_abinitio)
+            else: 
+                print(f'Ab initio directory {ab_initio_dir} already exists!')
             
-            k_points = calc_ngkpt(ab_initio_ase_atoms.cell.reciprocal(),ab_initio_kresol)
-            print(f'KPOINTS: {k_points}')
-            if ab_initio_modules_load != None:
-                ab_initio_run_command = f"module load {ab_initio_modules_load}; mpirun -np {np_ab_initio} pw.x -in ESP.pwi > ESP.pwo"
-            else:
-                ab_initio_run_command = f"mpirun -np {np_ab_initio} pw.x -in ESP.pwi > ESP.pwo" 
-            ab_initio_cc_calc = Espresso(pseudopotentials = ab_initio_pseudos,
-                                        input_data = ab_initio_parameters,
-                                        kpts = k_points,
-                                        command = ab_initio_run_command,
-                                        koffset  = (0,0,0))
-            ab_initio_cc_calc.set_directory(ab_initio_dir)
-            in_ext  = ".pwi"
-            out_ext = ".pwo"   
-            print(ab_initio_cc_calc.command)
-
-        ### Starting Ab initio calculations ###
-        if ab_initio_cluster != None:
-            print("Using HPC for ab initio calculations")
-            if ab_initio_calculator == "QE":
-                # Here we need to improve run_atoms method to allow it to wait 
-                ab_initio_cluster.run_atoms(ab_initio_cc_calc, ab_initio_ase_atoms, in_extension = in_ext, out_extension = out_ext)
-
-            # my_hpc.read_results(cc_calc, my_hpc.label)
-        elif ab_initio_cluster == None:
+            ab_initio_ase_atoms = one_cfg_to_atoms(f'selected.cfg.{i}',specorder) 
 
             if ab_initio_calculator == "QE":
-                cc_struct = CC.Structure.Structure()
-                cc_struct.generate_from_ase_atoms(ab_initio_ase_atoms)
-                ab_initio_cc_calc.set_label("ESP")
-                ab_initio_cc_calc.calculate(cc_struct)
+                
+                k_points = calc_ngkpt(ab_initio_ase_atoms.cell.reciprocal(),ab_initio_kresol)
+                print(f'KPOINTS: {k_points}')
+                if ab_initio_modules_load != None:
+                    ab_initio_run_command = f"module load {ab_initio_modules_load}; mpirun -np {np_ab_initio} pw.x -in ESP.pwi > ESP.pwo"
+                else:
+                    ab_initio_run_command = f"mpirun -np {np_ab_initio} pw.x -in ESP.pwi > ESP.pwo" 
+                ab_initio_cc_calc = Espresso(pseudopotentials = ab_initio_pseudos,
+                                            input_data = ab_initio_parameters,
+                                            kpts = k_points,
+                                            command = ab_initio_run_command,
+                                            koffset  = (0,0,0))
+                ab_initio_cc_calc.set_directory(ab_initio_dir)
+                in_ext  = ".pwi"
+                out_ext = ".pwo"   
+                print(ab_initio_cc_calc.command)
 
-        ### Ending Ab initio calculations ###
+            ### Starting Ab initio calculations ###
+            if ab_initio_cluster != None:
+                print("Using HPC for ab initio calculations")
+                if ab_initio_calculator == "QE":
+                    # Here we need to improve run_atoms method to allow it to wait 
+                    ab_initio_cluster.run_atoms(ab_initio_cc_calc, ab_initio_ase_atoms, in_extension = in_ext, out_extension = out_ext)
 
-        # print(dir(cc_calc.structure))
-        if ab_initio_calculator == "QE":
-            # using finction for CellConstructor calculator
-            cc_calc_to_cfg(ab_initio_cc_calc,f'input.cfg.{i}',specorder, include_stress)
+                # my_hpc.read_results(cc_calc, my_hpc.label)
+            elif ab_initio_cluster == None:
 
-    os.system(f'cp set.cfg set.cfg.bak')
+                if ab_initio_calculator == "QE":
+                    cc_struct = CC.Structure.Structure()
+                    cc_struct.generate_from_ase_atoms(ab_initio_ase_atoms)
+                    ab_initio_cc_calc.set_label("ESP")
+                    ab_initio_cc_calc.calculate(cc_struct)
 
-    os.system('cat input.cfg* >> set.cfg')
-    os.system(f'cp {pot_name} {pot_name}.bak')
-    print('Start training MLIP')
-    os.system(cmd_mlip_train)
-    print('End training MLIP')
-    if train_local_mtps:
-        os.system(f'cat input.cfg* >> all_input_pop_{str(pop)}.cfg')
-        os.system(f'cat selected.cfg* >> all_selected_pop_{str(pop)}.cfg')
-        os.system(f'mv set.cfg set_pop_{str(pop)}.cfg')
-        os.system(f'cp {pot_name} {pot_name}.pop_{str(pop)}')
-        # os.system(f'cp {pot_name}.bak {pot_name}')
-        os.system('rm -f input.cfg*')
-        os.system('rm -f selected.cfg*')
-        os.system('rm -f preselected.cfg*')
+            ### Ending Ab initio calculations ###
+
+            # print(dir(cc_calc.structure))
+            if ab_initio_calculator == "QE":
+                # using finction for CellConstructor calculator
+                cc_calc_to_cfg(ab_initio_cc_calc,f'input.cfg.{i}',specorder, include_stress)
+
+        os.system(f'cp set.cfg set.cfg.bak')
+
+        os.system('cat input.cfg* >> set.cfg')
+        os.system(f'cp {pot_name} {pot_name}.bak')
+        print('Start training MLIP')
+        os.system(cmd_mlip_train)
+        print('End training MLIP')
+        if train_local_mtps:
+            os.system(f'cat input.cfg* >> all_input_pop_{str(pop)}.cfg')
+            os.system(f'cat selected.cfg* >> all_selected_pop_{str(pop)}.cfg')
+            os.system(f'mv set.cfg set_pop_{str(pop)}.cfg')
+            os.system(f'cp {pot_name} {pot_name}.pop_{str(pop)}')
+            # os.system(f'cp {pot_name}.bak {pot_name}')
+            os.system('rm -f input.cfg*')
+            os.system('rm -f selected.cfg*')
+            os.system('rm -f preselected.cfg*')
+        else:
+            os.system(f'cat input.cfg* >> all_input.cfg')
+            os.system(f'cat selected.cfg* >> all_selected.cfg')
+            os.system('rm -f input.cfg*')
+            os.system('rm -f selected.cfg*')
+            os.system('rm -f preselected.cfg*')
     else:
-        os.system(f'cat input.cfg* >> all_input.cfg')
-        os.system(f'cat selected.cfg* >> all_selected.cfg')
-        os.system('rm -f input.cfg*')
-        os.system('rm -f selected.cfg*')
-        os.system('rm -f preselected.cfg*')
+        print('No new configurations are need to be added into the training set! Training will be ommited this time!')
+        try:
+            os.system('rm -f input.cfg*')
+            os.system('rm -f selected.cfg*')
+            os.system('rm -f preselected.cfg*')
+        except:
+            pass
 
     return  
 
