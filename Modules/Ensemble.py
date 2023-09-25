@@ -3481,3 +3481,388 @@ DETAILS OF ERROR:
             self.stress_computed[:] = True
         else:
             self.has_stress = False
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import ase
+from ase.calculators.lammpsrun import LAMMPS
+from ase.units import Bohr, Ry
+from sscha.Relax import train_mtp_on_cfg, \
+                       ase_structures_list_to_cfg, \
+                       calc_ngkpt, \
+                       one_cfg_to_atoms, \
+                       split_cfg, \
+                       cc_calc_to_cfg, \
+                       ase_calc_to_cfg
+
+
+class Ensemble_MTP(Ensemble):
+
+    def __init__(self, dyn0, T0, supercell = None,
+                 specorder = None, 
+                 pot_name = 'fitted.mtp', 
+                 mlip_run_command = 'mpirun -np 1', 
+                 path_to_mlip = 'mlp',
+                 ab_initio_calculator = 'QE',
+                 ab_initio_parameters = None,
+                 ab_initio_modules_load = None,
+                 ab_initio_kresol = 0.25,
+                 ab_initio_pseudos = None,
+                 ab_initio_cluster = None,
+                 iteration_limit = 500,
+                 energy_weight = 1.0,
+                 force_weight = 0.01,
+                 stress_weight = 0.001,
+                 include_stress = False,
+                 retrain = False, 
+                 **kwargs):
+        # super().__init__(dyn0 = dyn0, T0 = T0, supercell = supercell)
+        # super().__init__(dyn0, T0, supercell)
+        # super().__init__(dyn0, T0, supercell)
+        # self.dyn0 = dyn0
+        # self.T0 = T0
+        # self.supercell = supercell
+        self.specorder = specorder 
+        self.mlip_run_command = mlip_run_command
+        self.path_to_mlip = path_to_mlip
+        self.pot_name = pot_name 
+        self.ab_initio_calculator = ab_initio_calculator
+        self.ab_initio_parameters = ab_initio_parameters 
+        self.ab_initio_modules_load = ab_initio_modules_load
+        self.ab_initio_kresol = ab_initio_kresol 
+        self.ab_initio_pseudos = ab_initio_pseudos 
+        self.ab_initio_cluster = ab_initio_cluster
+        self.iteration_limit = iteration_limit 
+        self.energy_weight = energy_weight 
+        self.force_weight = force_weight
+        self.stress_weight = stress_weight
+        self.include_stress = include_stress
+        self.retrain = retrain # IMPORTANT TAG!!! if we wish to retrain the MTP on structures produced with extrapolation control
+        # super().__init__(dyn0, T0, supercell, **kwargs)
+        super().__init__(dyn0, T0, supercell)
+
+
+    def compute_ensemble(self, calculator, compute_stress = True, stress_numerical = False,
+                         cluster = None, verbose = True):
+        """
+        GET ENERGY AND FORCES
+        =====================
+
+        This is the generic function to compute forces and stresses.
+        It can be used both with clusters, and with simple ase calculators
+
+        Paramters
+        ---------
+            calculator:
+                The ase calculator
+            compute_stress: bool
+                If true compute the stress
+            stress_numerical : bool
+                Compute the stress tensor with finite difference,
+                this is not possible with clusters
+            cluster: Cluster, optional
+                The cluster in which to send the calculation.
+                If None the calculation is performed on the same computer of
+                the sscha code.
+        """
+
+
+        # Check if the calculator is a cluster
+        is_cluster = False
+        if not cluster is None:
+            is_cluster = True
+
+        # Check consistency
+        if stress_numerical and is_cluster:
+            raise ValueError("Error, stress_numerical is not implemented with clusters")
+
+        # Check if not all the calculation needs to be done
+        n_calcs = np.sum( self.force_computed.astype(int))
+        computing_ensemble = self
+
+        if compute_stress:
+            self.has_stress = True
+
+        # Check wheter compute the whole ensemble, or just a small part
+        should_i_merge = False
+        if n_calcs != self.N:
+            should_i_merge = True
+            computing_ensemble = self.get_noncomputed()
+            self.remove_noncomputed()
+
+        if is_cluster:
+            print("BEFORE COMPUTING:", self.all_properties)
+            cluster.compute_ensemble(computing_ensemble, calculator, compute_stress)
+
+        else:
+            computing_ensemble.get_energy_forces(calculator, compute_stress, stress_numerical, verbose = verbose)
+
+        print("CE BEFORE MERGE:", len(self.force_computed))
+
+        if should_i_merge:
+            # Remove the noncomputed ensemble from here, and merge
+            self.merge(computing_ensemble)
+        print("CE AFTER MERGE:", len(self.force_computed))
+
+        print('ENSEMBLE ALL PROPERTIES:', self.all_properties)
+
+
+    def get_energy_forces(self, ase_calculator, compute_stress = True, stress_numerical = False, skip_computed = False, verbose = False, retrain = False):
+        """
+        GET ENERGY AND FORCES FOR THE CURRENT ENSEMBLE
+        ==============================================
+
+        This subroutine uses the ase calculator to compute the abinitio energies and forces
+        of the self ensemble.
+        This subroutine requires to have ASE installed and properly configured to
+        interface with your favourite ab-initio software.
+
+
+        Parameters
+        ----------
+            ase_calculator : ase.calculator
+                The ASE interface to the calculator to run the calculation.
+                also a CellConstructor calculator is accepted
+            compute_stress : bool
+                If true, the stress is requested from the ASE calculator. Be shure
+                that the calculator you provide supports stress calculation
+            stress_numerical : bool
+                If the calculator does not support stress, it can be computed numerically
+                by doing finite differences.
+            skip_computed : bool
+                If true the configurations already computed will be skipped.
+                Usefull if the calculation crashed for some reason.
+
+        """
+
+        # Setup the calculator for each structure
+        parallel = False
+        print("Force computed shape:", len(self.force_computed))
+        if __MPI__:
+            comm = MPI.COMM_WORLD
+            size = comm.Get_size()
+            rank = comm.Get_rank()
+
+            if size > 1:
+                parallel = True
+                # Broad cast to all the structures
+                structures = comm.bcast(self.structures, root = 0)
+                nat3 = comm.bcast(self.current_dyn.structure.N_atoms* 3* np.prod(self.supercell), root = 0)
+                N_rand = comm.bcast(self.N, root=0)
+
+
+                #if not Parallel.am_i_the_master():
+                #    self.structures = structures
+                #    self.init_from_structures(structures) # Enforce all the ensembles to have the same structures
+
+                # Setup the label of the calculator
+                #ase_calculator = comm.bcast(ase_calculator, root = 0)   # This broadcasting seems causing some issues on some fortran codes called by python (which may interact with MPI)
+                ase_calculator.set_label("esp_%d" % rank) # Avoid overwriting the same file
+
+                compute_stress = comm.bcast(compute_stress, root = 0)
+
+
+                # Check if the parallelization is correct
+                if N_rand % size != 0:
+                    raise ValueError("Error, for paralelization the ensemble dimension must be a multiple of the processors")
+
+        if not parallel:
+            size = 1
+            rank = 0
+            structures = self.structures
+            nat3 = self.current_dyn.structure.N_atoms* 3 * np.prod(self.supercell)
+            N_rand = self.N
+
+        # Only for the master
+
+        # Prepare the energy, forces and stress array
+        # TODO: Correctly setup the number of energies here
+
+
+        # If an MPI istance is running, split the calculation
+        tot_configs = N_rand // size
+        remainer = N_rand % size
+
+        if rank < remainer:
+            start = rank * (tot_configs + 1)
+            stop = start + tot_configs + 1
+        else:
+            start = rank * tot_configs + remainer
+            stop = start + tot_configs
+
+        num_confs = stop - start
+
+        energies = np.zeros( num_confs, dtype = np.float64)
+        forces = np.zeros( ( num_confs) * nat3 , dtype = np.float64)
+        if compute_stress:
+            stress = np.zeros( num_confs * 9, dtype = np.float64)
+
+        if rank == 0:
+            total_forces = np.zeros( N_rand * nat3, dtype = np.float64)
+            total_stress = np.zeros( N_rand * 9, dtype = np.float64)
+        else:
+            total_forces = np.empty( N_rand * nat3, dtype = np.float64)
+            total_stress = np.empty( N_rand * 9, dtype = np.float64)
+
+        i0 = 0
+        for i in range(start, stop):
+
+            # Avoid performing this calculation if already done
+            if skip_computed:
+                if self.force_computed[i]:
+                    if compute_stress:
+                        if self.stress_computed[i]:
+                            continue
+                    else:
+                        continue
+
+
+            struct = structures[i]
+            #atms = struct.get_ase_atoms()
+
+            # Setup the ASE calculator
+            #atms.set_calculator(ase_calculator)
+
+
+            # Print the status
+            if Parallel.am_i_the_master() and verbose:
+                print ("Computing configuration %d out of %d (nat = %d)" % (i+1, stop, struct.N_atoms))
+                sys.stdout.flush()
+
+            # Avoid for errors
+            run = True
+            count_fails = 0
+            retrain_count_fails = 0
+            while run:
+                try:
+                    results = CC.calculators.get_results(ase_calculator, struct, get_stress = compute_stress)
+                    energy = results["energy"] / Rydberg # eV => Ry
+                    forces_ = results["forces"] / Rydberg
+
+                    if compute_stress:
+                        stress[9*i0 : 9*i0 + 9] = -results["stress"].reshape(9)* Bohr**3 / Rydberg
+                        #energy = atms.get_total_energy() / Rydberg # eV => Ry
+                        # Get energy, forces (and stress)
+                        #energy = atms.get_total_energy() / Rydberg # eV => Ry
+                        #forces_ = atms.get_forces() / Rydberg # eV / A => Ry / A
+                        #if compute_stress:
+                    #    if not stress_numerical:
+                    #        stress[9*i0 : 9*i0 + 9] = -atms.get_stress(False).reshape(9) * Bohr**3 / Rydberg  # ev/A^3 => Ry/bohr
+                    #    else:
+                    #        stress[9*i0 : 9*i0 + 9] = -ase_calculator.calculate_numerical_stress(atms, voigt = False).ravel()* Bohr**3 / Rydberg
+
+                    # Copy into the ensemble array
+                    energies[i0] = energy
+                    forces[nat3*i0 : nat3*i0 + nat3] = forces_.reshape( nat3 )
+                    run = False
+                except:
+                    if self.retrain:
+                        print ("Retraining MTP on job %d" % i)
+                        os.system('touch set.cfg')
+                        try:
+                            train_mtp_on_cfg(self.specorder,self.mlip_run_command, self.path_to_mlip, self.pot_name, 
+                                self.ab_initio_calculator, self.ab_initio_parameters, self.ab_initio_modules_load, self.ab_initio_kresol, self.ab_initio_pseudos, self.ab_initio_cluster, 
+                                self.iteration_limit, self.energy_weight, self.force_weight, self.stress_weight, self.include_stress, 
+                                train_local_mtps = False, pop = 'ensemble_retrain')
+                            retrain_count_fails = 0
+                        except:
+                            retrain_count_fails += 1
+                            if retrain_count_fails >= 5:
+                                run = False
+                                struct.save_scf("error_struct.scf")
+                                sys.stderr.write("Error in the retrain MTP for more than 5 times\n     while computing 'error_struct.scf'")
+                                raise
+
+                    else:
+                        print ("Rerun the job %d" % i)
+                        count_fails += 1
+                        if count_fails >= 5:
+                            run = False
+                            struct.save_scf("error_struct.scf")
+                            sys.stderr.write("Error in the ASE calculator for more than 5 times\n     while computing 'error_struct.scf'")
+                            raise
+
+
+
+            i0 += 1
+
+
+
+
+
+        # Collect all togheter
+
+        if parallel:
+            comm.Allgather([energies, MPI.DOUBLE], [self.energies, MPI.DOUBLE])
+            comm.Allgather([forces, MPI.DOUBLE], [total_forces, MPI.DOUBLE])
+
+            if compute_stress:
+                comm.Allgather([stress, MPI.DOUBLE], [total_stress, MPI.DOUBLE])
+
+
+            #self.update_weights(self.current_dyn, self.current_T)
+            CC.Settings.barrier()
+
+
+        else:
+            self.energies = energies
+            total_forces = forces
+            if compute_stress:
+                total_stress = stress
+
+        # Reshape the arrays
+        self.forces[:, :, :] = np.reshape(total_forces, (N_rand, self.current_dyn.structure.N_atoms*np.prod(self.supercell), 3), order = "C")
+        self.force_computed[:] = True
+        print("Force computed shape:", len(self.force_computed))
+
+        if compute_stress:
+            self.stresses[:,:,:] = np.reshape(total_stress, (N_rand, 3, 3), order = "C")
+            self.has_stress = True
+            self.stress_computed[:] = True
+        else:
+            self.has_stress = False

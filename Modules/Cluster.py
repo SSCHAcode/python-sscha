@@ -1511,11 +1511,10 @@ Error while connecting to the cluster to copy the files:
                     if error_struct > 1e-2:
                         print("ERROR IDENTIFYING STRUCTURE!")
                         MSG = """
-                            Error in thread {}.
-                            Displacement between the expected structure {} 
-                            and the one readed from the calculator
-                            is of {} A.
-                        """.format(threading.get_native_id(), jobs_id[i], error_struct)
+Error in thread {}.
+     Displacement between the expected structure {} and the one readed from the calculator
+     is of {} A.
+""".format(threading.get_native_id(), jobs_id[i], error_struct)
                         print(MSG)
                         ensemble.structures[jobs_id[i]].save_scf('t_{}_error_struct_generated_{}.scf'.format(threading.get_native_id(), jobs_id[i]))
                         structures[i].save_scf('t_{}_error_struct_cmp_local_{}.scf'.format(threading.get_native_id(), jobs_id[i]))
