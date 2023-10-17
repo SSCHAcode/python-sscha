@@ -220,12 +220,18 @@ class SSCHA_Minimizer(object):
         # Setup the minimization algorithm
         self.minimization_algorithm = minimization_algorithm
 
-        # This is used to polish the ensemble energy
+        # This is the energy [in Ry] of the primitive cell without quantum fluctuation
+        # It is used to get the real contribution of anharmonicity.
         self.eq_energy = 0
 
         # This is used to store the number of symmetries
         # It is used almost to check that no symmetry is broken along the minimization
         self.N_symmetries = 1
+
+        # Check if julia is available
+        self.use_julia = False
+        if Ensemble.__JULIA_EXT__:
+            self.use_julia = True
 
         # This is the maximum number of steps (if negative = infinity)
         self.max_ka = -1
@@ -281,6 +287,9 @@ class SSCHA_Minimizer(object):
             if value < 0:
                 raise ValueError("Error, the step attribute {} must be positive ({} given)".format(name, value))
 
+        if "use_julia" in name:
+            if value and not Ensemble.__JULIA_EXT__:
+                raise ValueError("Error, Julia is not available")
 
     def set_minimization_step(self, step):
         """
@@ -337,10 +346,16 @@ class SSCHA_Minimizer(object):
         #dyn_grad, err = self.ensemble.get_fc_from_self_consistency(True, True)
         if self.minim_dyn:
             if self.precond_dyn:
-                if timer is not None:
-                    dyn_grad, err = timer.execute_timed_function(self.ensemble.get_preconditioned_gradient_parallel, True, True, preconditioned=1)
+                if self.use_julia:
+                    if timer is not None:
+                        dyn_grad, err = timer.execute_timed_function(self.ensemble.get_fourier_gradient)
+                    else:
+                        dyn_grad, err = self.ensemble.get_fourier_gradiennt()
                 else:
-                    dyn_grad, err = self.ensemble.get_preconditioned_gradient_parallel(True, True, preconditioned=1)
+                    if timer is not None:
+                        dyn_grad, err = timer.execute_timed_function(self.ensemble.get_preconditioned_gradient_parallel, True, True, preconditioned=1)
+                    else:
+                        dyn_grad, err = self.ensemble.get_preconditioned_gradient_parallel(True, True, preconditioned=1)
             else:
                 if timer is not None:
                     dyn_grad, err = timer.execute_timed_function(self.ensemble.get_preconditioned_gradient_parallel, True, True, preconditioned=0)
@@ -384,8 +399,12 @@ class SSCHA_Minimizer(object):
                         t_5 = time.time()
                         super_structure = self.dyn.structure.generate_supercell(supercell)
                         if timer is not None:
-                            timer_prepare.execute_timed_function(CC.Phonons.GetSupercellFCFromDyn, dyn_grad, np.array(self.dyn.q_tot), \
-                                self.dyn.structure, super_structure)
+                            fc_supercell = timer_prepare.execute_timed_function(
+                                    CC.Phonons.GetSupercellFCFromDyn, 
+                                    dyn_grad, 
+                                    np.array(self.dyn.q_tot),
+                                    self.dyn.structure, 
+                                    super_structure)
                         else:
                             fc_supercell = CC.Phonons.GetSupercellFCFromDyn(dyn_grad, np.array(self.dyn.q_tot), \
                                 self.dyn.structure, super_structure)
@@ -475,9 +494,13 @@ class SSCHA_Minimizer(object):
         if self.minim_struct:
             t1 = time.time()
             # Get the gradient of the free-energy respect to the structure
-            struct_grad, struct_grad_err =  self.ensemble.get_average_forces(True)
-            #print "SHAPE:", np.shape(struct_grad)
-            struct_grad_reshaped = - struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
+            if self.use_julia:
+                struct_grad_reshaped, struct_grad_err = self.ensemble.get_fourier_forces(get_error=True)
+                struct_grad_reshaped *= -1
+            else:
+                struct_grad, struct_grad_err =  self.ensemble.get_average_forces(True)
+                #print "SHAPE:", np.shape(struct_grad)
+                struct_grad_reshaped = - struct_grad.reshape( (3 * self.dyn.structure.N_atoms))
 
 
             # Preconditionate the gradient for the wyckoff minimization
@@ -562,7 +585,7 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
         # Append the gradient modulus to the minimization info
         if self.minim_struct:
             self.__gw__.append(np.sqrt( np.sum(struct_grad**2)))
-            self.__gw_err__.append(np.sqrt( np.einsum("ij, ij", struct_grad_err, struct_grad_err) / qe_sym.QE_nsymq))
+            self.__gw_err__.append(np.sqrt( np.sum(struct_grad_err**2) / qe_sym.QE_nsymq))
         else:
             self.__gw__.append(0)
             self.__gw_err__.append(0)
@@ -570,7 +593,10 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
 
         # Store the gradient in the minimization
         self.__gc__.append( np.sqrt(np.sum( np.abs(dyn_grad)**2)))
-        self.__gc_err__.append( np.sqrt(np.sum( np.abs(err)**2)))
+        if self.use_julia:
+            self.__gc_err__.append(np.real(err))
+        else:
+            self.__gc_err__.append( np.sqrt(np.sum( np.abs(err)**2)))
 
         # Perform the minimization step (with the chosen minimization algorithm)
         if timer:
@@ -975,12 +1001,16 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
 
         NOTE: it is equivalent to call self.ensemble.update_weights(self.dyn, self.ensemble.current_T)
         """
-
-        if timer:
-            timer.execute_timed_function(self.ensemble.update_weights, self.dyn, self.ensemble.current_T)
+        if not self.use_julia:
+            if timer:
+                timer.execute_timed_function(self.ensemble.update_weights, self.dyn, self.ensemble.current_T)
+            else:
+                self.ensemble.update_weights(self.dyn, self.ensemble.current_T)
         else:
-            self.ensemble.update_weights(self.dyn, self.ensemble.current_T)
-
+            if timer:
+                timer.execute_timed_function(self.ensemble.update_weights_fourier, self.dyn, self.ensemble.current_T)
+            else:
+                self.ensemble.update_weights_fourier(self.dyn, self.ensemble.current_T)
 
     def get_free_energy(self, return_error = False):
         """
@@ -1128,7 +1158,13 @@ Maybe data_dir is missing from your input?"""
         #grad = self.ensemble.get_fc_from_self_consistency(True, False)
         if verbosity:
             print ("Get the gradient for the first time...")
-        grad = self.ensemble.get_preconditioned_gradient(True)
+        if self.use_julia:
+            if self.timer:
+                grad, err_grad = self.timer.execute_timed_function(self.ensemble.get_fourier_gradient)
+            else:
+                grad, err_grad = self.ensemble.get_fourier_gradient()
+        else:
+            grad = self.ensemble.get_preconditioned_gradient(True)
         if verbosity:
             print ("After gradient.")
         self.prev_grad = grad
@@ -1477,7 +1513,7 @@ WARNING, the preconditioning is activated together with a root representation.
             timer.print_report(is_master=True)
 
 
-    def check_imaginary_frequencies(self):
+    def check_imaginary_frequencies(self, timer=None):
         """
         The following subroutine check if the current matrix has imaginary frequency. In this case
         the minimization is stopped.
@@ -1492,7 +1528,8 @@ WARNING, the preconditioning is activated together with a root representation.
         w = self.ensemble.current_w.copy()
         pols = self.ensemble.current_pols.copy()
         #w, pols = self.dyn.DiagonalizeSupercell()#.DyagDinQ(0)
-        ss = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
+        ss = self.ensemble.supercell_structure.copy()
+        #ss = self.dyn.structure.generate_supercell(self.dyn.GetSupercell())
 
         # Get translations
         if not self.ensemble.ignore_small_w:
@@ -1514,10 +1551,10 @@ WARNING, the preconditioning is activated together with a root representation.
             pold = self.ensemble.pols_0.copy()
             #wold, pold = self.ensemble.dyn_0.DiagonalizeSupercell()# superdyn0.DyagDinQ(0)
 
-            ss0 = self.ensemble.dyn_0.structure.generate_supercell(self.dyn.GetSupercell())
+            #ss0 = self.ensemble.dyn_0.structure.generate_supercell(self.dyn.GetSupercell())
 
             if not self.ensemble.ignore_small_w:
-                trans_mask = ~CC.Methods.get_translations(pold, ss0.get_masses_array())
+                trans_mask = ~CC.Methods.get_translations(pold, ss.get_masses_array())
             else:
                 trans_mask = np.abs(wold) > CC.Phonons.__EPSILON_W__
 
@@ -1556,7 +1593,7 @@ You can try to fix this error setting the {} variable of {} class to True.
         return False
 
 
-    def check_stop(self):
+    def check_stop(self, timer=None):
         """
         CHECK THE STOPPING CONDITION
         ============================
@@ -1614,7 +1651,10 @@ You can try to fix this error setting the {} variable of {} class to True.
             return True
 
         # Check if there are imaginary frequencies
-        im_freq = self.check_imaginary_frequencies()
+        if timer is not None:
+            im_freq = timer.execute_timed_function(self.check_imaginary_frequencies)
+        else:
+            im_freq = self.check_imaginary_frequencies()
         if im_freq:
             print ("ERROR: imaginary frequencies found in the minimization")
             sys.stderr.write("ERROR: imaginary frequencies found in the minimization\n")
