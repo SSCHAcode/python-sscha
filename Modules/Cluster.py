@@ -321,16 +321,17 @@ class Cluster(object):
         """.format(name, type(self).__name__,  similar_objects)
 
                 raise AttributeError(ERROR_MSG)
+
+            # Setting the account or partition name will automatically result in
+            # activating the corresponding flags
+            if name.endswith("_name"):
+                key = "use_{}".format(name.split("_")[0])
+                self.__dict__[key] = True
         else:
             super(Cluster, self).__setattr__(name, value)
 
 
-        # Setting the account or partition name will automatically result in
-        # activating the corresponding flags
-        if name.endswith("_name"):
-            key = "use_{}".format(name.split("_")[0])
-            self.__dict__[key] = True
-        
+                
         
         
     def ExecuteCMD(self, cmd, raise_error = False, return_output = False, on_cluster = False):
@@ -621,11 +622,15 @@ class Cluster(object):
 
                 list_of_inputs.append(input_file)     
                 list_of_outputs.append(output_file)
-            except:
+            except Exception as e: 
                 MSG = '''
 Error while writing input file {}.
+
+Error message:
 '''.format(label)
+                MSG += str(e)
                 print(MSG)
+
 
             # Release the lock on the threads
             self.lock.release()            
