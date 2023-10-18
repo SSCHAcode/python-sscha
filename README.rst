@@ -1,176 +1,174 @@
+# SSCHA
+
+The stochastic self-consistent harmonic approximation (SSCHA) is a full computational python package that simulates thermodynamic and phononic properties of materials accounting for anharmonicity at a nonperturbative level, fully including quantum and thermal fluctuations.
+
+See more info on the webpage:
+
+[www.sscha.eu](https://sscha.eu)
+
+## Easy installation through Anaconda
+
+The SSCHA code comes as a python library, with computationally intense part speedup with C, Fortran and Julia. The easiest way to install is through Anaconda ([how to install anaconda](https://www.anaconda.com/download)) 
 
 
+```
+conda create -n sscha -c conda-forge python=3.10 gfortran libblas lapack openmpi julia openmpi-mpicc pip numpy scipy spglib
+conda activate sscha
+pip install ase julia mpi4py
+pip install cellconstructor python-sscha tdscha
+```
 
-Introduction
-============
+Video lessons from  the 2023 School are available
+=================================================
 
-Website for more information [sscha.eu](http://sscha.eu/).
+The full recordings, both of theoretical lectures, tutorials and Hands-on sessions can be found 
+in our youtube channel `SSCHAcode <https://www.youtube.com/@SSCHAcode>`_
 
-The full documentation of the package is in the [python-sscha.pdf](https://github.com/SSCHAcode/python-sscha/blob/master/python-sscha.pdf) file, in the root directory of this repository
+This is the safest and best way to install the SSCHA. The first line creates a new pristine python environment with all the required libraries to compile the source code. The second line activates the newly installed environment. Then, the thrid command installs the additional dependencies, the last line compiles and install the SSCHA code.
+
+To use the SSCHA, you must activate the python environment with:
+
+```
+conda activate sscha
+```
+
+This installation method should work also on clusters and with computers with custom configurations. You must remember to activate the ``sscha`` environment even in your submission scripts on clusters.
+
+To activate the julia speedup on the SSCHA minimization, you must ensure julia dependencies are correctly setup. To do this, run the following line:
+
+```
+python -c 'import julia; julia.install()'
+```
 
 
-Subscriptions to the 2023 School are open!
-==========================================
+## Installing without Anaconda 
 
-Visit the official [webpage](http://sscha.eu/Schools/2023/home/) to learn more about the in presence school on the sscha code about how to compute thermodynamic properties of the matter, accounting for anharmonicity and quantum fluctuations of ions!
-The school will be held in San Sebastian, Spain, between 26-30 June.
+If you do not have anaconda to handle your dependencies you need to manually compile the code.
 
+Most of the codes require a fortran or C compiler and MPI configured. Here we install all the requirements to properly setup the SSCHA code. To properly compile and install the SSCHA code, you need a fortran compiler and LAPACK/BLAS available.
 
+On Debian-based Linux distribution, all the software required is installed with (Tested on Quantum Mobile and ubuntu 20.04):
+```
+sudo apt update
+sudo apt install libblas-dev liblapack-dev liblapacke-dev gfortran openmpi-bin
+```
+Note that some of the names of the libraries may change slightly in different linux versions or on MacOS.
 
-What is python-sscha?
+### Python installation
+
+Up to version 1.4 of SSCHA, it supports only python <= 3.10. If you are using the default python in the system, make sure to have installed the development header files. On ubuntu, they can be installed with:
+
+```
+sudo apt install python-dev
+```
+
+If you use anaconda, they are automatically installed.
+
+### Prerequisites
+
+The SSCHA code is a collection of 3 python packages: CellConstructor, python-sscha and tdscha.
+
+- `CellConstructor <https://github.com/SSCHAcode/CellConstructor>`_ : utility to manage phonon dispersions, atomic structures and crystal symmetries
+- `sscha <https://github.com/SSCHAcode/python-sscha>`_ : This repository, relax with anharmonicity and compute static linear response properties.
+- `tdscha <https://github.com/SSCHAcode/tdscha>`_ : Compute the dynamical linear response (Raman and IR, spectral functions) 
+
+More details about installations are in the official website `www.sscha.eu <https://sscha.eu/download>`_
+
+Install with Anaconda
 ---------------------
 
-python-sscha is both a python library and a stand-alone program to simulate quantum and thermal fluctuations in solid systems.
+The easiest way to install the code is through anaconda.
+First make sure you have anaconda installed `(install anaconda) <https://www.anaconda.com/download>`_
 
+The following commands are sufficient to install the full sscha suite and its dependencies.
 
-
-
-Why do I need python-sscha?
----------------------------
-
-
-If you are simulating transport or thermal properties of materials, phase diagrams, or phonon-related properties of materials, you need python-sscha.
-It is a package that enables you to include the effect of both thermal and quantum phonon fluctuations into your *ab initio* simulations.
-
-The method used by this package is the  Stochastic self-consistent Harmonic Approximation (SSCHA). The SSCHA is a full-quantum method that optimizes the nuclear wave-function (or density matrix at finite temperature) to minimize the free energy.
-In this way, you can simulate highly anharmonic systems, like those close to a second-order phase transition (as charge density waves and thermoelectric materials). 
-Despite the full quantum and thermal nature of the algorithm, the overall computational cost is comparable to standard classical molecular dynamics. Since the algorithm correctly exploits the symmetries of the crystal, it is also much cheaper. 
-
-python-sscha comes both as a python library that can be run inside your workflows and as stand-alone software, initialized by input scripts with the same syntax as Quantum ESPRESSO.
-
-You can couple it with any *ab initio* engine for force and energy calculations. It can interact through the Atomic Simulation Environment (ASE) and has an implemented interface for automatic submission of jobs in a remote cluster.
-
-Moreover, it is easy to use, with short input files highly human-readable.
-What are you waiting for? Download and install python-sscha, and start enjoying the Tutorials!
-
-
-How to install
-==============
-
-The SSCHA code is a collection of 2 python packages: CellConstructor and python-sscha.
-In this guide, we refer to the installation of python-sscha.
-
-
-Requirements
-------------
-
-To install python-sscha you need:
-1. python (either 2.7 or 3.*)
-2. numpy
-3. scipy
-4. matplotlib
-5. Lapack
-6. Blas
-7. gfortran (or any fortran compiler)
-8. CellConstructor
-
-For python, we strongly recommend using the anaconda distribution, that already comes with numerical packages correctly compiled to exploit multithreading.
-
-The numpy, scipy and matplotlib are python packages. These are usually provided with a new installation
-of python distributions like anaconda. Lapack and Blas are needed for compiling the FORTRAN code (together with a FORTRAN compiler like gfortran).
-In many Linux distributions like ubuntu they can be installed as 
-
-.. code-block:: console
-
-   sudo apt-get install libblas-dev liblapack-dev liblapacke-dev gfortran
-
-
-
-Note that this specific command may change in time. 
-
-
-Together with these mandatory requirements (otherwise, the code will not compile correctly or raise an exception at the startup), we
-strongly recommend installing also the following libraries:
-1. Atomic Simulation Environment (ASE)
-2. SPGLIB
-
-If these packages are available, they will enable the automatic cluster/local calculation of forces (ASE) and the symmetry recognition in the supercell (SPGLIB).
-
-
-To install all the python dependencies (and recommended) automatically, you may just run:
-
-.. code-block:: console
+.. code:: console
    
-   pip install -r requirements.txt
+   conda create -n sscha -c conda-forge python=3.10 gfortran libblas lapack openmpi julia openmpi-mpicc pip numpy scipy spglib
+   conda activate sscha
+   pip install ase julia mpi4py
+   pip install cellconstructor python-sscha tdscha
+
+To activate the environment and execute the SSCHA, run
+
+.. code:: console
+
+   conda activate sscha
 
 
+Manual installation
+-------------------
+
+The SSCHA benefits from julia being installed in the system. If present,
+it will be automatically used to speedup the calculation.
+
+To install julia, refer to the official website [julialang.org/downloads/](https://julialang.org/downloads/)
+Alternatively, to install julia on linux we can employ juliaup:
+
+.. code:: console
+
+  curl -fsSL https://install.julialang.org | sh
+
+Hit enter when asked to install julia.
+
+Then, install the python bindings for julia with
+
+.. code:: console
+  
+   pip install julia
 
 
-Installation from pip
----------------------
+The tdscha extension to compute Raman and IR requires some additional julia packages that can be installed within a julia terminal. Update your configuration to have access to the newly installed julia
 
-The easiest way to install python-sscha (and CellConstructor) is through the python package manager:
+.. code:: console
+  
+  source ~/.bashrc
 
-.. code-block:: console
-   
-   pip install python-sscha 
+Then, open a terminal and type `julia`. Inside the julia prompt, type `]`. The prompt should change color and display the julia version ending with `pkg>`
 
+Install the required julia libraries
 
+.. code:: julia
+  
+  pkg> add SparseArrays, LinearAlgebra, InteractiveUtils, PyCall
 
-Eventually, you can append the --user option to install the package only for the user (without requiring administrator powers).
-Pip will check for requirements automatically and install them. This method only works if pip is already installed with python.
+This should install the required libraries. Press backspace to return to the standard julia prompt and exit with
 
+.. code:: julia
+  
+  julia> exit()
 
-
-Installation from source
-------------------------
-
-Once all the dependences of the codes are satisfied, you can unzip the source code downloaded from the website.
-Then run, inside the directory that contains the setup.py script, the following command:
-
-.. code-block:: console
-
-   python setup.py install
+Now, you should be able to exploit the julia speedup in the TDSCHA calculations. It is not required to install julia before TDSCHA, it can also be done in a later moment.
 
 
-As for the pip installation, you may append the --user option to install the package only for the user (without requiring administrator powers).
+Compiling SSCHA
+~~~~~~~~~~~~~~~
+
+Once the prerequisites have been installed, python-sscha can be downloaded and installed with
+
+.. code:: console
+
+  pip install cellconstructor python-sscha
 
 
-Install with Intel FORTRAN compiler
------------------------------------
+Alternatively, it is possible to use the most recent version from the [SSCHA GitHub](https://github.com/SSCHAcode) repository, under CellConstructor and python-sscha repositories. The installation is performed in this case with
 
-The setup.py script works automatically with the GNU FORTRAN compiler. However, due to some differences in linking lapack,
-to use the intel compiler you need to edit a bit the setup.py script:
+.. code:: console
 
-In this case, you need to delete the lapack linking from the
-setup.py and include the -mkl as linker option.
-Note that you must force to use the same liker compiler as the one used for the compilation. 
-
-Install with a specific compiler path
--------------------------------------
-
-This can be achieved by specifying the environment variables on which setup.py relies:
-
-1. CC (C compiler)
-2. FC (Fortran compiler)
-3. LDSHARED (linking)
-
-If we want to use a custom compiler in /path/to/fcompiler we may run the setup as:
-
-.. code-block:: console
-
-   FC=/path/to/fcompiler LDSHARED=/path/to/fcompiler python setup.py install
+  pip install .
 
 
+Personalize the compiler
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-A specific setup.py script is provided to install it easily in FOSS clusters.
+If you have multiple compilers installed, and want to force pip to employ a specific fortran compiler, you can specify its path in the FC environment variable. Remember that the compiler employed to compile the code should match with the linker, indicated in the LDSHARED variable.
 
+For example
 
-Quick start
-===========
-
-
-To quickly start using the code, we recommend using the jupyter notebooks with examples we provide in the Tutorials directory of the source code.
-
-Tutorials are organized as follows:
-
-1. Setup the first calculation: PbTe tutorial. Here you learn how to set up a SSCHA calculation starting just with the structure (we provide a .cif file of the PbTe at high temperature). The tutorial will guide you step by step. You will learn how to: prepare the starting data needed for the SSCHA calculation, generate a random ensemble, save the ensemble and prepare input files for your favorite ab-initio code, read back the energies and the forces inside SSCHA, run a SSCHA minimization. You will also learn how to use ASE and the Cluster module to automatize the calculation of the ensemble and submit it to a HPC system.
-2. Automatic relaxation with a force field: SnTe_ToyModel. Here, we show how to use a force-field for a SSCHA calculation, running everything on your computer. We also will explain how to calculate the free energy hessian for second-order phase transitions, and study a phase transition as a function of temperature.
-3. Variable cell relaxation: LaH10 tutorial. Here you learn how to perform an automatic calculation with a variable cell. You will exploit the quantum effect to search the high-temperature superconductive phase (Fm-3m) of LaH10 below 200 GPa, starting from a distorted structure. 
-4. Hessian matrix calculation for second-order phase transitions: H3S tutorial. Here you reproduce the calculation of the Hessian of the free energy to assert the stability of the H3S phase.
-5. Spectral properties: Spectral_Properties. In this tutorial, we explain how to use the post-processing utilities of the SSCHA to calculate the phonon spectral function, and computing phonon lifetimes, and plotting interacting phonon dispersion. We provide an ensemble for PbTe already computed ab-initio.
+.. code:: console
+  
+  FC=gfortran LDSHARED=gfortran pip install cellconstructor python-sscha
 
 
-The jupyter notebooks are interactive, to quickly start with your simulation, pick the tutorial that resembles the kind of calculation you want to run, and simply edit it directly in the notebook. 
+For the development version of the code, subtitute the pip call with the python setup.py install.
 
-Stop

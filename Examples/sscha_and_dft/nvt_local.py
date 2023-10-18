@@ -20,7 +20,9 @@ input_data = {
         # Avoid writing wavefunctions on the disk
         'disk_io' : 'None',
         # Where to find the pseudopotential
-        'pseudo_dir' : '.'
+        'pseudo_dir' : '.',
+        'tprnfor' : True, # Print forces
+        'tstress' : True  # Print stress
     },
     'system' : {
         # Specify the basis set cutoffs
