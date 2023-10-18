@@ -64,6 +64,9 @@ scf_population*.dat
 frequencies*.*
 timer.json
 minim.dat
+otf_run*
+disp_*
+_data_tmp_
 
 # Translations
 *.mo
