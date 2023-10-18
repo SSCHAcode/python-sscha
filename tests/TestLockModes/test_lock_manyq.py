@@ -12,7 +12,7 @@ import sscha.SchaMinimizer
 
 
 MODE_LOCKED = 3
-def test_lock_manyq():
+def test_lock_manyq(verbose=False, use_julia=True):
     total_path = os.path.dirname(os.path.abspath(__file__))
     os.chdir(total_path)
 
@@ -27,6 +27,7 @@ def test_lock_manyq():
     IO_freq.SetupSaving("frequencies_graphite.dat") # The frequencies will be saved at each step of the minimization
 
     minim = sscha.SchaMinimizer.SSCHA_Minimizer(ens)
+    minim.use_julia = use_julia
     minim.min_step_dyn = 4e-2
     minim.min_step_struc = 4e-2
     minim.meaningful_factor = 1e-6 
@@ -66,4 +67,7 @@ def test_lock_manyq():
 
 
 if __name__ == "__main__":
-    test_lock_manyq()
+    use_julia = True
+    if len(sys.argv) > 1:
+        use_julia = sys.argv[1] == "julia"
+    test_lock_manyq(verbose=True, use_julia=use_julia)
