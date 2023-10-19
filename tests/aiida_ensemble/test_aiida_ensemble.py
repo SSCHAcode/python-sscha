@@ -1,5 +1,37 @@
 """Tests for :mod:`sscha.aiida_ensemble`."""
 import pytest
+import numpy as np
+
+from sscha.aiida_ensemble import AiiDAEnsemble
+
+
+def get_ensemble() -> AiiDAEnsemble:
+    """Return an AiiDAEnsemble instance."""
+    import os
+    from cellconstructor.Phonons import Phonons
+
+    path = os.path.dirname(os.path.abspath(__file__))
+
+    return AiiDAEnsemble(Phonons(os.path.join(path,"dyn"), 3), 0, (2,1,2))
+
+
+def test_clean_runs():
+    """Test the :func:`sscha.aiida_ensemble.AiiDAEnsemble._clean_runs` method."""
+    ensemble = get_ensemble()
+    num_configs, num_atoms = 4, 1
+    ensemble.generate(num_configs)
+
+    ensemble.energies = np.ones((num_configs,)) # (configs,)
+    ensemble.forces = np.ones((num_configs, num_atoms, 3)) # (configs, atoms, force index)
+    ensemble.stresses = np.ones((num_configs, 3, 3)) # (configs, 3, 3)
+    ensemble.force_computed = np.array([True, False, True, True], dtype=bool)
+    ensemble.stress_computed = np.copy(ensemble.force_computed)
+    ensemble._clean_runs()
+    
+    assert all(ensemble.force_computed)
+    assert len(ensemble.force_computed) == 3
+    assert len(ensemble.stress_computed) == 3
+    assert np.all(np.isclose(ensemble.forces, np.ones((num_configs-1, num_atoms, 3))))
 
 
 @pytest.mark.usefixtures('aiida_profile')
@@ -51,5 +83,4 @@ def test_submit_and_get_workchains(fixture_code):
     )
     
     assert len(workchains) == 5
-    
     

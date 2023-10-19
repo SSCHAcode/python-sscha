@@ -18,8 +18,7 @@ pip install ase julia mpi4py
 pip install cellconstructor python-sscha tdscha
 ```
 
-Video lessons from  the 2023 School are available
-=================================================
+## Video lessons from  the 2023 School are available
 
 The full recordings, both of theoretical lectures, tutorials and Hands-on sessions can be found 
 in our youtube channel `SSCHAcode <https://www.youtube.com/@SSCHAcode>`_
@@ -74,30 +73,29 @@ The SSCHA code is a collection of 3 python packages: CellConstructor, python-ssc
 
 More details about installations are in the official website `www.sscha.eu <https://sscha.eu/download>`_
 
-Install with Anaconda
----------------------
+## Install with Anaconda
+
 
 The easiest way to install the code is through anaconda.
 First make sure you have anaconda installed `(install anaconda) <https://www.anaconda.com/download>`_
 
 The following commands are sufficient to install the full sscha suite and its dependencies.
 
-.. code:: console
-   
+```   
    conda create -n sscha -c conda-forge python=3.10 gfortran libblas lapack openmpi julia openmpi-mpicc pip numpy scipy spglib
    conda activate sscha
    pip install ase julia mpi4py
    pip install cellconstructor python-sscha tdscha
+```
 
 To activate the environment and execute the SSCHA, run
 
-.. code:: console
-
+```
    conda activate sscha
+```
 
 
-Manual installation
--------------------
+## Manual installation
 
 The SSCHA benefits from julia being installed in the system. If present,
 it will be automatically used to speedup the calculation.
@@ -105,69 +103,65 @@ it will be automatically used to speedup the calculation.
 To install julia, refer to the official website [julialang.org/downloads/](https://julialang.org/downloads/)
 Alternatively, to install julia on linux we can employ juliaup:
 
-.. code:: console
-
+```
   curl -fsSL https://install.julialang.org | sh
+```
 
 Hit enter when asked to install julia.
 
 Then, install the python bindings for julia with
 
-.. code:: console
-  
+```
    pip install julia
-
+```
 
 The tdscha extension to compute Raman and IR requires some additional julia packages that can be installed within a julia terminal. Update your configuration to have access to the newly installed julia
 
-.. code:: console
-  
+```
   source ~/.bashrc
+```
 
 Then, open a terminal and type `julia`. Inside the julia prompt, type `]`. The prompt should change color and display the julia version ending with `pkg>`
 
 Install the required julia libraries
 
-.. code:: julia
-  
+```
   pkg> add SparseArrays, LinearAlgebra, InteractiveUtils, PyCall
+```
 
 This should install the required libraries. Press backspace to return to the standard julia prompt and exit with
 
-.. code:: julia
-  
+```
   julia> exit()
+```
 
 Now, you should be able to exploit the julia speedup in the TDSCHA calculations. It is not required to install julia before TDSCHA, it can also be done in a later moment.
 
 
-Compiling SSCHA
-~~~~~~~~~~~~~~~
+### Compiling SSCHA
 
 Once the prerequisites have been installed, python-sscha can be downloaded and installed with
 
-.. code:: console
-
+```
   pip install cellconstructor python-sscha
-
+```
 
 Alternatively, it is possible to use the most recent version from the [SSCHA GitHub](https://github.com/SSCHAcode) repository, under CellConstructor and python-sscha repositories. The installation is performed in this case with
 
-.. code:: console
 
+```
   pip install .
+```
 
-
-Personalize the compiler
-~~~~~~~~~~~~~~~~~~~~~~~~
+### Personalize the compiler
 
 If you have multiple compilers installed, and want to force pip to employ a specific fortran compiler, you can specify its path in the FC environment variable. Remember that the compiler employed to compile the code should match with the linker, indicated in the LDSHARED variable.
 
 For example
 
-.. code:: console
-  
+```
   FC=gfortran LDSHARED=gfortran pip install cellconstructor python-sscha
+```
 
 
 For the development version of the code, subtitute the pip call with the python setup.py install.
