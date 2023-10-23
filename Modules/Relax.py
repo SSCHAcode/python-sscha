@@ -628,7 +628,7 @@ Error, the specified location to save the ensemble:
             stress_err *=  sscha.SchaMinimizer.__RyBohr3_to_evA3__
 
             # Check if the stress tensor is actually loaded in the ensemble
-            if np.max(np.abs(self.stresses)) < 1e-10:
+            if np.max(np.abs(self.minim.ensemble.stresses)) < 1e-10:
                 # Probably there is an error in the submission of the stress tensor calculation
                 raise ValueError("Error, the stress tensor is not loaded in the ensemble. Check the stress tensor calculation.")
 
