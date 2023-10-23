@@ -683,7 +683,7 @@ Error, the specified location to save the ensemble:
  Gibbs Free energy = {:.10e} eV {}
  Zero energy = {:.10e} eV
 
- """.format(Press / CC.Units.GPA_TO_EV_PER_A3, press_err/ CC.Units.GPA_TO_EV_PER_A3, target_press , Vol,target_press_evA3 * Vol, helmoltz, mark_helmoltz, gibbs, mark_gibbs, self.minim.eq_energy)
+ """.format(Press / CC.Units.GPA_TO_EV_PER_A3, press_err/ CC.Units.GPA_TO_EV_PER_A3, target_press, target_press, Vol, target_press_evA3 * Vol, helmoltz, mark_helmoltz, gibbs, mark_gibbs, self.minim.eq_energy)
             print(message)
             # print " ====================== "
             # print " ENTHALPIC CONTRIBUTION "
