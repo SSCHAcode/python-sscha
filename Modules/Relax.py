@@ -609,6 +609,8 @@ Error, the specified location to save the ensemble:
                 if ensemble_loc is not None and self.save_ensemble:
                     self.minim.ensemble.save_bin(ensemble_loc, pop)
 
+
+
             self.minim.population = pop
             self.minim.init(delete_previous_data = False)
 
@@ -624,6 +626,11 @@ Error, the specified location to save the ensemble:
             stress_tensor, stress_err = self.minim.get_stress_tensor()
             stress_tensor *= sscha.SchaMinimizer.__RyBohr3_to_evA3__
             stress_err *=  sscha.SchaMinimizer.__RyBohr3_to_evA3__
+
+            # Check if the stress tensor is actually loaded in the ensemble
+            if np.max(np.abs(self.minim.ensemble.stresses)) < 1e-10:
+                # Probably there is an error in the submission of the stress tensor calculation
+                raise ValueError("Error, the stress tensor is not loaded in the ensemble. Check the stress tensor calculation.")
 
             # Get the pressure
             Press = np.trace(stress_tensor) / 3
@@ -676,7 +683,7 @@ Error, the specified location to save the ensemble:
  Gibbs Free energy = {:.10e} eV {}
  Zero energy = {:.10e} eV
 
- """.format(Press / CC.Units.GPA_TO_EV_PER_A3, press_err/ CC.Units.GPA_TO_EV_PER_A3, target_press , Vol,target_press_evA3 * Vol, helmoltz, mark_helmoltz, gibbs, mark_gibbs, self.minim.eq_energy)
+ """.format(Press / CC.Units.GPA_TO_EV_PER_A3, press_err/ CC.Units.GPA_TO_EV_PER_A3, target_press, target_press, Vol, target_press_evA3 * Vol, helmoltz, mark_helmoltz, gibbs, mark_gibbs, self.minim.eq_energy)
             print(message)
             # print " ====================== "
             # print " ENTHALPIC CONTRIBUTION "
