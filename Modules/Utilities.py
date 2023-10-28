@@ -600,7 +600,7 @@ class IOInfo:
         
         # Generate the supercell in real space (Do it only if the frequency changes)
         if minim.minimizer.new_direction:
-            w, pols = minim.dyn.DiagonalizeSupercell()
+            w = minim.ensemble.current_w
 
             # Dyagonalize
             self.total_freqs.append(w)
