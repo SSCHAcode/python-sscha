@@ -600,10 +600,9 @@ class IOInfo:
         
         # Generate the supercell in real space (Do it only if the frequency changes)
         if minim.minimizer.new_direction:
-            dyn_sc = minim.dyn.GenerateSupercellDyn( minim.ensemble.supercell )
+            w, pols = minim.dyn.DiagonalizeSupercell()
 
             # Dyagonalize
-            w, pols = dyn_sc.DyagDinQ(0)
             self.total_freqs.append(w)
             
 
