@@ -265,7 +265,8 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
             self.r_lat[i,:] = self.supercell_structure.coords[i, :] - \
                 self.dyn_0.structure.coords[self.itau[i] - 1, :]
         self.r_lat *= CC.Units.A_TO_BOHR
-        self.init_q_opposite()
+        if __JULIA_EXT__:
+            self.init_q_opposite()
 
         self.u_disps_original = np.zeros_like(self.u_disps)
         self.u_disps_original_qspace = np.zeros_like(self.u_disps_qspace)
