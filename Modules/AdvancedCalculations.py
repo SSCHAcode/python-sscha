@@ -147,6 +147,18 @@ rm -rf {0}.wfc* {0}.save
     def read_results(self, calc, label):
         '''
         Get the results
+
+        Parameters
+        ----------
+            calc : the ASE or CellConstructor calculator.
+                In this case, it works with quantum espresso
+            labels : List of strings
+                The unique name of this calculation
+        Returns
+        -------
+            results : array
+                An array containing the real part of epsilon, 
+                and the mean of the real and imaginary parst of epsilon.
         '''
 
         results = super().read_results(calc, label)
