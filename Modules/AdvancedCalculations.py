@@ -176,6 +176,30 @@ rm -rf {0}.wfc* {0}.save
     def prepare_input_file(self, structures, calc, labels):
         '''
         Prepare the input files for the cluster
+
+        This is specific for quantum espresso and must be inherit and replaced for
+        other calculators.
+
+        This crates the input files in the local working directory
+        self.local_workdir and it returns the list of all the files generated.
+
+
+        Parameters
+        ----------
+            structures : List of cellconstructor.Structure.Structure
+                The atomic structures.
+            calc : the ASE or CellConstructor calculator.
+                In this case, it works with quantum espresso
+            labels : List of strings
+                The unique name of this calculation
+
+        Returns
+        -------
+            List_of_input : list
+                List of strings containing all the input files
+            List_of_output : list
+                List of strings containing the output files expected
+                for the calculation
         '''
 
 
