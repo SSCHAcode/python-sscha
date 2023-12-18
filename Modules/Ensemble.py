@@ -423,6 +423,12 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
         And initializes the parameters to perform the fourier transform
         faster at each minimization steps
         """
+        if self.N != len(self.structures):
+            self.N = self.structures
+
+        # Check if th all_properties is initialized
+        if len(self.all_properties) == 0:
+            self.all_properties = [None] * self.N
 
         # Initialize the supercell
         super_struct, itau = self.dyn_0.structure.generate_supercell(self.supercell, get_itau=True)
