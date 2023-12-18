@@ -138,6 +138,56 @@ You can plot all the minimization path (frequencies, free energy, gradients) cal
 The sscha-plot-data.py script is automatically installed within the SSCHA code.
 
 
+Load from the output files
+--------------------------
+
+It is possible to load an ensemble directly from a list of output files from a specific program, 
+like quantum ESPRESSO.
+This is usefull when a calculation ended with an error on the cluster, 
+and the ensemble has not been saved on the disk (but you have the output files of the 
+configurations that have been already computed succesfully).
+
+In this case, you can restart the minimization using an ensemble with the following code:
+
+.. code-block:: python
+
+    # Load the dynamical matrix
+    dyn = CC.Phonons.Phonons("dyn", 4)
+
+    # Load the ensemble
+    ens = sscha.Ensemble.Ensemble(dyn, 300)
+
+    # Load the ensemble from the output of the calculator
+    # In this case, the pwo files are output of the quantum espresso program.
+    # Any output file that ASE is able to read can be used to load the ensemble.
+    ens.load_from_calculator_output(directory="data", out_ext=".pwo")
+
+
+    # Run the minimization
+    minim = sscha.SchaMinimizer.SSCHA_Minimizer(ens)
+    minim.init()
+    minim.set_minimization_step(0.01)
+    minim.run()
+    minim.finalize()
+
+An example of this procedure is provided in the ``tests/test_load_ensemble_from_calculator_output`` directory.
+
+Alternatively, you can also use the ensemble to restart a full relax procedure.
+In this case, you need to provide the key ``restart_from_ens = True`` to the
+``relax`` or ``vc_relax`` methods of the ``SSCHA`` class in the ``Relax`` module.
+
+.. code-block:: python
+
+   # Initialize the minimizer minim (see example above)
+   relax = sscha.Relax.SSCHA(minim, ase_calculator=calculator,
+                           N_configs = 100, max_pop = 20)
+   relax.relax(restart_from_ens = True)
+
+   # Or, if you want to perform a variable cell relaxation
+   relax.vc_relax(restart_from_ens = True)  
+
+
+
 Cluster configuration with a code different from Quantum ESPRESSO
 -----------------------------------------------------------------
 
