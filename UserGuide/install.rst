@@ -5,11 +5,57 @@ The SSCHA code is a collection of 2 python packages: CellConstructor and python-
 In this guide, we refer to the installation of python-sscha.
 
 
+Easy installation using Anaconda
+--------------------------------
+
+The easy way to install python-sscha is to use the anaconda distribution of python.
+
+.. code-block:: console
+
+    conda create -n sscha -c conda-forge python=3.11 gfortran libblas lapack openmpi julia openmpi-mpicc pip numpy scipy spglib
+    conda activate sscha
+    pip install ase julia mpi4py
+    pip install cellconstructor python-sscha tdscha
+
+
+This will create a new environment called sscha, install all the dependencies and the packages.
+To use the code, you need to activate the environment:
+
+.. code-block:: console
+
+    conda activate sscha
+
+
+The sscha code exploits the julia language to speed up the calculation.
+To install the julia dependencies, you need to run the following command:
+
+.. code-block:: console
+
+   python -c 'import julia; julia.install()'
+
+
+And that's it! You can now run the sscha code.
+
+.. code-block:: console
+
+   sscha -h
+
+
+SSCHA also works as a library, so you can import it in your python scripts.
+To check that everything is working, you can run the following script:
+
+.. code-blocK:: python
+
+   import sscha, sscha.Ensemble
+   print("Hello world!")
+
+If it runs without problems, the SSCHA code is working correctly.
+
 Requirements
 ------------
 
 To install python-sscha you need:
-1. python (either 2.7 or 3.*)
+1. python<=3.11
 2. numpy
 3. scipy
 4. matplotlib

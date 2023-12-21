@@ -423,6 +423,12 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
         And initializes the parameters to perform the fourier transform
         faster at each minimization steps
         """
+        if self.N != len(self.structures):
+            self.N = self.structures
+
+        # Check if th all_properties is initialized
+        if len(self.all_properties) == 0:
+            self.all_properties = [None] * self.N
 
         # Initialize the supercell
         super_struct, itau = self.dyn_0.structure.generate_supercell(self.supercell, get_itau=True)
@@ -675,6 +681,9 @@ Error, the file '{}' is missing from the ensemble
 
 
 
+        if timer:
+            timer.add_timer("Load_all_configurations", time.time() - t_before_for)
+
         if verbose:
             print( "[LOAD ENSEMBLE]: time elapsed for the cycle over the configurations:", time.time() - t_before_for)
 
@@ -685,9 +694,6 @@ Error, the file '{}' is missing from the ensemble
         else:
             total_energies = np.loadtxt(os.path.join(data_dir, "energies_supercell_population%d.dat" % (population)))
         self.energies = total_energies[:N]
-
-        # Initialize all the auxiliary harmonic quantities for this ensemble
-        self.init()
 
         # Setup the initial weight
         self.rho = np.ones(self.N, dtype = np.float64)
@@ -767,6 +773,11 @@ Error, the following stress files are missing from the ensemble:
 
         self.u_disps = np.zeros( (self.N, nat_sc * 3), order = "F", dtype = np.float64)
 
+        # Initialize the computation of energy and forces
+        self.force_computed = np.ones(self.N, dtype = bool)
+        self.stress_computed = np.ones(self.N, dtype = bool)
+        self.all_properties = [None] * self.N
+
         # Add a counter to check if all the stress tensors are present
         count_stress = 0
 
@@ -809,16 +820,12 @@ Error, the following stress files are missing from the ensemble:
             except:
                 pass
 
-
-        # Initialize the SSCHA quantities
-        self.init()
-
         self.rho = np.ones(self.N, dtype = np.float64)
 
         t1 = time.time()
-        self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell, self.u_disps)
+        # self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell, self.u_disps)
         t2 = time.time()
-        self.current_q = self.q_start.copy()
+        # self.current_q = self.q_start.copy()
 
         if count_stress == self.N:
             self.has_stress = True
