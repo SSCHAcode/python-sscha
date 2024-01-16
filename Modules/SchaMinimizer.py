@@ -350,7 +350,7 @@ class SSCHA_Minimizer(object):
                     if timer is not None:
                         dyn_grad, err = timer.execute_timed_function(self.ensemble.get_fourier_gradient)
                     else:
-                        dyn_grad, err = self.ensemble.get_fourier_gradiennt()
+                        dyn_grad, err = self.ensemble.get_fourier_gradient()
                 else:
                     if timer is not None:
                         dyn_grad, err = timer.execute_timed_function(self.ensemble.get_preconditioned_gradient_parallel, True, True, preconditioned=1)
