@@ -1,5 +1,0 @@
-setuptools
-numpy
-scipy
-ase==3.16.0
-spglib
