@@ -37,7 +37,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name='python-sscha',
-    version='1.4.0',
+    version='1.4.1',
     author='Lorenzo Monacelli',
     description='Python implementation of the sscha code',
     long_description='',
