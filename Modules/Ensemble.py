@@ -1732,7 +1732,7 @@ Error, the following stress files are missing from the ensemble:
         w = np.array(w/2, dtype = np.float64)
 
         # Get the a_0
-        old_a = SCHAModules.thermodynamic.w_to_a(w, self.T0)
+        old_a = self.w_to_a(w, self.T0)
 
         # Now do the same for the new dynamical matrix
         #new_super_dyn = new_dynamical_matrix.GenerateSupercellDyn(self.supercell)
@@ -1770,7 +1770,7 @@ DETAILS OF ERROR:
 
         w= w_new[~trans_mask]
         w = np.array(w/2, dtype = np.float64)
-        new_a = SCHAModules.thermodynamic.w_to_a(w, newT)
+        new_a = self.w_to_a(w, newT)
 
 
         # Get the new displacements in the supercell
@@ -1954,7 +1954,7 @@ DETAILS OF ERROR:
         w = np.array(w/2, dtype = np.float64)
 
         # Get the a_0
-        old_a = SCHAModules.thermodynamic.w_to_a(w, self.T0)
+        old_a = self.w_to_a(w, self.T0)
 
         # Now do the same for the new dynamical matrix
         #new_super_dyn = new_dynamical_matrix.GenerateSupercellDyn(self.supercell)
@@ -1992,7 +1992,7 @@ DETAILS OF ERROR:
 
         w= w_new[~trans_mask]
         w = np.array(w/2, dtype = np.float64)
-        new_a = SCHAModules.thermodynamic.w_to_a(w, newT)
+        new_a = self.w_to_a(w, newT)
 
 
         # Get the new displacements in the supercell
@@ -3654,7 +3654,7 @@ Error while loading the julia module.
         else:
             w, pols = w_pols
 
-        a = SCHAModules.thermodynamic.w_to_a(w, self.current_T)
+        a = self.w_to_a(w, self.current_T)
 
 
         n_modes = len(w)
@@ -4195,8 +4195,16 @@ Error while loading the julia module.
             timer.execute_timed_function(self.init)
         else:
             self.init()
+    def w_to_a(w, T):
+        n = len(w)
+        a = np.zeros(n)
+        if T == 0.0:
+            a[:] = np.sqrt(1.0 / (2.0 * w))
+        else:
+            a[:] = np.sqrt((1.0 / tanh(0.5 * w * 315774.65221921849 / T)) / (2.0 * w))
+        return a
 
-
+#-------------------------------------------------------------------------------
 def _wrapper_julia_get_upsilon_q(*args, **kwargs):
     """Worker function, just for testing"""
     return julia.Main.get_upsilon_fourier(*args, **kwargs)
