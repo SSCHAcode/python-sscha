@@ -4,7 +4,7 @@ import sys, os
 import warnings
 import numpy as np
 import time
-from scipy.special import tanh, sinh, cosh
+#from scipy.special import tanh, sinh, cosh
 
 
 """
@@ -4201,7 +4201,7 @@ Error while loading the julia module.
         if T == 0.0:
             a[:] = np.sqrt(1.0 / (2.0 * w))
         else:
-            a[:] = np.sqrt((1.0 / tanh(0.5 * w * 315774.65221921849 / T)) / (2.0 * w))
+            a[:] = np.sqrt((1.0 / np.tanh(0.5 * w * 315774.65221921849 / T)) / (2.0 * w))
         return a
 
 #-------------------------------------------------------------------------------
