@@ -111,7 +111,7 @@ class SSCHA_Minimizer(object):
 
     def __init__(self, ensemble = None, root_representation = "normal",
                  kong_liu_ratio = 0.5, meaningful_factor = 0.2,
-                 minimization_algorithm = "sdes", lambda_a = 1, 
+                 minimization_algorithm = "sdes", lambda_a = 1,
                  timer=None, **kwargs):
         """
         This class create a minimizer to perform the sscha minimization.
@@ -437,7 +437,7 @@ class SSCHA_Minimizer(object):
                             timer.add_timer("Symmetrize in the supercell", t_7 - t_6, timer=timer_apply)
                             timer.add_timer("Return in fourier space", t_8 - t_7, timer=timer_return)
 
-                    
+
                     # Apply the sum rule at gamma
                     if timer is not None:
                         timer.execute_timed_function(CC.symmetries.CustomASR, dyn_grad[0,:,:])
@@ -614,7 +614,7 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
                 timer.execute_timed_function(self.minimizer.update_dyn, new_kl_ratio, dyn_grad, struct_grad)
                 new_dyn, new_struct = timer.execute_timed_function(self.minimizer.get_dyn_struct)
             else:
-                self.minimizer.update_dyn(new_kl_ratio, dyn_grad, struct_grad)        
+                self.minimizer.update_dyn(new_kl_ratio, dyn_grad, struct_grad)
                 new_dyn, new_struct = self.minimizer.get_dyn_struct()
 
 
@@ -1066,7 +1066,7 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
                 If true, it will clean previous minimizations from the free energies, gradients...
             init_timer : bool
                 If true, it will initialize the timer for timing the function.
-                This can slightly slowdown the minimization, 
+                This can slightly slowdown the minimization,
                 however enables the use of the timer to check the time spent in each step.
 
         """
@@ -1295,7 +1295,7 @@ WARNING, the preconditioning is activated together with a root representation.
 
             # Perform the minimization step
             if timer is not None:
-                timer.execute_timed_function(self.minimization_step, custom_function_gradient) 
+                timer.execute_timed_function(self.minimization_step, custom_function_gradient)
                 im_freqs = timer.execute_timed_function(self.check_imaginary_frequencies)
             else:
                 self.minimization_step(custom_function_gradient)

@@ -11,7 +11,7 @@ MODULE_DESCRIPTION = '''
 This module contains useful functions to do post-processing analysis of the SSCHA.
 
 For example, it implements custom cluster calculators to compute the electron-phonon effect on
-absorbption and the bandgap.
+absorption and the bandgap.
 
 '''
 
@@ -23,7 +23,7 @@ class OpticalQECluster(sscha.Cluster.Cluster):
     '''
 
     def __init__(self, new_k_grid = None, random_offset = True, epsilon_data = None,
-                epsilon_binary = 'epsilon.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo', 
+                epsilon_binary = 'epsilon.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo',
                 **kwargs):
         '''
         Initialize the cluster object.
@@ -40,7 +40,7 @@ class OpticalQECluster(sscha.Cluster.Cluster):
                 epsilon.x file
             epsilon_binary : string
                 The path to the epsilon.x binary inside the cluster.
-            **kwargs : 
+            **kwargs :
                 All other arguments to be passed to the cluster.
 
         '''
@@ -67,7 +67,7 @@ class OpticalQECluster(sscha.Cluster.Cluster):
                 'wmax' : 40,
                 'nw' : 10000,
                 'temperature' : 300
-            }   
+            }
         }
         if epsilon_data is not None:
             self.epsilon_data = epsilon_data
@@ -79,10 +79,10 @@ class OpticalQECluster(sscha.Cluster.Cluster):
         super().__setattr__(__name, __value)
 
         # Always regenerate the kpts
-        if __name == 'new_k_grid' and not __value is None: 
+        if __name == 'new_k_grid' and not __value is None:
             assert len(__value) == 3, 'Error, new_k_grid must be a tuple with 3 elements'
             self.generate_kpts()
-    
+
 
     def generate_kpts(self):
         '''
@@ -119,7 +119,7 @@ class OpticalQECluster(sscha.Cluster.Cluster):
 
         # Get the MPI command replacing NPROC
         new_mpicmd  = self.mpi_cmd.replace("NPROC", str(self.n_cpu))
-        
+
         # Replace the NPOOL variable and the PREFIX in the binary
         binary = self.binary.replace("NPOOL", str(self.n_pool)).replace("PREFIX", label)
         binary_nscf = self.binary.replace("NPOOL", str(self.n_pool)).replace("PREFIX", label + '_nscf')
@@ -147,6 +147,18 @@ rm -rf {0}.wfc* {0}.save
     def read_results(self, calc, label):
         '''
         Get the results
+
+        Parameters
+        ----------
+            calc : the ASE or CellConstructor calculator.
+                In this case, it works with quantum espresso
+            labels : List of strings
+                The unique name of this calculation
+        Returns
+        -------
+            results : array
+                An array containing the real part of epsilon, 
+                and the mean of the real and imaginary parst of epsilon.
         '''
 
         results = super().read_results(calc, label)
@@ -176,7 +188,31 @@ rm -rf {0}.wfc* {0}.save
     def prepare_input_file(self, structures, calc, labels):
         '''
         Prepare the input files for the cluster
-        '''    
+
+        This is specific for quantum espresso and must be inherit and replaced for
+        other calculators.
+
+        This crates the input files in the local working directory
+        self.local_workdir and it returns the list of all the files generated.
+
+
+        Parameters
+        ----------
+            structures : List of cellconstructor.Structure.Structure
+                The atomic structures.
+            calc : the ASE or CellConstructor calculator.
+                In this case, it works with quantum espresso
+            labels : List of strings
+                The unique name of this calculation
+
+        Returns
+        -------
+            List_of_input : list
+                List of strings containing all the input files
+            List_of_output : list
+                List of strings containing the output files expected
+                for the calculation
+        '''
 
 
         # Prepare the input file
@@ -185,7 +221,7 @@ rm -rf {0}.wfc* {0}.save
         for i, (label, structure) in enumerate(zip(labels, structures)):
             # Avoid thread conflict
             self.lock.acquire()
-            
+
             try:
                 calc.set_directory(self.local_workdir)
                 PREFIX = label
@@ -204,7 +240,7 @@ rm -rf {0}.wfc* {0}.save
                 input_file = '{}.pwi'.format(label)
                 output_file = '{}.pwo'.format(label)
 
-                list_of_inputs.append(input_file)     
+                list_of_inputs.append(input_file)
                 list_of_outputs.append(output_file)
 
                 # prepare the nscf calculation
@@ -218,7 +254,7 @@ rm -rf {0}.wfc* {0}.save
                 calc.write_input(structure)
                 input_file = '{}.pwi'.format(new_label)
                 output_file = '{}.pwo'.format(new_label)
-                list_of_inputs.append(input_file)     
+                list_of_inputs.append(input_file)
                 list_of_outputs.append(output_file)
 
 
@@ -239,8 +275,8 @@ rm -rf {0}.wfc* {0}.save
                     print('fname: {} prepared'.format(eps_in_filename))
 
 
-                
-                list_of_inputs.append(input_file)     
+
+                list_of_inputs.append(input_file)
                 list_of_outputs.append(output_file)
 
                 # Append also the imaginary and real part of epsilon and sigma
@@ -263,11 +299,11 @@ Error while writing input file {}.
                 print(e)
 
             # Release the lock on the threads
-            self.lock.release()            
+            self.lock.release()
 
         print('THREAD: {} inputs: {} outputs: {}'.format(threading.get_native_id(), list_of_inputs, list_of_outputs))
-            
-        
+
+
         return list_of_inputs, list_of_outputs
 
 
@@ -306,7 +342,7 @@ def get_optical_spectrum(ensemble, w_array = None):
 Error, the configuration {} has no 'epsilon' data.
 """.format(i)
             raise ValueError(ERR)
-        
+
         data = np.array(ensemble.all_properties[i]['epsilon'])
 
         if w_data is None:
@@ -330,7 +366,7 @@ Error, the configuration {} has no 'epsilon' data.
             kind = 'cubic', bounds_error = False, fill_value = 'extrapolate')
         eps_imag = f_imag(w_array)
         w_data = w_array
-    
+
     # Build the complex epsilon
     epsilon = eps_real + 1j * eps_imag
 
@@ -338,5 +374,3 @@ Error, the configuration {} has no 'epsilon' data.
     n = np.sqrt(epsilon)
 
     return w_data, n
-
-
