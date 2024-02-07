@@ -4,7 +4,7 @@ import sys, os
 import warnings
 import numpy as np
 import time
-
+from scipy.special import tanh, sinh, cosh
 
 
 """
