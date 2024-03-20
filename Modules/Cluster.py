@@ -51,7 +51,7 @@ __CLUSTER_SUBNAME__ = "queue_directive"
 __CLUSTER_VNODES__ = "v_nodes"
 __CLUSTER_NNODES__ = "n_nodes"
 __CLUSTER_UNODES__ = "use_nodes"
-__CLUSTER_VCPU__ = "v_cpu" 
+__CLUSTER_VCPU__ = "v_cpu"
 __CLUSTER_NCPU__ = "n_cpu"
 __CLUSTER_UCPU__ = "use_cpu"
 __CLUSTER_VTIME__ = "v_time"
@@ -97,7 +97,7 @@ __CLUSTER_KEYS__ = [__CLUSTER_NAMELIST__, __CLUSTER_TEMPLATE__, __CLUSTER_HOST__
                     __CLUSTER_UPART__, __CLUSTER_VQOS__, __CLUSTER_NQOS__, __CLUSTER_UQOS__,
                     __CLUSTER_INITSCRIPT__, __CLUSTER_MAXRECALC__, __CLUSTER_BATCHSIZE__,
                     __CLUSTER_LOCALWD__, __CLUSTER_VACCOUNT__, __CLUSTER_UACCOUNT__, __CLUSTER_SSHCMD__,
-                    __CLUSTER_SCPCMD__, __CLUSTER_WORKDIR__, __CLUSTER_TIMEOUT__, 
+                    __CLUSTER_SCPCMD__, __CLUSTER_WORKDIR__, __CLUSTER_TIMEOUT__,
                     __CLUSTER_JOBNUMBER__, __CLUSTER_NPARALLEL__, __CLUSTER_NPOOLS__,
                     __CLUSTER_ATTEMPTS__, __CLUSTER_PORT__]
 
@@ -113,13 +113,13 @@ def parse_symbols(string):
     In a string that must be used on a shell command, replace all the special symbols
     in a way that they are correctly passed through the SHELL.
 
-    for example $USER  => \$USER  
-    
+    for example $USER  => \$USER
+
     Parameters
     ----------
         string : str
             The string to be parsed
-    
+
     Results
     -------
         output : str
@@ -134,7 +134,7 @@ def parse_symbols(string):
 
 
 class Cluster(object):
-    
+
     def __init__(self, hostname=None, pwd=None, extra_options="", workdir = "",
                  account_name = "", partition_name = "", qos_name = "", binary="pw.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo",
                  mpi_cmd=r"srun --mpi=pmi2 -n NPROC"):
@@ -143,17 +143,17 @@ class Cluster(object):
         =================
         It is strongly suggested to use public/private keys.
         However, sometimes for some reasons it is not possible to do so.
-        Then you must install sshpass, and provide the password 
+        Then you must install sshpass, and provide the password
         for establishing the connection.
-        
+
         Parameters
         ----------
             hostname:
                 The name of the host toward you want to connect.
-                E.G. 
+                E.G.
                 pippo@login.cineca.marconi.it
             pwd:
-                The password for the connection. 
+                The password for the connection.
                 If you use a private key, do not pass this argument.
                 In the other case you must have sshpass package to allow the
                 password communication.
@@ -170,7 +170,7 @@ class Cluster(object):
             qos_name:
                 The QOS name for the job submission
         """
-        
+
         self.hostname = hostname
         self.pwd = pwd
 
@@ -183,14 +183,14 @@ class Cluster(object):
             res = os.system("sshpass > /dev/null")
             if res != 0:
                 raise ValueError("Error, sshpass command not found, required to connect through password to server.")
-            
+
             self.sshcmd = "sshpass -p '" + pwd + "' ssh " + extra_options
             self.scpcmd = "sshpass -p '" + pwd + "' scp " + extra_options.replace("-p", "-P")
         else:
             self.sshcmd = "ssh " + extra_options
             self.scpcmd = "scp " + extra_options.replace("-p", "-P")
 
-    
+
         self.account_name = account_name
         self.partition_name = partition_name
         if partition_name:
@@ -198,11 +198,11 @@ class Cluster(object):
         self.qos_name = qos_name
         if qos_name:
             self.use_qos = True
-            
+
         self.binary = binary
         self.mpi_cmd = mpi_cmd
 
-        self.workdir=r""
+        self.workdir=""
         self.submit_command="sbatch"
         self.submit_name="SBATCH"
         self.terminal="/bin/bash"
@@ -248,39 +248,39 @@ class Cluster(object):
         # This is a set of lines to be runned before the calculation
         # It can be used to load the needed modules in the cluster
         self.load_modules=""
-        
+
         # Setup the number of cpu, nodes and pools for the calculation
         self.n_nodes = 1
         self.n_cpu = 1
         self.n_pool = 1
-        
+
         # This is the default label, change it if you are going to submit
         # two different calculations in the same working directory
         self.label = "ESP_"
-        
+
         # This is the maximum number of resubmissions after the expected one
         # from the batch size. It can be use to resubmit the failed jobs.
         self.max_recalc = 10
         self.connection_attempts = 1
-        
+
         # This is the time string. Faster job will be the less in the queue,
         self.time="00:02:00" # 2minutes
-        
+
         # The ram required for the calculation
         self.ram="10000Mb" # 10Gb
-        
+
         # The default partition in which to submit calculations
         self.partition_name = ""
-        
+
         # The default qos in which to submit calculations
         self.qos_name = ""
 
         # Still unused
         self.prefix_name = "prefix" # Variable in the calculator for differentiating the calculations
-        
+
         # This directory is used to work with clusters.
         self.local_workdir = "cluster_work/"
-        
+
         # The batch size is the maximum number of job to be submitted together.
         # The new jobs will be submitted only after a batch is compleated
         # Useful if the cluster has a limit for the maximum number of jobs allowed.
@@ -311,7 +311,7 @@ class Cluster(object):
         It will raise an exception if the attribute does not exists (with a suggestion of similar entries)
         """
 
-        
+
         if "fixed_attributes" in self.__dict__:
             if name in self.__total_attributes__:
                 super(Cluster, self).__setattr__(name, value)
@@ -333,17 +333,17 @@ class Cluster(object):
             super(Cluster, self).__setattr__(name, value)
 
 
-                
-        
-        
+
+
+
     def ExecuteCMD(self, cmd, raise_error = False, return_output = False, on_cluster = False):
         """
         EXECUTE THE CMD ON THE CLUSTER
         ==============================
-        
+
         This subroutine execute the cmd in the cluster,
         with the specified number of attempts.
-        
+
         Parameters
         ----------
             cmd: string
@@ -351,11 +351,11 @@ class Cluster(object):
             raise_error : bool, optional
                 If True (default) raises an error upon failure.
             return_output : bool, optional
-                If True (default False) the output of the command is 
+                If True (default False) the output of the command is
                 returned as second value.
             on_cluster : bool
                 If true, the command is executed directly on the cluster through ssh
-                
+
         Returns
         -------
             success : bool
@@ -368,7 +368,7 @@ class Cluster(object):
         if on_cluster:
             cmd = self.sshcmd + " {} '{}'".format(self.hostname, cmd)
 
-        
+
         success = False
         output = ""
         for i in range(self.connection_attempts):
@@ -383,7 +383,7 @@ class Cluster(object):
                     sys.stderr.write(e)
                     sys.stderr.write("\n")
                     sys.stderr.flush()
-                    
+
             output = output.strip()
             status = p.wait()
 
@@ -391,7 +391,7 @@ class Cluster(object):
             print('THREAD {} EXECUTE COMMAND: {}'.format(threading.get_native_id(), cmd))
             if not err is None:
                 sys.stderr.write(err)
-            
+
             if status != 0:
                 sys.stderr.write("Error with cmd: "+ cmd + "\n")
                 sys.stderr.write(output + "\n")
@@ -399,17 +399,17 @@ class Cluster(object):
             else:
                 success = True
                 break
-            
+
         if raise_error and not success:
             raise IOError("Error while communicating with the cluster. More than %d attempts failed." % (i+1))
-            
-        
+
+
         if return_output:
             return success, output
         return success
-    
-    
-            
+
+
+
 
     def set_timeout(self, timeout):
         """
@@ -424,22 +424,22 @@ class Cluster(object):
 
         self.use_timeout = True
         self.timeout = timeout
-        
-        
-            
+
+
+
     def CheckCommunication(self):
         """
         CHECK IF THE SERVER IS AVAILABLE
         ================================
-        
-        This function return true if the server respond correctly, 
+
+        This function return true if the server respond correctly,
         false otherwise.
         """
-        
+
         cmd = self.sshcmd + " %s 'echo ciao'" % self.hostname
-        
+
         status, output = self.ExecuteCMD(cmd, return_output = True)
-        
+
 #        print cmd
 #        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
 #        output, err = p.communicate()
@@ -451,14 +451,14 @@ class Cluster(object):
 #            sys.stderr.write("Error, cmd: " + cmd + "\n")
 #            sys.stderr.write("Exit status:" + str(status))
 #            return False
-    
+
         if output != "ciao":
             sys.stderr.write("Code exited correctly but echo did not answer properly\n")
             sys.stderr.write("cmd: " + cmd + "\n")
             sys.stderr.write("out: " + output + "\n")
             sys.stderr.write("expected " + "ciao" + "\n")
             return False
-        
+
         return True
 
     def create_submission_script(self, labels):
@@ -471,9 +471,9 @@ class Cluster(object):
 
         Parameters
         ----------
-            labels : list 
+            labels : list
                 It is a list of the labels of the calculations to be done.
-        
+
         Returns
         -------
             submission_header : string
@@ -482,8 +482,8 @@ class Cluster(object):
 
         # prepare the submission script
         submission = "#!" + self.terminal + "\n"
-        
-        
+
+
 
         # Add the submission options
         if self.use_nodes:
@@ -513,14 +513,14 @@ class Cluster(object):
             else:
                 submission += "#{} {}={}\n".format(self.submit_name, adder_string, self.custom_params[add_parameter])
 
-        
+
         # Add the set -x option
         if self.add_set_minus_x:
             submission += "set -x\n"
-        
+
         # Add the loading of the modules
         submission += self.load_modules + "\n"
-        
+
         # Go to the working directory
         submission += "cd " + self.workdir + "\n"
 
@@ -531,9 +531,9 @@ class Cluster(object):
             other_input, other_output = self.additional_script_parameters(labels)
 
         submission += other_input
-        
+
         # Use the xargs trick
-        #submission += "xargs -d " + r"'\n'" + " -L1 -P%d -a %s -- bash -c\n" % (n_togheder, 
+        #submission += "xargs -d " + r"'\n'" + " -L1 -P%d -a %s -- bash -c\n" % (n_togheder,
         for i, lbl in enumerate(labels):
             submission += self.get_execution_command(lbl)
 
@@ -562,7 +562,7 @@ class Cluster(object):
 
         # Get the MPI command replacing NPROC
         new_mpicmd  = self.mpi_cmd.replace("NPROC", str(self.n_cpu))
-        
+
         # Replace the NPOOL variable and the PREFIX in the binary
         binary = self.binary.replace("NPOOL", str(self.n_pool)).replace("PREFIX", label)
 
@@ -577,10 +577,10 @@ class Cluster(object):
         PREPARE THE INPUT FILE
         ======================
 
-        This is specific for quantum espresso and must be inherit and replaced for 
+        This is specific for quantum espresso and must be inherit and replaced for
         other calculators.
 
-        This crates the input files in the local working directory 
+        This crates the input files in the local working directory
         self.local_workdir and it returns the list of all the files generated.
 
 
@@ -608,7 +608,7 @@ class Cluster(object):
         for i, (label, structure) in enumerate(zip(labels, structures)):
             # Avoid thread conflict
             self.lock.acquire()
-            
+
             try:
                 calc.set_directory(self.local_workdir)
                 calc.set_label(label)
@@ -622,9 +622,9 @@ class Cluster(object):
                 input_file = '{}.pwi'.format(label)
                 output_file = '{}.pwo'.format(label)
 
-                list_of_inputs.append(input_file)     
+                list_of_inputs.append(input_file)
                 list_of_outputs.append(output_file)
-            except Exception as e: 
+            except Exception as e:
                 MSG = '''
 Error while writing input file {}.
 
@@ -635,9 +635,9 @@ Error message:
 
 
             # Release the lock on the threads
-            self.lock.release()            
-            
-        
+            self.lock.release()
+
+
         return list_of_inputs, list_of_outputs
 
     def clean_localworkdir(self):
@@ -686,12 +686,12 @@ Error message:
 
             for i, fname in enumerate(list_of_input):
                 cmd += ' ' +  fname
-                
+
                 # Remove all the previous output files on cluster
                 rm_cmd = 'rm -f {}; '.format(os.path.join(self.workdir, fname))
 
 
-            
+
             os.system(cmd)
 
             if not os.path.exists(tar_file):
@@ -708,7 +708,7 @@ Error, for some reason I'm unable to generate the tar.
                 if os.path.exists(os.path.join(self.local_workdir, fname)):
                     os.remove(os.path.join(self.local_workdir, fname))
 
-        
+
             # Clean eventually input/output file of this very same calculation
             cmd = self.sshcmd + " %s '%s'" % (self.hostname, rm_cmd)
             self.ExecuteCMD(cmd, False)
@@ -717,7 +717,7 @@ Error, for some reason I'm unable to generate the tar.
 #                print "Error while executing:", cmd
 #                print "Return code:", cp_res
 #                sys.stderr.write(cmd + ": exit with code " + str(cp_res) + "\n")
-#            
+#
 
             # Copy the file into the cluster
             cmd = self.scpcmd + " %s %s:%s/" % (tar_file, self.hostname, self.workdir)
@@ -748,7 +748,7 @@ Error while connecting to the cluster to copy the files:
             tar_command = 'tar cf {} '.format(tar_name)
             for output in list_of_output:
                 tar_command += ' ' + output
-            
+
             compress_cmd = 'cd {}; {}'.format(self.workdir, tar_command)
 
             cmd = self.sshcmd + " %s '%s'" % (self.hostname, compress_cmd)
@@ -757,7 +757,7 @@ Error while connecting to the cluster to copy the files:
                 print ("Error while compressing the outputs:", cmd, list_of_output, "\nReturn code:", cp_res)
                 #return cp_res
 
-            
+
             # Copy the tar and unpack
             cmd = self.scpcmd + "%s:%s %s/" % (self.hostname, os.path.join(self.workdir, tar_name), self.local_workdir)
             cp_res = self.ExecuteCMD(cmd, False)
@@ -777,8 +777,8 @@ Error while connecting to the cluster to copy the files:
 
             return cp_res
 
-            
-        
+
+
 
     def submit(self, script_location):
         """
@@ -791,33 +791,33 @@ Error while connecting to the cluster to copy the files:
 
             return self.ExecuteCMD(cmd, True, return_output=True)
 
-        
+
 
         Parameters
         ----------
             script_localtion : string
                 Path to the submission script inside the cluster.
-        
+
         Results
         -------
             success : bool
-                Result of the execution of the submission command. 
+                Result of the execution of the submission command.
                 It is what returned from self.ExecuteCMD(cmd, False)
         """
-        
-        cmd = "{ssh} {host} '{submit_cmd} {script}'".format(ssh = self.sshcmd, host = self.hostname, 
-                         submit_cmd = self.submit_command, script = script_location) 
-        if self.use_active_shell:   
-            cmd = "{ssh} {host} -t '{shell} --login -c \"{submit_cmd} {script}\"'".format(ssh = self.sshcmd, 
-                         host = self.hostname, 
-                         submit_cmd = self.submit_command, script = script_location, 
-                         shell = self.terminal)
-        
-        
 
-        #cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, 
+        cmd = "{ssh} {host} '{submit_cmd} {script}'".format(ssh = self.sshcmd, host = self.hostname,
+                         submit_cmd = self.submit_command, script = script_location)
+        if self.use_active_shell:
+            cmd = "{ssh} {host} -t '{shell} --login -c \"{submit_cmd} {script}\"'".format(ssh = self.sshcmd,
+                         host = self.hostname,
+                         submit_cmd = self.submit_command, script = script_location,
+                         shell = self.terminal)
+
+
+
+        #cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command,
         #                                           self.workdir, label+ "_" + str(indices[0]))
-       
+
         return self.ExecuteCMD(cmd, False, return_output=True)
 
     def get_output_path(self, label):
@@ -825,7 +825,7 @@ Error while connecting to the cluster to copy the files:
         Given the label of the submission, retrive the path of all the output files of that calculation
         """
 
-        out_filename = os.path.join(self.workdir, label + ".pwo") 
+        out_filename = os.path.join(self.workdir, label + ".pwo")
         return [out_filename]
 
     def read_results(self, calc, label):
@@ -847,21 +847,21 @@ Error while connecting to the cluster to copy the files:
 
         return results
 
-    def batch_submission(self, list_of_structures, calc, indices, 
+    def batch_submission(self, list_of_structures, calc, indices,
                          in_extension, out_extension,
                          label = "ESP", n_togheder=1):
         """
         BATCH SUBMISSION
         ================
-        
+
         This is a different kind of submission, it exploits xargs to perform
         a parallel submission of serveral structures in one single job.
         This is very good to avoid overloading the queue system manager, or
         when a limited number of jobs per user are allowed.
-        
+
         NOTE: the number of structure in the list must be a divisor of the
         total number of processors.
-        
+
         Parameters
         ----------
             list_of_structures : list
@@ -878,21 +878,21 @@ Error while connecting to the cluster to copy the files:
             label : string, optional
                 The root of the input file.
             n_togheder : int, optional (DO NOT USE)
-                If present, the job will lunch a new job immediately after the other 
-                is ended. This is usefull to further reduce the number of submitted 
+                If present, the job will lunch a new job immediately after the other
+                is ended. This is usefull to further reduce the number of submitted
                 jobs.
-        
+
         Results
         -------
             list_of_results.
                 Returns a list of results dicts, one for each structure.
         """
         N_structs  = len(list_of_structures)
-        
+
         if n_togheder != 1:
             raise NotImplementedError("Error, n_togheder != 1 does not work!")
-            
-        
+
+
         # Prepare the input atoms
         app_list = ""
         new_ncpu = self.n_cpu * n_togheder
@@ -900,21 +900,21 @@ Error while connecting to the cluster to copy the files:
         submitted = []
         submission_labels = []
 
-        
+
 
         for i in range(N_structs):
             # Prepare a typical label
             lbl = label + "_" + str(indices[i])
             submission_labels.append(lbl)
             submitted.append(i)
-        
-            
-        # Create the input files 
+
+
+        # Create the input files
         input_files, output_files =  self.prepare_input_file(list_of_structures, calc, submission_labels)
 
         # Create the submission script
         submission = self.create_submission_script(submission_labels)
-        
+
         # Add the submission script to the input files
         sub_name =  label + "_" + str(indices[0]) + '.sh'
         sub_fpath = os.path.join(self.local_workdir, sub_name)
@@ -922,16 +922,16 @@ Error while connecting to the cluster to copy the files:
         f.write(submission)
         f.close()
         input_files.append(sub_name)
-        
+
         if not self.copy_files(input_files, output_files, to_server = True):
             # Submission failed
             return submitted, indices, label
-        
-        
+
+
         # Run the simulation
         sub_script_loc = os.path.join(self.workdir, sub_name)
         cp_res, submission_output = self.submit(sub_script_loc)
-        
+
         if self.nonblocking_command:
             job_id = self.get_job_id_from_submission_output(submission_output)
 
@@ -950,11 +950,11 @@ Error while connecting to the cluster to copy the files:
         else:
             print('[SUBMISSION {}] GOT OUTPUT'.format(threading.get_native_id()))
 
-        
+
         return submitted, indices, label
 
     def collect_results(self, calc, submitted, indices, label):
-        """ 
+        """
         Collect back all the results from the submitted data.
         This operation needs to be performed in thread safe mode
         (all threads must be locked between this operation and when the results are actually assigned to the ensemble
@@ -965,10 +965,10 @@ Error while connecting to the cluster to copy the files:
         for i in submitted:
             # Prepare a typical label
             lbl = label + "_" + str(indices[i])
-            
+
             # Get the results
             try:
-                results[i] = self.read_results(calc, lbl) 
+                results[i] = self.read_results(calc, lbl)
             except FileNotFoundError:
                 sys.stderr.write("JOB {} | {} resulted in error:\n".format(i, lbl))
                 sys.stderr.write('File not found!\n')
@@ -977,7 +977,7 @@ Error while connecting to the cluster to copy the files:
                 sys.stderr.write("JOB {} | {} resulted in error:\n".format(i, lbl))
                 print(e, file=sys.stderr)
                 sys.stderr.flush()
-                
+
 
         print('[SUBMISSION {}] GOT RESULTS:\n{}'.format(threading.get_native_id(), results))
         return results
@@ -986,7 +986,7 @@ Error while connecting to the cluster to copy the files:
         """
         GET THE JOB ID
 
-        Retreive the job id from the output of the submission. 
+        Retreive the job id from the output of the submission.
         This depends on the software employed. It works for slurm.
 
         Returns None if the output contains an error
@@ -997,12 +997,12 @@ Error while connecting to the cluster to copy the files:
         try:
             id = output.split()[-1]
 
-            print('Understanding output "{}" => {}'.format(output, id))    
+            print('Understanding output "{}" => {}'.format(output, id))
             return id
         except:
             print("Error, expected a standard output, but the result of the submission was: {}".format(output))
             return None
-        
+
     def check_job_finished(self, job_id, verbose = True):
         """
         Check if the job identified by the job_id is finished
@@ -1025,7 +1025,7 @@ Error while connecting to the cluster to copy the files:
                         sys.stderr.write("{}/{}/{} - {}:{}:{} | job {}: No response from the server \n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id))
                         sys.stderr.flush()
                     return False
-                    
+
                 data = l.split()
                 if len(data) == 0:
                     if verbose:
@@ -1039,7 +1039,7 @@ Error while connecting to the cluster to copy the files:
                         sys.stderr.write("{}/{}/{} - {}:{}:{} | job {} still running\n".format(now.year, now.month, now.day, now.hour, now.minute, now.second, job_id))
                         sys.stderr.flush()
                     return False
-            
+
             # If I'm here it means I did not find the job, but the command returned at least 1 line (so it was correctly executed).
             if verbose:
                 now = datetime.datetime.now()
@@ -1052,28 +1052,28 @@ Error while connecting to the cluster to copy the files:
             sys.stderr.flush()
         return False
 
-            
-    def run_atoms(self, ase_calc, ase_atoms, label="ESP", 
+
+    def run_atoms(self, ase_calc, ase_atoms, label="ESP",
                   in_extension = ".pwi", out_extension=".pwo",
                   n_nodes = 1, n_cpu=1, npool=1):
         """
         RUN ATOMS ON THE CLUSTER
         ========================
-        
+
         This function runs the given atoms in the cluster, using the ase_calculator.
-        Note: the ase_calc must be a FileIOCalculator. 
+        Note: the ase_calc must be a FileIOCalculator.
         For now it works with quantum espresso.
         """
-        
+
         # Setup the calculator with the atomic structure
         ase_atoms.set_calculator(ase_calc)
-        
+
         # Write the input file
         ase.io.write("%s/%s%s" % (self.local_workdir, label, in_extension),ase_atoms,**ase_calc.parameters)
-        
+
         # prepare the submission script
         submission = self.terminal + "\n"
-        
+
         # Add the submission options
         if self.use_nodes:
             submission += "#%s %s%d\n" % (self.submit_name, self.v_nodes, n_nodes)
@@ -1103,18 +1103,18 @@ Error while connecting to the cluster to copy the files:
 
         # Add the loading of the modules
         submission += self.load_modules + "\n"
-        
+
         # Go to the working directory
         submission += "cd " + self.workdir + "\n"
-        
+
         # Get the real calculation command
         mpicmd = self.mpi_cmd.replace("NPROC", str(n_cpu))
         binary = self.binary.replace("NPOOL", str(npool)).replace("PREFIX", label)
-        
+
         submission += mpicmd + " " + binary + "\n"
-        
+
         # First of all clean eventually input/output file of this very same calculation
-        cmd = self.sshcmd + " %s 'rm -f %s/%s%s %s/%s%s'" % (self.hostname, 
+        cmd = self.sshcmd + " %s 'rm -f %s/%s%s %s/%s%s'" % (self.hostname,
                                                              self.workdir, label, in_extension,
                                                              self.workdir, label, out_extension)
         self.ExecuteCMD(cmd, False)
@@ -1123,7 +1123,7 @@ Error while connecting to the cluster to copy the files:
 #            print "Error while executing:", cmd
 #            print "Return code:", cp_res
 #            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
-#        
+#
         # Copy the input files into the target directory
         f = open("%s/%s.sh" % (self.local_workdir, label), "w")
         f.write(submission)
@@ -1135,7 +1135,7 @@ Error while connecting to the cluster to copy the files:
 #            print "Error while executing:", cmd
 #            print "Return code:", cp_res
 #            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
-#            
+#
         cmd = self.scpcmd + " %s/%s%s %s:%s" % (self.local_workdir, label, in_extension, self.hostname, self.workdir)
         cp_res = self.ExecuteCMD(cmd, False)
         #cp_res = os.system(cmd)
@@ -1144,7 +1144,7 @@ Error while connecting to the cluster to copy the files:
             #print "Return code:", cp_res
             #sys.stderr.write(cmd + ": exit with code " + str(cp_res))
             return
-        
+
         # Run the simulation
         cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command, self.workdir, label)
         self.ExecuteCMD(cmd, False)
@@ -1153,10 +1153,10 @@ Error while connecting to the cluster to copy the files:
 #            print "Error while executing:", cmd
 #            print "Return code:", cp_res
 #            sys.stderr.write(cmd + ": exit with code " + str(cp_res))
-            
+
         # Get the response
-        cmd = self.scpcmd + " %s:%s/%s%s %s/" % (self.hostname, self.workdir, label, out_extension, 
-                                                 self.local_workdir) 
+        cmd = self.scpcmd + " %s:%s/%s%s %s/" % (self.hostname, self.workdir, label, out_extension,
+                                                 self.local_workdir)
         cp_res = self.ExecuteCMD(cmd, False)
         #cp_res = os.system(cmd)
         if not cp_res:
@@ -1164,39 +1164,39 @@ Error while connecting to the cluster to copy the files:
             print ("Return code:", cp_res)
             sys.stderr.write(cmd + ": exit with code " + str(cp_res))
             return
-            
+
         # Get the results
         ase_calc.set_label("%s/%s" % (self.local_workdir, label))
         ase_calc.read_results()
-        
+
         return ase_calc.results
-    
+
     def setup_from_namelist(self, namelist):
         """
         SETUP THE CLUSTER WITH AN INPUTFILE
         ===================================
-        
+
         This method setup the cluster using a custom input file.
         The inputfile must have the same shape of QuantumESPRESSO ones.
         The information about the cluster must be located in a namespace called
         as __CLUSTER_NAMELIST
-        
+
         Parameters
         ----------
-            namelist: 
+            namelist:
                 The parsed namelist dictionary.
         """
         # Parse the namelist if needed
         if isinstance(namelist, str):
             namelist = CC.Methods.read_namelist(namelist)
-        
+
         # Check if the cluster namelist is present
         if not __CLUSTER_NAMELIST__ in namelist.keys():
             raise ValueError("Error, the parsed namelist must contain %s" % __CLUSTER_NAMELIST__)
-            
+
         c_info = namelist[__CLUSTER_NAMELIST__]
         keys = c_info.keys()
-        
+
         # Check if there is an unknown key
         for k in keys:
             if not k in __CLUSTER_KEYS__:
@@ -1204,7 +1204,7 @@ Error while connecting to the cluster to copy the files:
                 s = "Did you mean something like:" + str( difflib.get_close_matches(k, __CLUSTER_KEYS__))
                 print (s)
                 raise IOError("Error in cluster namespace: key '" + k +"' not recognized.\n" + s)
-        
+
         # First of all, check if a template is present
         if __CLUSTER_TEMPLATE__ in keys:
             # Check if the environment variable has been defined
@@ -1219,7 +1219,7 @@ Error while connecting to the cluster to copy the files:
                     if not os.path.exists(newfname):
                         print ("Error, Environ variable", __TEMPLATE_ENV__, "exists, but no file", fname, "found.")
                         raise IOError("Error while reading the cluster template.")
-                    
+
                     self.setup_from_namelist(CC.Methods.read_namelist(newfname))
                 else:
                     sys.stderr.write("Error, Environ variable" + __TEMPLATE_ENV__ + "exists, but not the directory it is pointing to.\n")
@@ -1232,26 +1232,26 @@ Error while connecting to the cluster to copy the files:
             for req_key in __CLUSTER_RKW__:
                 if not req_key in keys:
                     raise IOError("Error, the cluster configuration namelist requires the keyword: '" + req_key + "'")
-                    
 
-        
+
+
         # Setup all the info
         if __CLUSTER_HOST__ in keys:
             self.hostname = c_info[__CLUSTER_HOST__]
             #print "HOST:", c_info[__CLUSTER_HOST__]
-            
+
         if __CLUSTER_SSHCMD__ in keys:
             self.sshcmd = c_info[__CLUSTER_SSHCMD__]
         if __CLUSTER_SCPCMD__ in keys:
             self.scpcmd = c_info[__CLUSTER_SCPCMD__]
-        
+
         if __CLUSTER_PWD__ in keys:
             self.pwd = c_info[__CLUSTER_PWD__]
             # Check if sshpass is present
-            res = os.system("sshpass > /dev/null") 
+            res = os.system("sshpass > /dev/null")
             if res != 0:
                 raise ValueError("Error, sshpass command not found, required to connect through password to server.")
-            
+
             self.sshcmd = "sshpass -p '" + self.pwd + "' " + self.sshcmd
             self.scpcmd = "sshpass -p '" + self.pwd + "' " + self.scpcmd
 
@@ -1260,13 +1260,13 @@ Error while connecting to the cluster to copy the files:
             # Check if the password has been setup
             self.sshcmd += " -p {:.0f}".format(c_info[__CLUSTER_PORT__])
             self.scpcmd += " -P {:.0f}".format(c_info[__CLUSTER_PORT__])
-            
+
         if __CLUSTER_ACCOUNT__ in keys:
             self.account_name = c_info[__CLUSTER_ACCOUNT__]
-            
+
         if __CLUSTER_MPICMD__ in keys:
             self.mpi_cmd = c_info[__CLUSTER_MPICMD__]
-            
+
         if __CLUSTER_TIMEOUT__ in keys:
             self.use_timeout = True
             self.timeout = int(c_info[__CLUSTER_TIMEOUT__])
@@ -1276,18 +1276,18 @@ Error while connecting to the cluster to copy the files:
             if self.job_number < 1:
                 print ("Error, the number of job per batch must be >= 1")
                 raise ValueError("Error in the %s input variable." % __CLUSTER_JOBNUMBER__)
-        
+
         if __CLUSTER_NPARALLEL__ in keys:
             self.n_together_def = int(c_info[__CLUSTER_NPARALLEL__])
-            
+
             if self.n_together_def < 1:
                 print ("Error, the number of parallel jobs must be >= 1")
                 raise ValueError("Error in the %s input variable." % __CLUSTER_NPARALLEL__)
             if self.n_together_def > self.job_number:
                 print ("Error, the number of parallel runs must be <= than the number of runs per job")
                 raise ValueError("Error, check the cluster keys %s and %s" % (__CLUSTER_NPARALLEL__, __CLUSTER_JOBNUMBER__))
-            
-            
+
+
         if __CLUSTER_TERMINAL__ in keys:
             self.terminal = "#!" + c_info[__CLUSTER_TERMINAL__]
         if __CLUSTER_SUBCMD__ in keys:
@@ -1339,10 +1339,10 @@ Error while connecting to the cluster to copy the files:
             self.v_account = c_info[__CLUSTER_VACCOUNT__]
         if __CLUSTER_NPOOLS__ in keys:
             self.n_pool = int(c_info[__CLUSTER_NPOOLS__])
-            
+
         if __CLUSTER_ATTEMPTS__ in keys:
             self.connection_attempts = int(c_info[__CLUSTER_ATTEMPTS__])
-            
+
         if __CLUSTER_INITSCRIPT__ in keys:
             # Load the init script.
             # First lets parse the local environmental variables
@@ -1350,84 +1350,84 @@ Error while connecting to the cluster to copy the files:
             script_path = c_info[__CLUSTER_INITSCRIPT__]
             for key in k_env:
                 script_path = script_path.replace("$" + key, os.environ[key])
-            
+
             script_path = os.path.abspath(script_path)
-            
+
             # Check if the file exists
             if not os.path.exists(script_path):
                 raise IOError("Error, the provided script path %s does not exists." % script_path)
-            
+
             # Read the script and store the contnet
             f = open(script_path, "r")
             self.load_modules = f.read()
             f.close()
-        
+
         if __CLUSTER_MAXRECALC__ in keys:
             self.max_recalc = int(c_info[__CLUSTER_MAXRECALC__])
         if __CLUSTER_BATCHSIZE__ in keys:
             self.batch_size = int(c_info[__CLUSTER_BATCHSIZE__])
         if __CLUSTER_LOCALWD__ in keys:
             wdir = c_info[__CLUSTER_LOCALWD__]
-            
+
             # Parse the local environmental variables
             for ekey in os.environ.keys():
                 wdir = wdir.replace("$" + ekey, os.environ[ekey])
-                
+
             self.local_workdir = wdir
-            
-        
+
+
         if __CLUSTER_BINARY__ in keys:
             print ("Binary before parsing:")
             print (c_info[__CLUSTER_BINARY__])
             self.binary = self.parse_string(c_info[__CLUSTER_BINARY__])
             print ("Cluster binary setted to:")
             print (self.binary)
-            
+
         # If all the cluster has been setted, setup the working directory
         if __CLUSTER_WORKDIR__ in keys:
             self.workdir = c_info[__CLUSTER_WORKDIR__]
             self.setup_workdir()
 
-            
+
     def setup_workdir(self, verbose = True):
         """
         SETUP THE WORKING DIRECTORY
         ===========================
-        
+
         Parse the line contained in self.workdir in the claster to get working directory.
         It needs that the communication with the cluster has been correctly setted up.
-        
+
         It will parse correctly environmental variables of the cluster.
         """
         workdir = self.parse_string(self.workdir)
-        
-        sshcmd = self.sshcmd + " %s 'mkdir -p %s'" % (self.hostname, 
+
+        sshcmd = self.sshcmd + " %s 'mkdir -p %s'" % (self.hostname,
                                                       workdir)
-        
+
         self.ExecuteCMD(sshcmd, raise_error= True)
-#        
+#
 #        retval = os.system(sshcmd)
 #        if retval != 0:
 #            raise IOError("Error, while executing cmd: " + sshcmd)
-#        
+#
 #        if verbose:
 #            print "Cluster workdir setted to:"
 #            print workdir
-        
+
         self.workdir = workdir
-    
+
     def parse_string(self, string):
         """
         PARSE STRING
         ============
-        
-        Parse the given string on the cluster. 
+
+        Parse the given string on the cluster.
         It can be used to resolve environmental variables defined in the cluster.
-        
+
         It will execute on the cluster the command:
             echo "string"
         and return the result of the cluster.
-        
+
         Parameter
         ---------
             string :
@@ -1438,7 +1438,7 @@ Error while connecting to the cluster to copy the files:
                 The same as input, but with the cluster environmental variables correctly
                 parsed.
         """
-        
+
         # Open a pipe with the server
         # Use single ' to avoid string parsing by the local terminal
         cmd = "%s %s 'echo \"%s\"'" % (self.sshcmd, self.hostname, string)
@@ -1451,50 +1451,50 @@ Error while connecting to the cluster to copy the files:
         #print cmd
 
         #print(cmd)
-        
+
         status, output = self.ExecuteCMD(cmd, return_output = True, raise_error= True)
-#        
+#
 #        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
 #        output, err = p.communicate()
 #        status = p.wait()
 #        output = output.strip()
 #
-#        if not err is None: 
+#        if not err is None:
 #            sys.stderr.write(err)
 #        if status != 0:
 #            print "Command:", cmd
 #            print "Error, status:", status
 #            raise ValueError("Error, while connecting with the server.")
-        
+
         return str(output)
-            
+
     def compute_ensemble_batch(self, ensemble, cellconstructor_calc, get_stress = True, timeout=None):
         """
         RUN THE ENSEMBLE WITH BATCH SUBMISSION
         ======================================
         """
-        
+
         # Track the remaining configurations
         success = [False] * ensemble.N
-        
+
         # Setup if the ensemble has the stress
         ensemble.has_stress = get_stress
         #ensemble.all_properties = [None] * ensemble.N
-        
+
         # Check if the working directory exists
         if not os.path.isdir(self.local_workdir):
             os.makedirs(self.local_workdir)
-    
-        
+
+
         # Get the expected number of batch
         num_batch_offset = int(ensemble.N / self.batch_size)
-        
+
         def compute_single_jobarray(jobs_id, calc):
             structures = [ensemble.structures[i].copy() for i in jobs_id]
             n_together = min(len(structures), self.n_together_def)
             subs, indices, labels = self.batch_submission(structures, calc, jobs_id, ".pwi",
                                             ".pwo", "ESP", n_together)
-            
+
             # Thread safe operation
             self.lock.acquire()
             print("[THREAD {}] submitted calculations: {}".format(threading.get_native_id(), indices))
@@ -1506,7 +1506,7 @@ Error while connecting to the cluster to copy the files:
 
                 if res is None:
                     continue
-                
+
                 # Check if the run was good
                 check_e = "energy" in res
                 check_f = "forces" in res
@@ -1519,7 +1519,7 @@ Error while connecting to the cluster to copy the files:
                         print("ERROR IDENTIFYING STRUCTURE!")
                         MSG = """
                             Error in thread {}.
-                            Displacement between the expected structure {} 
+                            Displacement between the expected structure {}
                             and the one readed from the calculator
                             is of {} A.
                         """.format(threading.get_native_id(), jobs_id[i], error_struct)
@@ -1531,14 +1531,14 @@ Error while connecting to the cluster to copy the files:
                         continue
                 else:
                     print("[WARNING] no check on the structure.")
-                
+
                 is_success =  check_e and check_f
                 if get_stress:
                     is_success = is_success and check_s
-                
+
                 if not is_success:
                     continue
-                
+
                 res_only_extra = {x : res[x] for x in res if x not in ["energy", "forces", "stress", "structure"]}
                 ensemble.all_properties[num].update(res_only_extra)
                 ensemble.energies[num] = res["energy"] / units["Ry"]
@@ -1559,7 +1559,7 @@ Error while connecting to the cluster to copy the files:
                 success[num] = is_success
 
             self.lock.release()
-        
+
         # Run until some work has not finished
         recalc = 0
         self.lock = threading.Lock()
@@ -1568,17 +1568,17 @@ Error while connecting to the cluster to copy the files:
 
             print("[CYCLE] SUCCESS: ", success)
             print("[CYCLE] STOPPING CONDITION:", np.sum(np.array(success, dtype = int) - 1))
-            
+
             # Get the remaining jobs
             false_mask = np.array(success) == False
             false_id = np.arange(ensemble.N)[false_mask]
-            
+
             count = 0
             # Submit in parallel
             jobs = [false_id[i : i + self.job_number] for i in range(0, len(false_id), self.job_number)]
             # Create a local copy of the calculator for each thread, to avoid conflicting modifications
             calculators = [cellconstructor_calc.copy() for i in range(0, len(jobs))]
-            
+
             for k_th, job in enumerate(jobs):
                 # Submit only the batch size
                 if count >= self.batch_size:
@@ -1587,11 +1587,11 @@ Error while connecting to the cluster to copy the files:
                 t.start()
                 threads.append(t)
                 count += 1
-            
+
             # Wait until all the job have finished
             for t in threads:
                 t.join(timeout)
-            
+
             print("[CYCLE] [END] SUCCESS: ", success)
             print("[CYCLE] [END] STOPPING CONDITION:", np.sum(np.array(success, dtype = int) - 1))
 
@@ -1600,43 +1600,43 @@ Error while connecting to the cluster to copy the files:
                 print ("Expected batch ordinary resubmissions:", num_batch_offset)
                 raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
                 break
-        
+
         print("CALCULATION ENDED: all properties: {}".format(ensemble.all_properties))
-            
-            
-    
+
+
+
     def compute_ensemble(self, ensemble, ase_calc, get_stress = True, timeout=None):
         """
         RUN THE WHOLE ENSEMBLE ON THE CLUSTER
         =====================================
-        
+
         Parameters
         ----------
             ensemble :
                 The ensemble to be runned.
         """
-        
+
         # Check if the compute_ensemble batch must be done
         #if self.job_number != 1:
         self.compute_ensemble_batch(ensemble, ase_calc, get_stress, timeout)
         return
-        
+
         """
         # Track the remaining configurations
         success = [False] * ensemble.N
-        
+
         # Setup if the ensemble has the stress
         ensemble.has_stress = get_stress
-        
+
         # Check if the working directory exists
         if not os.path.isdir(self.local_workdir):
             os.makedirs(self.local_workdir)
-            
+
         # Prepare the function for the simultaneous submission
         def compute_single(num, calc):
             atm = ensemble.structures[num].get_ase_atoms()
-            res = self.run_atoms(calc, atm, self.label + str(num), 
-                                 n_nodes = self.n_nodes, 
+            res = self.run_atoms(calc, atm, self.label + str(num),
+                                 n_nodes = self.n_nodes,
                                  n_cpu=self.n_cpu,
                                  npool = self.n_pool)
             if res:
@@ -1656,19 +1656,19 @@ Error while connecting to the cluster to copy the files:
                     # Remember, ase has a very strange definition of the stress
                     ensemble.stresses[num, :, :] = -stress * units["Bohr"]**3 / units["Ry"]
                 success[num] = True
-                
+
         # Get the expected number of batch
         num_batch_offset = int(ensemble.N / self.batch_size)
-        
+
         # Run until some work has not finished
         recalc = 0
         while np.sum(np.array(success, dtype = int) - 1) != 0:
             threads = []
-            
+
             # Get the remaining jobs
             false_mask = np.array(success) == False
             false_id = np.arange(ensemble.N)[false_mask]
-            
+
             count = 0
             # Submit in parallel
             for i in false_id:
@@ -1679,16 +1679,15 @@ Error while connecting to the cluster to copy the files:
                 t.start()
                 threads.append(t)
                 count += 1
-                
-            
+
+
             # Wait until all the job have finished
             for t in threads:
                 t.join(timeout)
-            
+
             recalc += 1
             if recalc > num_batch_offset + self.max_recalc:
                 print ("Expected batch ordinary resubmissions:", num_batch_offset)
                 raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
                 break
         """
-            

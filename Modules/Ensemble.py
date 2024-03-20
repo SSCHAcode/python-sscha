@@ -4,7 +4,7 @@ import sys, os
 import warnings
 import numpy as np
 import time
-
+#from scipy.special import tanh, sinh, cosh
 
 
 """
@@ -80,7 +80,7 @@ __JULIA_EXT__ = False
 __JULIA_ERROR__ = ""
 try:
     import julia, julia.Main
-    julia.Main.include(os.path.join(os.path.dirname(__file__), 
+    julia.Main.include(os.path.join(os.path.dirname(__file__),
         "fourier_gradient.jl"))
     __JULIA_EXT__ = True
 except:
@@ -224,7 +224,7 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
     You can omit the supercell keyword when initializing the ensemble
     if you are not sure on the value.
 """.format(nq, supercell)
-        
+
         # Flag to use the fourier gradient
         # If true, avoid to compute the forces in real space at all.
         self.fourier_gradient = __JULIA_EXT__
@@ -257,7 +257,7 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
         # Get the extra quantities
         self.all_properties = []
 
-        # Initialize the q grid and lattice 
+        # Initialize the q grid and lattice
         # For the fourier transform
         self.q_grid = np.array(self.dyn_0.q_tot) / CC.Units.A_TO_BOHR
         self.r_lat = np.zeros((nat_sc, 3), dtype = np.float64)
@@ -445,7 +445,7 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
         # Get the original u_disps
         self.u_disps_original = np.reshape(
                 self.xats - np.tile(self.supercell_structure.coords, (self.N, 1,1)),
-                (self.N, 3 * nat_sc), 
+                (self.N, 3 * nat_sc),
                 order = "C"
             )
         self.u_disps = self.u_disps_original.copy()
@@ -455,7 +455,7 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
                 self.u_disps,
                 self.q_grid,
                 self.itau,
-                self.r_lat, 
+                self.r_lat,
             )
             self.u_disps_original_qspace = self.u_disps_qspace.copy()
 
@@ -475,8 +475,8 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
             self.sscha_energies[:] = -julia.Main.multiply_vector_vector_fourier(
                 self.forces_qspace / CC.Units.A_TO_BOHR,
                 self.u_disps_qspace * CC.Units.A_TO_BOHR
-            ) * 0.5 # The conversion is useless, keep it for clarity 
-            
+            ) * 0.5 # The conversion is useless, keep it for clarity
+
             self.sscha_forces = julia.Main.vector_q2r(
                 self.sscha_forces_qspace,
                 self.q_grid,
@@ -488,7 +488,7 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
 
             self.forces_qspace = None
             self.u_disps_qspace = None
-        
+
         self.q_grid = np.array(self.dyn_0.q_tot) / CC.Units.A_TO_BOHR
         nat_sc = self.supercell_structure.N_atoms
         self.r_lat = np.zeros((nat_sc, 3), dtype = np.float64)
@@ -709,7 +709,7 @@ Error, the file '{}' is missing from the ensemble
             self.has_stress = True
         else:
             self.has_stress = False
-        
+
         if timer:
             timer.execute_timed_function(self.init)
         else:
@@ -732,7 +732,7 @@ Error, the following stress files are missing from the ensemble:
                 raise IOError(ERROR_MSG)
 
 
-    
+
 
     def load_from_calculator_output(self, directory, out_ext = ".pwo", timer=None):
         """
@@ -836,7 +836,7 @@ Error, the following stress files are missing from the ensemble:
             timer.execute_timed_function(self.init)
         else:
             self.init()
-       
+
 
     def save(self, data_dir, population, use_alat = False):
         """
@@ -988,7 +988,7 @@ Error, the following stress files are missing from the ensemble:
             self.save_enhanced_xyz(filename, append_mode = append_mode)
             raise ImportError("Error, this function requires ASE installed")
 
-        
+
         ase_structs = []
 
         for i, s in enumerate(self.structures):
@@ -999,7 +999,7 @@ Error, the following stress files are missing from the ensemble:
 
             calculator = ase.calculators.singlepoint.SinglePointCalculator(struct, energy = energy,
                 forces = forces, stress = CC.Methods.transform_voigt(stress))
-            
+
             struct.set_calculator(calculator)
             ase_structs.append(struct)
 
@@ -1220,8 +1220,8 @@ Error, the following stress files are missing from the ensemble:
             timer.execute_timed_function(self.init)
         else:
             self.init()
-        
-        
+
+
     def init_from_structures(self, structures):
         """
         Initialize the ensemble from the given list of structures
@@ -1250,7 +1250,7 @@ Error, the following stress files are missing from the ensemble:
         for i, s in enumerate(self.structures):
             # Get the displacements
             self.xats[i, :, :] = s.coords
-        
+
         # Initialize the supercell
         super_struct, itau = self.dyn_0.structure.generate_supercell(self.supercell, get_itau=True)
         self.supercell_structure = super_struct
@@ -1267,13 +1267,13 @@ Error, the following stress files are missing from the ensemble:
                 self.u_disps,
                 self.q_grid,
                 self.itau,
-                self.r_lat 
+                self.r_lat
             )
             self.u_disps_original_qspace = julia.Main.vector_r2q(
                 self.u_disps_original,
                 self.q_grid,
                 self.itau,
-                self.r_lat 
+                self.r_lat
             )
             # Get the dynamical matrix in the fourier format
             nat = self.dyn_0.structure.N_atoms
@@ -1291,7 +1291,7 @@ Error, the following stress files are missing from the ensemble:
             self.sscha_energies[:] = julia.Main.multiply_vector_vector_fourier(
                 self.sscha_forces_qspace,
                 self.u_disps_original_qspace * CC.Units.A_TO_BOHR
-            ) * 0.5 
+            ) * 0.5
 
 
         self.rho = np.ones(self.N, dtype = np.float64)
@@ -1310,7 +1310,7 @@ Error, the following stress files are missing from the ensemble:
         self.init_q_opposite()
 
         # Initialize the supercell
-        
+
         self.q_grid = np.array(self.dyn_0.q_tot) / CC.Units.A_TO_BOHR
         nat_sc = self.supercell_structure.N_atoms
         self.r_lat = np.zeros((nat_sc, 3), dtype = np.float64)
@@ -1321,13 +1321,13 @@ Error, the following stress files are missing from the ensemble:
         self.init_q_opposite()
 
 
-        
+
 
 
     def init_q_opposite(self):
         """
         Setup the inverse q points.
-        
+
         This subroutine identifies the inverse of each q point from the dynamical matrix"""
         if self.fourier_gradient:
             bg = self.current_dyn.structure.get_reciprocal_vectors() / (2* np.pi )
@@ -1644,23 +1644,23 @@ Error, the following stress files are missing from the ensemble:
             super_structure = self.supercell_structure.copy()
 
         Nat_sc = super_structure.N_atoms
-    
+
         #self.u_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_structure.coords.ravel(), (self.N,1))
         #old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_struct0.coords.ravel(), (self.N,1))
-        
-        
+
+
         # Get the new displacements.
         # In fourier space this only affects the q=0 point
         self.update_displacements(new_dynamical_matrix.structure)
 
         # Get the lattice vectors
         nat_sc = super_structure.N_atoms
-         
+
 
         # Get the displacements according to Fourier
         u_disp_fourier_new = self.u_disps_qspace
         u_disp_fourier_old = self.u_disps_original_qspace
-        
+
         if changed_dyn:
             if timer:
                 w_new, pols, wqn, polsqn = timer.execute_timed_function(new_dynamical_matrix.DiagonalizeSupercell, return_qmodes=True)
@@ -1690,7 +1690,7 @@ Error, the following stress files are missing from the ensemble:
         t2 = time.time()
         if timer:
             timer.add_timer("Prepare dynq for julia", t2-t1)
-        
+
         # Get the forces [Ry/A] and energies [Ry]
         self.sscha_forces_qspace = - julia.Main.multiply_matrix_vector_fourier(
                 dynq,
@@ -1700,7 +1700,7 @@ Error, the following stress files are missing from the ensemble:
         self.sscha_energies[:] = -julia.Main.multiply_vector_vector_fourier(
                 self.sscha_forces_qspace / CC.Units.A_TO_BOHR,
                 u_disp_fourier_new * CC.Units.A_TO_BOHR
-                ) * 0.5 
+                ) * 0.5
 
         # Go back to real space and convert in Ry/Angstrom
         # self.sscha_forces = julia.Main.vector_q2r(
@@ -1708,7 +1708,7 @@ Error, the following stress files are missing from the ensemble:
         #         np.array(new_dynamical_matrix.q_tot),
         #         self.itau,
         #         r_lat
-        #         ) * CC.Units.A_TO_BOHR 
+        #         ) * CC.Units.A_TO_BOHR
 
 
         t2 = time.time()
@@ -1732,7 +1732,7 @@ Error, the following stress files are missing from the ensemble:
         w = np.array(w/2, dtype = np.float64)
 
         # Get the a_0
-        old_a = SCHAModules.thermodynamic.w_to_a(w, self.T0)
+        old_a = self.w_to_a(w, self.T0)
 
         # Now do the same for the new dynamical matrix
         #new_super_dyn = new_dynamical_matrix.GenerateSupercellDyn(self.supercell)
@@ -1770,7 +1770,7 @@ DETAILS OF ERROR:
 
         w= w_new[~trans_mask]
         w = np.array(w/2, dtype = np.float64)
-        new_a = SCHAModules.thermodynamic.w_to_a(w, newT)
+        new_a = self.w_to_a(w, newT)
 
 
         # Get the new displacements in the supercell
@@ -1814,7 +1814,7 @@ DETAILS OF ERROR:
             self.pols_q_0,
             self.dyn_0.structure.get_masses_array(),
             np.float64(self.T0)
-        ) 
+        )
         t2 = time.time()
 
         if timer:
@@ -1843,7 +1843,7 @@ DETAILS OF ERROR:
         # Get the normalization ratio
         #norm = np.sqrt(np.abs(np.linalg.det(ups_new) / np.linalg.det(ups_old)))
         t2 = time.time()
-        self.rho = np.prod( old_a / new_a) * np.exp(-0.5 * (uYu_new - uYu_old) ) 
+        self.rho = np.prod( old_a / new_a) * np.exp(-0.5 * (uYu_new - uYu_old) )
         t3 = time.time()
 
         if timer:
@@ -1862,7 +1862,7 @@ DETAILS OF ERROR:
             # Get the new displacement
             #self.u_disps[i, :] = self.structures[i].get_displacement(new_super_dyn.structure).reshape(3 * new_super_dyn.structure.N_atoms)
             #self.u_disps[i, :] = (self.xats[i, :, :] - super_structure.coords).reshape( 3*Nat_sc )
-      
+
         if timer:
             self.current_dyn = timer.execute_timed_function(new_dynamical_matrix.Copy)
         #print( "Time elapsed to update weights the sscha energies, forces and displacements:", t1 - t3, "s")
@@ -1908,7 +1908,7 @@ DETAILS OF ERROR:
         self.u_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_structure.coords.ravel(), (self.N,1))
         old_disps[:,:] = self.xats.reshape((self.N, 3*Nat_sc)) - np.tile(super_struct0.coords.ravel(), (self.N,1))
 
-        
+
 
         if changed_dyn:
             if timer:
@@ -1954,7 +1954,7 @@ DETAILS OF ERROR:
         w = np.array(w/2, dtype = np.float64)
 
         # Get the a_0
-        old_a = SCHAModules.thermodynamic.w_to_a(w, self.T0)
+        old_a = self.w_to_a(w, self.T0)
 
         # Now do the same for the new dynamical matrix
         #new_super_dyn = new_dynamical_matrix.GenerateSupercellDyn(self.supercell)
@@ -1992,7 +1992,7 @@ DETAILS OF ERROR:
 
         w= w_new[~trans_mask]
         w = np.array(w/2, dtype = np.float64)
-        new_a = SCHAModules.thermodynamic.w_to_a(w, newT)
+        new_a = self.w_to_a(w, newT)
 
 
         # Get the new displacements in the supercell
@@ -2178,14 +2178,14 @@ DETAILS OF ERROR:
         transform to avoid doing the average once more.
         """
 
-        
+
         delta_forces = np.real(self.forces_qspace[:, :, 0] - self.sscha_forces_qspace[:, :, 0])
         nq = self.q_grid.shape[0]
         delta_forces /= np.sqrt(nq)
         sum_f = self.rho.dot(delta_forces)
         N_eff = np.sum(self.rho)
         f_average = sum_f / N_eff
-        
+
         if get_error:
             sum_f2 = self.rho.dot(delta_forces**2)
             error_f = np.sqrt(sum_f2 / N_eff - f_average**2) / np.sqrt(N_eff)
@@ -2453,19 +2453,19 @@ DETAILS OF ERROR:
         GET GRADIENT IN FOURIER SPACE
         =============================
 
-        This subroutine computes the gradient in foureir space
+        This subroutine computes the gradient in fourier space
 
-        It employes the acceleration available thanks 
+        It employes the acceleration available thanks
         to the julia code.
 
         In brief, the calculation performs:
 
         .. math::
 
-            \left< u(q) \delta f(-q)\right> 
+            \left< u(q) \delta f(-q)\right>
 
-        To get the gradient in the q space. 
-        The method can be easily parallelized, 
+        To get the gradient in the q space.
+        The method can be easily parallelized,
         since the julia subroutine returns also the average of the
         square.
 
@@ -2473,7 +2473,7 @@ DETAILS OF ERROR:
         ----------
             - timer : Timer object, optional
                 If present, the time spent in the julia code is added to the timer.
-            
+
         Results
         -------
             - grad : ndarray (3*nat x 3*nat)
@@ -2487,11 +2487,11 @@ DETAILS OF ERROR:
 Error while loading the julia module.
     This subroutine requires the julia speedup.
     install julia as specified in the guide,
-    and execute the python script using the python-jl 
-    interpreter. 
+    and execute the python script using the python-jl
+    interpreter.
 """
             raise ImportError(MSG)
-        
+
         t1 = time.time()
         # Check if the opposite q are initialize, otherwise do it once for all
         if self.q_opposite_index is None:
@@ -2501,14 +2501,14 @@ Error while loading the julia module.
         nq = len(self.current_dyn.q_tot)
         nat = self.current_dyn.structure.N_atoms
         nat_sc = self.structures[0].N_atoms
-        
+
         Y_qspace = julia.Main.get_upsilon_fourier(
             self.w_q_current,
             self.pols_q_current,
             self.current_dyn.structure.get_masses_array(),
             np.float64(self.current_T)
         )
-        
+
         t3 = time.time()
 
         # Get the v tilde (Yu) vector in fourier space (Bohr^-1)
@@ -2522,15 +2522,15 @@ Error while loading the julia module.
 
         t4 = time.time()
 
-        phi_grad = np.zeros((nq, 3*nat, 3*nat), dtype = np.complex128) 
+        phi_grad = np.zeros((nq, 3*nat, 3*nat), dtype = np.complex128)
         phi_grad2 = np.zeros((nq, 3*nat, 3*nat), dtype = np.float64)
-        
+
         # if self.itau is not None:
         #     super_struct = self.supercell_structure
         #     itau = self.itau
         # else:
         #     # Create the lattices
-        #     if timer is not None:  
+        #     if timer is not None:
         #         super_struct, itau = timer.execute_timed_function(self.current_dyn.structure.generate_supercell, self.supercell, get_itau=True)
         #     else:
         #         super_struct, itau = self.current_dyn.structure.generate_supercell(self.supercell, get_itau=True)
@@ -2546,14 +2546,14 @@ Error while loading the julia module.
         # r_lat *= CC.Units.A_TO_BOHR
 
         # q_tot = np.array(self.current_dyn.q_tot) / CC.Units.A_TO_BOHR
-        
+
         t5 = time.time()
 
         # f_vector = (self.forces - self.sscha_forces).reshape( (self.N, 3 * nat_sc)) * CC.Units.BOHR_TO_ANGSTROM
         # u_vector = self.u_disps.reshape( (self.N, 3 * nat_sc)) / CC.Units.BOHR_TO_ANGSTROM
 
         # Call the julia subroutine
-        delta_forces = self.forces_qspace - self.sscha_forces_qspace 
+        delta_forces = self.forces_qspace - self.sscha_forces_qspace
         delta_forces /= CC.Units.A_TO_BOHR
 
         # Compute the gradient splitting the configurations
@@ -2576,7 +2576,7 @@ Error while loading the julia module.
             result = np.concatenate((phi_grad, phi_grad2), axis=0)
             return result
 
-        
+
 
         # Get the range of the configurations to be computed for each processor
         configs_ranges = CC.Settings.split_configurations(self.N)
@@ -2592,7 +2592,7 @@ Error while loading the julia module.
         phi_grad = gradient_and_error[:nq, :, :]
         phi_grad2 = gradient_and_error[nq:, :, :]
 
-        
+
         # Divide by the total weights
         n_tot = np.sum(self.rho)
         phi_grad /= n_tot
@@ -2628,12 +2628,12 @@ Error while loading the julia module.
             gradient, _ = new_ensemble.get_preconditioned_gradient(*args, timer=timer, **kwargs)
 
             av_ensemble = np.sum(new_ensemble.rho)
-            
+
             return gradient * av_ensemble
 
         # Get the range of the configurations to be computed for each processor
         configs_ranges = CC.Settings.split_configurations(self.N)
-        
+
         if timer:
             gradient = timer.execute_timed_function(CC.Settings.GoParallel, work_function, configs_ranges, "+")
         else:
@@ -2643,10 +2643,10 @@ Error while loading the julia module.
 
         return gradient, np.zeros_like(gradient) + 1
 
-        
 
-        
-    
+
+
+
 
     def get_preconditioned_gradient(self, subtract_sscha = True, return_error = False,
                                     use_ups_supercell = True, preconditioned = 1,
@@ -2698,7 +2698,7 @@ Error while loading the julia module.
 
         super_struct = self.current_dyn.structure.generate_supercell(self.supercell)
         #supercell_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
-        
+
         # Dyagonalize
         if timer:
             w, pols = timer.execute_timed_function(self.current_dyn.DiagonalizeSupercell)
@@ -2712,7 +2712,7 @@ Error while loading the julia module.
 
         ityp = super_struct.get_ityp() + 1 # Py to fortran convertion
         mass = np.array(list(super_struct.masses.values()))
-        
+
         log_err = "err_yesrho"
 
         mass *= 2
@@ -2742,7 +2742,7 @@ Error while loading the julia module.
 
         if fast_grad or not preconditioned:
             if timer:
-                grad, grad_err = timer.execute_timed_function(SCHAModules.get_gradient_supercell, 
+                grad, grad_err = timer.execute_timed_function(SCHAModules.get_gradient_supercell,
                                                               self.rho, u_disp, eforces, w, pols, trans,
                                                               self.current_T, mass, ityp, log_err, self.N,
                                                               nat, 3*nat, len(mass), preconditioned,
@@ -2771,7 +2771,7 @@ Error while loading the julia module.
             # Perform the fourier transform
             if return_error:
                 # Check if a multiprocessing function can be exploited
-                if hasattr(CC.Phonons, 'GetDynQFromFCSupercell_parallel') and CC.Settings.GetNProc() > 1:  
+                if hasattr(CC.Phonons, 'GetDynQFromFCSupercell_parallel') and CC.Settings.GetNProc() > 1:
                     if timer:
                         q_grad,q_grad_err = timer.execute_timed_function(CC.Phonons.GetDynQFromFCSupercell_parallel,
                                                                          grad, np.array(self.current_dyn.q_tot),
@@ -2798,7 +2798,7 @@ Error while loading the julia module.
                                                         self.current_dyn.structure, super_struct)
                 else:
                     if timer:
-                        q_grad = timer.execute_timed_function(CC.Phonons.GetDynQFromFCSupercell, 
+                        q_grad = timer.execute_timed_function(CC.Phonons.GetDynQFromFCSupercell,
                                                               grad, np.array(self.current_dyn.q_tot),
                                                         self.current_dyn.structure, super_struct)
                     else:
@@ -3654,7 +3654,7 @@ Error while loading the julia module.
         else:
             w, pols = w_pols
 
-        a = SCHAModules.thermodynamic.w_to_a(w, self.current_T)
+        a = self.w_to_a(w, self.current_T)
 
 
         n_modes = len(w)
@@ -3716,7 +3716,7 @@ Error while loading the julia module.
             else:
                 qe_sym.SetupFromSPGLIB()
                 qe_sym.ApplySymmetryToTensor3(d3)
-            
+
 
         if verbose:
             print("Saving the third order force constants as d3_realspace_sym.npy [Ha units]")
@@ -3935,7 +3935,7 @@ Error while loading the julia module.
         N = np.sum(split_mask.astype(int))
         ens = Ensemble(self.dyn_0, self.T0, self.dyn_0.GetSupercell())
         ens.init_from_structures(structs)
-        
+
 
         ens.force_computed[:] = self.force_computed[split_mask]
         ens.stress_computed[:] = self.stress_computed[split_mask]
@@ -4195,8 +4195,16 @@ Error while loading the julia module.
             timer.execute_timed_function(self.init)
         else:
             self.init()
+    def w_to_a(self,w, T):
+        n = len(w)
+        a = np.zeros(n)
+        if T == 0.0:
+            a[:] = np.sqrt(1.0 / (2.0 * w))
+        else:
+            a[:] = np.sqrt((1.0 / np.tanh(0.5 * w * 315774.65221921849 / T)) / (2.0 * w))
+        return a
 
-
+#-------------------------------------------------------------------------------
 def _wrapper_julia_get_upsilon_q(*args, **kwargs):
     """Worker function, just for testing"""
     return julia.Main.get_upsilon_fourier(*args, **kwargs)
@@ -4210,7 +4218,7 @@ def _wrapper_julia_vector_q2r(*args, **kwargs):
     Parameters
     ----------
 
-        - vector_q : ndarray (3*nat, nq, n_random) 
+        - vector_q : ndarray (3*nat, nq, n_random)
         - q_tot : ndarray (nq, 3)
         - itau : ndarray (nat_sc)
         - R_lat : ndarray (nat_sc, 3)
@@ -4219,7 +4227,7 @@ def _wrapper_julia_vector_q2r(*args, **kwargs):
     -------
 
         - vector_sc : ndarray (n_random, 3*nat_sc)
-        
+
     """
 
     return julia.Main.vector_q2r(*args, **kwargs)
@@ -4234,14 +4242,14 @@ def _wrapper_julia_vector_r2q(*args, **kwargs):
     Parameters
     ----------
 
-        - vector_sc : ndarray (n_random, 3*nat_sc) 
+        - vector_sc : ndarray (n_random, 3*nat_sc)
         - q_tot : ndarray (nq, 3)
         - itau : ndarray (nat_sc)
         - R_lat : ndarray (nat_sc, 3)
 
     Returns
     -------
-        
+
         - vector_q : ndarray (3*nat, nq, n_random)
     """
 
@@ -4263,12 +4271,12 @@ def _wrapper_julia_matrix_vector_fourier(*args, **kwargs):
 
     Returns
     -------
-        
+
         - vector_q : ndarray (n_random, 3*nat, nq)
             The result of the matrix vector multiplication
     """
 
-    return julia.Main.multiply_matrix_vector_fourier(*args, 
+    return julia.Main.multiply_matrix_vector_fourier(*args,
             **kwargs)
 
 def _wrapper_julia_vector_vector_fourier(*args, **kwargs):
@@ -4291,7 +4299,5 @@ def _wrapper_julia_vector_vector_fourier(*args, **kwargs):
             The result of the vector vector multiplication
     """
 
-    return julia.Main.multiply_vector_vector_fourier(*args, 
+    return julia.Main.multiply_vector_vector_fourier(*args,
             **kwargs)
-
-
