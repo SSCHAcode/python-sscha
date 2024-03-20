@@ -229,6 +229,8 @@ class Cluster(object):
 
         # Enforce ssh to open a shell for each command in the cluster
         self.use_active_shell = False
+        # If the following is true, then use the active shell always
+        self.use_active_shell_for_parsing = False
 
         # This is the number of configurations to be computed for each jub submitted
         # This times the self.batch_size is the total amount of configurations submitted toghether
@@ -1441,7 +1443,7 @@ Error while connecting to the cluster to copy the files:
         # Use single ' to avoid string parsing by the local terminal
         cmd = "%s %s 'echo \"%s\"'" % (self.sshcmd, self.hostname, string)
 
-        if self.use_active_shell:
+        if self.use_active_shell_for_parsing:
             cmd = "{ssh} {host} -t '{shell} --login -c \"echo {string}\"'".format(ssh = self.sshcmd, 
                          host = self.hostname, 
                          string = parse_symbols(string), 
