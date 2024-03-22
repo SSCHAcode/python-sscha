@@ -1037,9 +1037,10 @@ Error, the following stress files are missing from the ensemble:
                 # Add the energy
                 info += '{}={:.16f} '.format(energy_key, self.energies[i] * Rydberg)
 
-                # Add the virial stress
-                stress_data = - self.stresses[i].ravel() * CC.Units.RY_PER_BOHR3_TO_EV_PER_A3
-                info += '{}="{:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f}" '.format(stress_key, *list(stress_data))
+                # Add the virial stress only if present
+                if self.stress_computed[i]:
+                    stress_data = - self.stresses[i].ravel() * CC.Units.RY_PER_BOHR3_TO_EV_PER_A3
+                    info += '{}="{:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f}" '.format(stress_key, *list(stress_data))
 
                 # Add the secription of the xyz format
                 info += 'Properties=species:S:1:pos:R:3:{}:R:3\n'.format(forces_key)

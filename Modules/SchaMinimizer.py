@@ -1587,8 +1587,8 @@ You can try to fix this error setting the {} variable of {} class to True.
                 total_mask.pop(np.argmax(scalar))
 
 
-            print ("\n".join(["%d) %.4f  | %.4f cm-1" % (i, x, wold[i]) for i, x in enumerate(ws)]))
-            print ()
+            print("\n".join(["%d) %.4f  | %.4f cm-1" % (i, x, wold[i]) for i, x in enumerate(ws)]))
+            print()
             return True
         return False
 
