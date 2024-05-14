@@ -100,6 +100,7 @@ class AiiDAEnsemble(Ensemble):
             self.stress_computed = copy(self.force_computed)
 
         self._clean_runs()
+        self.init()
 
     def _clean_runs(self) -> None:
         """Clean the failed runs and print summary."""
