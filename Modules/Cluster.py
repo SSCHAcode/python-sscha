@@ -412,9 +412,9 @@ class Cluster(object):
         if on_cluster:
             cmd = self.sshcmd + " {} '{}'".format(self.hostname, cmd)
             if use_active_shell:
-                cmd = "{ssh} {host} -t '{shell} --login -c \"echo {string}\"'".format(ssh = self.sshcmd, 
+                cmd = "{ssh} {host} -t '{shell} --login -c \"{command}\"'".format(ssh = self.sshcmd, 
                          host = self.hostname, 
-                         string = parse_symbols(string), 
+                         command = parse_symbols(cmd), 
                          shell = self.terminal)
 
 
