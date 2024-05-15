@@ -15,11 +15,11 @@ class LocalCluster(Cluster.Cluster):
         """
 
         # Override the value of on_cluster
-        super().ExecuteCMD(cmd, *args, on_cluster = False, **kwargs)
+        return super().ExecuteCMD(cmd, *args, on_cluster = False, **kwargs)
 
     def copy_file(self, source, destination, server_source = False, server_dest = False, **kwargs):
         """
         Copy the files ignoring if the cluster is used.
         """
 
-        super().copy_file(source, destination, server_source = False, server_dest = False, **kwargs)
+        return super().copy_file(source, destination, server_source = False, server_dest = False, **kwargs)
