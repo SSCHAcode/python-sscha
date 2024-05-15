@@ -488,9 +488,9 @@ class Cluster(object):
         false otherwise.
         """
 
-        cmd = self.sshcmd + " %s 'echo ciao'" % self.hostname
-
-        status, output = self.ExecuteCMD(cmd, return_output = True)
+        #cmd = self.sshcmd + " %s 'echo ciao'" % self.hostname
+        cmd = "echo ciao"
+        status, output = self.ExecuteCMD(cmd, return_output = True, on_cluster = True)
 
 #        print cmd
 #        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
@@ -860,20 +860,26 @@ Error while connecting to the cluster to copy the files:
                 It is what returned from self.ExecuteCMD(cmd, False)
         """
 
-        cmd = "{ssh} {host} '{submit_cmd} {script}'".format(ssh = self.sshcmd, host = self.hostname,
-                         submit_cmd = self.submit_command, script = script_location)
-        if self.use_active_shell:
-            cmd = "{ssh} {host} -t '{shell} --login -c \"{submit_cmd} {script}\"'".format(ssh = self.sshcmd,
-                         host = self.hostname,
-                         submit_cmd = self.submit_command, script = script_location,
-                         shell = self.terminal)
+        cmd = f"{self.submit_command} {script_location}"
+        #cmd = "{ssh} {host} '{submit_cmd} {script}'".format(ssh = self.sshcmd, host = self.hostname,
+        #                 submit_cmd = self.submit_command, script = script_location)
+        
+        result, output = self.ExecuteCMD(cmd, False, return_output=True, on_cluster = True,
+                                        use_active_shell = self.use_active_shell)
+
+
+        # if self.use_active_shell:
+        #     cmd = "{ssh} {host} -t '{shell} --login -c \"{submit_cmd} {script}\"'".format(ssh = self.sshcmd,
+        #                  host = self.hostname,
+        #                  submit_cmd = self.submit_command, script = script_location,
+        #                  shell = self.terminal)
 
 
 
         #cmd = self.sshcmd + " %s '%s %s/%s.sh'" % (self.hostname, self.submit_command,
         #                                           self.workdir, label+ "_" + str(indices[0]))
 
-        return self.ExecuteCMD(cmd, False, return_output=True)
+        return result, output
 
     def get_output_path(self, label):
         """
@@ -1679,73 +1685,3 @@ Error while connecting to the cluster to copy the files:
         self.compute_ensemble_batch(ensemble, ase_calc, get_stress, timeout)
         return
 
-        """
-        # Track the remaining configurations
-        success = [False] * ensemble.N
-
-        # Setup if the ensemble has the stress
-        ensemble.has_stress = get_stress
-
-        # Check if the working directory exists
-        if not os.path.isdir(self.local_workdir):
-            os.makedirs(self.local_workdir)
-
-        # Prepare the function for the simultaneous submission
-        def compute_single(num, calc):
-            atm = ensemble.structures[num].get_ase_atoms()
-            res = self.run_atoms(calc, atm, self.label + str(num),
-                                 n_nodes = self.n_nodes,
-                                 n_cpu=self.n_cpu,
-                                 npool = self.n_pool)
-            if res:
-                ensemble.energies[num] = res["energy"] / units["Ry"]
-                ensemble.forces[num, :, :] = res["forces"] / units["Ry"]
-                if get_stress:
-                    stress = np.zeros((3,3), dtype = np.float64)
-                    stress[0,0] = res["stress"][0]
-                    stress[1,1] = res["stress"][1]
-                    stress[2,2] = res["stress"][2]
-                    stress[1,2] = res["stress"][3]
-                    stress[2,1] = res["stress"][3]
-                    stress[0,2] = res["stress"][4]
-                    stress[2,0] = res["stress"][4]
-                    stress[0,1] = res["stress"][5]
-                    stress[1,0] = res["stress"][5]
-                    # Remember, ase has a very strange definition of the stress
-                    ensemble.stresses[num, :, :] = -stress * units["Bohr"]**3 / units["Ry"]
-                success[num] = True
-
-        # Get the expected number of batch
-        num_batch_offset = int(ensemble.N / self.batch_size)
-
-        # Run until some work has not finished
-        recalc = 0
-        while np.sum(np.array(success, dtype = int) - 1) != 0:
-            threads = []
-
-            # Get the remaining jobs
-            false_mask = np.array(success) == False
-            false_id = np.arange(ensemble.N)[false_mask]
-
-            count = 0
-            # Submit in parallel
-            for i in false_id:
-                # Submit only the batch size
-                if count >= self.batch_size:
-                    break
-                t = threading.Thread(target = compute_single, args=(i, ase_calc, ))
-                t.start()
-                threads.append(t)
-                count += 1
-
-
-            # Wait until all the job have finished
-            for t in threads:
-                t.join(timeout)
-
-            recalc += 1
-            if recalc > num_batch_offset + self.max_recalc:
-                print ("Expected batch ordinary resubmissions:", num_batch_offset)
-                raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
-                break
-        """
