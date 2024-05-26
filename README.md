@@ -21,7 +21,7 @@ pip install cellconstructor python-sscha tdscha
 ## Video lessons from  the 2023 School are available
 
 The full recordings, both of theoretical lectures, tutorials and Hands-on sessions can be found 
-in our youtube channel `SSCHAcode <https://www.youtube.com/@SSCHAcode>`_
+in our youtube channel [SSCHAcode](https://www.youtube.com/@SSCHAcode>)
 
 This is the safest and best way to install the SSCHA. The first line creates a new pristine python environment with all the required libraries to compile the source code. The second line activates the newly installed environment. Then, the thrid command installs the additional dependencies, the last line compiles and install the SSCHA code.
 
@@ -67,17 +67,17 @@ If you use anaconda, they are automatically installed.
 
 The SSCHA code is a collection of 3 python packages: CellConstructor, python-sscha and tdscha.
 
-- `CellConstructor <https://github.com/SSCHAcode/CellConstructor>`_ : utility to manage phonon dispersions, atomic structures and crystal symmetries
-- `sscha <https://github.com/SSCHAcode/python-sscha>`_ : This repository, relax with anharmonicity and compute static linear response properties.
-- `tdscha <https://github.com/SSCHAcode/tdscha>`_ : Compute the dynamical linear response (Raman and IR, spectral functions) 
+- [CellConstructor](https://github.com/SSCHAcode/CellConstructor>): utility to manage phonon dispersions, atomic structures and crystal symmetries
+- [sscha](https://github.com/SSCHAcode/python-sscha>) : This repository, relax with anharmonicity and compute static linear response properties.
+- [tdscha](<https://github.com/SSCHAcode/tdscha>) : Compute the dynamical linear response (Raman and IR, spectral functions) 
 
-More details about installations are in the official website `www.sscha.eu <https://sscha.eu/download>`_
+More details about installations are in the official website [www.sscha.eu](https://sscha.eu/download>)
 
 ## Install with Anaconda
 
 
 The easiest way to install the code is through anaconda.
-First make sure you have anaconda installed `(install anaconda) <https://www.anaconda.com/download>`_
+First make sure you have anaconda installed [(install anaconda)](https://www.anaconda.com/download>)
 
 The following commands are sufficient to install the full sscha suite and its dependencies.
 
