@@ -502,7 +502,7 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
 
 
 
-    def load(self, data_dir, population, N, verbose = False, load_displacements = True, raise_error_on_not_found = False, load_noncomputed_ensemble = False,
+    def load(self, data_dir, population, N, verbose = False, load_displacements = True, raise_error_on_not_found = False, load_noncomputed_ensemble = False, skip_extra_rows = False,
              timer=None):
         """
         LOAD THE ENSEMBLE
@@ -554,6 +554,9 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
             load_noncomputed_ensemble: bool
                 If True, it allows for loading an ensemble where some of the configurations forces and stresses are missing.
                 Note that it must be compleated before running a SCHA minimization
+            skip_extra_rows : bool
+                If True, only loads the first Nat_sc rows of the forces.
+                Useful if the parsing script reads more than the necessary rows from the calculation output.
         """
         A_TO_BOHR = 1.889725989
 
@@ -599,6 +602,12 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
         total_t_for_loading = 0
         total_t_for_sscha_ef = 0
         t_before_for = time.time()
+
+        # Avoid reading extra rows on the forces
+        maxrowforces = None
+        if skip_extra_rows:
+            maxrowforces = Nat_sc
+
         for i in range(self.N):
             # Load the structure
             structure = CC.Structure.Structure()
@@ -636,10 +645,11 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
             force_path = os.path.join(data_dir, "forces_population%d_%d.dat" % (population, i+1))
 
             if os.path.exists(force_path):
+                
                 if timer:
-                    self.forces[i,:,:] = timer.execute_timed_function(np.loadtxt, force_path) * A_TO_BOHR
+                    self.forces[i,:,:] = timer.execute_timed_function(np.loadtxt, force_path, max_rows=maxrowforces) * A_TO_BOHR
                 else:
-                    self.forces[i,:,:] = np.loadtxt(force_path) * A_TO_BOHR
+                    self.forces[i,:,:] = np.loadtxt(force_path, max_rows=maxrowforces) * A_TO_BOHR
                 self.force_computed[i] = True
             else:
                 if raise_error_on_not_found:
