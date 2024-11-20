@@ -2309,7 +2309,7 @@ DETAILS OF ERROR:
         return free_energy
 
 
-    def get_free_energy_interpolating(self, target_supercell, support_dyn_coarse = None, support_dyn_fine = None, error_on_imaginary_frequency = True, return_error = False):
+    def get_free_energy_interpolating(self, target_supercell, support_dyn_coarse = None, support_dyn_fine = None, error_on_imaginary_frequency = True, return_error = False, use_lo_to_splitting = False):
         """
         GET THE FREE ENERGY IN A BIGGER CELL
         ====================================
@@ -2337,6 +2337,7 @@ DETAILS OF ERROR:
             return_error : bool
                As the normal get_free_energy, if this flag is True, the stochastic error is returned.
 
+
         Returns
         -------
             free_energy : float
@@ -2354,17 +2355,17 @@ DETAILS OF ERROR:
 
 
         # Interpolate the dynamical matrix
-        if support_dyn_fine is not None:
-            new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
-                                                    target_supercell,
-                                                    support_dyn_coarse,
-                                                    support_dyn_fine)
+        if not use_lo_to_splitting:
+            if support_dyn_fine is not None:
+                new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
+                                                        target_supercell,
+                                                        support_dyn_coarse,
+                                                        support_dyn_fine)
+            else:
+                new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
+                                                        target_supercell)
         else:
-            new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
-                                                    target_supercell)
-
-        #else:
-        #    new_dyn = self.current_dyn.InterpolateMesh(target_supercell, lo_to_splitting = True)
+            new_dyn = self.current_dyn.InterpolateMesh(target_supercell, lo_to_splitting = True)
 
         #print("dyn after interpolation:", new_dyn.GetSupercell())
 
