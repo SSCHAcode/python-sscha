@@ -3,6 +3,9 @@ from __future__ import print_function
 from numpy.distutils.core import setup, Extension
 import os, sys 
 import numpy 
+from numpy.distutils.system_info import get_info
+
+lapack_opt = get_info('lapack_opt')
 
 extra_flags_c = []
 extra_link_args_c = []
@@ -48,7 +51,6 @@ if sys.version_info[0] < 3:
 
 
 
-LIBRARIES = ["lapack", "blas"]
 EXTRA_F90_FLAGS =  ["-cpp", "-fopenmp"]
 EXTRA_LINK_ARGS = ["-fopenmp"]
 
@@ -70,9 +72,9 @@ SCHAModules = Extension(name = "SCHAModules",
                                    "SCHAModules/get_cmat.f90",
                                    "SCHAModules/get_v4.f90",
                                    "SCHAModules/get_odd_straight_with_v4.f90"],
-                        libraries = LIBRARIES,
                         extra_f90_compile_args = EXTRA_F90_FLAGS,
-                        extra_link_args= EXTRA_LINK_ARGS)
+                        extra_link_args= EXTRA_LINK_ARGS,
+                        **lapack_opt)
 
 
 
