@@ -12,11 +12,18 @@ The SSCHA code comes as a python library, with computationally intense part spee
 
 
 ```
-conda create -n sscha -c conda-forge python=3.10 gfortran libblas lapack openmpi julia openmpi-mpicc pip numpy scipy spglib=2.2
+conda create -n sscha -c conda-forge python=3.10 gfortran=11 libblas lapack openmpi julia openmpi-mpicc pip=23 numpy=1.26 scipy=1.10 spglib=2.2 setuptools=64
 conda activate sscha
 pip install ase julia mpi4py
 pip install cellconstructor python-sscha tdscha
 ```
+
+Note, the first time you will startup a sscha calculation, the code will try to download extra packages to setup the python
+julia interface. This process may fail if you do not have an internet connection available, or if the julia installation failed.
+Note, this is not mandatory, as the code will simply fallback to the old fortran implementation (before 1.4), and continue to run.
+
+If you want the julia speedup, see the section on Manual installation to preconfigure correctly your system.
+
 
 ## Video lessons from  the 2023 School are available
 
@@ -81,12 +88,14 @@ First make sure you have anaconda installed [(install anaconda)](https://www.ana
 
 The following commands are sufficient to install the full sscha suite and its dependencies.
 
-```   
-   conda create -n sscha -c conda-forge python=3.10 gfortran libblas lapack openmpi julia openmpi-mpicc pip numpy scipy spglib
-   conda activate sscha
-   pip install ase julia mpi4py
-   pip install cellconstructor python-sscha tdscha
 ```
+conda create -n sscha -c conda-forge python=3.10 gfortran=11 libblas lapack openmpi julia openmpi-mpicc pip=23 numpy=1.26 scipy=1.10 spglib=2.2 setuptools=64
+conda activate sscha
+pip install ase julia mpi4py
+pip install cellconstructor python-sscha tdscha
+```
+
+If you get an error of using Julia, try to install julia from the official website and see the passages reported in the Manual installation.
 
 To activate the environment and execute the SSCHA, run
 
