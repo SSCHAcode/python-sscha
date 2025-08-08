@@ -169,12 +169,14 @@ install_data(
 #  'scripts/read_incomplete_ensemble.py'
 #]
 install_data = (
+  [
   'scripts/sscha',
   'scripts/cluster_check.x',
   'scripts/plot_frequencies.py',
   'scripts/sscha-plot-data.py',
   'scripts/static-vc-relax.pyx', # Si esto es un script ejecutable directamente
-  'scripts/read_incomplete_ensemble.py',
+  'scripts/read_incomplete_ensemble.py'
+  ],
   install_dir: get_option('bindir')
   )
 
