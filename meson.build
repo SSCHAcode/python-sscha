@@ -89,6 +89,8 @@ schamodules_sources = files(
   'SCHAModules/get_odd_straight.f90',
   'SCHAModules/get_cmat.f90',
   'SCHAModules/get_v4.f90',
+  'SCHAModules/cell_force.f90',
+  'SCHAModules/module_polarization.f90',
   'SCHAModules/get_odd_straight_with_v4.f90'
 )
 
