@@ -6,7 +6,7 @@ build-backend = "mesonpy"
 name = "python-sscha"
 version = "1.4.2"
 description = "Python implementation of the sscha code"
-authors = [{name = "Lorenzo Monacelli", email = "your_email@example.com"}] # Put here email
+authors = [{name = "Lorenzo Monacelli"}] # Put here email
 readme = "README.md"
 license = {file = "LICENSE.txt"}
 requires-python = ">=3.8" # Ajusta según las versiones de Python que soportes
