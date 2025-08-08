@@ -160,25 +160,25 @@ install_data(
 # --- Installing Scripts ---
 # Meson is great for installing scripts and making them executable.
 # Scripts will be installed in the `bin` directory of the Python environment (e.g., venv/bin/).
-#install_scripts = [
-#  'scripts/sscha',
-#  'scripts/cluster_check.x',
-#  'scripts/plot_frequencies.py',
-#  'scripts/sscha-plot-data.py',
-#  'scripts/static-vc-relax.pyx', # Si esto es un script ejecutable directamente
-#  'scripts/read_incomplete_ensemble.py'
-#]
-install_data = (
-  [
+executable(
   'scripts/sscha',
   'scripts/cluster_check.x',
   'scripts/plot_frequencies.py',
   'scripts/sscha-plot-data.py',
   'scripts/static-vc-relax.pyx', # Si esto es un script ejecutable directamente
   'scripts/read_incomplete_ensemble.py'
-  ],
-  install_dir: get_option('bindir')
-  )
+, install : true)
+#install_data = (
+#  [
+#  'scripts/sscha',
+#  'scripts/cluster_check.x',
+#  'scripts/plot_frequencies.py',
+#  'scripts/sscha-plot-data.py',
+#  'scripts/static-vc-relax.pyx', # Si esto es un script ejecutable directamente
+#  'scripts/read_incomplete_ensemble.py'
+#  ],
+#  install_dir: get_option('bindir')
+#  )
 
 #foreach s : install_scripts
 #  install_data(s, install_dir : python.get_install_subdir() / '..' / 'bin') # Installs in bin
