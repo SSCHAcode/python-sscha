@@ -160,21 +160,21 @@ install_data(
 # --- Installing Scripts ---
 # Meson is great for installing scripts and making them executable.
 # Scripts will be installed in the `bin` directory of the Python environment (e.g., venv/bin/).
-executable(
-  'scripts/sscha',
-  'scripts/cluster_check.x',
-  'scripts/plot_frequencies.py',
-  'scripts/sscha-plot-data.py',
+#executable(
+#  'scripts/sscha',
+#  'scripts/cluster_check.x',
+#  'scripts/plot_frequencies.py',
+#  'scripts/sscha-plot-data.py',
 #  'scripts/static-vc-relax.pyx', # Si esto es un script ejecutable directamente
-  'scripts/read_incomplete_ensemble.py'
-, install : true)
-install_data = (
+#  'scripts/read_incomplete_ensemble.py'
+#, install : true)
+#install_data = (
 #  [
 #  'scripts/sscha',
 #  'scripts/cluster_check.x',
 #  'scripts/plot_frequencies.py',
 #  'scripts/sscha-plot-data.py',
-  'scripts/static-vc-relax.pyx')#, # Si esto es un script ejecutable directamente
+#  'scripts/static-vc-relax.pyx')#, # Si esto es un script ejecutable directamente
 #  'scripts/read_incomplete_ensemble.py'
 #  ],
 #  install_dir: get_option('bindir')
@@ -204,3 +204,26 @@ install_data(
 # configure_file(input: 'src/my_template.py.in',
 # output: 'my_module/version.py',
 # configuration: conf)
+
+# Define el intérprete de Python
+python = find_program('python3')
+
+# Crea un array con los nombres de todos los scripts que quieres instalar
+python_scripts = [
+  'scripts/sscha',
+  'scripts/cluster_check.x',
+  'scripts/plot_frequencies.py',
+  'scripts/sscha-plot-data.py',
+  'scripts/static-vc-relax.pyx',
+  'scripts/read_incomplete_ensemble.py'
+]
+
+# Itera sobre el array y crea un ejecutable para cada script
+foreach script : python_scripts
+  executable(
+    '@0@'.format(fs.stem(script)), # Crea un nombre de ejecutable sin la extensión .py
+    python,
+    script,
+    install: true
+  )
+endforeach
