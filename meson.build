@@ -97,7 +97,7 @@ schamodules_sources = files(
 
 # Meson's `extension_module` function for Python handles much of the magic.
 # 'SCHAModules' will be the name of the resulting Python module.
-py_mod_schamodules = python.extension_module(
+py_mod_schamodules = python_installation.extension_module(
   'SCHAModules',
   schamodules_sources,
   # Make sure BLAS/LAPACK dependencies are linked correctly
