@@ -1,0 +1,27 @@
+[build-system]
+requires = ["meson-python>=0.13.0", "meson>=1.0", "numpy", "setuptools"]
+build-backend = "mesonpy"
+
+[project]
+name = "python-sscha"
+version = "1.4.2"
+description = "Python implementation of the sscha code"
+authors = [{name = "Lorenzo Monacelli", email = "your_email@example.com"}] # Put here email
+readme = "README.md"
+license = {file = "LICENSE.txt"}
+requires-python = ">=3.8" # Ajusta según las versiones de Python que soportes
+dependencies = [
+    "numpy",
+    "ase",
+    "scipy",
+    "cellconstructor",
+    "spglib",
+    "matplotlib",
+    # mpi4py y pypar are optional and are handled at runtime/configuration
+]
+# If you have scripts that you want to be installed and executable
+# entries = { scripts = ["scripts/sscha", "scripts/cluster_check.x", ...] }
+# However, Meson is better at handling scripts like install_data
+
+[project.urls]
+Homepage = "https://github.com/mesonepigreco/python-sscha"
