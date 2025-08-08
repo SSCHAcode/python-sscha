@@ -210,18 +210,22 @@ python = find_program('python3')
 
 # Crea un array con los nombres de todos los scripts que quieres instalar
 python_scripts = [
+  'scripts/sscha',
   'scripts/cluster_check.x',
   'scripts/plot_frequencies.py',
-  'scripts/read_incomplete_ensemble.py',
-  'scripts/sscha',
   'scripts/sscha-plot-data.py',
-  'scripts/static-vc-relax.pyx'
+  'scripts/static-vc-relax.pyx',
+  'scripts/read_incomplete_ensemble.py'
 ]
 
 # Itera sobre el array y crea un ejecutable para cada script
 foreach script : python_scripts
-  # Usa rpartition para separar la extensión
-  script_name_without_ext = script.split('/')[-1].rpartition('.')[0]
+  # Obtiene el nombre del archivo de la ruta, por ejemplo 'cluster_check.x'
+  script_basename = script.split('/')[-1]
+
+  # Divide el nombre por el punto y toma el primer elemento para quitar la extensión
+  # Si el nombre no tiene punto, esto lo maneja correctamente
+  script_name_without_ext = script_basename.split('.')[0]
 
   executable(
     script_name_without_ext,
