@@ -177,7 +177,7 @@ install_data = (
   'scripts/static-vc-relax.pyx', # Si esto es un script ejecutable directamente
 #  'scripts/read_incomplete_ensemble.py'
 #  ],
-  install_dir: get_option('bindir')
+#  install_dir: get_option('bindir')
   )
 
 #foreach s : install_scripts
