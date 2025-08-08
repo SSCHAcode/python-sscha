@@ -38,7 +38,8 @@ has_mpi = false
 # You can specify a specific MPI compiler with the 'mpi_compiler' parameter
 # or, if you want, a specific Fortran compiler with 'mpi_fortran_compiler'.
 # For OpenMPI, IntelMPI, MPICH, etc., Meson usually finds it automatically.
-mpi_dep = dependency('mpi', required: false, language: ['c', 'fortran'])
+#mpi_dep = dependency('mpi', required: false, language: ['c', 'fortran'])
+mpi_dep = dependency('mpi', required: false)
 
 if mpi_dep.found()
   message('MPI environment detected correctly.')
