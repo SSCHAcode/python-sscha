@@ -210,18 +210,18 @@ python = find_program('python3')
 
 # Crea un array con los nombres de todos los scripts que quieres instalar
 python_scripts = [
-  'scripts/sscha',
-  'scripts/cluster_check.x',
-  'scripts/plot_frequencies.py',
-  'scripts/sscha-plot-data.py',
-  'scripts/static-vc-relax.pyx',
-  'scripts/read_incomplete_ensemble.py'
+  'scripts/script1.py',
+  'scripts/script2.py',
+  'scripts/utility.py'
 ]
 
 # Itera sobre el array y crea un ejecutable para cada script
 foreach script : python_scripts
+  # Usa rpartition para separar la extensión
+  script_name_without_ext = script.split('/')[-1].rpartition('.')[0]
+
   executable(
-    '@0@'.format(fs.stem(script)), # Crea un nombre de ejecutable sin la extensión .py
+    script_name_without_ext,
     python,
     script,
     install: true
