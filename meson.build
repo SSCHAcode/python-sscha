@@ -101,7 +101,7 @@ py_mod_schamodules = python.extension_module(
   'SCHAModules',
   schamodules_sources,
   # Make sure BLAS/LAPACK dependencies are linked correctly
-  dependencies : [py_dep, lapack_dep, blas_dep, mpi_dep],
+  dependencies : [lapack_dep, blas_dep, mpi_dep],
   # Fortran-specific flags
   fortran_args : common_fortran_flags,
   link_args : common_link_flags,
