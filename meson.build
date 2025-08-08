@@ -61,11 +61,11 @@ endif
 # In Meson, this would be done based on the Python version Meson is using.
 # Since Python 2 is EOL, this check is generally not needed.
 # However, if you want to keep the flag:
-py2_flag = []
-if py_dep.version().version_compare('<3.0')
-  message('Running on Python 2, adding the flag -D_PYTHON2')
-  py2_flag += ['-D_PYTHON2']
-endif
+#py2_flag = []
+#if py_dep.version().version_compare('<3.0')
+#  message('Running on Python 2, adding the flag -D_PYTHON2')
+#  py2_flag += ['-D_PYTHON2']
+#endif
 
 # --- Common Flags ---
 common_fortran_flags = ['-cpp', '-fopenmp']
