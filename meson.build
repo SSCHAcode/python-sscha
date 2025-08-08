@@ -210,9 +210,12 @@ python = find_program('python3')
 
 # Crea un array con los nombres de todos los scripts que quieres instalar
 python_scripts = [
-  'scripts/script1.py',
-  'scripts/script2.py',
-  'scripts/utility.py'
+  'scripts/cluster_check.x',
+  'scripts/plot_frequencies.py',
+  'scripts/read_incomplete_ensemble.py',
+  'scripts/sscha',
+  'scripts/sscha-plot-data.py',
+  'scripts/static-vc-relax.pyx'
 ]
 
 # Itera sobre el array y crea un ejecutable para cada script
