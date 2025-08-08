@@ -145,7 +145,7 @@ install_data(
   'Modules/Cluster.py',
   'Modules/Dynamical.py',
   'Modules/Ensemble.py',
-  'Modules/fourier_gradient.jl',
+#  'Modules/fourier_gradient.jl',
   'Modules/LocalCluster.py',
   'Modules/Minimizer.py',
   'Modules/Optimizer.py',
@@ -179,7 +179,7 @@ endforeach
 # and copy the .jl files there.
 install_data(
   ['Modules/fourier_gradient.jl'], # List the .jl files you need
-  install_dir : python.get_install_dir() / 'sscha'
+  install_dir : python_installation.get_install_dir() / 'sscha'
 )
 # If there are many .jl files in multiple subdirectories,
 # you would need to use 'install_subdir' or list them all explicitly.
