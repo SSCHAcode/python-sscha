@@ -129,13 +129,32 @@ py_mod_schamodules = python_installation.extension_module(
 
 # --- Installing Python Packages ---
 # The 'Modules' directory will be installed as the 'sscha' package.
-python.install_sources(
-  'Modules/', # Path to your Python package directory
+#python.install_sources(
+#  'Modules/', # Path to your Python package directory
 # The sources in this directory will be copied.
 # You can also use install_dir: python.get_install_dir() / 'sscha'
 # If you want to install it in a specific subdirectory of site-packages.
 # By default, Meson-Python will install it correctly.
-  subdir: 'sscha'
+#  subdir: 'sscha'
+#)
+install_data(
+  'Modules/__init__.py',
+  'Modules/AdvancedCalculations.py',
+  'Modules/aiida_ensemble.py',
+  'Modules/Calculator.py',
+  'Modules/Cluster.py',
+  'Modules/Dynamical.py',
+  'Modules/Ensemble.py',
+  'Modules/fourier_gradient.jl',
+  'Modules/LocalCluster.py',
+  'Modules/Minimizer.py',
+  'Modules/Optimizer.py',
+  'Modules/Parallel.py',
+  'Modules/Relax.py',
+  'Modules/SchaMinimizer.py',
+  'Modules/Tools.py',
+  'Modules/Utilities.py',
+  install_dir: python_installation.get_install_dir() / 'sscha',
 )
 
 # --- Installing Scripts ---
