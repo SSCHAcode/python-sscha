@@ -234,3 +234,4 @@ foreach script : python_scripts
     install: true
   )
 endforeach
+# executable('sscha','scripts/sscha',install: true)
