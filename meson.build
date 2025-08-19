@@ -229,7 +229,7 @@ foreach script : python_scripts
 
   executable(
     script_name_without_ext,
-    python,
+#    python,
     script,
     install: true
   )
