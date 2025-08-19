@@ -235,3 +235,8 @@ foreach script : python_scripts
   )
 endforeach
 # executable('sscha','scripts/sscha',install: true)
+# executable('cluster_check','scripts/cluster_check.x',install: true)
+# executable('plot_frequencies','scripts/plot_frequencies.py',install: true)
+# executable('sscha-plot-data','scripts/sscha-plot-data.py',install: true)
+# executable('static-vc-relax','scripts/static-vc-relax.pyx',install: true)
+# executable('read_incomplete_ensemble','scripts/read_incomplete_ensemble.py',install: true)
