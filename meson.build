@@ -214,7 +214,7 @@ python_scripts = [
   'scripts/cluster_check.x',
   'scripts/plot_frequencies.py',
   'scripts/sscha-plot-data.py',
-  'scripts/static-vc-relax.pyx',
+#  'scripts/static-vc-relax.pyx',
   'scripts/read_incomplete_ensemble.py'
 ]
 
@@ -238,5 +238,5 @@ endforeach
 # executable('cluster_check','scripts/cluster_check.x',install: true)
 # executable('plot_frequencies','scripts/plot_frequencies.py',install: true)
 # executable('sscha-plot-data','scripts/sscha-plot-data.py',install: true)
-# executable('static-vc-relax','scripts/static-vc-relax.pyx',install: true)
+executable('static-vc-relax','scripts/static-vc-relax.pyx', python, install: true)
 # executable('read_incomplete_ensemble','scripts/read_incomplete_ensemble.py',install: true)
