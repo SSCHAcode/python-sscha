@@ -240,3 +240,8 @@ endforeach
 # executable('sscha-plot-data','scripts/sscha-plot-data.py',install: true)
 executable('static-vc-relax','scripts/static-vc-relax.pyx', python, install: true)
 # executable('read_incomplete_ensemble','scripts/read_incomplete_ensemble.py',install: true)
+install_data([
+  'scripts/static-vc-relax.pyx'
+],
+install_dir: get_option('bindir')
+)
