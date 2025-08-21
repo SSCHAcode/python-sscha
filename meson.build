@@ -210,7 +210,7 @@ python = find_program('python3')
 
 # Crea un array con los nombres de todos los scripts que quieres instalar
 python_scripts = [
-  'scripts/sscha',
+#  'scripts/sscha',
   'scripts/cluster_check.x',
   'scripts/plot_frequencies.py',
   'scripts/sscha-plot-data.py',
@@ -241,6 +241,7 @@ endforeach
 # executable('static-vc-relax','scripts/static-vc-relax.pyx', install: true)
 # executable('read_incomplete_ensemble','scripts/read_incomplete_ensemble.py',install: true)
 install_data([
+  'scripts/sscha',
   'scripts/static-vc-relax.pyx'
 ],
 install_dir: get_option('bindir')
