@@ -75,7 +75,7 @@ common_link_flags = ['-fopenmp'] # For OpenMP
 # This compiles and links your Fortran module with the Python, LAPACK, BLAS, and MPI dependencies
 # Note: The Fortran extension will generate a .so or .pyd file that Python can import.
 schamodules_sources = files(
-  'SCHAModules/module_stochastic.f90',
+  /*'SCHAModules/module_stochastic.f90',
   'SCHAModules/module_new_thermodynamic.f90',
   'SCHAModules/module_anharmonic.f90',
   'SCHAModules/get_stress_tensor.f90',
@@ -92,7 +92,23 @@ schamodules_sources = files(
   'SCHAModules/get_v4.f90',
   'SCHAModules/cell_force.f90',
   'SCHAModules/module_polarization.f90',
-  'SCHAModules/get_odd_straight_with_v4.f90'
+  'SCHAModules/get_odd_straight_with_v4.f90'*/
+  "SCHAModules/module_stochastic.f90",
+  "SCHAModules/module_new_thermodynamic.f90",
+  "SCHAModules/module_anharmonic.f90",
+  "SCHAModules/get_stress_tensor.f90",
+  "SCHAModules/get_gradient_supercell.f90",
+  "SCHAModules/get_upsilon_matrix.f90",
+  "SCHAModules/multiply_lambda_tensor.f90",
+  "SCHAModules/cell_force.f90",
+  "SCHAModules/get_gradient_supercell_fast.f90",
+  "SCHAModules/get_g.f90",
+  "SCHAModules/get_emat.f90",
+  "SCHAModules/get_v3.f90",
+  "SCHAModules/get_odd_straight.f90",
+  "SCHAModules/get_cmat.f90",
+  "SCHAModules/get_v4.f90",
+  "SCHAModules/get_odd_straight_with_v4.f90"
 )
 
 # Meson's `extension_module` function for Python handles much of the magic.
