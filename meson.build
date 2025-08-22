@@ -24,7 +24,7 @@ lapack_dep = dependency('lapack', required : true)
 blas_dep = dependency('blas', required : true)
 
 # SSCHA needs CellConstructor
-CellConstructor_dep = dependency('CellConstructor', required : true)
+CellConstructor_dep = dependency('cellconstructor', required : true)
 
 # Look for the OpenMP library if it is needed for parallelization.
 openmp_dep = dependency('openmp', required: true)
