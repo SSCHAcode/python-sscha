@@ -210,38 +210,6 @@ install_data(
 # Define el intérprete de Python
 python = find_program('python3')
 
-# Crea un array con los nombres de todos los scripts que quieres instalar
-python_scripts = [
-#  'scripts/sscha',
-#  'scripts/cluster_check.x',
-#  'scripts/plot_frequencies.py',
-#  'scripts/sscha-plot-data.py',
-#  'scripts/static-vc-relax.pyx',
-#  'scripts/read_incomplete_ensemble.py'
-]
-
-# Itera sobre el array y crea un ejecutable para cada script
-foreach script : python_scripts
-  # Obtiene el nombre del archivo de la ruta, por ejemplo 'cluster_check.x'
-  script_basename = script.split('/')[-1]
-
-  # Divide el nombre por el punto y toma el primer elemento para quitar la extensión
-  # Si el nombre no tiene punto, esto lo maneja correctamente
-  script_name_without_ext = script_basename.split('.')[0]
-
-  executable(
-    script_name_without_ext,
-#    python,
-    script,
-    install: true
-  )
-endforeach
-# executable('sscha','scripts/sscha',install: true)
-# executable('cluster_check','scripts/cluster_check.x',install: true)
-# executable('plot_frequencies','scripts/plot_frequencies.py',install: true)
-# executable('sscha-plot-data','scripts/sscha-plot-data.py',install: true)
-# executable('static-vc-relax','scripts/static-vc-relax.pyx', install: true)
-# executable('read_incomplete_ensemble','scripts/read_incomplete_ensemble.py',install: true)
 install_data([
   'scripts/sscha',
   'scripts/cluster_check.x',
@@ -252,3 +220,4 @@ install_data([
 ],
 install_dir: get_option('bindir')
 )
+test('pytest', find_program('pytest'), args : ['-v', '-m', 'not release', 'tests'])
