@@ -23,9 +23,6 @@ project('python-sscha', 'fortran', 'c',
 lapack_dep = dependency('lapack', required : true)
 blas_dep = dependency('blas', required : true)
 
-# SSCHA needs CellConstructor
-CellConstructor_dep = dependency('cellconstructor', required : true)
-
 # Look for the OpenMP library if it is needed for parallelization.
 openmp_dep = dependency('openmp', required: true)
 
@@ -103,7 +100,7 @@ py_mod_schamodules = python_installation.extension_module(
   'SCHAModules',
   schamodules_sources,
   # Make sure BLAS/LAPACK dependencies are linked correctly
-  dependencies : [lapack_dep, blas_dep, mpi_dep, CellConstructor_dep],
+  dependencies : [lapack_dep, blas_dep, mpi_dep],
   # Fortran-specific flags
   fortran_args : common_fortran_flags,
   link_args : common_link_flags,
