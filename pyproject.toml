@@ -24,4 +24,16 @@ dependencies = [
 # However, Meson is better at handling scripts like install_data
 
 [project.urls]
-Homepage = "https://github.com/mesonepigreco/python-sscha"
+Homepage = "https://sscha.eu/"
+Repository = "https://github.com/mesonepigreco/python-sscha"
+# Documentation = "https://documentacion.readthedocs.io/"
+# Issues = "https://github.com/mesonepigreco/python-sscha/issues"
+
+# --- Meson-python specific configuration (Optional but useful) ---
+[tool.meson-python]
+# Here you can pass options to Meson that control the build process.
+# For example, to enable debugging or specify a different installation path.
+# By default, meson-python takes care of using the virtual environment if it exists.
+
+# build-args = ["-Dbuildtype=debug"] # Uncomment for a debug build
+# setup-args = ["--prefix=/opt/cellconstructor"] # For a non-standard installation
