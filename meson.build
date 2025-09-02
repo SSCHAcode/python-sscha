@@ -148,6 +148,8 @@ py_mod_schamodules = python_installation.extension_module(
 #    subdir: 'sscha'
 #)
 
+# install_subdir('Modules', install_dir : join_paths(get_option('prefix'), 'share', 'sscha', 'Modules'))
+
 install_data(
   'Modules/__init__.py',
   'Modules/AdvancedCalculations.py',
