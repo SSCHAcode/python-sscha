@@ -149,6 +149,8 @@ py_mod_schamodules = python_installation.extension_module(
 #)
 
 # install_subdir('Modules', install_dir : join_paths(get_option('prefix'), 'share', 'sscha', 'Modules'))
+# install_subdir('Modules', install_dir : 'share', strip_directory : false)   <-- Not the best option
+# install_subdir('Modules', install_dir : python_installation.get_install_dir()) <-- .get_install_dir() gives the python installation place for libraries
 
 install_data(
   'Modules/__init__.py',
