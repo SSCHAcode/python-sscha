@@ -142,11 +142,11 @@ py_mod_schamodules = python_installation.extension_module(
 #lib_path = python.find_sources(lib_dir, lib_name)
 
 # Instala la librería en el sitio de paquetes de Python
-python.install_sources(
-    ['Modules/Calculator.py'],
-    pure: true,
-    subdir: 'sscha'
-)
+#python.install_sources(
+#    ['Modules/Calculator.py'],
+#    pure: true,
+#    subdir: 'sscha'
+#)
 
 install_data(
   'Modules/__init__.py',
