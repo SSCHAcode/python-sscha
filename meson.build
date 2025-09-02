@@ -136,6 +136,18 @@ py_mod_schamodules = python_installation.extension_module(
 # By default, Meson-Python will install it correctly.
 #  subdir: 'sscha'
 #)
+# Define la ruta de la librería
+lib_dir = 'Modules'
+lib_name = 'Calculator.py'
+lib_path = python.find_sources(lib_dir, lib_name)
+
+# Instala la librería en el sitio de paquetes de Python
+python.install_sources(
+    lib_path,
+    pure: true,
+    subdir: 'sscha'
+)
+
 install_data(
   'Modules/__init__.py',
   'Modules/AdvancedCalculations.py',
