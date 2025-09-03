@@ -175,7 +175,7 @@ For example
 
 For the development version of the code, subtitute the pip call with the python setup.py install.
 
-### Compiling with Meson
+## Compiling with Meson
 
 To compile and install SSCHA with Meson, follow these typical steps:
 
@@ -215,7 +215,7 @@ This will compile the source code according to the configuration from the previo
 
 ### 4. Run Tests (Optional)
 
-If the project includes tests, you can run them with:
+The project includes tests, you need to install pytest and uncomment the last two lines of 'meson.build' to work. You can run them with:
 
 ```bash
 meson test
