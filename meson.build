@@ -236,3 +236,8 @@ install_dir: get_option('bindir')
 
 # Establece los test con pytest. (necesita tener pytest instalado)
 # test('pytest', find_program('pytest'), args : ['-v', '-m', 'not release', 'tests'])
+pytest_exe = find_program('pytest', required: true)
+
+test('pytest', pytest_exe,
+     args : ['-v', '-m', 'not release', 'tests'],
+     workdir : meson.source_root())
