@@ -215,7 +215,7 @@ This will compile the source code according to the configuration from the previo
 
 ### 4. Run Tests (Optional)
 
-The project includes tests, you need to install pytest and uncomment the last two lines of 'meson.build' to work. You can run them with:
+The project includes tests, you need to install pytest and uncomment the last line of 'meson.build' to work. You can run them with:
 
 ```bash
 meson test
