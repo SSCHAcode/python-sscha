@@ -233,6 +233,14 @@ install_data([
 ],
 install_dir: get_option('bindir')
 )
+# python.install_sources(['scripts/sscha',
+#  'scripts/cluster_check.x',
+#  'scripts/plot_frequencies.py',
+#  'scripts/sscha-plot-data.py',
+#  'scripts/static-vc-relax.pyx',
+#  'scripts/read_incomplete_ensemble.py'
+#])
+
 
 # Establece los test con pytest. (necesita tener pytest instalado)
 pytest_exe = find_program('pytest', required: false)
