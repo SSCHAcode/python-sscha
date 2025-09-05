@@ -249,7 +249,7 @@ pytest_exe = find_program('pytest', required: false)
 if pytest_exe.found()
   test('pytest', pytest_exe,
        args : ['-v', '-m', 'not release', 'tests'],
-       workdir : meson.source_root())
+       workdir : meson.project_source_root())
 else
   message('pytest no encontrado; se omiten tests con pytest.')
 endif
