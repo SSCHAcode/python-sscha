@@ -29,8 +29,8 @@ jobs:
     - name: Compile
       run: meson compile -C builddir
 
+    - name: Install package
+      run: meson install -C builddir
+
     - name: Run tests
       run: meson test -C builddir
-
-#    - name: Install package
-#      run: meson install -C builddir
