@@ -222,25 +222,26 @@ install_data(
 # configuration: conf)
 
 # Define el intérprete de Python
-python = find_program('python3')
+#python = find_program('python3')
 
-install_data([
+#install_data([
+#  'scripts/sscha',
+#  'scripts/cluster_check.x',
+#  'scripts/plot_frequencies.py',
+#  'scripts/sscha-plot-data.py',
+#  'scripts/static-vc-relax.pyx',
+#  'scripts/read_incomplete_ensemble.py'
+#],
+#install_dir: get_option('bindir')
+#)
+python_installation.install_sources([
   'scripts/sscha',
   'scripts/cluster_check.x',
   'scripts/plot_frequencies.py',
   'scripts/sscha-plot-data.py',
   'scripts/static-vc-relax.pyx',
   'scripts/read_incomplete_ensemble.py'
-],
-install_dir: get_option('bindir')
-)
-# python.install_sources(['scripts/sscha',
-#  'scripts/cluster_check.x',
-#  'scripts/plot_frequencies.py',
-#  'scripts/sscha-plot-data.py',
-#  'scripts/static-vc-relax.pyx',
-#  'scripts/read_incomplete_ensemble.py'
-#])
+])
 
 
 # Establece los test con pytest. (necesita tener pytest instalado)
