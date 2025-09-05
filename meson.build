@@ -149,7 +149,7 @@ py_mod_schamodules = python_installation.extension_module(
 #    subdir: 'sscha'
 #)
 
-# install_subdir('Modules', install_dir : join_paths(get_option('prefix'), 'share', 'sscha', 'Modules'))
+# install_subdir('Modules', install_dir : join_paths(get_option('prefix'), 'share', 'python-sscha', 'Modules'))
 # install_subdir('Modules', install_dir : 'share', strip_directory : false)   <-- Not the best option
 # install_subdir('Modules', install_dir : python_installation.get_install_dir()) <-- .get_install_dir() gives the python installation place for libraries
 
@@ -170,7 +170,7 @@ install_data(
   'Modules/SchaMinimizer.py',
   'Modules/Tools.py',
   'Modules/Utilities.py',
-  install_dir: python_installation.get_install_dir() / 'sscha',
+  install_dir: python_installation.get_install_dir() / 'python-sscha',
 )
 
 # --- Installing Scripts ---
@@ -206,7 +206,7 @@ install_data(
 # and copy the .jl files there.
 install_data(
   ['Modules/fourier_gradient.jl'], # List the .jl files you need
-  install_dir : python_installation.get_install_dir() / 'sscha'
+  install_dir : python_installation.get_install_dir() / 'python-sscha'
 )
 # If there are many .jl files in multiple subdirectories,
 # you would need to use 'install_subdir' or list them all explicitly.
