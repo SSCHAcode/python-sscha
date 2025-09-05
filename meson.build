@@ -108,7 +108,7 @@ py_mod_schamodules = python_installation.extension_module(
   # This is the equivalent of extra_f90_compile_args and extra_link_args
   # in setup.py for the Fortran module.
   include_directories: include_directories(numpy_incdir),
-  install_rpath: true,
+  install_rpath: true
 )
 
 # --- Module odd_HP (C) ---
