@@ -15,6 +15,13 @@ project('python-sscha', 'fortran', 'c',
     check: true
   ).stdout().strip()
 
+  # Find the fpm and f2py programs
+  fpm_exe = find_program('fpm', required: true)
+  f2py_exe = python.find_installation().find_program('f2py', required: true)
+
+  # Define the build directory for fpm
+  fpm_build_dir = meson.build_root() / 'fpm_build'
+
 # --- BLAS/LAPACK Dependencies ---
 # Meson will attempt to automatically detect LAPACK and BLAS.
 # You don't need 'lapack_opt' as in numpy.distutils.
@@ -74,6 +81,19 @@ common_link_flags = ['-fopenmp'] # For OpenMP
 # --- SCHAModules Module (Fortran) ---
 # This compiles and links your Fortran module with the Python, LAPACK, BLAS, and MPI dependencies
 # Note: The Fortran extension will generate a .so or .pyd file that Python can import.
+
+# Use fpm to build and install your Fortran sources
+run_command(
+    fpm_exe,
+    'install',
+    '--flag', ['-g', '-fPIC', '-O2', '-fopenmp'],
+    '--prefix', fpm_build_dir,
+    check : true
+)
+
+
+# --- La extensión SCHAModules ---
+# Estas son las fuentes de Fortran que serán procesadas por f2py
 schamodules_sources = files(
   'SCHAModules/module_stochastic.f90',
   'SCHAModules/module_new_thermodynamic.f90',
@@ -94,22 +114,53 @@ schamodules_sources = files(
   # ,'SCHAModules/module_polarization.f90'
 )
 
+# Usa f2py para crear el wrapper de C
+SCHAModules_wrapper = custom_target(
+    '_f2py_wrapper',
+    input: schamodules_sources,
+    output: 'schamodules-f2pywrappers.c',
+    command: [
+        f2py_exe,
+        '-m', 'schamodules', # El nombre del módulo
+        '@INPUT@',
+        '--quiet',
+        '--lower'
+    ],
+    build_by_default: true
+)
+# Crea el módulo de extensión de Python
+py_sschamodules_ext = python_installation.extension_module(
+    'SCHAModules', # Nombre del módulo resultante
+    # Ahora pasamos el wrapper de C generado y la librería estática de fpm
+    symph_wrapper,
+    fpm_build_dir / 'lib' / 'libschamodules.a',
+    install: true,
+    include_directories: [
+        include_directories(numpy_incdir),
+        fpm_build_dir / 'include' # Directorio de inclusión para módulos Fortran
+    ],
+    dependencies: [lapack_dep, blas_dep, mpi_dep],
+    link_args: ['-fopenmp'],
+    install_rpath: '$ORIGIN/..'
+)
+
+
 # Meson's `extension_module` function for Python handles much of the magic.
 # 'SCHAModules' will be the name of the resulting Python module.
-py_mod_schamodules = python_installation.extension_module(
-  'SCHAModules',
-  schamodules_sources,
+#py_mod_schamodules = python_installation.extension_module(
+#  'SCHAModules',
+#  schamodules_sources,
   # Make sure BLAS/LAPACK dependencies are linked correctly
-  dependencies : [lapack_dep, blas_dep, mpi_dep],
+#  dependencies : [lapack_dep, blas_dep, mpi_dep],
   # Fortran-specific flags
-  fortran_args : common_fortran_flags,
-  link_args : common_link_flags,
+#  fortran_args : common_fortran_flags,
+#  link_args : common_link_flags,
   # Add -fPIC for Linux if needed (Meson usually handles this)
   # This is the equivalent of extra_f90_compile_args and extra_link_args
   # in setup.py for the Fortran module.
-  include_directories: include_directories(numpy_incdir),
-  install_rpath: '$ORIGIN/..'
-)
+#  include_directories: include_directories(numpy_incdir),
+#  install_rpath: '$ORIGIN/..'
+#)
 
 # --- Module odd_HP (C) ---
 # Uncomment and adapt if you want to include this module.
