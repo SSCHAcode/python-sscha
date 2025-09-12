@@ -41,8 +41,10 @@ f2py_libdir = run_command(
 py_libdir = python_installation.get_install_dir() / 'lib'
 
   # Find the fpm and f2py programs
-  fpm_exe = find_program('fpm', required: true)
-  f2py_exe = python.find_program('f2py', required: true)
+  #fpm_exe = find_program('fpm', required: true)
+  #f2py_exe = python.find_program('f2py', required: true)
+  f2py_exe = find_program('f2py', required: true)
+
 
   # Define the build directory for fpm
   fpm_build_dir = meson.build_root() / 'fpm_build'
