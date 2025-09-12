@@ -47,7 +47,7 @@ py_libdir = python_installation.get_install_dir() / 'lib'
 
 
   # Define the build directory for fpm
-  fpm_build_dir = meson.build_root() / 'fpm_build'
+  #fpm_build_dir = meson.build_root() / 'fpm_build'
 
 # --- BLAS/LAPACK Dependencies ---
 # Meson will attempt to automatically detect LAPACK and BLAS.
@@ -143,9 +143,10 @@ schamodules_sources = files(
 
 # Usa f2py para crear el wrapper de C
 SCHAModules_wrapper = custom_target(
-    '_f2py_wrapper',
+    'schamodules_f2py_wrapper',
     input: schamodules_sources,
-    output: 'schamodules-f2pywrappers.c',
+    output: 'schamodulesmodule.c',
+    #output: 'schamodules-f2pywrappers.c',
     command: [
         f2py_exe,
         '-m', 'schamodules', # El nombre del módulo
