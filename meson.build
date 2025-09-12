@@ -110,13 +110,13 @@ common_link_flags = ['-fopenmp'] # For OpenMP
 # Note: The Fortran extension will generate a .so or .pyd file that Python can import.
 
 # Use fpm to build and install your Fortran sources
-run_command(
-    fpm_exe,
-    'install',
-    '--flag', ['-g', '-fPIC', '-O2', '-fopenmp'],
-    '--prefix', fpm_build_dir,
-    check : true
-)
+#run_command(
+#    fpm_exe,
+#    'install',
+#    '--flag', ['-g', '-fPIC', '-O2', '-fopenmp'],
+#    '--prefix', fpm_build_dir,
+#    check : true
+#)
 
 
 # --- La extensión SCHAModules ---
