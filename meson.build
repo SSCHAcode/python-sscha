@@ -159,7 +159,7 @@ SCHAModules_wrapper = custom_target(
 py_sschamodules_ext = python_installation.extension_module(
     'SCHAModules', # Nombre del módulo resultante
     # Ahora pasamos el wrapper de C generado y la librería estática de fpm
-    [symph_wrapper,schamodules_sources],
+    [SCHAModules_wrapper,schamodules_sources],
     #fpm_build_dir / 'lib' / 'libschamodules.a',
     install: true,
     include_directories: include_dirs,
