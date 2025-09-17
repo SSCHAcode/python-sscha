@@ -96,9 +96,6 @@ project('python-sscha',
   #  warning('No openblas found.')
     list_dep = [py_dep, mpi_dep, quadmath_dep, lapack_dep, blas_dep]
   #endif
----------------
-
-
 
 # --- Common Flags ---
 common_fortran_flags = ['-cpp', '-fopenmp']
