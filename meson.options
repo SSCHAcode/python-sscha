@@ -1,0 +1,3 @@
+# meson.options
+option('use_mkl', type: 'boolean', value: false,
+       description: 'Use Intel Math Kernel Library (MKL) for BLAS/LAPACK')

@@ -1,105 +1,104 @@
-project('python-sscha', 'fortran', 'c',
+project('python-sscha',
+  ['c','fortran'],
   version : '1.4.2',
   license: 'GPL',
-# Common compilation options for Fortran.
-# -cpp is essential for the Fortran preprocessor.
-# -O2 is a general optimization you had in setup.py.
-  default_options : ['warning_level=1','fortran_args=-cpp', 'fortran_args=-O2'])
+  default_options : [
+        'warning_level=1',
+        'buildtype=release',
+        'fortran_args=-O2',
+        'fortran_args=-cpp'
+    ])
 
   # --- System and Python Dependencies ---
   # Imports the Meson Python module to handle extensions and Python installation.
-  python = import('python')
-  python_installation = python.find_installation()
-  py_dep = dependency('python3', required: true)
+  # --- Opciones de compilación ---
+  use_mkl = get_option('use_mkl')
 
-  # Obtenemos la ruta principal de los headers de numpy
-  numpy_incdir = run_command(
-    python_installation, '-c', 'import numpy; print(numpy.get_include())',
-    check: true
+  # --- System and Python Dependencies ---
+  # Encuentra las instalaciones necesarias
+  py = import('python').find_installation(pure: false)
+  py_dep = py.dependency()
+  fc = meson.get_compiler('fortran')
+
+  # Dependencias adicionales
+
+  # --- BLAS/LAPACK Dependencies ---
+  # Meson will attempt to automatically detect LAPACK and BLAS.
+  # You don't need 'lapack_opt' as in numpy.distutils.
+  # If detection fails, you can pass configuration options to Meson
+  # (e.g., -Dblas_args='-L/path/to/blas -lblas').
+  openblas_dep = dependency('openblas', required: false)
+  if use_mkl
+    mkl_dep = dependency('mkl', required: true)
+    blas_dep = mkl_dep
+    lapack_dep = mkl_dep
+  else
+    lapack_dep = dependency('lapack', required: true)
+    blas_dep = dependency('blas', required: true)
+  endif
+
+  # Look for the OpenMP library if it is needed for parallelization.
+  openmp_dep = dependency('openmp', required: true)
+
+  # --- MPI Detection ---
+  # This overrides the logic in os.environ["MPICC"] and os.popen("%s -show" % mpicc).
+  # Meson has a built-in MPI module.
+  mpi_args = []
+  mpi_link_args = []
+  mpi_compile_args = []
+  has_mpi = false
+
+  # Attempts to find the MPI dependency.
+  # You can specify a specific MPI compiler with the 'mpi_compiler' parameter
+  # or, if you want, a specific Fortran compiler with 'mpi_fortran_compiler'.
+  # For OpenMPI, IntelMPI, MPICH, etc., Meson usually finds it automatically.
+  #mpi_dep = dependency('mpi', required: false, language: ['c', 'fortran'])
+  mpi_dep = dependency('mpi', required: false)
+
+  if mpi_dep.found()
+    message('MPI environment detected correctly.')
+    has_mpi = true
+    # Meson handles adding appropriate flags. We just add the define.
+    # If you need specific MPI flags beyond what Meson adds automatically,
+    # you can get them via mpi_dep.get_compile_args() and mpi_dep.get_link_args()
+    # and add them to extra_compile_args/extra_link_args.
+    mpi_compile_args += ['-D_MPI']
+  else
+    # Here you can add warning logic if MPI is not found.
+    # Meson prints a warning if required: true and it is not found.
+    # For required: false, you can print your own warning.
+    warning('No MPI compiler found, please ensure MPI is installed and configured.')
+    warning('If you wish to activate MPI acceleration, consider setting MPICC environment variable or providing Meson with appropriate flags.')
+  endif
+  # Busca la librería quadmath, si está disponible
+  quadmath_dep = fc.find_library('quadmath', required: false)
+
+  # --- CONFIGURACIÓN DE NUMPY ---
+  # Obtiene la ruta de los directorios de cabecera de NumPy y f2py usando el comando de Python
+  incdir_numpy = run_command(py,
+      ['-c', 'import numpy; print(numpy.get_include())'],
+      check : true
   ).stdout().strip()
-# Obtenemos la ruta padre para incluir los headers de numpy anidados
-numpy_parent_incdir = run_command(
-  python_installation, '-c', 'import os, numpy; print(os.path.dirname(numpy.get_include()))',
-  check: true
-).stdout().strip()
 
-# Obtenemos la ruta específica para los headers de f2py
-f2py_incdir = run_command(
-  python_installation, '-c', 'import os, numpy.f2py; print(os.path.join(os.path.dirname(numpy.f2py.__file__), "src"))',
-  check: true
-).stdout().strip()
+  # f2py también requiere la cabecera fortranobject.h
+  incdir_f2py = run_command(py,
+      ['-c', 'import numpy.f2py; print(numpy.f2py.get_include())'],
+      check : true
+  ).stdout().strip()
 
-# Creamos una lista de directorios de inclusión para usar en todas las extensiones
-include_dirs = include_directories(numpy_incdir, numpy_parent_incdir, f2py_incdir, '.')
+  inc_np = include_directories(incdir_numpy, incdir_f2py)
 
-# Obtenemos la ruta de la biblioteca de f2py para la vinculación
-f2py_libdir = run_command(
-    python_installation, '-c', 'import os, numpy.f2py; print(os.path.join(os.path.dirname(os.path.dirname(numpy.f2py.__file__)), "core", "lib"))',
-    check: true
-).stdout().strip()
-# Obtenemos la ruta del directorio de bibliotecas de Python
-py_libdir = python_installation.get_install_dir() / 'lib'
-
-  # Find the fpm and f2py programs
-  #fpm_exe = find_program('fpm', required: true)
-  #f2py_exe = python.find_program('f2py', required: true)
-  f2py_exe = find_program('f2py', required: true)
+  # --- FIN DE LA CONFIGURACIÓN DE NUMPY ---
+  #if openblas_dep.found()
+  #  message('openblas environment detected correctly.')
+  #  list_dep = [py_dep, mpi_dep, quadmath_dep, openblas_dep, lapack_dep, blas_dep]
+  #else
+  #  warning('No openblas found.')
+    list_dep = [py_dep, mpi_dep, quadmath_dep, lapack_dep, blas_dep]
+  #endif
+---------------
 
 
-  # Define the build directory for fpm
-  #fpm_build_dir = meson.build_root() / 'fpm_build'
-
-# --- BLAS/LAPACK Dependencies ---
-# Meson will attempt to automatically detect LAPACK and BLAS.
-# You don't need 'lapack_opt' as in numpy.distutils.
-# If detection fails, you can pass configuration options to Meson
-# (e.g., -Dblas_args='-L/path/to/blas -lblas').
-lapack_dep = dependency('lapack', required : true)
-blas_dep = dependency('blas', required : true)
-
-# Look for the OpenMP library if it is needed for parallelization.
-openmp_dep = dependency('openmp', required: true)
-
-# --- MPI Detection ---
-# This overrides the logic in os.environ["MPICC"] and os.popen("%s -show" % mpicc).
-# Meson has a built-in MPI module.
-mpi_args = []
-mpi_link_args = []
-mpi_compile_args = []
-has_mpi = false
-
-# Attempts to find the MPI dependency.
-# You can specify a specific MPI compiler with the 'mpi_compiler' parameter
-# or, if you want, a specific Fortran compiler with 'mpi_fortran_compiler'.
-# For OpenMPI, IntelMPI, MPICH, etc., Meson usually finds it automatically.
-#mpi_dep = dependency('mpi', required: false, language: ['c', 'fortran'])
-mpi_dep = dependency('mpi', required: false)
-
-if mpi_dep.found()
-  message('MPI environment detected correctly.')
-  has_mpi = true
-  # Meson handles adding appropriate flags. We just add the define.
-  # If you need specific MPI flags beyond what Meson adds automatically,
-  # you can get them via mpi_dep.get_compile_args() and mpi_dep.get_link_args()
-  # and add them to extra_compile_args/extra_link_args.
-  mpi_compile_args += ['-D_MPI']
-else
-  # Here you can add warning logic if MPI is not found.
-  # Meson prints a warning if required: true and it is not found.
-  # For required: false, you can print your own warning.
-  warning('No MPI compiler found, please ensure MPI is installed and configured.')
-  warning('If you wish to activate MPI acceleration, consider setting MPICC environment variable or providing Meson with appropriate flags.')
-endif
-
-# --- Python 2/3 Detection (not as relevant anymore, but translated) ---
-# In Meson, this would be done based on the Python version Meson is using.
-# Since Python 2 is EOL, this check is generally not needed.
-# However, if you want to keep the flag:
-#py2_flag = []
-#if py_dep.version().version_compare('<3.0')
-#  message('Running on Python 2, adding the flag -D_PYTHON2')
-#  py2_flag += ['-D_PYTHON2']
-#endif
 
 # --- Common Flags ---
 common_fortran_flags = ['-cpp', '-fopenmp']
@@ -109,19 +108,9 @@ common_link_flags = ['-fopenmp'] # For OpenMP
 # This compiles and links your Fortran module with the Python, LAPACK, BLAS, and MPI dependencies
 # Note: The Fortran extension will generate a .so or .pyd file that Python can import.
 
-# Use fpm to build and install your Fortran sources
-#run_command(
-#    fpm_exe,
-#    'install',
-#    '--flag', ['-g', '-fPIC', '-O2', '-fopenmp'],
-#    '--prefix', fpm_build_dir,
-#    check : true
-#)
-
-
 # --- La extensión SCHAModules ---
-# Estas son las fuentes de Fortran que serán procesadas por f2py
-schamodules_sources = files(
+
+schamodules_sources = [
   'SCHAModules/module_stochastic.f90',
   'SCHAModules/module_new_thermodynamic.f90',
   'SCHAModules/module_anharmonic.f90',
@@ -139,58 +128,16 @@ schamodules_sources = files(
   'SCHAModules/get_v4.f90',
   'SCHAModules/get_odd_straight_with_v4.f90'
   # ,'SCHAModules/module_polarization.f90'
-)
+]
 
-# Usa f2py para crear el wrapper de C
-SCHAModules_wrapper = custom_target(
-    'schamodules_f2py_wrapper',
-    input: schamodules_sources,
-    output: 'schamodulesmodule.c',
-    #output: 'schamodules-f2pywrappers.c',
-    command: [
-        f2py_exe,
-        '-m', 'schamodules', # El nombre del módulo
-        '@INPUT@',
-        '--quiet',
-        '--lower'
-    ],
-    build_by_default: true
+py.extension_module('SCHAModules',
+    schamodules_sources,
+#    f2py_c_source, # <- Cambio aplicado
+#    c_args: ['-DF2PY_SETUP_RUN'], # <--- Solucinar "_npy_f2py_ARRAY_API"
+    include_directories: inc_np,
+    dependencies: list_dep,
+    install: true
 )
-# Crea el módulo de extensión de Python
-py_sschamodules_ext = python_installation.extension_module(
-    'SCHAModules', # Nombre del módulo resultante
-    # Ahora pasamos el wrapper de C generado y la librería estática de fpm
-    [SCHAModules_wrapper,schamodules_sources],
-    #fpm_build_dir / 'lib' / 'libschamodules.a',
-    install: true,
-    include_directories: include_dirs,
-    #[
-    #    include_directories(numpy_incdir),
-    #    fpm_build_dir / 'include' # Directorio de inclusión para módulos Fortran
-    #],
-    dependencies: [lapack_dep, blas_dep, mpi_dep, py_dep],
-    link_args: ['-fopenmp'],
-    fortran_args: ['-cpp'],
-    install_rpath: '$ORIGIN/..'
-)
-
-
-# Meson's `extension_module` function for Python handles much of the magic.
-# 'SCHAModules' will be the name of the resulting Python module.
-#py_mod_schamodules = python_installation.extension_module(
-#  'SCHAModules',
-#  schamodules_sources,
-  # Make sure BLAS/LAPACK dependencies are linked correctly
-#  dependencies : [lapack_dep, blas_dep, mpi_dep],
-  # Fortran-specific flags
-#  fortran_args : common_fortran_flags,
-#  link_args : common_link_flags,
-  # Add -fPIC for Linux if needed (Meson usually handles this)
-  # This is the equivalent of extra_f90_compile_args and extra_link_args
-  # in setup.py for the Fortran module.
-#  include_directories: include_directories(numpy_incdir),
-#  install_rpath: '$ORIGIN/..'
-#)
 
 # --- Module odd_HP (C) ---
 # Uncomment and adapt if you want to include this module.
@@ -232,7 +179,7 @@ py_sschamodules_ext = python_installation.extension_module(
 
 # install_subdir('Modules', install_dir : join_paths(get_option('prefix'), 'share', 'python-sscha', 'Modules'))
 # install_subdir('Modules', install_dir : 'share', strip_directory : false)   <-- Not the best option
-# install_subdir('Modules', install_dir : python_installation.get_install_dir()) <-- .get_install_dir() gives the python installation place for libraries
+# install_subdir('Modules', install_dir : py.get_install_dir()) <-- .get_install_dir() gives the python installation place for libraries
 
 install_data(
   'Modules/__init__.py',
@@ -251,35 +198,21 @@ install_data(
   'Modules/SchaMinimizer.py',
   'Modules/Tools.py',
   'Modules/Utilities.py',
-  install_dir: python_installation.get_install_dir() / 'python-sscha',
+  install_dir: py.get_install_dir() / 'python-sscha',
 )
 
 # --- Installing Scripts ---
 # Meson is great for installing scripts and making them executable.
 # Scripts will be installed in the `bin` directory of the Python environment (e.g., venv/bin/).
-#executable(
-#  'scripts/sscha',
-#  'scripts/cluster_check.x',
-#  'scripts/plot_frequencies.py',
-#  'scripts/sscha-plot-data.py',
-#  'scripts/static-vc-relax.pyx', # Si esto es un script ejecutable directamente
-#  'scripts/read_incomplete_ensemble.py'
-#, install : true)
-#install_data = (
-#  [
-#  'scripts/sscha',
-#  'scripts/cluster_check.x',
-#  'scripts/plot_frequencies.py',
-#  'scripts/sscha-plot-data.py',
-#  'scripts/static-vc-relax.pyx')#, # Si esto es un script ejecutable directamente
-#  'scripts/read_incomplete_ensemble.py'
-#  ],
-#  install_dir: get_option('bindir')
-#  )
 
-#foreach s : install_scripts
-#  install_data(s, install_dir : python.get_install_subdir() / '..' / 'bin') # Installs in bin
-#endforeach
+py.install_sources([
+  'scripts/sscha',
+  'scripts/cluster_check.x',
+  'scripts/plot_frequencies.py',
+  'scripts/sscha-plot-data.py',
+  'scripts/static-vc-relax.pyx',
+  'scripts/read_incomplete_ensemble.py'
+])
 
 # --- Copy package data (e.g. *.jl) ---
 # This emulates package_data={"": ["*.jl"]}
@@ -287,7 +220,7 @@ install_data(
 # and copy the .jl files there.
 install_data(
   ['Modules/fourier_gradient.jl'], # List the .jl files you need
-  install_dir : python_installation.get_install_dir() / 'python-sscha'
+  install_dir : py.get_install_dir() / 'python-sscha'
 )
 # If there are many .jl files in multiple subdirectories,
 # you would need to use 'install_subdir' or list them all explicitly.
@@ -301,28 +234,6 @@ install_data(
 # configure_file(input: 'src/my_template.py.in',
 # output: 'my_module/version.py',
 # configuration: conf)
-
-# Define el intérprete de Python
-#python = find_program('python3')
-
-#install_data([
-#  'scripts/sscha',
-#  'scripts/cluster_check.x',
-#  'scripts/plot_frequencies.py',
-#  'scripts/sscha-plot-data.py',
-#  'scripts/static-vc-relax.pyx',
-#  'scripts/read_incomplete_ensemble.py'
-#],
-#install_dir: get_option('bindir')
-#)
-python_installation.install_sources([
-  'scripts/sscha',
-  'scripts/cluster_check.x',
-  'scripts/plot_frequencies.py',
-  'scripts/sscha-plot-data.py',
-  'scripts/static-vc-relax.pyx',
-  'scripts/read_incomplete_ensemble.py'
-])
 
 
 # Establece los test con pytest. (necesita tener pytest instalado)
