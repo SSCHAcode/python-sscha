@@ -21,7 +21,7 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        pip install meson ninja meson-python numpy scipy ase pytest fpm
+        pip install meson ninja meson-python numpy scipy ase pytest
 
     - name: Setup build directory
       run: meson setup builddir
