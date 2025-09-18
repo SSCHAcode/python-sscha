@@ -2,7 +2,7 @@ project('python-sscha',
   ['c','fortran'],
   version : '1.4.2',
   license: 'GPL',
-  meson_version: '>= 1.1.0',
+  meson_version: '>= 1.1.0', # <- set min version of meson.
   default_options : [
         'warning_level=1',
         'buildtype=release',
@@ -130,7 +130,7 @@ schamodules_sources = [
 ## Generate the C wrapper with f2py using a custom target
 #f2py_SCHAModules_target = custom_target('SCHAModules-f2py-wrapper',
 #    input: schamodules_sources,
-#    output: 'SCHAModules-f2py.c',
+#    output: ['SCHAModules-f2py.c','SCHAModules-f2py-wrapper.f'],
 #    command: [
 #        py.full_path(), '-m', 'numpy.f2py',
 #        '--backend', 'meson',
@@ -143,8 +143,9 @@ schamodules_sources = [
 #    install: false
 #)
 py.extension_module('SCHAModules',
+  # [
     schamodules_sources,
-  #   f2py_SCHAModules_target,
+  #   f2py_SCHAModules_target],
 #    f2py_c_source, # <- Cambio aplicado
 #    c_args: ['-DF2PY_SETUP_RUN'], # <--- Solucinar "_npy_f2py_ARRAY_API"
     include_directories: inc_np,
