@@ -128,18 +128,18 @@ schamodules_sources = [
   # ,'SCHAModules/module_polarization.f90'
 ]
 ## Generate the C wrapper with f2py using a custom target
-#f2py_SCHAModules_target = custom_target('SCHAModules-f2py-wrapper',
-#    input: schamodules_sources,
-#    output: ['SCHAModulesmodule.c','SCHAModules-f2pywrappers2.f90'],
-##    command: [py.full_path(), '-m', 'numpy.f2py', '--backend', 'meson',
-##        '--dep', 'mpi', '--quiet', '-c', '@INPUT0@', '-m', 'SCHAModules'],
-#    command : [py, '-m', 'numpy.f2py', '@INPUT@', '-m', 'SCHAModules', '--lower'],
-#    install: false
-#)
+f2py_SCHAModules_target = custom_target('SCHAModules-f2py-wrapper',
+    input: schamodules_sources,
+    output: ['SCHAModulesmodule.c','SCHAModules-f2pywrappers2.f90'],
+#    command: [py.full_path(), '-m', 'numpy.f2py', '--backend', 'meson',
+#        '--dep', 'mpi', '--quiet', '-c', '@INPUT0@', '-m', 'SCHAModules'],
+    command : [py, '-m', 'numpy.f2py', '@INPUT@', '-m', 'SCHAModules', '--lower'],
+    install: false
+)
 py.extension_module('SCHAModules',
-  # [
+   [
     schamodules_sources,
-  #   f2py_SCHAModules_target],
+     f2py_SCHAModules_target],
 #    f2py_c_source, # <- Cambio aplicado
 #    c_args: ['-DF2PY_SETUP_RUN'], # <--- Solucinar "_npy_f2py_ARRAY_API"
     include_directories: inc_np,
