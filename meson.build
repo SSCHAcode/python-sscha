@@ -126,9 +126,24 @@ schamodules_sources = [
   'SCHAModules/get_odd_straight_with_v4.f90'
   # ,'SCHAModules/module_polarization.f90'
 ]
-
+## Generate the C wrapper with f2py using a custom target
+#f2py_SCHAModules_target = custom_target('SCHAModules-f2py-wrapper',
+#    input: schamodules_sources,
+#    output: 'SCHAModules-f2py.c',
+#    command: [
+#        py.full_path(), '-m', 'numpy.f2py',
+#        '--backend', 'meson',
+#        '--dep', 'mpi',
+#        '--quiet',
+#        '-c',
+#        '@INPUT0@',
+#        '-m', 'SCHAModules'
+#    ],
+#    install: false
+#)
 py.extension_module('SCHAModules',
     schamodules_sources,
+  #   f2py_SCHAModules_target,
 #    f2py_c_source, # <- Cambio aplicado
 #    c_args: ['-DF2PY_SETUP_RUN'], # <--- Solucinar "_npy_f2py_ARRAY_API"
     include_directories: inc_np,
