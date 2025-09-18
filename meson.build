@@ -2,6 +2,7 @@ project('python-sscha',
   ['c','fortran'],
   version : '1.4.2',
   license: 'GPL',
+  meson_version: '>= 1.1.0',
   default_options : [
         'warning_level=1',
         'buildtype=release',
