@@ -88,6 +88,10 @@ project('python-sscha',
   ).stdout().strip()
 
   inc_np = include_directories(incdir_numpy, incdir_f2py)
+  np_dep = declare_dependency(include_directories: inc_np)
+
+  inc_f2py = include_directories(incdir_f2py)
+  fortranobject_c = incdir_f2py / 'fortranobject.c'
 
   # --- END OF NUMPY CONFIGURATION ---
   if openblas_dep.found()
@@ -139,7 +143,7 @@ f2py_SCHAModules_target = custom_target('SCHAModules-f2py-wrapper',
 py.extension_module('SCHAModules',
    [
     schamodules_sources,
-     f2py_SCHAModules_target],
+     f2py_SCHAModules_target, fortranobject_c],
     include_directories: inc_np,
     dependencies: list_dep,
     install: true
