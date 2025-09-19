@@ -1,5 +1,5 @@
 [build-system]
-requires = ["meson-python>=0.13.0", "meson>=1.1.0", "numpy", "cellconstructor","meson-python", "numpy>=1.20.0"]
+requires = ["meson-python>=0.13.0", "meson>=1.1.0", "numpy>=1.20.0", "cellconstructor","meson-python"]
 build-backend = "mesonpy"
 
 [project]
