@@ -16,12 +16,12 @@ project('python-sscha',
   use_mkl = get_option('use_mkl')
 
   # --- System and Python Dependencies ---
-  # Encuentra las instalaciones necesarias
+  # Find the necessary installations
   py = import('python').find_installation(pure: false)
   py_dep = py.dependency()
   fc = meson.get_compiler('fortran')
 
-  # Dependencias adicionales
+  # Additional dependencies
 
   # --- BLAS/LAPACK Dependencies ---
   # Meson will attempt to automatically detect LAPACK and BLAS.
@@ -71,17 +71,17 @@ project('python-sscha',
     warning('No MPI compiler found, please ensure MPI is installed and configured.')
     warning('If you wish to activate MPI acceleration, consider setting MPICC environment variable or providing Meson with appropriate flags.')
   endif
-  # Busca la librería quadmath, si está disponible
+  # Find the quadmath library, if available
   quadmath_dep = fc.find_library('quadmath', required: false)
 
-  # --- CONFIGURACIÓN DE NUMPY ---
-  # Obtiene la ruta de los directorios de cabecera de NumPy y f2py usando el comando de Python
+  # --- NUMPY CONFIGURATION ---
+  # Gets the path to the NumPy and f2py header directories using the Python command
   incdir_numpy = run_command(py,
       ['-c', 'import numpy; print(numpy.get_include())'],
       check : true
   ).stdout().strip()
 
-  # f2py también requiere la cabecera fortranobject.h
+  # f2py also requires the fortranobject.h header
   incdir_f2py = run_command(py,
       ['-c', 'import numpy.f2py; print(numpy.f2py.get_include())'],
       check : true
@@ -89,14 +89,14 @@ project('python-sscha',
 
   inc_np = include_directories(incdir_numpy, incdir_f2py)
 
-  # --- FIN DE LA CONFIGURACIÓN DE NUMPY ---
-  #if openblas_dep.found()
-  #  message('openblas environment detected correctly.')
-  #  list_dep = [py_dep, mpi_dep, quadmath_dep, openblas_dep, lapack_dep, blas_dep]
-  #else
-  #  warning('No openblas found.')
+  # --- END OF NUMPY CONFIGURATION ---
+  if openblas_dep.found()
+    message('openblas environment detected correctly.')
+    list_dep = [py_dep, mpi_dep, quadmath_dep, openblas_dep, lapack_dep, blas_dep]
+  else
+    warning('No openblas found.')
     list_dep = [py_dep, mpi_dep, quadmath_dep, lapack_dep, blas_dep]
-  #endif
+  endif
 
 # --- Common Flags ---
 common_fortran_flags = ['-cpp', '-fopenmp']
@@ -106,7 +106,7 @@ common_link_flags = ['-fopenmp'] # For OpenMP
 # This compiles and links your Fortran module with the Python, LAPACK, BLAS, and MPI dependencies
 # Note: The Fortran extension will generate a .so or .pyd file that Python can import.
 
-# --- La extensión SCHAModules ---
+# --- SCHAModules extension ---
 
 schamodules_sources = [
   'SCHAModules/module_stochastic.f90',
@@ -140,8 +140,6 @@ py.extension_module('SCHAModules',
    [
     schamodules_sources,
      f2py_SCHAModules_target],
-#    f2py_c_source, # <- Cambio aplicado
-#    c_args: ['-DF2PY_SETUP_RUN'], # <--- Solucinar "_npy_f2py_ARRAY_API"
     include_directories: inc_np,
     dependencies: list_dep,
     install: true
@@ -244,7 +242,7 @@ install_data(
 # configuration: conf)
 
 
-# Establece los test con pytest. (necesita tener pytest instalado)
+# Set the tests by pytest.
 pytest_exe = find_program('pytest', required: false)
 
 if pytest_exe.found()
@@ -252,5 +250,5 @@ if pytest_exe.found()
        args : ['-v', '-m', 'not release', 'tests'],
        workdir : meson.project_source_root())
 else
-  message('pytest no encontrado; se omiten tests con pytest.')
+  message('pytest not found; pytest tests are skipped.')
 endif
