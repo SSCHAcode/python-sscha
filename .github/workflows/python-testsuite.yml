@@ -53,10 +53,12 @@ jobs:
         sudo apt-get install git gfortran libblas-dev liblapack-dev
         git clone https://github.com/mesonepigreco/CellConstructor.git
         cd CellConstructor
-        python setup.py install --user
+        # python setup.py install --user
+        pip install -e .
         cd ..
 
-        python setup.py install --user
+        # python setup.py install --user
+        pip install -e .
 
         # Install julia requirements
         python -c 'import julia; julia.install()'
