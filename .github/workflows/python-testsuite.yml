@@ -54,11 +54,11 @@ jobs:
         git clone https://github.com/mesonepigreco/CellConstructor.git
         cd CellConstructor
         # python setup.py install --user
-        pip install -e .
+        pip install .
         cd ..
 
         # python setup.py install --user
-        pip install -e .
+        pip install .
 
         # Install julia requirements
         python -c 'import julia; julia.install()'
