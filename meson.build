@@ -187,7 +187,26 @@ py.extension_module('SCHAModules',
 # install_subdir('Modules', install_dir : 'share', strip_directory : false)   <-- Not the best option
 # install_subdir('Modules', install_dir : py.get_install_dir()) <-- .get_install_dir() gives the python installation place for libraries
 
-install_data(
+#install_data(
+#  'Modules/__init__.py',
+#  'Modules/AdvancedCalculations.py',
+#  'Modules/aiida_ensemble.py',
+#  'Modules/Calculator.py',
+#  'Modules/Cluster.py',
+#  'Modules/Dynamical.py',
+#  'Modules/Ensemble.py',
+##  'Modules/fourier_gradient.jl',
+#  'Modules/LocalCluster.py',
+#  'Modules/Minimizer.py',
+#  'Modules/Optimizer.py',
+#  'Modules/Parallel.py',
+#  'Modules/Relax.py',
+#  'Modules/SchaMinimizer.py',
+#  'Modules/Tools.py',
+#  'Modules/Utilities.py',
+#  install_dir: py.get_install_dir() / 'python-sscha',
+#)
+py.install_sources([
   'Modules/__init__.py',
   'Modules/AdvancedCalculations.py',
   'Modules/aiida_ensemble.py',
@@ -203,8 +222,9 @@ install_data(
   'Modules/Relax.py',
   'Modules/SchaMinimizer.py',
   'Modules/Tools.py',
-  'Modules/Utilities.py',
-  install_dir: py.get_install_dir() / 'python-sscha',
+  'Modules/Utilities.py'
+  ],
+  subdir: 'python-sscha',
 )
 
 # --- Installing Scripts ---
