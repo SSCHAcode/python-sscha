@@ -228,7 +228,7 @@ py.install_sources([
   'Modules/Tools.py',
   'Modules/Utilities.py'
   ],
-  subdir: 'python-sscha',
+  subdir: 'sscha',
 )
 
 # --- Installing Scripts ---
@@ -236,7 +236,7 @@ py.install_sources([
 # Scripts will be installed in the `bin` directory of the Python environment (e.g., venv/bin/).
 
 py.install_sources([
-  'scripts/sscha',
+  'scripts/sscha.x',
   'scripts/cluster_check.x',
   'scripts/plot_frequencies.py',
   'scripts/sscha-plot-data.py',
@@ -250,7 +250,7 @@ py.install_sources([
 # and copy the .jl files there.
 install_data(
   ['Modules/fourier_gradient.jl'], # List the .jl files you need
-  install_dir : py.get_install_dir() / 'python-sscha'
+  install_dir : py.get_install_dir() / 'sscha'
 )
 # If there are many .jl files in multiple subdirectories,
 # you would need to use 'install_subdir' or list them all explicitly.
