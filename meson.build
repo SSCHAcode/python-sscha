@@ -134,7 +134,7 @@ schamodules_sources = [
 ## Generate the C wrapper with f2py using a custom target
 f2py_SCHAModules_target = custom_target('SCHAModules-f2py-wrapper',
     input: schamodules_sources,
-    output: ['SCHAModulesmodule.c','SCHAModules-f2pywrappers2.f90'],
+    output: ['SCHAModulesmodule.c','SCHAModules-f2pywrappers.f','SCHAModules-f2pywrappers2.f90'],
 #    command: [py.full_path(), '-m', 'numpy.f2py', '--backend', 'meson',
 #        '--dep', 'mpi', '--quiet', '-c', '@INPUT0@', '-m', 'SCHAModules'],
     command : [py, '-m', 'numpy.f2py', '@INPUT@', '-m', 'SCHAModules', '--lower'],
