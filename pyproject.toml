@@ -36,4 +36,4 @@ Repository = "https://github.com/mesonepigreco/python-sscha"
 # By default, meson-python takes care of using the virtual environment if it exists.
 
 # build-args = ["-Dbuildtype=debug"] # Uncomment for a debug build
-# setup-args = ["--prefix=/opt/cellconstructor"] # For a non-standard installation
+# setup-args = ["--prefix=/opt/python-sscha"] # For a non-standard installation
