@@ -25,9 +25,9 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://sscha.eu/"
-Repository = "https://github.com/mesonepigreco/python-sscha"
+Repository = "https://github.com/SSCHAcode/python-sscha"
 # Documentation = "https://documentacion.readthedocs.io/"
-# Issues = "https://github.com/mesonepigreco/python-sscha/issues"
+Issues = "https://github.com/SSCHAcode/python-sscha/issues"
 
 # --- Meson-python specific configuration (Optional but useful) ---
 [tool.meson-python]
