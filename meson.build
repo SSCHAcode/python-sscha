@@ -1,6 +1,6 @@
 project('python-sscha',
   ['c','fortran'],
-  version : '1.4.2',
+  version : '1.5.0',
   license: 'GPL',
   meson_version: '>= 1.1.0', # <- set min version of meson.
   default_options : [

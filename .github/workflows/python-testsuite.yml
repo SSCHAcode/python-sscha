@@ -51,7 +51,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install git gfortran libblas-dev liblapack-dev
-        git clone https://github.com/mesonepigreco/CellConstructor.git
+        git clone https://github.com/SSCHAcode/CellConstructor.git
         cd CellConstructor
         # python setup.py install --user
         pip install .
