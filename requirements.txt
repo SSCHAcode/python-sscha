@@ -4,4 +4,4 @@ scipy
 ase
 spglib<=2.2
 julia
-cellconstructor
+cellconstructor>=1.5.0
