@@ -12,7 +12,7 @@ The SSCHA code comes as a python library, with computationally intense part spee
 
 
 ```
-conda create -n sscha -c conda-forge python=3.10 gfortran=11 libblas lapack openmpi julia openmpi-mpicc pip=23 numpy=1.26 scipy=1.10 spglib=2.2 setuptools=64
+conda create -n sscha -c conda-forge python=3.12 gfortran=11 libblas lapack openmpi julia openmpi-mpicc pip=23 numpy=1.26 scipy=1.10 spglib=2.2 setuptools=64
 conda activate sscha
 pip install ase julia mpi4py
 pip install cellconstructor python-sscha tdscha
@@ -89,7 +89,7 @@ First make sure you have anaconda installed [(install anaconda)](https://www.ana
 The following commands are sufficient to install the full sscha suite and its dependencies.
 
 ```
-conda create -n sscha -c conda-forge python=3.10 gfortran=11 libblas lapack openmpi julia openmpi-mpicc pip=23 numpy=1.26 scipy=1.10 spglib=2.2 setuptools=64
+conda create -n sscha -c conda-forge python=3.12 gfortran=11 libblas lapack openmpi julia openmpi-mpicc pip=23 numpy=1.26 scipy=1.10 spglib=2.2 setuptools=64
 conda activate sscha
 pip install ase julia mpi4py
 pip install cellconstructor python-sscha tdscha
