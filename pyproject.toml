@@ -9,7 +9,7 @@ description = "Python implementation of the sscha code"
 authors = [{name = "Lorenzo Monacelli"}] # Put here email
 readme = "README.md"
 license = {file = "LICENSE.txt"}
-requires-python = ">=3.12" # Ajusta según las versiones de Python que soportes
+requires-python = ">=3.8,<=3.12" # Updated to specify Python 3.8 to 3.12
 dependencies = [
     "numpy",
     "ase",

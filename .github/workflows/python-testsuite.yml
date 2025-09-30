@@ -52,12 +52,12 @@ jobs:
         sudo apt-get update
         sudo apt-get install git gfortran libblas-dev liblapack-dev
         git clone https://github.com/SSCHAcode/CellConstructor.git
+        pip install meson meson-python ninja
         cd CellConstructor
-        # python setup.py install --user
-        pip install .
+        pip install --no-build-isolation .
         cd ..
 
-        # python setup.py install --user
+        # python setup.py install --use
         pip install .
 
         # Install julia requirements
