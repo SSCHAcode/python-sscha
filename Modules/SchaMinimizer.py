@@ -216,6 +216,7 @@ class SSCHA_Minimizer(object):
 
         # Setup the meaningful_factor
         self.meaningful_factor = meaningful_factor
+        self.abs_conv_thr = 1e-8 # Below this number the minimization is considered converged
 
         # Setup the minimization algorithm
         self.minimization_algorithm = minimization_algorithm
@@ -935,6 +936,7 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
         print (" number of configurations = ", self.ensemble.N)
         print (" max number of steps (infinity if negative) = ", self.max_ka)
         print (" meaningful factor = ", self.meaningful_factor)
+        print (" absolute convergence threshold = ", self.abs_conv_thr)
         print (" gradient to watch (for stopping) = ", self.gradi_op)
         print (" Kong-Liu minimum effective sample size = ", self.ensemble.N * self.kong_liu_ratio)
         print (" (Kong-Liu ratio = ", self.kong_liu_ratio, ")")
@@ -1590,8 +1592,8 @@ You can try to fix this error setting the {} variable of {} class to True.
                 total_mask.pop(np.argmax(scalar))
 
 
-            print ("\n".join(["%d) %.4f  | %.4f cm-1" % (i, x, wold[i]) for i, x in enumerate(ws)]))
-            print ()
+            print("\n".join(["%d) %.4f  | %.4f cm-1" % (i, x, wold[i]) for i, x in enumerate(ws)]))
+            print()
             return True
         return False
 
@@ -1619,6 +1621,11 @@ You can try to fix this error setting the {} variable of {} class to True.
 
         gc_cond = (last_gc < last_gc_err * self.meaningful_factor)
         gw_cond = (last_gw < last_gw_err * self.meaningful_factor)
+
+        # Add a condition on the absolute value of the gradient
+        # (For perfectly harmonic systems, the error goes to zero)
+        gc_cond = gc_cond or (last_gc < self.abs_conv_thr)
+        gw_cond = gw_cond or (last_gw < self.abs_conv_thr)
 
         total_cond = False
 

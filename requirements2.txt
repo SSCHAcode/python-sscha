@@ -3,3 +3,4 @@ numpy
 scipy
 ase==3.16.0
 spglib<=2.2
+cellconstructor
