@@ -68,7 +68,7 @@ For python, we strongly recommend using the anaconda distribution, that already 
 
 The numpy, scipy and matplotlib are python packages. These are usually provided with a new installation
 of python distributions like anaconda. Lapack and Blas are needed for compiling the FORTRAN code (together with a FORTRAN compiler like gfortran).
-In many Linux distributions like ubuntu they can be installed as 
+In many Linux distributions like ubuntu they can be installed as
 
 .. code-block:: console
 
@@ -76,7 +76,7 @@ In many Linux distributions like ubuntu they can be installed as
 
 
 
-Note that this specific command may change in time. 
+Note that this specific command may change in time.
 
 
 Together with these mandatory requirements (otherwise, the code will not compile correctly or raise an exception at the startup), we
@@ -90,7 +90,7 @@ If these packages are available, they will enable the automatic cluster/local ca
 To install all the python dependencies (and recommended) automatically, you may just run:
 
 .. code-block:: console
-   
+
    pip install -r requirements.txt
 
 
@@ -102,8 +102,8 @@ Installation from pip
 The easiest way to install python-sscha (and CellConstructor) is through the python package manager:
 
 .. code-block:: console
-   
-   pip install python-sscha 
+
+   pip install python-sscha
 
 
 
@@ -116,43 +116,121 @@ Installation from source
 ------------------------
 
 Once all the dependences of the codes are satisfied, you can unzip the source code downloaded from the website.
-Then run, inside the directory that contains the setup.py script, the following command:
+Then run, inside the directory that contains the meson.build script, the following command:
 
 .. code-block:: console
 
-   python setup.py install
+   pip install .
 
 
 As for the pip installation, you may append the --user option to install the package only for the user (without requiring administrator powers).
+
+An "editable" install is highly recommended for developers. It allows you to modify the source code and have the changes reflected immediately without needing to reinstall.
+.. code-block:: console
+
+   pip install -e .
 
 
 Install with Intel FORTRAN compiler
 -----------------------------------
 
-The setup.py script works automatically with the GNU FORTRAN compiler. However, due to some differences in linking lapack,
-to use the intel compiler you need to edit a bit the setup.py script:
+Meson works automatically with several FORTRAN compilers, including Intel FORTRAN. However, due to some differences in linking lapack,
+to use the intel compiler you need to:
 
-In this case, you need to delete the lapack linking from the
-setup.py and include the -mkl as linker option.
-Note that you must force to use the same liker compiler as the one used for the compilation. 
+Ensure MKL is installed in your Conda environment:
+.. code-block:: console
+
+   conda install mkl mkl-devel
+
+You can pass Meson options through pip's \--config-settings flag.
+.. code-block:: console
+
+    pip install . --config-settings=--setup-args=-Duse_mkl=true
+
+Or for an editable install:
+.. code-block:: console
+    pip install -e . --config-settings=--setup-args=-Duse_mkl=true
 
 Install with a specific compiler path
 -------------------------------------
 
-This can be achieved by specifying the environment variables on which setup.py relies:
+Method 1: Using Environment Variables (Recommended for most cases)
+------------------------------------------------------------------
 
-1. CC (C compiler)
-2. FC (Fortran compiler)
-3. LDSHARED (linking)
+Meson automatically detects compilers using standard environment variables. You can set these variables before running the installation command. This is the simplest way to specify a compiler for a single build.
 
-If we want to use a custom compiler in /path/to/fcompiler we may run the setup as:
+The key variables are:
+
+    CC: Specifies the C compiler executable.
+
+    CXX: Specifies the C++ compiler executable.
+
+    FC: Specifies the Fortran compiler executable.
+
+Step-by-Step Instructions
+
+1. Open your terminal. All commands must be run in the same session, as environment variables are typically not permanent.
+2. Set the environment variables to point to your desired compilers.
+
+Example for C (using a specific gcc):
 
 .. code-block:: console
+    export CC=/path/to/my/custom/gcc
 
-   FC=/path/to/fcompiler LDSHARED=/path/to/fcompiler python setup.py install
+Example for Fortran (using a specific gfortran):
 
+.. code-block:: console
+    export FC=/path/to/my/custom/gfortran
 
+Example for C++ (if the project needed it):
 
-A specific setup.py script is provided to install it easily in FOSS clusters.
+.. code-block:: console
+    export CXX=/path/to/my/custom/g++
 
+3. Combine them as needed. For this project, you will likely need to set CC and FC.
 
+# Example using compilers from a specific toolchain
+.. code-block:: console
+    export CC=/usr/local/bin/gcc-11
+    export FC=/usr/local/bin/gfortran-11
+
+4. Run the pip installation. With the variables set, run pip install from the project's root directory. pip will pass the environment variables down to Meson.
+
+.. code-block:: console
+    # Ensure you are in the project's root directory (where pyproject.toml is)
+    pip install .
+
+The build process will now use the compilers you specified instead of the system defaults.
+
+Method 2: Using a Meson Cross File (Advanced & Reproducible)
+------------------------------------------------------------
+
+For a more permanent or reproducible setup (e.g., in CI/CD pipelines or complex environments), a Meson "cross file" is the best practice. This file explicitly defines the toolchain.
+Step-by-Step Instructions
+
+1. Create a cross file. In your project's root directory, create a file named native-toolchain.ini (the name can be anything).
+
+2. Edit the file to specify the paths to your compilers in the [binaries] section.
+
+Example native-toolchain.ini:
+
+.. code-block:: console
+    # native-toolchain.ini
+    # Defines the compilers to use for the build.
+
+    [binaries]
+    c = '/path/to/my/custom/gcc'
+    fortran = '/path/to/my/custom/gfortran'
+
+    # If you also needed C++, you would add:
+    # cpp = '/path/to/my/custom/g++'
+
+Note: The keys are c, cpp, and fortran.
+
+3. Run the pip installation with meson-args. You can instruct pip to pass configuration settings to meson-python, which in turn passes them to Meson. We use this to specify our cross file.
+
+.. code-block:: console
+    # The --native-file option tells Meson which toolchain to use.
+    pip install . --config-settings=meson-args="--native-file=native-toolchain.ini"
+
+This method is more explicit and less prone to errors from shell configurations. It ensures that anyone building the project can easily use the exact same toolchain by sharing the native-toolchain.ini file.
