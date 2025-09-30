@@ -8,11 +8,11 @@ See more info on the webpage:
 
 ## Easy installation through Anaconda
 
-The SSCHA code comes as a python library, with computationally intense part speedup with C, Fortran and Julia. The easiest way to install is through Anaconda ([how to install anaconda](https://www.anaconda.com/download)) 
+The SSCHA code comes as a python library, with computationally intense part speedup with C, Fortran and Julia. The easiest way to install is through Anaconda ([how to install anaconda](https://www.anaconda.com/download))
 
 
 ```
-conda create -n sscha -c conda-forge python=3.10 gfortran=11 libblas lapack openmpi julia openmpi-mpicc pip=23 numpy=1.26 scipy=1.10 spglib=2.2 setuptools=64
+conda create -n sscha -c conda-forge python=3.12 gfortran=11 libblas lapack openmpi julia openmpi-mpicc pip=23 numpy=1.26 scipy=1.10 spglib=2.2
 conda activate sscha
 pip install ase julia mpi4py
 pip install cellconstructor python-sscha tdscha
@@ -27,7 +27,7 @@ If you want the julia speedup, see the section on Manual installation to preconf
 
 ## Video lessons from  the 2023 School are available
 
-The full recordings, both of theoretical lectures, tutorials and Hands-on sessions can be found 
+The full recordings, both of theoretical lectures, tutorials and Hands-on sessions can be found
 in our youtube channel [SSCHAcode](https://www.youtube.com/@SSCHAcode>)
 
 This is the safest and best way to install the SSCHA. The first line creates a new pristine python environment with all the required libraries to compile the source code. The second line activates the newly installed environment. Then, the thrid command installs the additional dependencies, the last line compiles and install the SSCHA code.
@@ -47,7 +47,7 @@ python -c 'import julia; julia.install()'
 ```
 
 
-## Installing without Anaconda 
+## Installing without Anaconda
 
 If you do not have anaconda to handle your dependencies you need to manually compile the code.
 
@@ -76,7 +76,7 @@ The SSCHA code is a collection of 3 python packages: CellConstructor, python-ssc
 
 - [CellConstructor](https://github.com/SSCHAcode/CellConstructor>): utility to manage phonon dispersions, atomic structures and crystal symmetries
 - [sscha](https://github.com/SSCHAcode/python-sscha>) : This repository, relax with anharmonicity and compute static linear response properties.
-- [tdscha](<https://github.com/SSCHAcode/tdscha>) : Compute the dynamical linear response (Raman and IR, spectral functions) 
+- [tdscha](<https://github.com/SSCHAcode/tdscha>) : Compute the dynamical linear response (Raman and IR, spectral functions)
 
 More details about installations are in the official website [www.sscha.eu](https://sscha.eu/download>)
 
@@ -89,7 +89,7 @@ First make sure you have anaconda installed [(install anaconda)](https://www.ana
 The following commands are sufficient to install the full sscha suite and its dependencies.
 
 ```
-conda create -n sscha -c conda-forge python=3.10 gfortran=11 libblas lapack openmpi julia openmpi-mpicc pip=23 numpy=1.26 scipy=1.10 spglib=2.2 setuptools=64
+conda create -n sscha -c conda-forge python=3.12 gfortran=11 libblas lapack openmpi julia openmpi-mpicc pip=23 numpy=1.26 scipy=1.10 spglib=2.2
 conda activate sscha
 pip install ase julia mpi4py
 pip install cellconstructor python-sscha tdscha
@@ -175,3 +175,80 @@ For example
 
 For the development version of the code, subtitute the pip call with the python setup.py install.
 
+## Compiling with Meson
+
+To compile and install SSCHA with Meson, follow these typical steps:
+
+### 1. Change to the Source Directory
+
+First, open a terminal and navigate to the root directory of the project source code. This is where the `meson.build` file is located.
+
+```bash
+cd /path/to/source/root/python-sscha
+```
+
+
+### 2. Configure the Build Directory
+
+Create and configure a build directory by running:
+
+```bash
+meson setup builddir
+```
+
+or if you are in a conda env (the best option for a local installation):
+```bash
+meson setup builddir --prefix=$CONDA_PREFIX
+```
+
+if you want to use Intel MKL:
+```bash
+setup builddir -Duse_mkl=true
+```
+
+This command sets up a separate build directory (`builddir`) where all compiled files and build artifacts will be placed, keeping the source directory clean. After this, change into the build directory:
+
+```bash
+cd builddir
+```
+
+
+### 3. Compile the Project
+
+Once inside the build directory, compile the project using:
+
+```bash
+meson compile
+```
+
+This will compile the source code according to the configuration from the previous step.
+
+### 4. Run Tests (Optional)
+
+The project includes tests, you need to install pytest to work. You can run them with:
+
+```bash
+meson test
+```
+
+This step helps verify that the build works correctly.
+
+### 5. Install the Project (Optional)
+
+To install the compiled binaries, libraries, and other files system-wide (or to a custom location), run:
+
+```bash
+meson install
+```
+
+or
+
+```bash
+sudo meson install
+```
+
+You may need superuser privileges (hence `sudo`) to install to system directories.
+
+***
+
+Following these steps will help you successfully compile, test, and install SSCHA with Meson as their build system.

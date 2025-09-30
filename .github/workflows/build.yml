@@ -1,0 +1,37 @@
+name: Build and Test
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.12
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libblas-dev liblapack-dev gfortran pkg-config
+
+    - name: Install Python dependencies
+      run: |
+        pip install meson ninja meson-python numpy scipy ase pytest
+
+    - name: Setup build directory
+      run: meson setup builddir
+
+    - name: Compile
+      run: meson compile -C builddir
+
+
+#    - name: Install package
+#      run: meson install -C builddir
+
+#    - name: Run tests
+#      run: meson test -C builddir
