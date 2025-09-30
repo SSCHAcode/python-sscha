@@ -1607,6 +1607,8 @@ Error while connecting to the cluster to copy the files:
                 ensemble.all_properties[num].update(res_only_extra)
                 ensemble.energies[num] = res["energy"] / units["Ry"]
                 ensemble.forces[num, :, :] = res["forces"] / units["Ry"]
+                ensemble.force_computed[num] = True
+
                 if get_stress:
                     stress = np.zeros((3,3), dtype = np.float64)
                     stress[0,0] = res["stress"][0]
@@ -1620,6 +1622,7 @@ Error while connecting to the cluster to copy the files:
                     stress[1,0] = res["stress"][5]
                     # Remember, ase has a very strange definition of the stress
                     ensemble.stresses[num, :, :] = -stress * units["Bohr"]**3 / units["Ry"]
+                    ensemble.stress_computed[num] = True
                 success[num] = is_success
 
             self.lock.release()
