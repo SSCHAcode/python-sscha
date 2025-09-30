@@ -502,7 +502,7 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
 
 
 
-    def load(self, data_dir, population, N, verbose = False, load_displacements = True, raise_error_on_not_found = False, load_noncomputed_ensemble = False,
+    def load(self, data_dir, population, N, verbose = False, load_displacements = True, raise_error_on_not_found = False, load_noncomputed_ensemble = False, skip_extra_rows = False,
              timer=None):
         """
         LOAD THE ENSEMBLE
@@ -554,6 +554,9 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
             load_noncomputed_ensemble: bool
                 If True, it allows for loading an ensemble where some of the configurations forces and stresses are missing.
                 Note that it must be compleated before running a SCHA minimization
+            skip_extra_rows : bool
+                If True, only loads the first Nat_sc rows of the forces.
+                Useful if the parsing script reads more than the necessary rows from the calculation output.
         """
         A_TO_BOHR = 1.889725989
 
@@ -599,6 +602,12 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
         total_t_for_loading = 0
         total_t_for_sscha_ef = 0
         t_before_for = time.time()
+
+        # Avoid reading extra rows on the forces
+        maxrowforces = None
+        if skip_extra_rows:
+            maxrowforces = Nat_sc
+
         for i in range(self.N):
             # Load the structure
             structure = CC.Structure.Structure()
@@ -636,10 +645,11 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
             force_path = os.path.join(data_dir, "forces_population%d_%d.dat" % (population, i+1))
 
             if os.path.exists(force_path):
+                
                 if timer:
-                    self.forces[i,:,:] = timer.execute_timed_function(np.loadtxt, force_path) * A_TO_BOHR
+                    self.forces[i,:,:] = timer.execute_timed_function(np.loadtxt, force_path, max_rows=maxrowforces) * A_TO_BOHR
                 else:
-                    self.forces[i,:,:] = np.loadtxt(force_path) * A_TO_BOHR
+                    self.forces[i,:,:] = np.loadtxt(force_path, max_rows=maxrowforces) * A_TO_BOHR
                 self.force_computed[i] = True
             else:
                 if raise_error_on_not_found:
@@ -1037,9 +1047,10 @@ Error, the following stress files are missing from the ensemble:
                 # Add the energy
                 info += '{}={:.16f} '.format(energy_key, self.energies[i] * Rydberg)
 
-                # Add the virial stress
-                stress_data = - self.stresses[i].ravel() * CC.Units.RY_PER_BOHR3_TO_EV_PER_A3
-                info += '{}="{:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f}" '.format(stress_key, *list(stress_data))
+                # Add the virial stress only if present
+                if self.stress_computed[i]:
+                    stress_data = - self.stresses[i].ravel() * CC.Units.RY_PER_BOHR3_TO_EV_PER_A3
+                    info += '{}="{:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f} {:20.16f}" '.format(stress_key, *list(stress_data))
 
                 # Add the secription of the xyz format
                 info += 'Properties=species:S:1:pos:R:3:{}:R:3\n'.format(forces_key)
@@ -2298,7 +2309,7 @@ DETAILS OF ERROR:
         return free_energy
 
 
-    def get_free_energy_interpolating(self, target_supercell, support_dyn_coarse = None, support_dyn_fine = None, error_on_imaginary_frequency = True, return_error = False):
+    def get_free_energy_interpolating(self, target_supercell, support_dyn_coarse = None, support_dyn_fine = None, error_on_imaginary_frequency = True, return_error = False, use_lo_to_splitting = False):
         """
         GET THE FREE ENERGY IN A BIGGER CELL
         ====================================
@@ -2326,6 +2337,7 @@ DETAILS OF ERROR:
             return_error : bool
                As the normal get_free_energy, if this flag is True, the stochastic error is returned.
 
+
         Returns
         -------
             free_energy : float
@@ -2343,17 +2355,17 @@ DETAILS OF ERROR:
 
 
         # Interpolate the dynamical matrix
-        if support_dyn_fine is not None:
-            new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
-                                                    target_supercell,
-                                                    support_dyn_coarse,
-                                                    support_dyn_fine)
+        if not use_lo_to_splitting:
+            if support_dyn_fine is not None:
+                new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
+                                                        target_supercell,
+                                                        support_dyn_coarse,
+                                                        support_dyn_fine)
+            else:
+                new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
+                                                        target_supercell)
         else:
-            new_dyn = self.current_dyn.Interpolate( self.current_dyn.GetSupercell(),
-                                                    target_supercell)
-
-        #else:
-        #    new_dyn = self.current_dyn.InterpolateMesh(target_supercell, lo_to_splitting = True)
+            new_dyn = self.current_dyn.InterpolateMesh(target_supercell, lo_to_splitting = True)
 
         #print("dyn after interpolation:", new_dyn.GetSupercell())
 
