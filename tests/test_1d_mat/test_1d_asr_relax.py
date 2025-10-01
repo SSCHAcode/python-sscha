@@ -6,6 +6,11 @@ import ase, ase.calculators, ase.calculators.emt
 
 
 def test_1d_asr_relax(verbose=False):
+    # Set the current working directory
+    total_path = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(total_path)
+
+
     # Load the dynamical matrix
     dyn = CC.Phonons.Phonons("1ddyn_asr")
 
