@@ -3,6 +3,7 @@ import cellconstructor as CC, cellconstructor.Phonons
 import sscha, sscha.Ensemble, sscha.SchaMinimizer
 import sscha.Relax
 import ase, ase.calculators, ase.calculators.emt
+import sys, os
 
 
 def test_1d_asr_relax(verbose=False):
