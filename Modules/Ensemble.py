@@ -1733,7 +1733,8 @@ Error, the following stress files are missing from the ensemble:
 
         # Exclude translations
         if not self.ignore_small_w:
-            trans_original = CC.Methods.get_translations(pols_original, super_struct0.get_masses_array())
+            trans_original = super_struct0.get_asr_modes(pols_original)
+            # trans_original = CC.Methods.get_translations(pols_original, super_struct0.get_masses_array())
         else:
             trans_original = np.abs(w_original) < CC.Phonons.__EPSILON_W__
 
@@ -1750,15 +1751,14 @@ Error, the following stress files are missing from the ensemble:
 
 
         if not self.ignore_small_w:
-            trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
+            trans_mask = super_structure.get_asr_modes(pols)
+            # trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
         else:
             trans_mask = np.abs(w_new) < CC.Phonons.__EPSILON_W__
 
 
         # Check if the new dynamical matrix satisfies the sum rule
-        violating_sum_rule = (np.sum(trans_mask.astype(int)) != 3) or (np.sum(trans_original.astype(int)) != 3)
-        if self.ignore_small_w:
-            violating_sum_rule = np.sum(trans_mask.astype(int)) != np.sum(trans_original.astype(int))
+        violating_sum_rule = np.sum(trans_mask.astype(int)) != np.sum(trans_original.astype(int))
 
 
         if violating_sum_rule:
@@ -1955,7 +1955,8 @@ DETAILS OF ERROR:
 
         # Exclude translations
         if not self.ignore_small_w:
-            trans_original = CC.Methods.get_translations(pols_original, super_struct0.get_masses_array())
+            trans_original = super_struct0.get_asr_modes(pols_original)
+            # trans_original = CC.Methods.get_translations(pols_original, super_struct0.get_masses_array())
         else:
             trans_original = np.abs(w_original) < CC.Phonons.__EPSILON_W__
 
@@ -1972,15 +1973,15 @@ DETAILS OF ERROR:
 
 
         if not self.ignore_small_w:
-            trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
+            trans_mask = super_structure.get_asr_modes(pols)
+            # trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
         else:
             trans_mask = np.abs(w_new) < CC.Phonons.__EPSILON_W__
 
 
         # Check if the new dynamical matrix satisfies the sum rule
-        violating_sum_rule = (np.sum(trans_mask.astype(int)) != 3) or (np.sum(trans_original.astype(int)) != 3)
-        if self.ignore_small_w:
-            violating_sum_rule = np.sum(trans_mask.astype(int)) != np.sum(trans_original.astype(int))
+        # violating_sum_rule = (np.sum(trans_mask.astype(int)) != 3) or (np.sum(trans_original.astype(int)) != 3)
+        violating_sum_rule = np.sum(trans_mask.astype(int)) != np.sum(trans_original.astype(int))
 
 
         if violating_sum_rule:
@@ -1995,7 +1996,7 @@ Error, one dynamical matrix does not satisfy the acoustic sum rule.
 DETAILS OF ERROR:
     Number of translatinal modes in the original dyn = {}
     Number of translational modes in the target dyn = {}
-    (They should be both 3)
+    (They should be both be the same - 3 in bulk)
 """.format(np.sum(trans_original.astype(int)), np.sum(trans_mask.astype(int)))
 
             print(ERR_MSG)
@@ -2718,7 +2719,8 @@ Error while loading the julia module.
             w, pols = self.current_dyn.DiagonalizeSupercell()#supercell_dyn.DyagDinQ(0)
 
         if not self.ignore_small_w:
-            trans = CC.Methods.get_translations(pols, super_struct.get_masses_array())
+            trans = super_struct.get_asr_modes(pols)
+            # trans = CC.Methods.get_translations(pols, super_struct.get_masses_array())
         else:
             trans = np.abs(w) < CC.Phonons.__EPSILON_W__
 
@@ -2958,7 +2960,8 @@ Error while loading the julia module.
         wr, pols = self.current_dyn.DiagonalizeSupercell()
 
         if not self.ignore_small_w:
-            trans = ~ CC.Methods.get_translations(pols, super_structure.get_masses_array())
+            trans = ~ super_structure.get_asr_modes(pols)
+            # trans = ~ CC.Methods.get_translations(pols, super_structure.get_masses_array())
         else:
             trans = np.abs(wr) > CC.Phonons.__EPSILON_W__
 
@@ -3386,7 +3389,8 @@ Error while loading the julia module.
         w_sc, pols_sc = super_dyn.DyagDinQ(0)
 
         # Remove translations
-        no_trans_mask = ~CC.Methods.get_translations(pols_sc, super_dyn.structure.get_masses_array())
+        no_trans_mask = ~super_dyn.structure.get_asr_modes(pols_sc)
+        # no_trans_mask = ~CC.Methods.get_translations(pols_sc, super_dyn.structure.get_masses_array())
         w_sc = w_sc[no_trans_mask]
         pols_sc = pols_sc[:, no_trans_mask]
 
@@ -3681,7 +3685,8 @@ Error while loading the julia module.
 
         # Get the translational modes
         if not self.ignore_small_w:
-            trans = CC.Methods.get_translations(pols, super_structure.get_masses_array())
+            trans = super_structure.get_asr_modes(pols)
+            # trans = CC.Methods.get_translations(pols, super_structure.get_masses_array())
         else:
             trans = np.abs(w) < CC.Phonons.__EPSILON_W__
 
