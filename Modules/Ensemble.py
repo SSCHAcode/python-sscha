@@ -1439,7 +1439,7 @@ Error, the following stress files are missing from the ensemble:
 
     #     # Get the symmetries from spglib
     #     super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
-    #     spglib_syms = spglib.get_symmetry(super_structure.get_ase_atoms())
+    #     spglib_syms = spglib.get_symmetry(super_structure.get_spglib_cell())
 
     #     # Convert them into the cellconstructor format
     #     cc_syms = CC.symmetries.GetSymmetriesFromSPGLIB(spglib_syms, False)
@@ -1534,7 +1534,7 @@ Error, the following stress files are missing from the ensemble:
 
         # Get the symmetries from spglib
         super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
-        spglib_syms = spglib.get_symmetry(super_structure.get_ase_atoms())
+        spglib_syms = spglib.get_symmetry(super_structure.get_spglib_cell())
 
         # Convert them into the cellconstructor format
         cc_syms = CC.symmetries.GetSymmetriesFromSPGLIB(spglib_syms, False)
