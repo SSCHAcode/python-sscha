@@ -1,6 +1,5 @@
-setuptools
 numpy
 scipy
 ase
-spglib<=2.2
+spglib
 julia
