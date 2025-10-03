@@ -948,7 +948,7 @@ Error, exceeded the maximum number of step with an imaginary frequency ({}).
         print (" use spglib = ", self.use_spglib)
         if self.use_spglib:
             import spglib
-            print (" Symmetry group = {}".format(spglib.get_spacegroup(self.dyn.structure.get_ase_atoms())))
+            print (" Symmetry group = {}".format(spglib.get_spacegroup(self.dyn.structure.get_spglib_cell())))
         print (" Number of symmetries in the unit cell = ", self.N_symmetries)
 
         print ()
@@ -1097,7 +1097,7 @@ Maybe data_dir is missing from your input?"""
 
                 import spglib
                 if verbosity:
-                    print("Symmetry group: ", spglib.get_spacegroup(self.dyn.structure.get_ase_atoms()))
+                    print("Symmetry group: ", spglib.get_spacegroup(self.dyn.structure.get_spglib_cell()))
 
                 self.N_symmetries = qe_sym.QE_nsym
 
@@ -1337,7 +1337,7 @@ WARNING, the preconditioning is activated together with a root representation.
                 print ("")
                 print("Number of symmetries before the step: ", self.N_symmetries)
                 if self.use_spglib:
-                    print("Group space: ", spglib.get_spacegroup(self.dyn.structure.get_ase_atoms()))
+                    print("Group space: ", spglib.get_spacegroup(self.dyn.structure.get_spglib_cell()))
                 print ("Harmonic contribution to free energy = %16.8f meV" % (harm_fe * __RyTomev__))
                 print ("Anharmonic contribution to free energy = %16.8f +- %16.8f meV" % (anharm_fe * __RyTomev__,
                                                                                          np.real(err) * __RyTomev__))

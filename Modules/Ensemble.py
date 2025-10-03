@@ -1439,7 +1439,7 @@ Error, the following stress files are missing from the ensemble:
 
     #     # Get the symmetries from spglib
     #     super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
-    #     spglib_syms = spglib.get_symmetry(super_structure.get_ase_atoms())
+    #     spglib_syms = spglib.get_symmetry(super_structure.get_spglib_cell())
 
     #     # Convert them into the cellconstructor format
     #     cc_syms = CC.symmetries.GetSymmetriesFromSPGLIB(spglib_syms, False)
@@ -1534,7 +1534,7 @@ Error, the following stress files are missing from the ensemble:
 
         # Get the symmetries from spglib
         super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
-        spglib_syms = spglib.get_symmetry(super_structure.get_ase_atoms())
+        spglib_syms = spglib.get_symmetry(super_structure.get_spglib_cell())
 
         # Convert them into the cellconstructor format
         cc_syms = CC.symmetries.GetSymmetriesFromSPGLIB(spglib_syms, False)
@@ -3654,6 +3654,15 @@ Error while loading the julia module.
         # Error, the v4 computation has not yet been implemented.
         # """
         #         raise NotImplementedError(ERROR_MSG)
+
+        # Check if the ensemble has been initialized
+        if len(self.forces) == 0:
+            n_forces = len(self.forces)
+            raise ValueError(
+                    f"Cannot evaluate free-energy Hessian: 'self.forces' is empty (len={n_forces}). "
+                    "Initialize or load the ensemble and compute energies and forces first."
+                )
+
 
         # Convert anything into the Ha units
         # This is needed for the Fortran subroutines
