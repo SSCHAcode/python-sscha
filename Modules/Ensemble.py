@@ -3655,6 +3655,15 @@ Error while loading the julia module.
         # """
         #         raise NotImplementedError(ERROR_MSG)
 
+        # Check if the ensemble has been initialized
+        if len(self.forces) == 0:
+            n_forces = len(self.forces)
+            raise ValueError(
+                    f"Cannot evaluate free-energy Hessian: 'self.forces' is empty (len={n_forces}). "
+                    "Initialize or load the ensemble and compute energies and forces first."
+                )
+
+
         # Convert anything into the Ha units
         # This is needed for the Fortran subroutines
         self.convert_units(UNITS_HARTREE)
