@@ -235,10 +235,6 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
         self.supercell_structure = super_struct
         self.itau = itau + 1
 
-        # To avoid to recompute each time the same variables store something usefull here
-        self.q_start = np.zeros( (self.N, Nsc * 3))
-        self.current_q = np.zeros( (self.N, Nsc * 3))
-
         self.q_opposite_index = None
 
         # Store also the displacements
@@ -709,11 +705,6 @@ Error, the file '{}' is missing from the ensemble
         self.rho = np.ones(self.N, dtype = np.float64)
 
 
-        t1 = time.time()
-        #self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell, self.u_disps)
-        t2 = time.time()
-        #self.current_q = self.q_start.copy()
-
         p_count = np.sum(self.stress_computed.astype(int))
         if p_count > 0:
             self.has_stress = True
@@ -831,11 +822,6 @@ Error, the following stress files are missing from the ensemble:
                 pass
 
         self.rho = np.ones(self.N, dtype = np.float64)
-
-        t1 = time.time()
-        # self.q_start = CC.Manipulate.GetQ_vectors(self.structures, dyn_supercell, self.u_disps)
-        t2 = time.time()
-        # self.current_q = self.q_start.copy()
 
         if count_stress == self.N:
             self.has_stress = True
@@ -1797,20 +1783,12 @@ DETAILS OF ERROR:
 
 
 
-        # Convert the q vectors in the Hartree units
-        #old_q = self.q_start * np.sqrt(np.float64(2)) * __A_TO_BOHR__
-        #new_q = self.current_q * np.sqrt(np.float64(2)) * __A_TO_BOHR__
-
-
-        #t1 = time.time()
-        #self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
-        #t2 = time.time()
-
         if __DEBUG_RHO__:
             print( " ==== [UPDATE RHO DEBUGGING] ==== ")
             print( " INPUT INFO: ")
             np.savetxt("rho_%05d.dat" % self.__debug_index__, self.rho)
             print( " rho saved in ", "rho_%05d.dat" % self.__debug_index__)
+
 
         # Get the two covariance matrix
         t1 = time.time()
@@ -2019,15 +1997,6 @@ DETAILS OF ERROR:
         #     # TODO: this method recomputes the displacements, it is useless since we already have them in self.u_disps
 
 
-
-        # Convert the q vectors in the Hartree units
-        #old_q = self.q_start * np.sqrt(np.float64(2)) * __A_TO_BOHR__
-        #new_q = self.current_q * np.sqrt(np.float64(2)) * __A_TO_BOHR__
-
-
-        #t1 = time.time()
-        #self.rho = SCHAModules.stochastic.get_gaussian_weight(new_q, old_q, new_a, old_a)
-        #t2 = time.time()
 
         if __DEBUG_RHO__:
             print( " ==== [UPDATE RHO DEBUGGING] ==== ")
@@ -3120,9 +3089,6 @@ Error while loading the julia module.
 #         pols = np.real(pols[:, not_trans])
 
 #         #n_modes = len(w)
-
-#         # Convert the q vector into Ha units
-#         q_new = np.array(self.current_q, dtype = np.float64) * np.sqrt(2) * __A_TO_BOHR__
 
 #         # Get the ityp variable
 #         #ityp = self.current_dyn.structure.get_atomic_types()
