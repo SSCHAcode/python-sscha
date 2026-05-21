@@ -34,18 +34,8 @@ project('python-sscha',
     blas_dep = mkl_dep
     lapack_dep = mkl_dep
   else
-    lapack_dep = dependency('lapack', required: false)
-    blas_dep = dependency('blas', required: false)
-
-    if not lapack_dep.found()
-      lapack_lib = fc.find_library('lapack', required: true)
-      lapack_dep = declare_dependency(dependencies: lapack_lib)
-    endif
-
-    if not blas_dep.found()
-      blas_lib = fc.find_library('blas', required: true)
-      blas_dep = declare_dependency(dependencies: blas_lib)
-    endif
+    lapack_dep = dependency('lapack', required: true)
+    blas_dep = dependency('blas', required: true)
   endif
 
   # Look for the OpenMP library if it is needed for parallelization.
