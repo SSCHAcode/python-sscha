@@ -643,6 +643,11 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
                 else:
                     self.dyn.Symmetrize(use_spglib = self.use_spglib)
 
+                # Enforce the dynamical matrix to be real at q = -q + G (time-reversal symmetry)
+                bg = self.dyn.structure.get_reciprocal_vectors() / (2 * np.pi)
+                for iq, q in enumerate(self.dyn.q_tot):
+                    if CC.Methods.get_min_dist_into_cell(bg, q, -q) < 1e-6:
+                        self.dyn.dynmats[iq] = np.real(self.dyn.dynmats[iq])
 
             # If we have imaginary frequencies, force the kl ratio to zero
 
