@@ -634,7 +634,7 @@ Error, the custom_function_gradient must have either 2 or 3 arguments:
 
             # Update the structure
             if self.minim_struct:
-                self.dyn.structure.coords[:,:] = new_struct
+                self.dyn.structure.coords[:,:] = np.real(new_struct)
 
             # Check if we must enforce the symmetries and the sum rule:
             if self.enforce_sum_rule and (not self.neglect_symmetries):
