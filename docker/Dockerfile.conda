@@ -1,0 +1,67 @@
+# Requires host NVIDIA driver >= 560 (CUDA 12.6 support)
+FROM nvidia/cuda:12.6.3-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Miniconda
+RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh \
+    && bash /tmp/miniconda.sh -b -p /opt/conda \
+    && rm /tmp/miniconda.sh
+ENV PATH="/opt/conda/bin:$PATH"
+
+# Accept Terms of Service
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
+# Create conda environment with all build dependencies
+RUN conda create -n sscha -c conda-forge \
+    python=3.12 gfortran openblas liblapack openmpi julia openmpi-mpicc pip numpy scipy "spglib=2.2" cmake pkg-config \
+    && conda clean -afy
+
+ENV PKG_CONFIG_PATH="/opt/conda/envs/sscha/lib/pkgconfig"
+ENV CUDA_HOME="/usr/local/cuda"
+ENV LIBRARY_PATH="/opt/conda/envs/sscha/lib"
+ENV LD_LIBRARY_PATH="/opt/conda/envs/sscha/lib:/usr/local/cuda-12.6/lib64"
+
+# conda-forge's openblas only ships openblas.pc; create lapack.pc and blas.pc
+# so meson's pkg-config lookup for "lapack"/"blas" succeeds
+RUN PCDIR=/opt/conda/envs/sscha/lib/pkgconfig && \
+    LIBDIR=/opt/conda/envs/sscha/lib && \
+    printf 'Name: lapack\nDescription: LAPACK\nVersion: 3.9\nLibs: -L%s -llapack\nCflags:\n' "$LIBDIR" \
+        > "$PCDIR/lapack.pc" && \
+    printf 'Name: blas\nDescription: BLAS\nVersion: 3.9\nLibs: -L%s -lopenblas\nCflags:\n' "$LIBDIR" \
+        > "$PCDIR/blas.pc"
+
+# Install PyTorch with CUDA 12.4 support
+RUN conda run -n sscha pip install --no-cache-dir \
+    torch==2.7.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+
+# Install remaining pip dependencies
+RUN conda run -n sscha pip install --no-cache-dir ase julia mpi4py
+
+# Install SSCHA packages
+RUN conda run -n sscha pip install --no-cache-dir cellconstructor python-sscha tdscha
+
+# Pre-install Julia packages (PyCall + SSCHA deps) as root so sscha-user
+# doesn't hit permission errors on the conda-owned Julia depot at runtime
+RUN conda run -n sscha python -c "import julia; julia.install()" || true
+RUN conda run -n sscha julia --project=@sscha -e \
+    'using Pkg; Pkg.add(["PyCall", "SparseArrays", "LinearAlgebra", "InteractiveUtils"])' || true
+RUN chown -R sscha-user:sscha-user /opt/conda/envs/sscha/share/julia 2>/dev/null || true
+
+# Set sscha env as default
+SHELL ["/bin/bash", "-c"]
+ENV PATH="/opt/conda/envs/sscha/bin:$PATH"
+ENV CONDA_DEFAULT_ENV=sscha
+
+RUN echo "conda activate sscha" >> /root/.bashrc
+
+# Allow OpenMPI to run as root
+ENV OMPI_ALLOW_RUN_AS_ROOT=1
+ENV OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+
+WORKDIR /workspace
+
+ENTRYPOINT ["/bin/bash"]
