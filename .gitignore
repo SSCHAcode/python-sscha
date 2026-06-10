@@ -65,6 +65,7 @@ frequencies*.*
 timer.json
 minim.dat
 otf_run*
+nohup.out
 disp_*
 _data_tmp_
 

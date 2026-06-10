@@ -1,0 +1,32 @@
+# ======================= SGP ML ========================= #
+# See also the official FLARE documentation for more details:
+# - Docs: https://mir-group.github.io/flare/
+# - GitHub: https://github.com/mir-group/flare/
+# ======================================================== #
+gp: SGP_Wrapper
+kernels:
+  - name: NormalizedDotProduct
+    sigma: 2.0
+    power: 2
+descriptors:
+  - name: B2
+    nmax: 8
+    lmax: 3
+    cutoff_function: quadratic
+    radial_basis: chebyshev
+energy_noise: 0.01
+forces_noise: 0.05
+stress_noise: 0.0001
+species:
+  - 14 # Si
+single_atom_energies:
+  - -154.272015018195 # Si
+cutoff: 4.0
+variance_type: local
+opt_algorithm: L-BFGS-B
+bounds: [[0.1,6.0],[0.01,1.0],[0.01,1.00],[0.0001,0.005]]
+max_iterations: 100
+use_mapping: False
+energy_training: True
+force_training: True
+stress_training: True

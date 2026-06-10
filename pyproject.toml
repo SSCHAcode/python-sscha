@@ -33,6 +33,30 @@ Repository = "https://github.com/SSCHAcode/python-sscha"
 # Documentation = "https://documentacion.readthedocs.io/"
 Issues = "https://github.com/SSCHAcode/python-sscha/issues"
 
+[project.optional-dependencies]
+pre-commit = [
+    'pre-commit~=2.17',
+    'pylint==2.13.7',
+    'toml',
+]
+tests = [
+    'pgtest~=1.3',
+    'pytest~=6.0',
+    'pytest-regressions~=2.3',
+    'pytest-timeout',
+]
+aiida = [
+    'aiida-core~=2.3',
+    'aiida-quantumespresso~=4.10',
+    'aiida-pseudo',
+]
+active-learning = [
+    'mir-flare~=1.4',
+    'aiida-core~=2.3',
+    'aiida-quantumespresso~=4.10',
+    'aiida-pseudo',
+]
+
 # --- Meson-python specific configuration (Optional but useful) ---
 [tool.meson-python]
 # Here you can pass options to Meson that control the build process.

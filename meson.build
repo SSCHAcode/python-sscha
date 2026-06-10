@@ -218,9 +218,17 @@ py.install_sources([
   'Modules/SchaMinimizer.py',
   'Modules/Tools.py',
   'Modules/Utilities.py',
-  'Modules/cli.py'
+  'Modules/cli.py',
   ],
   subdir: 'sscha',
+)
+
+py.install_sources(
+  [
+    'Modules/ml/__init__.py',
+    'Modules/ml/flare.py',
+  ],
+  subdir: 'sscha/ml',
 )
 
 # --- Installing Scripts ---

@@ -34,7 +34,7 @@ def test_clean_runs():
     ensemble.stresses = np.ones((num_configs, 3, 3)) # (configs, 3, 3)
     ensemble.force_computed = np.array([True, False, True, True], dtype=bool)
     ensemble.stress_computed = np.copy(ensemble.force_computed)
-    ensemble._clean_runs()
+    ensemble._clean_runs(0)
 
     assert all(ensemble.force_computed)
     assert len(ensemble.force_computed) == 3
@@ -90,6 +90,7 @@ def test_submit_and_get_workchains(fixture_code):
         structures=structures,
         pw_code=pw_code,
         temperature=300,
+        dft_indices=[0,1,2,3,4],
     )
 
     assert len(workchains) == 5

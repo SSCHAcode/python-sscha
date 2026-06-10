@@ -31,7 +31,7 @@ dyn_filepath = './harmonic_dyn/dynamical-matrix-'
 directory_output = "./thermal_expansion" 
 
 aiida_inputs = dict(
-    pw_code_label=pw_code_label,
+    pw_code=pw_code_label,
     protocol='precise',
     overrides={
         'pseudo_family': 'SSSP/1.3/PBEsol/precision',
