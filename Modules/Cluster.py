@@ -333,6 +333,30 @@ class Cluster(object):
             super(Cluster, self).__setattr__(name, value)
 
 
+    def __getstate__(self):
+        """
+        Return the picklable state of the cluster.
+
+        The thread lock created by compute_ensemble_batch cannot be pickled,
+        so it is dropped here. This allows sscha.Utilities.save_binary to
+        store objects holding a cluster after a calculation has run.
+        """
+        state = self.__dict__.copy()
+        state["lock"] = None
+        return state
+
+
+    def __setstate__(self, state):
+        """
+        Restore the cluster from a pickled state.
+
+        The thread lock is transient runtime state and is reset to None,
+        as after __init__; compute_ensemble_batch recreates it when needed.
+        """
+        state["lock"] = None
+        self.__dict__.update(state)
+
+
 
     def copy_file(self, source, destination, server_source = False, server_dest = True, raise_error=False, **kwargs):
         """
