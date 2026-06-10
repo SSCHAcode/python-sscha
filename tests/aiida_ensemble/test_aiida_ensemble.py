@@ -2,7 +2,15 @@
 import pytest
 import numpy as np
 
+try:
+    import aiida
+    HAVE_AIIDA = True
+except ImportError:
+    HAVE_AIIDA = False
+
 from sscha.aiida_ensemble import AiiDAEnsemble
+
+aiida_required = pytest.mark.skipif(not HAVE_AIIDA, reason='aiida not installed')
 
 
 def get_ensemble() -> AiiDAEnsemble:
@@ -34,6 +42,7 @@ def test_clean_runs():
     assert np.all(np.isclose(ensemble.forces, np.ones((num_configs-1, num_atoms, 3))))
 
 
+@aiida_required
 @pytest.mark.usefixtures('aiida_profile')
 def test_get_running_workchains(generate_workchain_pw_node):
     """Test the :func:`sscha.aiida_ensemble.get_running_workchains` method."""
@@ -67,6 +76,7 @@ def test_get_running_workchains(generate_workchain_pw_node):
     assert success == [False, True, False]
 
 
+@aiida_required
 @pytest.mark.usefixtures('aiida_profile')
 def test_submit_and_get_workchains(fixture_code):
     """Test the :func:`sscha.aiida_ensemble.submit_and_get_workchains` method."""

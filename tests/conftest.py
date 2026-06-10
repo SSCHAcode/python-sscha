@@ -10,7 +10,17 @@ import tempfile
 
 import pytest
 
-pytest_plugins = ['aiida.manage.tests.pytest_fixtures']  # pylint: disable=invalid-name
+# Conditionally include aiida fixtures only if aiida is available
+try:
+    import aiida
+    HAVE_AIIDA = True
+except ImportError:
+    HAVE_AIIDA = False
+
+if HAVE_AIIDA:
+    pytest_plugins = ['aiida.manage.tests.pytest_fixtures']  # pylint: disable=invalid-name
+else:
+    pytest_plugins = []
 
 
 @pytest.fixture(scope='session')
@@ -25,25 +35,27 @@ def filepath_tests():
 
 
 @pytest.fixture
-def filepath_fixtures(filepath_tests):
-    """Return the absolute filepath to the directory containing the file `fixtures`."""
-    return os.path.join(filepath_tests, 'fixtures')
-
-
-@pytest.fixture(scope='function')
 def fixture_sandbox():
     """Return a `SandboxFolder`."""
+    if not HAVE_AIIDA:
+        pytest.skip("aiida not installed")
     from aiida.common.folders import SandboxFolder
     with SandboxFolder() as folder:
         yield folder
 
 
-@pytest.fixture
-def fixture_localhost(aiida_localhost):
-    """Return a localhost `Computer`."""
-    localhost = aiida_localhost
-    localhost.set_default_mpiprocs_per_machine(1)
-    return localhost
+if HAVE_AIIDA:
+    @pytest.fixture
+    def fixture_localhost(aiida_localhost):
+        """Return a localhost `Computer`."""
+        localhost = aiida_localhost
+        localhost.set_default_mpiprocs_per_machine(1)
+        return localhost
+else:
+    @pytest.fixture
+    def fixture_localhost():
+        """Dummy fixture when aiida is not installed."""
+        pytest.skip("aiida not installed")
 
 
 @pytest.fixture
@@ -131,49 +143,51 @@ def serialize_builder():
     return _serialize_builder
 
 
-@pytest.fixture(scope='session', autouse=True)
-def sssp(aiida_profile, generate_upf_data):
-    """Create an SSSP pseudo potential family from scratch."""
-    from aiida.common.constants import elements
-    from aiida.plugins import GroupFactory
+if HAVE_AIIDA:
 
-    aiida_profile.clear_profile()
+    @pytest.fixture(scope='session', autouse=True)
+    def sssp(aiida_profile, generate_upf_data):
+        """Create an SSSP pseudo potential family from scratch."""
+        from aiida.common.constants import elements
+        from aiida.plugins import GroupFactory
 
-    SsspFamily = GroupFactory('pseudo.family.sssp')
+        aiida_profile.clear_profile()
 
-    cutoffs = {}
-    stringency = 'standard'
+        SsspFamily = GroupFactory('pseudo.family.sssp')
 
-    with tempfile.TemporaryDirectory() as dirpath:
-        for values in elements.values():
+        cutoffs = {}
+        stringency = 'standard'
 
-            element = values['symbol']
+        with tempfile.TemporaryDirectory() as dirpath:
+            for values in elements.values():
 
-            actinides = ('Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr')
+                element = values['symbol']
 
-            if element in actinides:
-                continue
+                actinides = ('Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr')
 
-            upf = generate_upf_data(element)
-            dirpath = pathlib.Path(dirpath)
-            filename = dirpath / f'{element}.upf'
+                if element in actinides:
+                    continue
 
-            with open(filename, 'w+b') as handle:
-                with upf.open(mode='rb') as source:
-                    handle.write(source.read())
-                    handle.flush()
+                upf = generate_upf_data(element)
+                dirpath = pathlib.Path(dirpath)
+                filename = dirpath / f'{element}.upf'
 
-            cutoffs[element] = {
-                'cutoff_wfc': 30.0,
-                'cutoff_rho': 240.0,
-            }
+                with open(filename, 'w+b') as handle:
+                    with upf.open(mode='rb') as source:
+                        handle.write(source.read())
+                        handle.flush()
 
-        label = 'SSSP/1.3/PBEsol/efficiency'
-        family = SsspFamily.create_from_folder(dirpath, label)
+                cutoffs[element] = {
+                    'cutoff_wfc': 30.0,
+                    'cutoff_rho': 240.0,
+                }
 
-    family.set_cutoffs(cutoffs, stringency, unit='Ry')
+            label = 'SSSP/1.3/PBEsol/efficiency'
+            family = SsspFamily.create_from_folder(dirpath, label)
 
-    return family
+        family.set_cutoffs(cutoffs, stringency, unit='Ry')
+
+        return family
 
 
 @pytest.fixture

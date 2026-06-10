@@ -42,7 +42,7 @@ def test_gradient_comparison(verbose = False):
             ka = self.ka
             
             if not os.path.exists("grad_{}.dat".format(ka)):
-                np.savetxt("grad_{}.dat".format(ka), dyn_grad[0,:,:])
+                np.savetxt("grad_{}.dat".format(ka), np.real(dyn_grad[0,:,:]))
             else:
                 correct_grad = np.loadtxt("grad_{}.dat".format(ka))
                 diff = np.max(np.abs(dyn_grad - correct_grad))
