@@ -210,6 +210,7 @@ py.install_sources([
   'Modules/Dynamical.py',
   'Modules/Ensemble.py',
 #  'Modules/fourier_gradient.jl',
+  'Modules/JuliaExt.py',
   'Modules/LocalCluster.py',
   'Modules/Minimizer.py',
   'Modules/Optimizer.py',
@@ -241,7 +242,7 @@ py.install_sources([
 # Create a 'sscha' subdirectory within the Python installation directory
 # and copy the .jl files there.
 install_data(
-  ['Modules/fourier_gradient.jl'], # List the .jl files you need
+  ['Modules/fourier_gradient.jl', 'Modules/juliapkg.json'], # List the .jl files you need
   install_dir : py.get_install_dir() / 'sscha'
 )
 # If there are many .jl files in multiple subdirectories,

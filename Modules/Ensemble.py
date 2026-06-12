@@ -76,34 +76,30 @@ except:
 __EPSILON__ =  1e-6
 __A_TO_BOHR__ = 1.889725989
 
-__JULIA_EXT__ = False
+# The Julia runtime is booted lazily by JuliaExt at the first actual use
+# (e.g. the first fourier gradient evaluation), so that importing
+# sscha.Ensemble stays fast.
+import sscha.JuliaExt as JuliaExt
+
+
+class _LazyJuliaModule(object):
+    """Lazy stand-in for the old "import julia" module.
+
+    Accessing the .Main attribute initializes the Julia runtime (and includes
+    fourier_gradient.jl) on first use. All the julia.Main.xxx(...) call sites
+    below keep working unchanged with both the juliacall and pyjulia backends.
+    """
+    @property
+    def Main(self):
+        return JuliaExt.get_main()
+
+
+julia = _LazyJuliaModule()
+
+# Deprecated alias kept for backward compatibility: it only tells whether a
+# Julia backend is installed, the runtime is not initialized at import time.
+__JULIA_EXT__ = JuliaExt.available()
 __JULIA_ERROR__ = ""
-try:
-    import julia, julia.Main
-    julia.Main.include(os.path.join(os.path.dirname(__file__),
-        "fourier_gradient.jl"))
-    __JULIA_EXT__ = True
-except:
-    try:
-        import julia
-        try:
-            from julia.api import Julia
-            jl = Julia(compiled_modules=False)
-            import julia.Main
-            julia.Main.include(os.path.join(os.path.dirname(__file__),
-                "fourier_gradient.jl"))
-            __JULIA_EXT__ = True
-        except:
-            # Install the required modules
-            julia.install()
-            try:
-                julia.Main.include(os.path.join(os.path.dirname(__file__),
-                    "fourier_gradient.jl"))
-                __JULIA_EXT__ = True
-            except Exception as e:
-                warnings.warn("Julia extension not available.\nError: {}".format(e))
-    except Exception as e:
-        warnings.warn("Julia extension not available.\nError: {}".format(e))
 
 
 try:
