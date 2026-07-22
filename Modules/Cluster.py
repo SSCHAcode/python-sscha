@@ -23,6 +23,8 @@ import ase, ase.io
 import cellconstructor as CC
 import cellconstructor.Methods
 
+from sscha.BaseCluster import BaseCluster
+
 # SETUP THE CODATA 2006, To match the QE definition of Rydberg
 try:
     units = ase.units.create_units("2006")
@@ -133,7 +135,11 @@ def parse_symbols(string):
 
 
 
-class Cluster(object):
+class Cluster(BaseCluster):
+
+    _required_calculator_interface = (
+        "copy", "set_directory", "set_label", "write_input", "read_results",
+    )
 
     def __init__(self, hostname=None, pwd=None, extra_options="", workdir = "",
                  account_name = "", partition_name = "", qos_name = "", binary="pw.x -npool NPOOL -i PREFIX.pwi > PREFIX.pwo",
@@ -170,6 +176,10 @@ class Cluster(object):
             qos_name:
                 The QOS name for the job submission
         """
+
+        # Common batch/submission knobs (batch_size, job_number, max_recalc,
+        # lock) are initialized by the base class; same defaults as today.
+        BaseCluster.__init__(self, batch_size=1000, job_number=1, max_recalc=10)
 
         self.hostname = hostname
         self.pwd = pwd
@@ -234,7 +244,7 @@ class Cluster(object):
 
         # This is the number of configurations to be computed for each jub submitted
         # This times the self.batch_size is the total amount of configurations submitted toghether
-        self.job_number = 1
+        # (job_number is set by BaseCluster.__init__)
         self.n_together_def = 1
         self.use_multiple_submission = False
 
@@ -260,7 +270,7 @@ class Cluster(object):
 
         # This is the maximum number of resubmissions after the expected one
         # from the batch size. It can be use to resubmit the failed jobs.
-        self.max_recalc = 10
+        # (max_recalc is set by BaseCluster.__init__)
         self.connection_attempts = 1
 
         # This is the time string. Faster job will be the less in the queue,
@@ -284,7 +294,7 @@ class Cluster(object):
         # The batch size is the maximum number of job to be submitted together.
         # The new jobs will be submitted only after a batch is compleated
         # Useful if the cluster has a limit for the maximum number of jobs allowed.
-        self.batch_size = 1000
+        # (batch_size is set by BaseCluster.__init__)
 
         # This could be a function that generates for each input file additional
         # text in the submission file.
@@ -296,66 +306,10 @@ class Cluster(object):
         # Allow to setup additional custom extra parameters
         self.custom_params = {}
 
-        self.lock = None  # Use to lock the threads
+        # (lock is set by BaseCluster.__init__)
 
-        # Fix the attributes
-
-        # Setup the attribute control
-        self.__total_attributes__ = [item for item in self.__dict__.keys()]
-        self.fixed_attributes = True # This must be the last attribute to be setted
-
-
-    def __setattr__(self, name, value):
-        """
-        This method is used to set an attribute.
-        It will raise an exception if the attribute does not exists (with a suggestion of similar entries)
-        """
-
-
-        if "fixed_attributes" in self.__dict__:
-            if name in self.__total_attributes__:
-                super(Cluster, self).__setattr__(name, value)
-            elif self.fixed_attributes:
-                similar_objects = str( difflib.get_close_matches(name, self.__total_attributes__))
-                ERROR_MSG = """
-        Error, the attribute '{}' is not a member of '{}'.
-        Suggested similar attributes: {} ?
-        """.format(name, type(self).__name__,  similar_objects)
-
-                raise AttributeError(ERROR_MSG)
-
-            # Setting the account or partition name will automatically result in
-            # activating the corresponding flags
-            if name.endswith("_name"):
-                key = "use_{}".format(name.split("_")[0])
-                self.__dict__[key] = True
-        else:
-            super(Cluster, self).__setattr__(name, value)
-
-
-    def __getstate__(self):
-        """
-        Return the picklable state of the cluster.
-
-        The thread lock created by compute_ensemble_batch cannot be pickled,
-        so it is dropped here. This allows sscha.Utilities.save_binary to
-        store objects holding a cluster after a calculation has run.
-        """
-        state = self.__dict__.copy()
-        state["lock"] = None
-        return state
-
-
-    def __setstate__(self, state):
-        """
-        Restore the cluster from a pickled state.
-
-        The thread lock is transient runtime state and is reset to None,
-        as after __init__; compute_ensemble_batch recreates it when needed.
-        """
-        state["lock"] = None
-        self.__dict__.update(state)
-
+        # Fix the attributes (attribute-locking machinery lives in BaseCluster)
+        self._lock_attributes()
 
 
     def copy_file(self, source, destination, server_source = False, server_dest = True, raise_error=False, **kwargs):
@@ -653,11 +607,15 @@ class Cluster(object):
         PREPARE THE INPUT FILE
         ======================
 
-        This is specific for quantum espresso and must be inherit and replaced for
-        other calculators.
-
         This crates the input files in the local working directory
         self.local_workdir and it returns the list of all the files generated.
+
+        The calculator may define:
+            input_extension   (default ".pwi")
+            output_extension  (default ".pwo")
+            extra_input_files (default []) extra files copied to the cluster
+                together with the inputs (e.g. the pickled ASE calculator
+                of ASEFileCalculator).
 
 
         Parameters
@@ -677,6 +635,8 @@ class Cluster(object):
                 List of strings containing the output files expected
                 for the calculation
         """
+        in_ext = getattr(calc, "input_extension", ".pwi")
+        out_ext = getattr(calc, "output_extension", ".pwo")
 
         # Prepare the input file
         list_of_inputs = []
@@ -690,13 +650,15 @@ class Cluster(object):
                 calc.set_label(label)
                 calc.write_input(structure)
 
-                print("[THREAD {}] LBL: {} | PREFIX: {}".format(threading.get_native_id(), label, calc.input_data["control"]["prefix"]))
+                input_data = getattr(calc, "input_data", None)
+                if isinstance(input_data, dict) and "control" in input_data:
+                    print("[THREAD {}] LBL: {} | PREFIX: {}".format(
+                        threading.get_native_id(), label, input_data["control"].get("prefix")))
+                else:
+                    print("[THREAD {}] LBL: {}".format(threading.get_native_id(), label))
 
-                #ase.io.write("%s/%s.pwi"% (self.local_workdir, label),
-                #                atm, **calc.parameters)
-
-                input_file = '{}.pwi'.format(label)
-                output_file = '{}.pwo'.format(label)
+                input_file = '{}{}'.format(label, in_ext)
+                output_file = '{}{}'.format(label, out_ext)
 
                 list_of_inputs.append(input_file)
                 list_of_outputs.append(output_file)
@@ -713,6 +675,10 @@ Error message:
             # Release the lock on the threads
             self.lock.release()
 
+        # Extra files the calculator needs on the cluster (copied once per batch)
+        for extra in getattr(calc, "extra_input_files", []):
+            if extra not in list_of_inputs:
+                list_of_inputs.append(extra)
 
         return list_of_inputs, list_of_outputs
 
@@ -905,12 +871,12 @@ Error while connecting to the cluster to copy the files:
 
         return result, output
 
-    def get_output_path(self, label):
+    def get_output_path(self, label, out_extension=".pwo"):
         """
         Given the label of the submission, retrive the path of all the output files of that calculation
         """
 
-        out_filename = os.path.join(self.workdir, label + ".pwo")
+        out_filename = os.path.join(self.workdir, label + out_extension)
         return [out_filename]
 
     def read_results(self, calc, label):
@@ -1556,159 +1522,26 @@ Error while connecting to the cluster to copy the files:
 
         return str(output)
 
-    def compute_ensemble_batch(self, ensemble, cellconstructor_calc, get_stress = True, timeout=None):
-        """
-        RUN THE ENSEMBLE WITH BATCH SUBMISSION
-        ======================================
-        """
-
-        # Track the remaining configurations
-        success = [False] * ensemble.N
-
-        # Setup if the ensemble has the stress
-        ensemble.has_stress = get_stress
-        #ensemble.all_properties = [None] * ensemble.N
-
-        # Check if the working directory exists
+    def _pre_compute_hook(self, ensemble, calc):
+        """Create the local working directory if it does not exist."""
         if not os.path.isdir(self.local_workdir):
             os.makedirs(self.local_workdir)
 
+    def compute_jobarray(self, ensemble, calc, jobs_id):
+        """Submit one job array through the scheduler and collect the outputs.
 
-        # Get the expected number of batch
-        num_batch_offset = int(ensemble.N / self.batch_size)
-
-        def compute_single_jobarray(jobs_id, calc):
-            structures = [ensemble.structures[i].copy() for i in jobs_id]
-            n_together = min(len(structures), self.n_together_def)
-            subs, indices, labels = self.batch_submission(structures, calc, jobs_id, ".pwi",
-                                            ".pwo", "ESP", n_together)
-
-            # Thread safe operation
-            self.lock.acquire()
-            print("[THREAD {}] submitted calculations: {}".format(threading.get_native_id(), indices))
-            results = self.collect_results(calc, subs, indices, labels)
-
-            for i, res in enumerate(results):
-                print("[THREAD {}] ADDING RESULT {} = {}".format(threading.get_native_id(), jobs_id[i], res))
-                num = jobs_id[i]
-
-                if res is None:
-                    continue
-
-                # Check if the run was good
-                check_e = "energy" in res
-                check_f = "forces" in res
-                check_s = "stress" in res
-
-                # Check the structure
-                if "structure" in res:
-                    error_struct = np.linalg.norm(ensemble.structures[jobs_id[i]].coords.ravel() - res["structure"].coords.ravel())
-                    if error_struct > 1e-2:
-                        print("ERROR IDENTIFYING STRUCTURE!")
-                        MSG = """
-                            Error in thread {}.
-                            Displacement between the expected structure {}
-                            and the one readed from the calculator
-                            is of {} A.
-                        """.format(threading.get_native_id(), jobs_id[i], error_struct)
-                        print(MSG)
-                        ensemble.structures[jobs_id[i]].save_scf('t_{}_error_struct_generated_{}.scf'.format(threading.get_native_id(), jobs_id[i]))
-                        structures[i].save_scf('t_{}_error_struct_cmp_local_{}.scf'.format(threading.get_native_id(), jobs_id[i]))
-                        res["structure"].save_scf('t_{}_error_struct_readed_{}.scf'.format(threading.get_native_id(), jobs_id[i]))
-
-                        continue
-                else:
-                    print("[WARNING] no check on the structure.")
-
-                is_success =  check_e and check_f
-                if get_stress:
-                    is_success = is_success and check_s
-
-                if not is_success:
-                    continue
-
-                res_only_extra = {x : res[x] for x in res if x not in ["energy", "forces", "stress", "structure"]}
-                ensemble.all_properties[num].update(res_only_extra)
-                ensemble.energies[num] = res["energy"] / units["Ry"]
-                ensemble.forces[num, :, :] = res["forces"] / units["Ry"]
-                ensemble.force_computed[num] = True
-
-                if get_stress:
-                    stress = np.zeros((3,3), dtype = np.float64)
-                    stress[0,0] = res["stress"][0]
-                    stress[1,1] = res["stress"][1]
-                    stress[2,2] = res["stress"][2]
-                    stress[1,2] = res["stress"][3]
-                    stress[2,1] = res["stress"][3]
-                    stress[0,2] = res["stress"][4]
-                    stress[2,0] = res["stress"][4]
-                    stress[0,1] = res["stress"][5]
-                    stress[1,0] = res["stress"][5]
-                    # Remember, ase has a very strange definition of the stress
-                    ensemble.stresses[num, :, :] = -stress * units["Bohr"]**3 / units["Ry"]
-                    ensemble.stress_computed[num] = True
-                success[num] = is_success
-
-            self.lock.release()
-
-        # Run until some work has not finished
-        recalc = 0
-        self.lock = threading.Lock()
-        while np.sum(np.array(success, dtype = int) - 1) != 0:
-            threads = []
-
-            print("[CYCLE] SUCCESS: ", success)
-            print("[CYCLE] STOPPING CONDITION:", np.sum(np.array(success, dtype = int) - 1))
-
-            # Get the remaining jobs
-            false_mask = np.array(success) == False
-            false_id = np.arange(ensemble.N)[false_mask]
-
-            count = 0
-            # Submit in parallel
-            jobs = [false_id[i : i + self.job_number] for i in range(0, len(false_id), self.job_number)]
-            # Create a local copy of the calculator for each thread, to avoid conflicting modifications
-            calculators = [cellconstructor_calc.copy() for i in range(0, len(jobs))]
-
-            for k_th, job in enumerate(jobs):
-                # Submit only the batch size
-                if count >= self.batch_size:
-                    break
-                t = threading.Thread(target = compute_single_jobarray, args=(job, calculators[k_th], ))
-                t.start()
-                threads.append(t)
-                count += 1
-
-            # Wait until all the job have finished
-            for t in threads:
-                t.join(timeout)
-
-            print("[CYCLE] [END] SUCCESS: ", success)
-            print("[CYCLE] [END] STOPPING CONDITION:", np.sum(np.array(success, dtype = int) - 1))
-
-            recalc += 1
-            if recalc > num_batch_offset + self.max_recalc:
-                print ("Expected batch ordinary resubmissions:", num_batch_offset)
-                raise ValueError("Error, resubmissions exceeded the maximum number of %d" % self.max_recalc)
-                break
-
-        print("CALCULATION ENDED: all properties: {}".format(ensemble.all_properties))
-
-
-
-    def compute_ensemble(self, ensemble, ase_calc, get_stress = True, timeout=None):
+        Overrides BaseCluster.compute_jobarray. The collect_results call runs
+        outside the lock (it only touches the per-thread calculator copy and
+        disjoint label files, so this is a safe parallelization improvement
+        with identical results); the BaseCluster driver handles locking
+        around the result ingestion.
         """
-        RUN THE WHOLE ENSEMBLE ON THE CLUSTER
-        =====================================
-
-        Parameters
-        ----------
-            ensemble :
-                The ensemble to be runned.
-        """
-
-        # Check if the compute_ensemble batch must be done
-        #if self.job_number != 1:
-        self.compute_ensemble_batch(ensemble, ase_calc, get_stress, timeout)
-        return
+        structures = [ensemble.structures[i].copy() for i in jobs_id]
+        n_together = min(len(structures), self.n_together_def)
+        subs, indices, labels = self.batch_submission(
+            structures, calc, jobs_id,
+            getattr(calc, "input_extension", ".pwi"),     # was hardcoded (G3)
+            getattr(calc, "output_extension", ".pwo"),    # was hardcoded (G3)
+            "ESP", n_together)
+        return self.collect_results(calc, subs, indices, labels)
 
