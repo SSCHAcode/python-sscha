@@ -23,6 +23,33 @@ contains
     end if
   end subroutine w_to_a
 
+  subroutine w_to_daq(w,T, da, iq, n)
+    double precision, intent(in) :: T
+    double precision, dimension(iq, n), intent(in) :: w
+    double precision, dimension(iq, n), intent(out) :: da
+
+
+    integer :: n, iq
+    double precision, dimension(iq, n) :: a, b
+    double precision :: beta
+
+
+    if (T .eq. 0.0D0) then
+       da = - dsqrt(1.0d0 / (8.0d0 *  w**3.0d0))
+    else
+       !    result_w_to_da = - dsqrt((1.0d0 / dtanH(0.5d0 * w * &
+       !                      315774.65221921849D0 / T )) / &
+       !                     (8.0d0 * m * w**3.0d0) )     * &
+       !                     (1.0d0 +  (w * 315774.65221921849D0 / T) * &
+       !                     (1.0d0 / dsinH(0.5d0 * w * &
+       !                      315774.65221921849D0 / T )))
+       beta =  315774.65221921849D0 / T
+       a = w * beta + dsinH(w * beta)
+       b = dsqrt(1.0d0 / (32.0d0 *  (w**3.0d0) * &
+            (dsinH(0.5d0 * w * beta)**3.0) *  dcosH(0.5d0 * w * beta)))  
+       da = - a * b
+    end if
+  end subroutine w_to_daq
 
   ! Computes da/dw starting from the w frequencies
   ! w unit <= Ha

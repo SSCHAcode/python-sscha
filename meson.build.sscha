@@ -37,6 +37,7 @@ quadmath_dep = fc.find_library('quadmath', required: false)
 
 py.extension_module('sscha',
                      [
+                     '''module_hess.f90''',
                      '''module_stochastic.f90''',
                      '''module_new_thermodynamic.f90''',
                      '''module_anharmonic.f90''',
@@ -47,6 +48,7 @@ py.extension_module('sscha',
                      '''cell_force.f90''',
                      '''get_gradient_supercell_fast.f90''',
                      '''get_g.f90''',
+                     '''get_gq.f90''',
                      '''get_emat.f90''',
                      '''get_v3.f90''',
                      '''get_odd_straight.f90''',
