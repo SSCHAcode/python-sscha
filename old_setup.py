@@ -56,7 +56,9 @@ EXTRA_LINK_ARGS = ["-fopenmp"]
 
 # Compile the fortran SCHA modules
 SCHAModules = Extension(name = "SCHAModules", 
-                        sources = ["SCHAModules/module_stochastic.f90",
+                        sources = [
+                                   "SCHAModules/module_stochastic.f90",
+                                   "SCHAModules/module_hess.f90",
                                    "SCHAModules/module_new_thermodynamic.f90",
                                    "SCHAModules/module_anharmonic.f90",
                                    "SCHAModules/get_stress_tensor.f90",
@@ -66,12 +68,14 @@ SCHAModules = Extension(name = "SCHAModules",
                                    "SCHAModules/cell_force.f90",
                                    "SCHAModules/get_gradient_supercell_fast.f90",
                                    "SCHAModules/get_g.f90",
+                                   "SCHAModules/get_gq.f90",
                                    "SCHAModules/get_emat.f90",
                                    "SCHAModules/get_v3.f90",
                                    "SCHAModules/get_odd_straight.f90",
                                    "SCHAModules/get_cmat.f90",
                                    "SCHAModules/get_v4.f90",
-                                   "SCHAModules/get_odd_straight_with_v4.f90"],
+                                   "SCHAModules/get_odd_straight_with_v4.f90",
+                                   "SCHAModules/get_ur_upsilon_matrices.f90"],
                         extra_f90_compile_args = EXTRA_F90_FLAGS,
                         extra_link_args= EXTRA_LINK_ARGS,
                         **lapack_opt)
@@ -101,7 +105,7 @@ setup( name = "python-sscha",
        package_data={"": ["*.jl"]},
        setup_requires = ["numpy", "ase", "scipy", "cellconstructor", "spglib", "matplotlib"],
        ext_modules = [SCHAModules], # odd_HP
-       scripts = ["scripts/sscha", "scripts/cluster_check.x", "scripts/plot_frequencies.py",
+       scripts = ["scripts/sscha.x", "scripts/cluster_check.x", "scripts/plot_frequencies.py",
                   "scripts/sscha-plot-data.py",
                   "scripts/static-vc-relax.pyx", "scripts/read_incomplete_ensemble.py"],
        license = "GPLv3"

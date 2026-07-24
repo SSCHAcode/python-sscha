@@ -106,10 +106,10 @@ project('python-sscha',
   # --- END OF NUMPY CONFIGURATION ---
   if openblas_dep.found()
     message('openblas environment detected correctly.')
-    list_dep = [py_dep, mpi_dep, quadmath_dep, openblas_dep, lapack_dep, blas_dep]
+    list_dep = [py_dep, mpi_dep, quadmath_dep, openblas_dep, lapack_dep, blas_dep, openmp_dep]
   else
     warning('No openblas found.')
-    list_dep = [py_dep, mpi_dep, quadmath_dep, lapack_dep, blas_dep]
+    list_dep = [py_dep, mpi_dep, quadmath_dep, lapack_dep, blas_dep, openmp_dep]
   endif
 
 # --- Common Flags ---
@@ -123,6 +123,7 @@ common_link_flags = ['-fopenmp'] # For OpenMP
 # --- SCHAModules extension ---
 
 schamodules_sources = [
+  'SCHAModules/module_hess.f90',
   'SCHAModules/module_stochastic.f90',
   'SCHAModules/module_new_thermodynamic.f90',
   'SCHAModules/module_anharmonic.f90',
@@ -133,12 +134,14 @@ schamodules_sources = [
   'SCHAModules/cell_force.f90',
   'SCHAModules/get_gradient_supercell_fast.f90',
   'SCHAModules/get_g.f90',
+  'SCHAModules/get_gq.f90',
   'SCHAModules/get_emat.f90',
   'SCHAModules/get_v3.f90',
   'SCHAModules/get_odd_straight.f90',
   'SCHAModules/get_cmat.f90',
   'SCHAModules/get_v4.f90',
-  'SCHAModules/get_odd_straight_with_v4.f90'
+  'SCHAModules/get_odd_straight_with_v4.f90',
+  'SCHAModules/get_ur_upsilon_matrices.f90',
   # ,'SCHAModules/module_polarization.f90'
 ]
 ## Generate the C wrapper with f2py using a custom target
@@ -223,6 +226,8 @@ py.install_sources([
   'Modules/Tools.py',
   'Modules/Utilities.py',
   'Modules/cli.py',
+  'Modules/Classify.py',
+  'Modules/qClassify.py',
   ],
   subdir: 'sscha',
 )
