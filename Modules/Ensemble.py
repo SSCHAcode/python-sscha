@@ -140,6 +140,90 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
 
+
+def _get_v3_blas(a, er, transmode, amass, ityp_sc, f, u, rho):
+    """
+    Same calculation as SCHAModules.get_v3 (with log_err = 'err_yesrho'),
+    written with numpy matrix products instead of element-by-element loops.
+
+    The average over the configurations is done one chunk at a time to keep
+    memory bounded for large ensembles.  The per-element error that get_v3
+    computed internally was never returned to the callers, so it is not
+    computed here.
+    """
+    n_random, nat_sc = u.shape[0], u.shape[1]
+    n_modes = 3 * nat_sc
+
+    e = SCHAModules.get_emat(er, a, amass, ityp_sc, False, transmode)
+    eprod = e.T @ e
+    u2 = u.reshape(n_random, n_modes)
+    f2 = f.reshape(n_random, n_modes)
+    ur = u2 @ eprod
+
+    rf = (rho[:, None] * f2) / np.sum(rho)
+    v3 = np.einsum("x,yz->xyz", rf.sum(axis=0), eprod)
+
+    # v3 -= sum_i rf[i,x] ur[i,y] ur[i,z], one chunk of configurations at a
+    # time so the (chunk, n_modes^2) intermediate stays around ~256 MB
+    chunk = max(1, (32 * 1024 * 1024) // (n_modes * n_modes))
+    for i0 in range(0, n_random, chunk):
+        i1 = min(i0 + chunk, n_random)
+        outer = (ur[i0:i1, :, None] * ur[i0:i1, None, :]).reshape(i1 - i0, -1)
+        v3 -= (rf[i0:i1].T @ outer).reshape(n_modes, n_modes, n_modes)
+
+    return v3
+
+
+def _get_odd_straight_blas(a, w, er, transmode, amass, ityp_sc, T, v3):
+    """
+    Same calculation as SCHAModules.get_odd_straight, written with numpy
+    matrix products: v3 is contracted with the polarization matrix on two
+    indexes, then one final matrix product (with the g factor included)
+    gives phi_odd.
+    """
+    n_modes = len(a)
+    l = SCHAModules.get_emat(er, a, amass, ityp_sc, True, transmode)
+    g = SCHAModules.get_g(a, w, transmode, T)
+    m = np.tensordot(np.tensordot(v3, l, axes=([1], [1])), l, axes=([1], [1]))
+    m2 = m.reshape(n_modes, -1)
+    return 0.5 * (m2 @ (m * g[None, :, :]).reshape(n_modes, -1).T)
+
+
+def _get_gradient_supercell_blas(rho, u_disp, eforces, w, pols, trans, T, mass, ityp):
+    """
+    Same calculation as SCHAModules.get_gradient_supercell_new (with
+    log_err = 'err_yesrho'), written with numpy matrix products.  Returns
+    the preconditioned gradient and its stochastic error.
+    """
+    n_random, nat = u_disp.shape[0], u_disp.shape[1]
+    n_modes = 3 * nat
+
+    ups = SCHAModules.get_upsilon_matrix(w, pols, trans, mass, ityp, T)
+    u2 = u_disp.reshape(n_random, n_modes)
+    f2 = eforces.reshape(n_random, n_modes)
+    v = u2 @ ups
+
+    nc = float(n_random)
+    av_rho = rho.sum() / nc
+    s_rho = ((rho - av_rho) ** 2).sum() / (nc - 1)
+
+    rv = rho[:, None] * v
+    av_f1 = (rv.T @ f2) / nc
+    s_f = (((rho ** 2)[:, None] * v ** 2).T @ f2 ** 2 - nc * av_f1 ** 2) / (nc - 1)
+    s_f_rho = ((rho[:, None] * rv).T @ f2 - nc * av_f1 * av_rho) / (nc - 1)
+
+    grad = av_f1 / av_rho
+    with np.errstate(divide="ignore", invalid="ignore"):
+        grad_err = np.abs(grad) / np.sqrt(nc) * np.sqrt(
+            s_f / av_f1 ** 2 + s_rho / av_rho ** 2
+            - 2 * s_f_rho / (av_rho * av_f1))
+
+    # get_gradient_supercell_new symmetrized the gradient (not the error)
+    # the same way before returning
+    grad = 0.5 * (grad + grad.T)
+    return grad, grad_err
+
+
 class Ensemble:
     __debug_index__ = 0
 
@@ -2759,15 +2843,13 @@ Error while loading the julia module.
                                                                 nat, 3*nat, len(mass), preconditioned)
         else:
             if timer:
-                grad, grad_err = timer.execute_timed_function(SCHAModules.get_gradient_supercell_new,
+                grad, grad_err = timer.execute_timed_function(_get_gradient_supercell_blas,
                                                               self.rho, u_disp, eforces, w, pols, trans,
-                                                                     self.current_T, mass, ityp, log_err, self.N,
-                                                                     nat, 3*nat, len(mass),
-                                                                     override_name = "get_gradient_supercell_new")
+                                                              self.current_T, mass, ityp,
+                                                              override_name = "get_gradient_supercell_blas")
             else:
-                grad, grad_err = SCHAModules.get_gradient_supercell_new(self.rho, u_disp, eforces, w, pols, trans,
-                                                                     self.current_T, mass, ityp, log_err, self.N,
-                                                                     nat, 3*nat, len(mass))
+                grad, grad_err = _get_gradient_supercell_blas(self.rho, u_disp, eforces, w, pols, trans,
+                                                              self.current_T, mass, ityp)
 
 
         # If we are at gamma, we can skip this part
@@ -3709,11 +3791,11 @@ Error while loading the julia module.
         if verbose:
             print ("Going into d3")
         if timer:
-            d3 = timer.execute_timed_function(SCHAModules.get_v3, a, new_pol, trans, amass, ityp,
-                                    f, u, self.rho, log_err, override_name="SCHAModules.get_v3")
+            d3 = timer.execute_timed_function(_get_v3_blas, a, new_pol, trans, amass, ityp,
+                                    f, u, self.rho, override_name="get_v3_blas")
         else:
-            d3 = SCHAModules.get_v3(a, new_pol, trans, amass, ityp,
-                                    f, u, self.rho, log_err)
+            d3 = _get_v3_blas(a, new_pol, trans, amass, ityp,
+                              f, u, self.rho)
         if verbose:
             print("Outside d3")
 
@@ -3777,11 +3859,11 @@ Error while loading the julia module.
                 print (" ITYP = ", ityp)
                 print (" T = ", self.current_T)
             if timer:
-                phi_sc_odd = timer.execute_timed_function(SCHAModules.get_odd_straight, a, w, new_pol, trans, amass, ityp,
-                                                        self.current_T, d3)
+                phi_sc_odd = timer.execute_timed_function(_get_odd_straight_blas, a, w, new_pol, trans, amass, ityp,
+                                                        self.current_T, d3, override_name="get_odd_straight_blas")
             else:
-                phi_sc_odd = SCHAModules.get_odd_straight(a, w, new_pol, trans, amass, ityp,
-                                                        self.current_T, d3)
+                phi_sc_odd = _get_odd_straight_blas(a, w, new_pol, trans, amass, ityp,
+                                                    self.current_T, d3)
 
             if verbose:
                 print ("Outside odd straight.")
