@@ -107,6 +107,17 @@ julia = _LazyJuliaModule()
 # Deprecated alias kept for backward compatibility: it only tells whether a
 # Julia backend is installed, the runtime is not initialized at import time.
 __JULIA_EXT__ = JuliaExt.available()
+
+# The qspace_light path is built on DiagonalizeSupercell(q_only=True), which
+# only newer CellConstructor releases provide. Probe it once, so that asking
+# for the flag against an older one gives an explanatory error instead of a
+# TypeError raised from inside __setattr__.
+import inspect as _inspect
+try:
+    _CC_HAS_Q_ONLY = "q_only" in _inspect.signature(
+        CC.Phonons.Phonons.DiagonalizeSupercell).parameters
+except (AttributeError, TypeError, ValueError):
+    _CC_HAS_Q_ONLY = False
 __JULIA_ERROR__ = ""
 
 
@@ -351,6 +362,14 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
 
         if name == "dyn_0":
             if self.__dict__.get("qspace_light", False):
+                if not _CC_HAS_Q_ONLY:
+                    raise RuntimeError(
+                        "Ensemble(qspace_light=True) requires a CellConstructor "
+                        "providing DiagonalizeSupercell(q_only=True); the "
+                        "installed one does not have it, so the light mode "
+                        "cannot avoid the dense (3N,3N) allocation it exists "
+                        "to avoid. Use qspace_light=False (the default), or "
+                        "install the CellConstructor that provides q_only.")
                 # q-space light mode: q_only=True never assembles the (3N,3N)
                 # supercell polarization matrix. Only the O(N) frequencies,
                 # the q-space pols and the sorted-mode -> (iq, band) maps are

@@ -24,6 +24,16 @@ import cellconstructor as CC
 import cellconstructor.Phonons
 import sscha, sscha.Ensemble
 
+# The light mode is built on DiagonalizeSupercell(q_only=True), which only
+# newer CellConstructor releases provide. Skip the whole module rather than
+# fail when it is missing: nothing here can run, and the failure would say
+# nothing about this package.
+if not bool(getattr(sscha.Ensemble, "_CC_HAS_Q_ONLY", False)):
+    pytest.skip(
+        "the installed CellConstructor has no "
+        "DiagonalizeSupercell(q_only=True), which qspace_light requires",
+        allow_module_level=True)
+
 _JULIA = bool(getattr(sscha.Ensemble, "__JULIA_EXT__", False))
 needs_julia = pytest.mark.skipif(
     not _JULIA, reason="Julia Fourier backend not available")
