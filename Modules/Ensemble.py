@@ -107,6 +107,17 @@ julia = _LazyJuliaModule()
 # Deprecated alias kept for backward compatibility: it only tells whether a
 # Julia backend is installed, the runtime is not initialized at import time.
 __JULIA_EXT__ = JuliaExt.available()
+
+# The qspace_light path is built on DiagonalizeSupercell(q_only=True), which
+# only newer CellConstructor releases provide. Probe it once, so that asking
+# for the flag against an older one gives an explanatory error instead of a
+# TypeError raised from inside __setattr__.
+import inspect as _inspect
+try:
+    _CC_HAS_Q_ONLY = "q_only" in _inspect.signature(
+        CC.Phonons.Phonons.DiagonalizeSupercell).parameters
+except (AttributeError, TypeError, ValueError):
+    _CC_HAS_Q_ONLY = False
 __JULIA_ERROR__ = ""
 
 
@@ -143,7 +154,7 @@ class NumpyEncoder(json.JSONEncoder):
 class Ensemble:
     __debug_index__ = 0
 
-    def __init__(self, dyn0, T0, supercell = None, **kwargs):
+    def __init__(self, dyn0, T0, supercell = None, qspace_light = False, **kwargs):
         """
         PREPARE THE ENSEMBLE
         ====================
@@ -160,6 +171,17 @@ class Ensemble:
                 The temperature used to generate the ensemble.
             supercell: optional, list of int
                 The supercell dimension. If not provided, it will be determined by dyn0
+            qspace_light : bool
+                OPT-IN memory-light mode for the q-space (tdscha) pipeline.
+                If True, the (3N,3N) supercell polarization vectors are NEVER
+                materialized (pols_0 and current_pols stay None): the
+                ensemble keeps only the O(N) q-space frequencies and
+                polarizations plus the sorted-mode -> (iq, band) maps from
+                DiagonalizeSupercell(q_only=True). In this mode only
+                update_weights_fourier is available (the real-space
+                update_weights raises, since it genuinely needs the supercell
+                pols). Default False = standard behavior, identical to
+                previous versions.
             **kwargs : any other attribute of the ensemble
         """
 
@@ -201,6 +223,22 @@ class Ensemble:
         self.pols_q_0 = None
         self.w_q_current = None
         self.pols_q_current = None
+
+        # q-space light mode (see the qspace_light parameter above) and its
+        # sorted-supercell-mode -> (iq, band) maps from
+        # DiagonalizeSupercell(q_only=True). Must be set BEFORE dyn_0 below,
+        # whose __setattr__ hook branches on it.
+        self.qspace_light = bool(qspace_light)
+        self.mode_iq_0 = None
+        self.mode_band_0 = None
+        self.mode_iq_current = None
+        self.mode_band_current = None
+        # Codex audit fix (2026-07-24): track which representation was refreshed by the latest importance
+        # sampling update. Q-space consumers use this to avoid mixing a fresh
+        # real-space force cache with a stale Fourier cache (or vice versa).
+        # Direct __dict__ writes in the update methods also keep old pickles,
+        # whose fixed-attribute list lacks this new field, usable.
+        self._last_weight_update_fourier = False
 
         self.sscha_energies = []
         self.sscha_forces = []
@@ -323,12 +361,37 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
             super(Ensemble, self).__setattr__(name, value)
 
         if name == "dyn_0":
-            self.w_0, self.pols_0, self.w_q_0, self.pols_q_0 = value.DiagonalizeSupercell(return_qmodes=True)
-            self.current_dyn = value.Copy()
-            self.current_w = self.w_0.copy()
-            self.current_pols = self.pols_0.copy()
-            self.w_q_current = self.w_q_0.copy()
-            self.pols_q_current = self.pols_q_0.copy()
+            if self.__dict__.get("qspace_light", False):
+                if not _CC_HAS_Q_ONLY:
+                    raise RuntimeError(
+                        "Ensemble(qspace_light=True) requires a CellConstructor "
+                        "providing DiagonalizeSupercell(q_only=True); the "
+                        "installed one does not have it, so the light mode "
+                        "cannot avoid the dense (3N,3N) allocation it exists "
+                        "to avoid. Use qspace_light=False (the default), or "
+                        "install the CellConstructor that provides q_only.")
+                # q-space light mode: q_only=True never assembles the (3N,3N)
+                # supercell polarization matrix. Only the O(N) frequencies,
+                # the q-space pols and the sorted-mode -> (iq, band) maps are
+                # stored; pols_0/current_pols stay None (the q-space pipeline
+                # never reads them).
+                self.w_0, self.mode_iq_0, self.mode_band_0, self.w_q_0, self.pols_q_0 = \
+                    value.DiagonalizeSupercell(q_only=True)
+                self.pols_0 = None
+                self.current_pols = None
+                self.mode_iq_current = self.mode_iq_0.copy()
+                self.mode_band_current = self.mode_band_0.copy()
+                self.current_dyn = value.Copy()
+                self.current_w = self.w_0.copy()
+                self.w_q_current = self.w_q_0.copy()
+                self.pols_q_current = self.pols_q_0.copy()
+            else:
+                self.w_0, self.pols_0, self.w_q_0, self.pols_q_0 = value.DiagonalizeSupercell(return_qmodes=True)
+                self.current_dyn = value.Copy()
+                self.current_w = self.w_0.copy()
+                self.current_pols = self.pols_0.copy()
+                self.w_q_current = self.w_q_0.copy()
+                self.pols_q_current = self.pols_q_0.copy()
 
 
     def convert_units(self, new_units):
@@ -443,7 +506,7 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
         faster at each minimization steps
         """
         if self.N != len(self.structures):
-            self.N = self.structures
+            self.N = len(self.structures)
 
         # Check if th all_properties is initialized
         if len(self.all_properties) == 0:
@@ -492,7 +555,7 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
                 ) * CC.Units.A_TO_BOHR
 
             self.sscha_energies[:] = -julia.Main.multiply_vector_vector_fourier(
-                self.forces_qspace / CC.Units.A_TO_BOHR,
+                self.sscha_forces_qspace / CC.Units.A_TO_BOHR,
                 self.u_disps_qspace * CC.Units.A_TO_BOHR
             ) * 0.5 # The conversion is useless, keep it for clarity
 
@@ -519,6 +582,70 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
         if self.fourier_gradient:
             self.init_q_opposite()
 
+        # The caches have been rebuilt from scratch: force the q-space
+        # consumers (QSpaceLanczos) to re-derive them from the real-space
+        # arrays rather than trusting a stale provenance marker.
+        self.__dict__["_last_weight_update_fourier"] = False
+
+
+    def _refresh_qspace_caches_from_real_space(self):
+        """Deprecated private alias of refresh_qspace_caches_from_real_space."""
+        return self.refresh_qspace_caches_from_real_space()
+
+    def refresh_qspace_caches_from_real_space(self):
+        """
+        Rebuild u_disps_qspace, forces_qspace and sscha_forces_qspace by
+        Fourier transforming the current real-space arrays.
+
+        After a real-space update_weights(new_dyn), u_disps and sscha_forces
+        are coherent with current_dyn (including relaxed centroids), so their
+        Fourier transform is the coherent q-space cache. Unlike init(), this
+        method does not touch rho, sscha_energies, u_disps, u_disps_original
+        or the real-space sscha_forces.
+
+        On return the caches are coherent with the current real-space state,
+        so this method raises the coherence marker itself. Callers must not
+        set it from the outside: _last_weight_update_fourier is written
+        through __dict__ because it predates __total_attributes__ and has to
+        keep loading from older pickles, and reaching into another package's
+        private state to flip it is exactly what this method exists to avoid.
+        The marker name is historical: it means "the q-space caches are
+        coherent with the current real-space arrays", which is what both
+        update_weights_fourier and this method establish.
+        """
+        if not __JULIA_EXT__:
+            raise ImportError("The julia extension is required to refresh the q-space caches.")
+
+        nat_sc = self.supercell_structure.N_atoms
+        self.u_disps_qspace = julia.Main.vector_r2q(
+            self.u_disps,
+            self.q_grid,
+            self.itau,
+            self.r_lat,
+        )
+        self.forces_qspace = julia.Main.vector_r2q(
+            self.forces.reshape((self.N, 3 * nat_sc)),
+            self.q_grid,
+            self.itau,
+            self.r_lat,
+        )
+        self.sscha_forces_qspace = julia.Main.vector_r2q(
+            np.reshape(self.sscha_forces, (self.N, 3 * nat_sc)),
+            self.q_grid,
+            self.itau,
+            self.r_lat,
+        )
+        # The dyn_0 baseline never changes after generation/load.
+        self.u_disps_original_qspace = julia.Main.vector_r2q(
+            self.u_disps_original,
+            self.q_grid,
+            self.itau,
+            self.r_lat,
+        )
+        if self.q_opposite_index is None:
+            self.init_q_opposite()
+
+        self.__dict__["_last_weight_update_fourier"] = True
 
 
     def load(self, data_dir, population, N, verbose = False, load_displacements = True, raise_error_on_not_found = False, load_noncomputed_ensemble = False, skip_extra_rows = False,
@@ -1307,9 +1434,9 @@ Error, the following stress files are missing from the ensemble:
             self.sscha_forces_qspace = - julia.Main.multiply_matrix_vector_fourier(
                 dynq,
                 self.u_disps_original_qspace * CC.Units.A_TO_BOHR,
-            )
-            self.sscha_energies[:] = julia.Main.multiply_vector_vector_fourier(
-                self.sscha_forces_qspace,
+            ) / CC.Units.BOHR_TO_ANGSTROM
+            self.sscha_energies[:] = -julia.Main.multiply_vector_vector_fourier(
+                self.sscha_forces_qspace / CC.Units.A_TO_BOHR,
                 self.u_disps_original_qspace * CC.Units.A_TO_BOHR
             ) * 0.5
 
@@ -1317,6 +1444,9 @@ Error, the following stress files are missing from the ensemble:
         self.rho = np.ones(self.N, dtype = np.float64)
         self.current_dyn = self.dyn_0.Copy()
         self.current_T = self.T0
+        # Freshly (re)generated ensemble: no reweight has happened yet, so
+        # the q-space caches must be re-derived by their consumers.
+        self.__dict__["_last_weight_update_fourier"] = False
 
         # Setup that both forces and stresses are not computed
         self.stress_computed = np.zeros(self.N, dtype = bool)
@@ -1619,6 +1749,11 @@ Error, the following stress files are missing from the ensemble:
         Update the displacement vector in fourier space
         using the new structure.
         """
+        if np.linalg.norm(self.q_grid[0]) > 1e-8:
+            raise ValueError("update_displacements assumes Gamma is the "
+                             "first q point (q_tot[0]); reorder the q points "
+                             "first (e.g. with Phonons.AdjustQStar).")
+
         self.u_disps_qspace[:,:,:] = self.u_disps_original_qspace.copy()
         delta = self.dyn_0.structure.coords - new_structure.coords
 
@@ -1626,6 +1761,39 @@ Error, the following stress files are missing from the ensemble:
         nq = self.q_grid.shape[0]
         self.u_disps_qspace[:,:,0] += np.tile(delta.ravel(), (self.N, 1)) * np.sqrt(nq)
 
+
+    def _get_asr_modes_gamma(self, pols_q, mode_iq, mode_band, dyn):
+        """Reproduce ``super_struct.get_asr_modes(supercell_pols)`` using only the
+        Gamma block of the q-space polarizations, with NO (3N,3N) allocation.
+
+        A rigid mass-weighted translation exists only at q=Gamma, so the
+        full-supercell translational (ASR) mask equals the Gamma-block band mask
+        scattered back through the sorted-supercell-mode -> (iq, band) mapping
+        produced by ``DiagonalizeSupercell(q_only=True)``. Verified bitwise-
+        identical (np.array_equal) to ``get_asr_modes`` on GOLD size3/size5.
+
+        NOTE: valid ONLY for the ``one_dim_axis is None`` branch of
+        get_asr_modes (normal 3D crystals -- the q-space pipeline case). The
+        1D/molecular rotation branch is not reproduced here (it needs the full
+        supercell coords): callers MUST check ``one_dim_axis`` and fall back
+        to the legacy ``get_asr_modes(full_pols)`` path when it is set, as
+        update_weights_fourier does.
+
+        Parameters
+        ----------
+            pols_q : (3nat, 3nat, nq) complex128 -- q-space polarizations.
+            mode_iq, mode_band : (3*nat_sc,) intp -- sorted mode -> (iq, band).
+            dyn : Phonons -- provides unit-cell masses and the q list (for Gamma).
+
+        Returns
+        -------
+            (3*nat_sc,) bool -- True on translational (ASR) supercell modes.
+        """
+        masses_uc = dyn.structure.get_masses_array()
+        i_gamma = int(np.argmin([np.linalg.norm(q) for q in dyn.q_tot]))
+        gamma_band_mask = CC.Methods.get_translations(
+            np.real(pols_q[:, :, i_gamma]), masses_uc)
+        return (mode_iq == i_gamma) & gamma_band_mask[mode_band]
 
     def update_weights_fourier(self, new_dynamical_matrix, newT, timer=None):
         """
@@ -1644,6 +1812,37 @@ Error, the following stress files are missing from the ensemble:
             new_T : float
                 The new temperature.
         """
+
+        # Mark the caches as dirty until this update completes: if an
+        # exception interrupts the method halfway, consumers (QSpaceLanczos)
+        # must re-derive the q-space caches instead of trusting the marker.
+        self.__dict__["_last_weight_update_fourier"] = False
+
+        # Fail fast on two silent-corruption scenarios. The fourier update
+        # contracts dynq[:, :, i] with u_disps_qspace[:, :, i] index by
+        # index, so the q ordering of the new dyn MUST match the generating
+        # one; and r_lat/q_grid are never rebuilt, so the lattice must be
+        # unchanged.
+        if len(new_dynamical_matrix.q_tot) != len(self.dyn_0.q_tot) or \
+           not np.allclose(np.array(new_dynamical_matrix.q_tot),
+                           np.array(self.dyn_0.q_tot), atol=1e-6, rtol=0):
+            raise ValueError(
+                "update_weights_fourier: the q points of the new dynamical "
+                "matrix differ (in values or ordering) from those of the "
+                "generating dyn. The Fourier reweighting contracts the two "
+                "index by index, which would silently mix different q "
+                "points. Reorder the new dyn to match dyn_0.q_tot (beware: "
+                "AdjustQStar can change the ordering).")
+        if not np.allclose(new_dynamical_matrix.structure.unit_cell,
+                           self.dyn_0.structure.unit_cell,
+                           atol=1e-8, rtol=0):
+            raise ValueError(
+                "update_weights_fourier: the unit cell of the new dynamical "
+                "matrix differs from the generating one. Variable-cell "
+                "reweighting is not supported on the Fourier path (r_lat "
+                "and q_grid are fixed at generation, and the Gamma-only "
+                "displacement shift assumes an unchanged lattice). Use the "
+                "real-space update_weights instead.")
 
         self.current_T = newT
 
@@ -1682,17 +1881,42 @@ Error, the following stress files are missing from the ensemble:
         u_disp_fourier_old = self.u_disps_original_qspace
 
         if changed_dyn:
-            if timer:
-                w_new, pols, wqn, polsqn = timer.execute_timed_function(new_dynamical_matrix.DiagonalizeSupercell, return_qmodes=True)
+            if self.__dict__.get("qspace_light", False):
+                # Light mode: q_only diag, no (3N,3N) supercell pols ever.
+                # The sorted-mode -> (iq, band) maps are refreshed together
+                # with the dyn they describe, so the ASR masks below are
+                # always coherent.
+                if timer:
+                    w_new, mode_iq_n, mode_band_n, wqn, polsqn = timer.execute_timed_function(new_dynamical_matrix.DiagonalizeSupercell, q_only=True)
+                else:
+                    w_new, mode_iq_n, mode_band_n, wqn, polsqn = new_dynamical_matrix.DiagonalizeSupercell(q_only=True)
+                self.current_w = w_new.copy()
+                self.mode_iq_current = mode_iq_n.copy()
+                self.mode_band_current = mode_band_n.copy()
+                self.w_q_current = wqn.copy()
+                self.pols_q_current = polsqn.copy()
             else:
-                w_new, pols, wqn, polsqn = new_dynamical_matrix.DiagonalizeSupercell(return_qmodes=True)#new_super_dyn.DyagDinQ(0)
-            self.current_w = w_new.copy()
-            self.current_pols = pols.copy()
-            self.w_q_current = wqn.copy()
-            self.pols_q_current = polsqn.copy()
+                if timer:
+                    w_new, pols, wqn, polsqn = timer.execute_timed_function(new_dynamical_matrix.DiagonalizeSupercell, return_qmodes=True)
+                else:
+                    w_new, pols, wqn, polsqn = new_dynamical_matrix.DiagonalizeSupercell(return_qmodes=True)#new_super_dyn.DyagDinQ(0)
+                self.current_w = w_new.copy()
+                self.current_pols = pols.copy()
+                self.w_q_current = wqn.copy()
+                self.pols_q_current = polsqn.copy()
         else:
             w_new = self.current_w.copy()
-            pols  = self.current_pols.copy()
+            if self.__dict__.get("qspace_light", False):
+                if self.mode_iq_current is None:
+                    # Defensive: maps missing (e.g. the light flag was toggled
+                    # on an existing object). Recompute from the unchanged
+                    # current_dyn -- cheap q_only diag, no (3N,3N).
+                    _, self.mode_iq_current, self.mode_band_current, _, _ = \
+                        self.current_dyn.DiagonalizeSupercell(q_only=True)
+                mode_iq_n = self.mode_iq_current
+                mode_band_n = self.mode_band_current
+            else:
+                pols  = self.current_pols.copy()
             wqn = self.w_q_current.copy()
             polsqn = self.pols_q_current.copy()
             #w_new, pols = new_dynamical_matrix.DiagonalizeSupercell()#new_super_dyn.DyagDinQ(0)
@@ -1738,11 +1962,30 @@ Error, the following stress files are missing from the ensemble:
         #super_dyn = self.dyn_0.GenerateSupercellDyn(self.supercell)
 
         w_original = self.w_0.copy()
-        pols_original = self.pols_0.copy()
+        if not self.__dict__.get("qspace_light", False):
+            pols_original = self.pols_0.copy()
 
         # Exclude translations
         if not self.ignore_small_w:
-            trans_original = super_struct0.get_asr_modes(pols_original)
+            if self.__dict__.get("qspace_light", False):
+                if super_struct0.one_dim_axis is not None:
+                    # 1D/molecular system: get_asr_modes has a rotational
+                    # branch (one_dim_axis) that the Gamma-block helper does
+                    # not reproduce. Fall back to the legacy full-pols path
+                    # with a TRANSIENT (3N,3N) materialization (freed on
+                    # return) -- correctness over memory for this rare case.
+                    trans_original = super_struct0.get_asr_modes(
+                        self.dyn_0.DiagonalizeSupercell(return_qmodes=True)[1])
+                else:
+                    if self.mode_iq_0 is None:
+                        # Defensive (light flag toggled on an existing
+                        # object): recompute dyn_0's maps once (cheap q_only).
+                        _, self.mode_iq_0, self.mode_band_0, _, _ = \
+                            self.dyn_0.DiagonalizeSupercell(q_only=True)
+                    trans_original = self._get_asr_modes_gamma(
+                        self.pols_q_0, self.mode_iq_0, self.mode_band_0, self.dyn_0)
+            else:
+                trans_original = super_struct0.get_asr_modes(pols_original)
             # trans_original = CC.Methods.get_translations(pols_original, super_struct0.get_masses_array())
         else:
             trans_original = np.abs(w_original) < CC.Phonons.__EPSILON_W__
@@ -1760,7 +2003,17 @@ Error, the following stress files are missing from the ensemble:
 
 
         if not self.ignore_small_w:
-            trans_mask = super_structure.get_asr_modes(pols)
+            if self.__dict__.get("qspace_light", False):
+                if super_structure.one_dim_axis is not None:
+                    # 1D/molecular fallback: legacy full-pols path, transient
+                    # (3N,3N), see the trans_original branch above.
+                    trans_mask = super_structure.get_asr_modes(
+                        new_dynamical_matrix.DiagonalizeSupercell(return_qmodes=True)[1])
+                else:
+                    trans_mask = self._get_asr_modes_gamma(
+                        polsqn, mode_iq_n, mode_band_n, new_dynamical_matrix)
+            else:
+                trans_mask = super_structure.get_asr_modes(pols)
             # trans_mask = CC.Methods.get_translations(pols, super_structure.get_masses_array())
         else:
             trans_mask = np.abs(w_new) < CC.Phonons.__EPSILON_W__
@@ -1880,6 +2133,7 @@ DETAILS OF ERROR:
         #print( "Time elapsed to update weights the sscha energies, forces and displacements:", t1 - t3, "s")
         else:
             self.current_dyn = new_dynamical_matrix.Copy()
+        self.__dict__["_last_weight_update_fourier"] = True
 
 
 
@@ -1904,6 +2158,17 @@ DETAILS OF ERROR:
                 methods and application, but not for standard minimization.
                 Since it is the most time consuming part, it can be safely avoided.
         """
+
+        if getattr(self, "qspace_light", False):
+            raise RuntimeError(
+                "This ensemble was built with qspace_light=True: the "
+                "real-space update_weights needs the (3N,3N) supercell "
+                "polarization vectors, which light mode never materializes. "
+                "Use update_weights_fourier instead, or construct the "
+                "ensemble with qspace_light=False.")
+
+        # Dirty until the update completes (see update_weights_fourier).
+        self.__dict__["_last_weight_update_fourier"] = False
 
         self.current_T = newT
 
@@ -2080,6 +2345,7 @@ DETAILS OF ERROR:
         #print( "Time elapsed to update weights the sscha energies, forces and displacements:", t1 - t3, "s")
         else:
             self.current_dyn = new_dynamical_matrix.Copy()
+        self.__dict__["_last_weight_update_fourier"] = False
 
 
         if __DEBUG_RHO__:
@@ -2183,6 +2449,11 @@ DETAILS OF ERROR:
         """
 
 
+        if np.linalg.norm(self.q_grid[0]) > 1e-8:
+            raise ValueError("get_fourier_forces assumes Gamma is the first "
+                             "q point (q_tot[0]); reorder the q points first "
+                             "(e.g. with Phonons.AdjustQStar).")
+
         delta_forces = np.real(self.forces_qspace[:, :, 0] - self.sscha_forces_qspace[:, :, 0])
         nq = self.q_grid.shape[0]
         delta_forces /= np.sqrt(nq)
@@ -2281,6 +2552,14 @@ DETAILS OF ERROR:
             float
                 The free energy in the current dynamical matrix and at the ensemble temperature
         """
+
+        if self.__dict__.get("qspace_light", False):
+            raise RuntimeError(
+                "This ensemble was built with qspace_light=True: current_pols "
+                "was deliberately never allocated, so the harmonic free energy "
+                "cannot be evaluated this way (it would fail inside "
+                "GetHarmonicFreeEnergy with an opaque AttributeError on None). "
+                "Rebuild the ensemble with qspace_light=False.")
 
         free_energy = self.current_dyn.GetHarmonicFreeEnergy(self.current_T, w_pols = (self.current_w, self.current_pols))
 
@@ -3860,6 +4139,17 @@ Error while loading the julia module.
             phi_sc : Phonons()
                 The dynamical matrix of the free energy hessian in (Ry/bohr^2)
         """
+
+        if self.__dict__.get("qspace_light", False):
+            raise RuntimeError(
+                "This ensemble was built with qspace_light=True. This routine "
+                "diagonalizes the supercell itself, materializing the dense "
+                "(3N, 3N) polarization matrix that the light path exists to "
+                "avoid; and a light ensemble can only have been reweighted "
+                "through update_weights_fourier, which does not refresh the "
+                "real-space sscha_forces this hessian consumes, so the result "
+                "would be wrong without any warning. Rebuild the ensemble with "
+                "qspace_light=False to use get_free_energy_hessian_dev.")
 
         self.convert_units(UNITS_HARTREE)
         super_structure = self.current_dyn.structure.generate_supercell(self.supercell)
