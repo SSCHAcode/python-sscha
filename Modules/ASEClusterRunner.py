@@ -7,8 +7,9 @@ remote) cluster as:
     python -m sscha.ASEClusterRunner --calc calculator.pkl \
         --input PREFIX_input.json --output PREFIX.json
 
-The output JSON contains energy [eV], forces [eV/Angstrom], stress
-[ASE Voigt (xx, yy, zz, yz, xz, xy), eV/Angstrom^3] and the computed Atoms.
+The output JSON contains energy [eV], forces [eV/Angstrom], the computed
+Atoms and, when the calculator supports it, stress [ASE Voigt
+(xx, yy, zz, yz, xz, xy), eV/Angstrom^3].
 """
 import argparse
 import pickle
@@ -36,9 +37,12 @@ def main():
     payload = {
         "energy": float(atoms.get_potential_energy()),  # eV
         "forces": atoms.get_forces(),                   # eV / Angstrom
-        "stress": atoms.get_stress(),                   # ASE Voigt, -eV/Angstrom^3
         "atoms": atoms,                                 # structure actually computed
     }
+    try:
+        payload["stress"] = atoms.get_stress()          # ASE Voigt, -eV/Angstrom^3
+    except Exception:
+        pass  # calculator without stress: call compute_ensemble with get_stress=False
     with open(args.output, "w") as handle:
         handle.write(ase.io.jsonio.encode(payload))
 

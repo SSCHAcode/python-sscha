@@ -150,3 +150,73 @@ def test_nonpicklable_calculator_fails_early():
             raise TypeError("no pickle")
     with pytest.raises(TypeError):
         cluster_calcs.ASEFileCalculator(Unpicklable())
+
+
+def test_directcluster_stress_less_calculator():
+    """A calculator without stress works via DirectCluster with get_stress=False."""
+    class NoStressEMT(EMT):
+        def get_stress(self, atoms=None, voigt=True):
+            raise NotImplementedError("NoStressEMT does not support stress")
+
+    np.random.seed(0)
+    ensemble = sscha.Ensemble.Ensemble(get_gold_dyn(), 0)
+    ensemble.generate(4)
+    cluster = sscha.BaseCluster.DirectCluster(batch_size=2, job_number=1)
+    ensemble.compute_ensemble(cluster_calcs.ASEDirectCalculator(NoStressEMT()),
+                              compute_stress=False, cluster=cluster)
+
+    assert all(ensemble.force_computed)
+    assert not any(ensemble.stress_computed)
+    from ase.units import create_units
+    Ry = create_units("2006")["Ry"]
+    atoms = ensemble.structures[0].get_ase_atoms()
+    atoms.calc = NoStressEMT()
+    assert ensemble.energies[0] == pytest.approx(atoms.get_potential_energy() / Ry, rel=1e-10)
+    assert np.allclose(ensemble.forces[0], atoms.get_forces() / Ry, atol=1e-10)
+
+
+_NO_STRESS_MODULE = """
+from ase.calculators.emt import EMT
+
+
+class NoStressEMT(EMT):
+    \"\"\"EMT that refuses to compute the stress (like stress-less codes).\"\"\"
+    def get_stress(self, atoms=None, voigt=True):
+        raise NotImplementedError("NoStressEMT does not support stress")
+"""
+
+
+def test_ase_file_calculator_stress_less_roundtrip(tmp_path):
+    """The file bridge tolerates calculators without stress (get_stress=False).
+
+    The runner must not crash on a missing stress implementation: the output
+    JSON simply omits the ``stress`` key and ``read_results`` keeps working.
+    """
+    import sys as _sys
+
+    (tmp_path / "_nostress_calc.py").write_text(_NO_STRESS_MODULE)
+    _sys.path.insert(0, str(tmp_path))
+    try:
+        from _nostress_calc import NoStressEMT
+
+        calc = cluster_calcs.ASEFileCalculator(NoStressEMT())
+        calc.set_directory(str(tmp_path))
+        calc.set_label("ESP_0")
+        struct = get_gold_structure()
+        calc.write_input(struct)
+
+        # Execute the runner exactly as Cluster.get_execution_command would
+        cmd = calc.command.replace("PREFIX", os.path.join(str(tmp_path), "ESP_0"))
+        subprocess.run(cmd, shell=True, check=True, cwd=str(tmp_path))
+
+        calc.read_results()
+        assert "energy" in calc.results
+        assert "forces" in calc.results
+        assert "stress" not in calc.results
+
+        atoms = struct.get_ase_atoms()
+        atoms.calc = NoStressEMT()
+        assert calc.results["energy"] == pytest.approx(atoms.get_potential_energy(), rel=1e-10)
+        assert np.allclose(calc.results["forces"], atoms.get_forces(), atol=1e-10)
+    finally:
+        _sys.path.remove(str(tmp_path))

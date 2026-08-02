@@ -187,8 +187,11 @@ class ASEFileCalculator(FileIOCalculator):
         self.results = {
             "energy": payload["energy"],   # eV
             "forces": payload["forces"],   # eV / Angstrom
-            "stress": payload["stress"],   # ASE Voigt (xx,yy,zz,yz,xz,xy), -eV/Angstrom^3
         }
+        if "stress" in payload:
+            # ASE Voigt (xx,yy,zz,yz,xz,xy), -eV/Angstrom^3. Absent when the
+            # calculator does not support stress (get_stress=False).
+            self.results["stress"] = payload["stress"]
         self.structure = CC.Structure.Structure()
         self.structure.generate_from_ase_atoms(payload["atoms"])
 
