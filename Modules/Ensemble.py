@@ -3871,7 +3871,7 @@ Error while loading the julia module.
 
         mapping, rot_cart, map_uc, map_tr, T_list, T_list_frac = Classify.map_singlet(self.current_dyn, verbose = False)
 
-        orbit2a, orbit2s, norbit, indep_elem, n_indep_elem, tensor = Classify.recognize_doublet(self.current_dyn, mapping, map_uc, verbose = False)
+        orbit2a, orbit2s, norbit, indep_elem, n_indep_elem, tensor = Classify.recognize_doublet(self.current_dyn, mapping, map_uc, verbose = verbose)
 
         orbit3a, orbit3s, norbit3, indep_3fc_elem, n_indep_3fc_elem, kernel_3fc, rot_3fc, mapping_triplet = Classify.recognize_triplet(self.current_dyn, mapping, map_uc, verbose=verbose)
 
@@ -4713,4 +4713,3 @@ def _wrapper_julia_vector_vector_fourier(*args, **kwargs):
 
     return julia.Main.multiply_vector_vector_fourier(*args,
             **kwargs)
-    

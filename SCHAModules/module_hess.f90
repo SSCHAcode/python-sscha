@@ -203,6 +203,8 @@ subroutine get_ref4fc(orbit4t, indep_4fc_elem, n_indep_4fc_elem, kernel_4fc, rot
 
     logical, intent(in) :: verbose
     double precision, dimension(nref4, 81), intent(out) :: ref_4fc
+    
+    double precision :: tstart, tend
 
     integer :: nref4, dim2, nat_sc, n_mode, n_random, nr
     double precision :: v4
@@ -218,6 +220,7 @@ subroutine get_ref4fc(orbit4t, indep_4fc_elem, n_indep_4fc_elem, kernel_4fc, rot
     tmp_ref_4fc = 0
 
     if (verbose) then
+        tstart = omp_get_wtime()
         print *, "======================= get_ref4fc() ======================= "
         print *, "  Computing the independent elements for the 4th order FCs"
     end if
@@ -247,6 +250,9 @@ indep_4fc(:n_indep_4fc_elem(ref4)), 1, 0.0d0, tmp_ref_4fc, 1)
     !$omp end do
     !$omp end parallel
     if (verbose) then
+        tend = omp_get_wtime()
+        print*, ""
+        print "(A, ES16.6,A)", "  Elapsed time inside get_ref4fc():", tend-tstart, " seconds"
         print *, "=======================     DONE     ======================="
         print *, ""
     end if
@@ -1446,7 +1452,7 @@ subroutine get_v3_element_sym (na_in, nb_in, nc_in, ur, eprod, f, rho, log_err, 
     integer :: nat_sc, n_mode, n_random, nr
   
     double precision, dimension(:), allocatable :: fun 
-    double precision, dimension(:,:), allocatable :: Rot,v3_tp, v3_s!aux matrix where the elements have transl and perm sym applied
+    double precision, dimension(:,:), allocatable :: Rot, v3_tp, v3_s !aux matrix where the elements have transl and perm sym applied
     double precision :: v3_aux, av, av_err
     double precision :: aux_elem1, aux_elem2, aux_elem3
     
@@ -2323,7 +2329,7 @@ jaux, indexprime, ll, nindep, iw, ref3
         end do doii
         if (verbose) then
             tend = omp_get_wtime()
-            print*, ""
+            print "(A, I8)", "  Number of independent triplets:", ref3 
             print "(A, ES16.6,A)", "  Elapsed time inside recognize_triplet():", tend-tstart, " seconds"
             print *, "=======================     DONE     ======================="
             print *, ""
@@ -2407,6 +2413,8 @@ subroutine recognize_quadruplet(nat, nat_sc, tot4, nref4, nsym, mappings, map_uc
         double precision, dimension(81,81) :: kern
         double precision, dimension(24*nsym*81,81) :: constrain
 
+        double precision :: tstart, tend
+
         integer, dimension(24,4) :: permutations
         integer, dimension(4) :: qplet, qplet_perm, qplet_sym
         integer :: ii, jj, kk, ll, nall4, equiv, nconstrain, iperm, isym, iaux, &
@@ -2415,7 +2423,11 @@ jaux, indexprime, mm, nindep, iw, ref4
 
         character(len=100) :: filename
 
-
+        if (verbose) then
+            tstart = omp_get_wtime()
+            print*, "================== recognize_quadruplet() =================="
+            print*, " Classifying atomic quadruplets..."
+        end if
         kernel = 0
         orbit4t = 0
         orbit4o = 0
@@ -2512,6 +2524,14 @@ qplet_sym(1)+1,qplet_sym(2)+1,qplet_sym(3)+1,qplet_sym(4)+1,:) = [ref4-1,iperm-1
                         end do dokk
                 end do dojj
         end do doii
+        if (verbose) then
+            tend = omp_get_wtime()
+            print *,""
+            print "(A, I8)", "  Number of independent triplets:", ref4 
+            print "(A, ES16.6,A)", "  Elapsed time inside recognize_quadruplet():", tend-tstart, " seconds"
+            print *, "=======================     DONE     ======================="
+            print *, ""
+        end if
 end subroutine   
 
 subroutine triplet_in_list(triplet, all3, nall3, its_in_list)
