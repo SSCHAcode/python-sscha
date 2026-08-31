@@ -1,15 +1,3 @@
-! This subroutine calculates the stochastic average of an element of the
-! third order force constants based on fu2 and lmat. 
-! The force constants element is given with three indexes that correspond 
-! to atom-cartesian coordinates.
-!
-! NOTE: there is a first addend that is not implemented at the moment
-!       because it should be zero if the odd correction is calculated
-!       at the atomic positions that minimize the gradient with respect
-!       to Wyckoff positions. This non-implemented addend vanishes
-!       if positions are fixed by symmetry.
-! Version de get_v3_element_sym pero guardando datos en una matrix auxiliar
-
 module module_hess
 
 use omp_lib
@@ -138,6 +126,8 @@ subroutine get_ref3fc(nat, orbit3t, indep_3fc_elem, n_indep_3fc_elem, kernel_3fc
     
     logical, intent(in) :: verbose
 
+    double precision :: tstart, tend
+
     double precision, dimension(nref3, 27), intent(out) :: ref_3fc
 
     integer :: nref3, dim2, nat_sc, n_mode, n_random, nr
@@ -153,8 +143,9 @@ subroutine get_ref3fc(nat, orbit3t, indep_3fc_elem, n_indep_3fc_elem, kernel_3fc
     tmp_ref_3fc = 0
 
     if (verbose) then
+        tstart = omp_get_wtime()
         print *, "======================= get_ref3fc() ======================= "
-        print *, "Computing the independent elements for the third order FCs."
+        print *, " Computing the independent elements for the third order FCs."
     end if
 
     !$omp parallel private (i, nat1, nat2, nat3, alpha, beta, gamma, v3, indep_3fc, tmp_ref_3fc)
@@ -180,6 +171,9 @@ indep_3fc(:n_indep_3fc_elem(ref3)), 1, 0.0d0, tmp_ref_3fc, 1)
     !$omp end do
     !$omp end parallel
     if (verbose) then
+        tend = omp_get_wtime()
+        print*, ""
+        print "(A, ES16.6,A)", "  Elapsed time inside get_ref3fc():", tend-tstart, " seconds"
         print *, "=======================     DONE     ======================="
         print *, ""
     end if
@@ -209,6 +203,8 @@ subroutine get_ref4fc(orbit4t, indep_4fc_elem, n_indep_4fc_elem, kernel_4fc, rot
 
     logical, intent(in) :: verbose
     double precision, dimension(nref4, 81), intent(out) :: ref_4fc
+    
+    double precision :: tstart, tend
 
     integer :: nref4, dim2, nat_sc, n_mode, n_random, nr
     double precision :: v4
@@ -224,6 +220,7 @@ subroutine get_ref4fc(orbit4t, indep_4fc_elem, n_indep_4fc_elem, kernel_4fc, rot
     tmp_ref_4fc = 0
 
     if (verbose) then
+        tstart = omp_get_wtime()
         print *, "======================= get_ref4fc() ======================= "
         print *, "  Computing the independent elements for the 4th order FCs"
     end if
@@ -253,6 +250,9 @@ indep_4fc(:n_indep_4fc_elem(ref4)), 1, 0.0d0, tmp_ref_4fc, 1)
     !$omp end do
     !$omp end parallel
     if (verbose) then
+        tend = omp_get_wtime()
+        print*, ""
+        print "(A, ES16.6,A)", "  Elapsed time inside get_ref4fc():", tend-tstart, " seconds"
         print *, "=======================     DONE     ======================="
         print *, ""
     end if
@@ -1081,6 +1081,8 @@ subroutine get_indep2fc( &
     double precision, dimension(Nqpoint, 3), intent(in) :: T_list, q_list
     double precision, dimension(Nqpoint, Nqpoint, n_mode, n_mode), intent(in) :: F
 
+    double precision :: tstart, tend
+
     logical, intent(in) :: verbose
 
     double precision, dimension(nref2,9), intent(out) :: indep_fc
@@ -1096,6 +1098,7 @@ subroutine get_indep2fc( &
     complex :: Vsa, Vsb
 
     if (verbose) then
+        tstart = omp_get_wtime()
         print*, "======================= get_indep2fc() ======================="
         print*, "Computing independent third order corrections to FCs \Phi^{3}_{a,b}^{\alpha,\beta}"
     end if
@@ -1143,6 +1146,9 @@ real(0.5d0*F(refq2(rq2,1,1)+1,refq2(rq2,1,2)+1,munu(permutations(iperm+1,1)), mu
         end do
     end do
     if (verbose) then
+        tend = omp_get_wtime()
+        print*, ""
+        print "(A, ES16.6,A)", "  Elapsed time inside get_indep2fc():", tend-tstart, " seconds"
         print *, "=======================     DONE     ======================="
         print *, ""
     end if
@@ -1413,7 +1419,7 @@ rot_pol_alpha3*rot_pol_alpha4
 
 end subroutine get_rotq_ws
 
-  ! This subroutine calculates the stochastic average of an element of the
+! This subroutine calculates the stochastic average of an element of the
 ! third order force constants based on fu2 and lmat. 
 ! The force constants element is given with three indexes that correspond 
 ! to atom-cartesian coordinates.
@@ -1446,7 +1452,7 @@ subroutine get_v3_element_sym (na_in, nb_in, nc_in, ur, eprod, f, rho, log_err, 
     integer :: nat_sc, n_mode, n_random, nr
   
     double precision, dimension(:), allocatable :: fun 
-    double precision, dimension(:,:), allocatable :: Rot,v3_tp, v3_s!aux matrix where the elements have transl and perm sym applied
+    double precision, dimension(:,:), allocatable :: Rot, v3_tp, v3_s !aux matrix where the elements have transl and perm sym applied
     double precision :: v3_aux, av, av_err
     double precision :: aux_elem1, aux_elem2, aux_elem3
     
@@ -2213,6 +2219,8 @@ subroutine recognize_triplet(nat, nat_sc, tot3, nref3, nsym, mappings, map_uc, n
 
         double precision, allocatable, dimension(:,:) :: constrain_reduced
 
+        double precision :: tstart, tend
+
         integer, dimension(tot3,3) :: all3
         integer, dimension(6*nsym, 3) :: equilist
         integer, dimension(27) :: indep
@@ -2227,7 +2235,11 @@ jaux, indexprime, ll, nindep, iw, ref3
 
         character(len=100) :: filename
 
-
+        if (verbose) then
+            tstart = omp_get_wtime()
+            print*, "=================== recognize_triplet() ==================="
+            print*, " Classifying atomic triplets..."
+        end if
         kernel = 0
         orbit3t = 0
         orbit3o = 0
@@ -2295,12 +2307,12 @@ jaux, indexprime, ll, nindep, iw, ref3
                                 call gauss_jordan(constrain_reduced, max(nconstrain,27), 27, nconstrain, kern, indep, nindep)
 
                                 deallocate(constrain_reduced)
-                                if (verbose) then
-                                    print *, "Reference triplet: (", ii, ",", jj, ",", kk, ")."
-                                    print *, "Orbit size:", equiv, ". Number of constrains: ", &
-nconstrain, ". Number of independent elemements:", nindep
-                                    print *, ""
-                                end if
+!                                 if (verbose) then
+!                                     print *, "Reference triplet: (", ii, ",", jj, ",", kk, ")."
+!                                     print *, "Orbit size:", equiv, ". Number of constrains: ", &
+! nconstrain, ". Number of independent elemements:", nindep
+!                                     print *, ""
+!                                 end if
                                 do iaux = 1, 27
                                         do jaux = 1, 27
                                                 kernel(ref3,iaux,jaux) = kern(iaux,jaux)
@@ -2315,6 +2327,13 @@ nconstrain, ". Number of independent elemements:", nindep
                         end do dokk
                 end do dojj
         end do doii
+        if (verbose) then
+            tend = omp_get_wtime()
+            print "(A, I8)", "  Number of independent triplets:", ref3 
+            print "(A, ES16.6,A)", "  Elapsed time inside recognize_triplet():", tend-tstart, " seconds"
+            print *, "=======================     DONE     ======================="
+            print *, ""
+        end if
 end subroutine
 
 subroutine generate_rot4(rot_cart, Rot, nsym)
@@ -2394,6 +2413,8 @@ subroutine recognize_quadruplet(nat, nat_sc, tot4, nref4, nsym, mappings, map_uc
         double precision, dimension(81,81) :: kern
         double precision, dimension(24*nsym*81,81) :: constrain
 
+        double precision :: tstart, tend
+
         integer, dimension(24,4) :: permutations
         integer, dimension(4) :: qplet, qplet_perm, qplet_sym
         integer :: ii, jj, kk, ll, nall4, equiv, nconstrain, iperm, isym, iaux, &
@@ -2402,7 +2423,11 @@ jaux, indexprime, mm, nindep, iw, ref4
 
         character(len=100) :: filename
 
-
+        if (verbose) then
+            tstart = omp_get_wtime()
+            print*, "================== recognize_quadruplet() =================="
+            print*, " Classifying atomic quadruplets..."
+        end if
         kernel = 0
         orbit4t = 0
         orbit4o = 0
@@ -2477,13 +2502,13 @@ qplet_sym(1)+1,qplet_sym(2)+1,qplet_sym(3)+1,qplet_sym(4)+1,:) = [ref4-1,iperm-1
                                         call gauss_jordan(&
         constrain_reduced, max(nconstrain,81), 81, nconstrain, kern, indep, nindep)
                                         deallocate(constrain_reduced)
-                                        if (verbose) then
-                                            print*, &
-        "Reference quadruplet: (", ii, ",", jj, ",", kk, ",", ll, ")."
-                                            print*, "Orbit size:", equiv, ". Number of constrains: ", nconstrain, &
-        ". Number of independet elements:", nindep
-                                            print*, ""
-                                        end if
+        !                                 if (verbose) then
+        !                                     print*, &
+        ! "Reference quadruplet: (", ii, ",", jj, ",", kk, ",", ll, ")."
+        !                                     print*, "Orbit size:", equiv, ". Number of constrains: ", nconstrain, &
+        ! ". Number of independet elements:", nindep
+        !                                     print*, ""
+        !                                 end if
                                         do iaux = 1, 81
                                                 do jaux = 1, 81
                                                         kernel(ref4,iaux,jaux) = kern(iaux,jaux)
@@ -2499,6 +2524,14 @@ qplet_sym(1)+1,qplet_sym(2)+1,qplet_sym(3)+1,qplet_sym(4)+1,:) = [ref4-1,iperm-1
                         end do dokk
                 end do dojj
         end do doii
+        if (verbose) then
+            tend = omp_get_wtime()
+            print *,""
+            print "(A, I8)", "  Number of independent triplets:", ref4 
+            print "(A, ES16.6,A)", "  Elapsed time inside recognize_quadruplet():", tend-tstart, " seconds"
+            print *, "=======================     DONE     ======================="
+            print *, ""
+        end if
 end subroutine   
 
 subroutine triplet_in_list(triplet, all3, nall3, its_in_list)

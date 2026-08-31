@@ -3869,7 +3869,7 @@ Error while loading the julia module.
         nat_sc = dyn_supercell.structure.N_atoms
         n_modes = nat_sc*3
 
-        mapping, rot_cart, map_uc, map_tr, T_list, T_list_frac = Classify.map_singlet(self.current_dyn, verbose = verbose)
+        mapping, rot_cart, map_uc, map_tr, T_list, T_list_frac = Classify.map_singlet(self.current_dyn, verbose = False)
 
         orbit2a, orbit2s, norbit, indep_elem, n_indep_elem, tensor = Classify.recognize_doublet(self.current_dyn, mapping, map_uc, verbose = verbose)
 
@@ -4713,4 +4713,3 @@ def _wrapper_julia_vector_vector_fourier(*args, **kwargs):
 
     return julia.Main.multiply_vector_vector_fourier(*args,
             **kwargs)
-    
