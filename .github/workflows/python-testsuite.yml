@@ -63,8 +63,9 @@ jobs:
 
         pip install --no-build-isolation .
 
-        # Install julia requirements
-        python -c 'import julia; julia.install()'
+        # Install julia (juliacall downloads julia and the required packages)
+        pip install juliacall
+        python -c 'import sscha.JuliaExt as J; J.get_main()'
     - name: Test with pytest
       env:
         OMP_NUM_THREADS: 1
