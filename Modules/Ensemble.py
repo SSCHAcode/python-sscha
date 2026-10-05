@@ -420,7 +420,7 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
         faster at each minimization steps
         """
         if self.N != len(self.structures):
-            self.N = self.structures
+            self.N = len(self.structures)
 
         # Check if th all_properties is initialized
         if len(self.all_properties) == 0:
@@ -469,7 +469,7 @@ Error, the supercell does not match with the q grid of the dynamical matrix.
                 ) * CC.Units.A_TO_BOHR
 
             self.sscha_energies[:] = -julia.Main.multiply_vector_vector_fourier(
-                self.forces_qspace / CC.Units.A_TO_BOHR,
+                self.sscha_forces_qspace / CC.Units.A_TO_BOHR,
                 self.u_disps_qspace * CC.Units.A_TO_BOHR
             ) * 0.5 # The conversion is useless, keep it for clarity
 
@@ -1291,12 +1291,13 @@ Error, the following stress files are missing from the ensemble:
 
             self.u_disps_original_qspace = self.u_disps_qspace.copy()
             self.forces_qspace = np.zeros_like(self.u_disps_qspace)
+            # Forces in Ry/A and energies in Ry (as in init and update_weights_fourier)
             self.sscha_forces_qspace = - julia.Main.multiply_matrix_vector_fourier(
                 dynq,
                 self.u_disps_original_qspace * CC.Units.A_TO_BOHR,
-            )
-            self.sscha_energies[:] = julia.Main.multiply_vector_vector_fourier(
-                self.sscha_forces_qspace,
+            ) / CC.Units.BOHR_TO_ANGSTROM
+            self.sscha_energies[:] = -julia.Main.multiply_vector_vector_fourier(
+                self.sscha_forces_qspace / CC.Units.A_TO_BOHR,
                 self.u_disps_original_qspace * CC.Units.A_TO_BOHR
             ) * 0.5
 
@@ -3968,7 +3969,14 @@ Error while loading the julia module.
         if self.has_stress:
             ens.stresses[:, :, :] = self.stresses[split_mask, :, :]
 
+        # Rebuild the fourier transformed forces (and displacements),
+        # init_from_structures sets them to zero, as the forces are not known yet.
+        ens.init()
+
         ens.update_weights(self.current_dyn, self.current_T)
+        if ens.fourier_gradient:
+            # update_weights does not update the q space sscha forces
+            ens.update_weights_fourier(self.current_dyn, self.current_T)
 
         ens.all_properties = [self.all_properties[x] for x in np.arange(len(split_mask))[split_mask]]
 
