@@ -14,7 +14,7 @@ The easy way to install python-sscha is to use the anaconda distribution of pyth
 
     conda create -n sscha -c conda-forge python=3.11 gfortran libblas lapack openmpi julia openmpi-mpicc pip numpy scipy spglib
     conda activate sscha
-    pip install ase julia mpi4py
+    pip install ase juliacall mpi4py
     pip install cellconstructor python-sscha tdscha
 
 
@@ -27,11 +27,12 @@ To use the code, you need to activate the environment:
 
 
 The sscha code exploits the julia language to speed up the calculation.
-To install the julia dependencies, you need to run the following command:
+Julia and its dependencies are downloaded automatically (through juliacall) the first time they are needed.
+To set them up in advance, and check that everything works, run the following command:
 
 .. code-block:: console
 
-   python -c 'import julia; julia.install()'
+   python -c 'import sscha.JuliaExt as J; J.get_main()'
 
 
 And that's it! You can now run the sscha code.

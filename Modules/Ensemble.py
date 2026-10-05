@@ -2495,10 +2495,9 @@ DETAILS OF ERROR:
         if not __JULIA_EXT__:
             MSG = """
 Error while loading the julia module.
-    This subroutine requires the julia speedup.
-    install julia as specified in the guide,
-    and execute the python script using the python-jl
-    interpreter.
+    This subroutine requires the julia extension.
+    Install it with: pip install juliacall
+    (julia itself is downloaded automatically at first use).
 """
             raise ImportError(MSG)
 

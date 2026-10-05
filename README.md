@@ -15,16 +15,15 @@ Alternatively, when `anaconda` is too slow, we recommend using `mamba` or `micro
 ```
 conda create -n sscha -c conda-forge python=3.12 gfortran libblas lapack openmpi julia openmpi-mpicc pip numpy scipy spglib=2.2
 conda activate sscha
-pip install ase julia mpi4py
+pip install ase juliacall mpi4py
 pip install cellconstructor python-sscha tdscha
 ```
 
 This is the safest and best way to install the SSCHA. The first line creates a new pristine Python environment with all the required libraries to compile the source code. The second line activates the newly installed environment. Then, the third command installs the additional dependencies, and the last line compiles and installs the SSCHA code.
 
-Note, the first time you start up a sscha calculation, the code will try to download extra packages to set up the python
-julia interface. This process may fail if you do not have an internet connection available or if the Julia installation failed.
-Note that this is not mandatory, as the code will fall back to the old Fortran implementation (prior to version 1.4) and continue to run.
-To achieve the Julia speedup in such a case, please take a look at the section on Manual Installation to preconfigure your system correctly.
+Note, the first time you start up a sscha calculation, the code will download (through juliacall) Julia and the extra packages
+needed by the python-julia interface. This process may fail if you do not have an internet connection available.
+Note that Julia is not mandatory, as the code will fall back to the old Fortran implementation (prior to version 1.4) and continue to run.
 
 ## Video lessons from  the 2023 School are available
 
@@ -39,10 +38,10 @@ conda activate sscha
 
 This installation method should also work on clusters and with computers with custom configurations. You must remember to activate the ``sscha`` environment even in your submission scripts on clusters.
 
-To activate the Julia speedup for SSCHA minimization, ensure that Julia dependencies are correctly set up. To do this, run the following line:
+To check that Julia is correctly set up (and download it the first time), run the following line:
 
 ```
-python -c 'import julia; julia.install()'
+python -c 'import sscha.JuliaExt as J; J.get_main()'
 ```
 
 
@@ -90,7 +89,7 @@ Replace `conda` with `mamba` or `micromamba` if that is the package manager you 
 ```
 conda create -n sscha -c conda-forge python=3.12 gfortran libblas lapack openmpi julia openmpi-mpicc pip numpy scipy spglib=2.2
 conda activate sscha
-pip install ase julia mpi4py
+pip install ase juliacall mpi4py
 pip install cellconstructor python-sscha tdscha
 ```
 
@@ -120,7 +119,7 @@ Hit enter when asked to install Julia.
 Then, install the python bindings for julia with
 
 ```
-   pip install julia
+   pip install juliacall
 ```
 
 The tdscha extension to compute Raman and IR requires some additional julia packages that can be installed within a julia terminal. Update your configuration to have access to the newly installed julia
