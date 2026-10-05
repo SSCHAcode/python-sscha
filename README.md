@@ -107,42 +107,31 @@ To activate the environment and execute the SSCHA, run
 The SSCHA benefits from Julia being installed in the system. If present,
 it will be automatically used to speedup the calculation.
 
-To install Julia, refer to the official website [julialang.org/downloads/](https://julialang.org/downloads/)
-Alternatively, to install Julia on Linux we can employ JuliaUp:
-
-```
-  curl -fsSL https://install.julialang.org | sh
-```
-
-Hit enter when asked to install Julia.
-
-Then, install the python bindings for julia with
+The python-julia interface is provided by [juliacall](https://github.com/JuliaPy/PythonCall.jl)
+(PyJulia is no longer required). Install it with
 
 ```
    pip install juliacall
 ```
 
-The tdscha extension to compute Raman and IR requires some additional julia packages that can be installed within a julia terminal. Update your configuration to have access to the newly installed julia
+There is no need to install Julia manually: the first time it is needed, juliacall downloads
+Julia and the required Julia packages automatically. You can trigger (and check) this step with
 
 ```
-  source ~/.bashrc
+python -c 'import sscha.JuliaExt as J; J.get_main()'
 ```
 
-Then, open a terminal and type `julia`. Inside the julia prompt, type `]`. The prompt should change color and display the julia version ending with `pkg>`
-
-Install the required julia libraries
-
-```
-  pkg> add SparseArrays, LinearAlgebra, InteractiveUtils, PyCall
-```
-
-This should install the required libraries. Press backspace to return to the standard Julia prompt and exit with
+If you prefer to use a Julia already installed in the system (e.g. from [julialang.org/downloads/](https://julialang.org/downloads/)
+or JuliaUp), point juliacall to the Julia executable (not the JuliaUp launcher) and to a Julia environment:
 
 ```
-  julia> exit()
+export PYTHON_JULIACALL_EXE=/path/to/julia/bin/julia
+export PYTHON_JULIACALL_PROJECT=/path/to/a/julia/environment
 ```
 
-Now, you should be able to exploit the Julia speedup in the TDSCHA calculations. It is not required to install Julia before TDSCHA; it can also be done at a later time.
+The tdscha extension to compute Raman and IR (from version 1.6.2) uses the same juliacall interface,
+and the required Julia packages are installed automatically: no further setup is needed.
+It is not required to install Julia before TDSCHA; it can also be done at a later time.
 
 
 ### Compiling SSCHA
