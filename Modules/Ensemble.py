@@ -2617,36 +2617,70 @@ Error while loading the julia module.
 
 
 
-    def get_preconditioned_gradient_parallel(self, *args, timer=None, **kwargs):
+    def get_preconditioned_gradient_parallel(self, subtract_sscha = True, return_error = True,
+                                             use_ups_supercell = True, preconditioned = 1,
+                                             fast_grad = False, verbose = True, timer=None):
         """
-        Compute the gradient using multiprocessing.
-        For documentation, see get_preconditioned_gradient
+        Compute the gradient splitting the configurations among the processors.
+        For documentation, see get_preconditioned_gradient.
+
+        Each processor computes the average on its configurations in the supercell (real space).
+        The averages are summed with their weights, then the fourier transform
+        is performed only once on the total gradient.
+        Note: the fourier transform must not be performed by each processor on its partial average,
+        as GetDynQFromFCSupercell_parallel splits the atomic pairs among the same processors
+        (each element of the gradient would be averaged only on the configurations of one processor).
+
+        The error of each processor is combined in quadrature.
+
+        Results
+        -------
+            gradient : ndarray (nq x 3*nat x 3*nat)
+                The gradient in q space
+            error : ndarray (nq x 3*nat x 3*nat)
+                The stochastic error of the gradient
         """
-
-
-        def work_function(argument, timer=None):
-            ensemble_start_config, ensemble_end_config = argument
-            mask = np.zeros(self.N, dtype = bool)
-            mask[ensemble_start_config : ensemble_end_config] = True
-            new_ensemble = self.split(mask)
-
-            gradient, _ = new_ensemble.get_preconditioned_gradient(*args, timer=timer, **kwargs)
-
-            av_ensemble = np.sum(new_ensemble.rho)
-
-            return gradient * av_ensemble
 
         # Get the range of the configurations to be computed for each processor
         configs_ranges = CC.Settings.split_configurations(self.N)
 
+        # Only one processor, no need to combine the results
+        if len(configs_ranges) == 1:
+            return self.get_preconditioned_gradient(subtract_sscha, True, use_ups_supercell, preconditioned,
+                                                    fast_grad, verbose, timer=timer)
+
+        nat3_sc = 3 * self.current_dyn.structure.N_atoms * np.prod(self.supercell)
+
+        def work_function(argument, timer=None):
+            start_config, end_config = argument
+
+            # The first element is the weighted gradient, the second the weighted error squared
+            result = np.zeros((2, nat3_sc, nat3_sc), dtype = np.double)
+            if end_config <= start_config:
+                return result
+
+            weight = np.sum(self.rho[start_config : end_config])
+            grad, grad_err, _ = self._get_gradient_supercell(subtract_sscha, preconditioned, fast_grad,
+                                                             config_range = (start_config, end_config),
+                                                             timer = timer)
+            result[0, :, :] = grad * weight
+            # The error is not defined with only one configuration
+            if end_config - start_config > 1:
+                result[1, :, :] = (grad_err * weight)**2
+            return result
+
         if timer:
-            gradient = timer.execute_timed_function(CC.Settings.GoParallel, work_function, configs_ranges, "+")
+            result = timer.execute_timed_function(CC.Settings.GoParallel, work_function, configs_ranges, "+")
         else:
-            gradient = CC.Settings.GoParallel(work_function, configs_ranges, "+")
+            result = CC.Settings.GoParallel(work_function, configs_ranges, "+")
 
-        gradient /= np.sum(self.rho)
+        total_weight = np.sum(self.rho)
+        grad = result[0, :, :] / total_weight
+        grad_err = np.sqrt(result[1, :, :]) / total_weight
 
-        return gradient, np.zeros_like(gradient) + 1
+        # Fourier transform the total gradient
+        super_struct = self.current_dyn.structure.generate_supercell(self.supercell)
+        return self._get_gradient_qspace(grad, grad_err, super_struct, True, timer = timer)
 
 
 
@@ -2701,6 +2735,38 @@ Error while loading the julia module.
                 self-consistent equation.
         """
 
+        grad, grad_err, super_struct = self._get_gradient_supercell(subtract_sscha, preconditioned,
+                                                                    fast_grad, timer = timer)
+        return self._get_gradient_qspace(grad, grad_err, super_struct, return_error, timer = timer)
+
+
+    def _get_gradient_supercell(self, subtract_sscha = True, preconditioned = 1, fast_grad = False,
+                                config_range = None, timer = None):
+        """
+        Compute the gradient in the supercell (real space).
+        See get_preconditioned_gradient for the parameters.
+
+        Parameters
+        ----------
+            config_range : (int, int), optional
+                If given, the average is performed only on the configurations
+                from config_range[0] to config_range[1] (excluded).
+
+        Results
+        -------
+            grad : ndarray (3*nat_sc x 3*nat_sc)
+                The gradient in the supercell (averaged with the weights rho)
+            grad_err : ndarray (3*nat_sc x 3*nat_sc)
+                The stochastic error of the gradient
+            super_struct : Structure
+                The supercell structure
+        """
+        if config_range is None:
+            config_range = (0, self.N)
+        start_config, end_config = config_range
+        n_configs = end_config - start_config
+        rho = np.copy(self.rho[start_config : end_config])
+
         super_struct = self.current_dyn.structure.generate_supercell(self.supercell)
         #supercell_dyn = self.current_dyn.GenerateSupercellDyn(self.supercell)
 
@@ -2725,17 +2791,17 @@ Error while loading the julia module.
         w /= 2
 
         nat = super_struct.N_atoms
-        eforces = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
-        u_disp = np.zeros((self.N, nat, 3), dtype = np.float64, order = "F")
+        eforces = np.zeros((n_configs, nat, 3), dtype = np.float64, order = "F")
+        u_disp = np.zeros((n_configs, nat, 3), dtype = np.float64, order = "F")
 
         t1 = time.time()
         #print nat
         if subtract_sscha:
-            eforces[:,:,:] = self.forces - self.sscha_forces
+            eforces[:,:,:] = self.forces[start_config : end_config] - self.sscha_forces[start_config : end_config]
         else:
-            eforces[:,:,:] = self.forces
-        for i in range(self.N):
-            u_disp[i, :, :] = np.reshape(self.u_disps[i,:], (nat, 3))
+            eforces[:,:,:] = self.forces[start_config : end_config]
+        for i in range(n_configs):
+            u_disp[i, :, :] = np.reshape(self.u_disps[start_config + i,:], (nat, 3))
 
 
         # TODO: This may be dangerous
@@ -2749,26 +2815,40 @@ Error while loading the julia module.
         if fast_grad or not preconditioned:
             if timer:
                 grad, grad_err = timer.execute_timed_function(SCHAModules.get_gradient_supercell,
-                                                              self.rho, u_disp, eforces, w, pols, trans,
-                                                              self.current_T, mass, ityp, log_err, self.N,
+                                                              rho, u_disp, eforces, w, pols, trans,
+                                                              self.current_T, mass, ityp, log_err, n_configs,
                                                               nat, 3*nat, len(mass), preconditioned,
                                                               override_name = "get_gradient_supercell")
             else:
-                grad, grad_err = SCHAModules.get_gradient_supercell(self.rho, u_disp, eforces, w, pols, trans,
-                                                                self.current_T, mass, ityp, log_err, self.N,
+                grad, grad_err = SCHAModules.get_gradient_supercell(rho, u_disp, eforces, w, pols, trans,
+                                                                self.current_T, mass, ityp, log_err, n_configs,
                                                                 nat, 3*nat, len(mass), preconditioned)
         else:
             if timer:
                 grad, grad_err = timer.execute_timed_function(SCHAModules.get_gradient_supercell_new,
-                                                              self.rho, u_disp, eforces, w, pols, trans,
-                                                                     self.current_T, mass, ityp, log_err, self.N,
+                                                              rho, u_disp, eforces, w, pols, trans,
+                                                                     self.current_T, mass, ityp, log_err, n_configs,
                                                                      nat, 3*nat, len(mass),
                                                                      override_name = "get_gradient_supercell_new")
             else:
-                grad, grad_err = SCHAModules.get_gradient_supercell_new(self.rho, u_disp, eforces, w, pols, trans,
-                                                                     self.current_T, mass, ityp, log_err, self.N,
+                grad, grad_err = SCHAModules.get_gradient_supercell_new(rho, u_disp, eforces, w, pols, trans,
+                                                                     self.current_T, mass, ityp, log_err, n_configs,
                                                                      nat, 3*nat, len(mass))
 
+        return grad, grad_err, super_struct
+
+
+    def _get_gradient_qspace(self, grad, grad_err, super_struct, return_error = False, timer = None):
+        """
+        Fourier transform the gradient computed in the supercell (see _get_gradient_supercell).
+
+        Results
+        -------
+            q_grad : ndarray (nq x 3*nat x 3*nat)
+                The gradient in q space
+            q_grad_err : ndarray (nq x 3*nat x 3*nat)
+                The error of the gradient (only if return_error is True)
+        """
 
         # If we are at gamma, we can skip this part
         # Which makes the code faster
