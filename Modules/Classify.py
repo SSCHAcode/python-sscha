@@ -436,10 +436,10 @@ def recognize_triplet(dyn, orbit1a, map_uc, symprec=1e-5, verbose=False):
             Maps an arbitrary triplet to its reference triplet, permutaion, and symmtry operation after
             the classification. Dimension [Natom,Natom_sc,Natom_sc,3]
     """
-    start_time = time.time()
+    # start_time = time.time()
 
-    if verbose:
-        print("===== STARTING TRIPLET CLASSIFICATION =====")
+    # if verbose:
+    #     print("===== STARTING TRIPLET CLASSIFICATION =====")
 
     # Get the symmetries of the unit cell
     spg_syms = spglib.get_symmetry(dyn.structure.get_spglib_cell(), symprec)
@@ -536,21 +536,21 @@ def recognize_triplet(dyn, orbit1a, map_uc, symprec=1e-5, verbose=False):
     nref3 = SCHAModules.module_hess.get_nref3(nat,ntot,tot3,nsym,orbit1a,map_uc)
     orbit3a, orbit3s, norbit, indep_fc, n_indep_fc, kernel, mapping_triplet = SCHAModules.module_hess.recognize_triplet(nat,ntot,tot3,nref3,nsym,orbit1a,map_uc,nontrivial,M,verbose)
 
-    end_time = time.time()
-    execution_time = end_time - start_time
+    # end_time = time.time()
+    # execution_time = end_time - start_time
 
-    # Print detailed info
-    if verbose:
-        print(" ")
-        print("Total triplets:", tot3)
-        print("Number of Orbits:", nref3)
-        print("Total number of independent elements:", sum(n_indep_fc[:nref3]))
-        print(" ")
+    # # Print detailed info
+    # if verbose:
+    #     print(" ")
+    #     print("Total triplets:", tot3)
+    #     print("Number of Orbits:", nref3)
+    #     print("Total number of independent elements:", sum(n_indep_fc[:nref3]))
+    #     print(" ")
 
 
-        print("execution_time in triplet recognition:", execution_time, " s")
-        print("===== TRIPLET CLASSIFICATION and GJ ELIMINATION FINISHED ======")
-        print(" ")
+    #     print("execution_time in triplet recognition:", execution_time, " s")
+    #     print("===== TRIPLET CLASSIFICATION and GJ ELIMINATION FINISHED ======")
+    #     print(" ")
 
     sys.stdout.flush()
     
@@ -603,10 +603,10 @@ def recognize_quadruplet(dyn, orbit1a, map_uc, verbose=False, symprec=1e-5):
             the classification. Dimension [Natom,Natom_sc,Natom_sc,3]
     """
 
-    start_time = time.time()
+    # start_time = time.time()
 
-    if verbose:
-        print("===== STARTING QUADRUPLET CLASSIFICATION =====")
+    # if verbose:
+    #     print("===== STARTING QUADRUPLET CLASSIFICATION =====")
 
     # Get the symmetries of the unit cell
     spg_syms = spglib.get_symmetry(dyn.structure.get_spglib_cell(), symprec)
@@ -671,19 +671,19 @@ def recognize_quadruplet(dyn, orbit1a, map_uc, verbose=False, symprec=1e-5):
     nref4 = SCHAModules.module_hess.get_nref4(nat,ntot,tot4,nsym,orbit1a,map_uc)
     orbit4a, orbit4s, norbit, indep_fc, n_indep_fc, kernel, mapping_quadruplet = SCHAModules.module_hess.recognize_quadruplet(nat,ntot,tot4,nref4,nsym,orbit1a,map_uc,nontrivial,M,verbose)
 
-    end_time = time.time()
-    execution_time = end_time - start_time
+    # end_time = time.time()
+    # execution_time = end_time - start_time
 
-    if verbose:
-        print(" ")
-        print("Total quadruplets:", tot4)
-        print("Number of Orbits:",nref4)
-        print("Total number of independent elements:", sum(n_indep_fc[:nref4]))
-        print(" ")
+    # if verbose:
+    #     print(" ")
+    #     print("Total quadruplets:", tot4)
+    #     print("Number of Orbits:",nref4)
+    #     print("Total number of independent elements:", sum(n_indep_fc[:nref4]))
+    #     print(" ")
 
-        print("execution_time in quadruplet recognition:", execution_time, " s")
-        print("===== QUADRUPLET CLASSIFICATION and GJ ELIMINATION FINISHED ======")
-        print(" ")
+    #     print("execution_time in quadruplet recognition:", execution_time, " s")
+    #     print("===== QUADRUPLET CLASSIFICATION and GJ ELIMINATION FINISHED ======")
+    #     print(" ")
     return(orbit4a[:nref4], orbit4s[:nref4], norbit[:nref4], indep_fc[:nref4], n_indep_fc[:nref4], kernel[:nref4], Rot, mapping_quadruplet)
 
 # Small functions required in main subroutines.

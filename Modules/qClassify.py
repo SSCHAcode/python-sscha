@@ -51,25 +51,31 @@ def map_singlet(q_list, q_list_frac, rcell, rot_cart):
 
     q_list_frac_fixed = np.empty(q_list_frac.shape)
     its_zb = np.empty(q_list_frac.shape[0], dtype=np.int8)
+    count1, count2 = 0, 0 
     for qi,q in enumerate(q_list):
-        q_list_frac_fixed[qi] = np.round(CC.Methods.cart_to_cryst(rcell, _map_q_to_1st_bz(rcell, q)),6)
+        q_list_frac_fixed[qi] = np.round(CC.Methods.cart_to_cryst(rcell, _map_q_to_frac_bz(rcell, q)[0]),6)
         if np.all((np.abs(np.round(2*q_list_frac_fixed[qi], 6))%1)<1e-6):
             its_zb[qi] = 0
         else:
             for alpha in range(3):
-                if np.abs(q_list[qi,alpha])>1e-6:
-                    if q_list[qi,alpha] > 1e-6:
+                if np.abs(q_list_frac_fixed[qi,alpha])>1e-6 and np.abs(q_list_frac_fixed[qi,alpha]+0.5)>1e-6:
+                    if q_list_frac_fixed[qi,alpha] > 1e-6:
                         its_zb[qi] = 1 # Non zone border. Positive class.
+                        count1 += 1
                         break
                     else:
                         its_zb[qi] = 2 # Non zone border. Negative class.
+                        count2 += 1
                         break
+    if count1 != count2:
+        print("q-point classification failing...")
+        raise ValueError
 
     mapping = np.zeros([len(q_list), rot_cart.shape[0]], dtype=np.int32)
     for qi, q in enumerate(q_list):
         for isym in range(rot_cart.shape[0]):
             q_sym_cart = rot_cart[isym] @ q
-            q_sym_cart_1bz = _map_q_to_1st_bz(rcell, q_sym_cart)
+            q_sym_cart_1bz = _map_q_to_frac_bz(rcell, q_sym_cart)[0]
             q_sym = np.round(CC.Methods.cart_to_cryst(rcell, q_sym_cart_1bz),6)
             match = np.all(np.abs(q_list_frac_fixed-q_sym)<1e-3, axis=1)
             qii = np.where(match)
@@ -335,6 +341,45 @@ def _map_q_to_1st_bz(rcell, q_cart, atol=1e-5):
     idx = np.lexsort((tied_candidates[:, 2], tied_candidates[:, 1], tied_candidates[:, 0]))
 
     return tied_candidates[idx[0]]
+
+def _map_q_to_frac_bz(rcell, q_cart, atol=1e-5):
+    """
+    Maps a Cartesian q-vector into the [-0.5, 0.5) fractional reciprocal unit cell.
+    Forces +0.5 to -0.5 so opposite BZ faces map consistently.
+
+    Parameters
+    ----------
+    rcell : np.ndarray
+        Reciprocal unit cell vectors [3, 3].
+    q_cart : np.ndarray
+        Cartesian coordinates of wave-vector [3].
+    atol : float
+        Tolerance for floating point noise near boundary.
+
+    Returns
+    -------
+    q_cart_mapped : np.ndarray
+        Mapped Cartesian coordinates [3].
+    q_frac_mapped : np.ndarray
+        Mapped fractional coordinates in [-0.5, 0.5) [3].
+    """
+    q_cart = np.array(q_cart).flatten()
+    rcell = np.array(rcell)
+
+    inv_rcell = np.linalg.inv(rcell)
+    q_frac = q_cart @ inv_rcell
+
+    q_frac_round = np.round(q_frac, 6)
+
+    # Shift coordinates into the [-0.5, 0.5) range
+    q_frac_mapped = q_frac_round - np.floor(q_frac_round + 0.5)
+
+    # Force values near +0.5 to strictly -0.5
+    q_frac_mapped = np.where(np.abs(q_frac_mapped - 0.5) < atol, -0.5, q_frac_mapped)
+
+    q_cart_mapped = q_frac_mapped @ rcell
+
+    return q_cart_mapped, q_frac_mapped
 
 def _doublet_in_list(doublet, llist, nlist):
     """
