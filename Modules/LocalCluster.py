@@ -1,3 +1,4 @@
+import shutil
 import sscha.Cluster as Cluster
 import sys, os
 
@@ -19,7 +20,11 @@ class LocalCluster(Cluster.Cluster):
 
     def copy_file(self, source, destination, server_source = False, server_dest = False, **kwargs):
         """
-        Copy the files ignoring if the cluster is used.
+        Copy the files locally, ignoring the remote flags.
+
+        Uses shutil.copy (instead of the scp shell-out of the base class)
+        for a cleaner local-to-local copy. Returns the destination path
+        (truthy), matching the contract expected by the callers.
         """
 
-        return super().copy_file(source, destination, server_source = False, server_dest = False, **kwargs)
+        return shutil.copy(source, destination)
